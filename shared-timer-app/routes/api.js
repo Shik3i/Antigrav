@@ -29,6 +29,15 @@ router.post('/esports/bets', authController.authenticateToken, apiController.pla
 router.get('/esports/bets', authController.authenticateToken, apiController.getBets);
 router.get('/esports/bets/recent', authController.optionalAuthenticateToken, apiController.getRecentBets);
 router.get('/koala/transactions', authController.authenticateToken, apiController.getKoalaTransactions);
+router.post('/games/koalaflap/submit', authController.authenticateToken, apiController.submitKoalaFlapScore);
+router.get('/games/leaderboard', apiController.getGameLeaderboards);
+router.get('/games/upgrades', authController.optionalAuthenticateToken, apiController.getGameUpgrades);
+router.post('/games/upgrades/purchase', authController.authenticateToken, apiController.purchaseGameUpgrade);
+router.get('/games/koalaflap/config', authController.optionalAuthenticateToken, apiController.getKoalaFlapConfig);
+router.get('/games/mission/status', authController.optionalAuthenticateToken, apiController.getMissionStatus);
+router.post('/admin/games/settings', authController.authenticateToken, apiController.updateAdminGameSettings);
+router.get('/admin/games/scores', authController.authenticateToken, apiController.getAdminGameScores);
+router.delete('/admin/games/scores/:id', authController.authenticateToken, apiController.deleteAdminGameScore);
 
 // Admin Bet Management
 router.get('/admin/bets', authController.authenticateToken, apiController.getAdminBets);
@@ -98,5 +107,8 @@ router.delete('/errors', authController.authenticateToken, apiController.clearEr
 router.delete('/errors/:id', authController.authenticateToken, apiController.deleteErrorLog);
 
 router.get('/twitch/status', apiController.getTwitchStatus);
+
+// ─── Changelog ──────────────────────────────────────────────
+router.get('/changelog', apiController.getChangelog);
 
 module.exports = router;

@@ -55,8 +55,10 @@ db.serialize(() => {
     value TEXT
   )`, () => {
     // Insert default koala baseline
-    db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_points_per_hour', '100')`);
+    db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_points_per_hour', '1000')`);
     db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_start_coins', '10000')`);
+    db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', '1.0')`);
+    db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', '1.0')`);
   });
 
   // KoalaTransactions: logs coin additions and deductions
@@ -231,6 +233,74 @@ db.serialize(() => {
     PRIMARY KEY (requestId, userId),
     FOREIGN KEY(requestId) REFERENCES FeatureRequests(id) ON DELETE CASCADE
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS GameScores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    gameId TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    coinsEarned INTEGER NOT NULL,
+    sessionLog TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id)
+  )`);
+
+  // --- NEW: Game Upgrades & Config ---
+  db.run(`CREATE TABLE IF NOT EXISTS GameUpgrades_Config (
+    upgrade_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    base_price INTEGER NOT NULL,
+    price_step INTEGER NOT NULL,
+    max_level INTEGER NOT NULL,
+    category TEXT DEFAULT 'koala_flap'
+  )`, () => {
+    // Initial data for KoalaFlap upgrades
+    db.run(`INSERT OR IGNORE INTO GameUpgrades_Config (upgrade_id, display_name, description, base_price, price_step, max_level, category) VALUES 
+      ('coin_base_value', 'Münz-Wert', 'Erhöht den KoalaCoin-Basiswert jeder Münze um +20% pro Level.', 500, 250, 10, 'koala_flap'),
+      ('extra_lives', 'Extra-Leben', 'Jedes Level gewährt ein zusätzliches Herz zu Rundenbeginn.', 1000, 500, 3, 'koala_flap'),
+      ('crit_coins', 'Crit Coins', 'Erhöht die Chance auf den 10-fachen Münzwert um +1% pro Level.', 1500, 750, 10, 'koala_flap'),
+      ('hotstreak_multiplier', 'Hotstreak-Multiplier', 'Je mehr Röhren man passiert, desto schneller steigen die Belohnungen.', 750, 400, 5, 'koala_flap')`);
+    
+    // Update existing descriptions if needed (since INSERT OR IGNORE won't update them)
+    db.run("UPDATE GameUpgrades_Config SET description = 'Erhöht den KoalaCoin-Basiswert jeder Münze um +20% pro Level.' WHERE upgrade_id = 'coin_base_value'");
+    db.run("UPDATE GameUpgrades_Config SET description = 'Jedes Level gewährt ein zusätzliches Herz zu Rundenbeginn.' WHERE upgrade_id = 'extra_lives'");
+  });
+
+  db.run(`CREATE TABLE IF NOT EXISTS UserUpgrades (
+    userId TEXT NOT NULL,
+    upgrade_id TEXT NOT NULL,
+    current_level INTEGER DEFAULT 0,
+    PRIMARY KEY (userId, upgrade_id),
+    FOREIGN KEY(userId) REFERENCES Users(id),
+    FOREIGN KEY(upgrade_id) REFERENCES GameUpgrades_Config(upgrade_id)
+  )`);
+
+  db.run("INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_coin_conversion_rate', '0.01')");
+  db.run("INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_reward', '5000')");
+
+  // UserMissions: tracks completion of daily tasks
+  db.run(`CREATE TABLE IF NOT EXISTS UserMissions (
+    userId TEXT NOT NULL,
+    mission_id TEXT NOT NULL,
+    last_completed_at TEXT NOT NULL,
+    PRIMARY KEY (userId, mission_id),
+    FOREIGN KEY(userId) REFERENCES Users(id)
+  )`);
+
+  db.run('CREATE INDEX IF NOT EXISTS idx_gamescores_userId ON GameScores(userId)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_gamescores_gameId ON GameScores(gameId)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_gamescores_score ON GameScores(score)');
+
+  db.run(`CREATE TABLE IF NOT EXISTS Changelog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version TEXT NOT NULL,
+    date TEXT NOT NULL,
+    changes TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run("INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('game_koalaflap_payout_enabled', 'true')");
 
   db.run('CREATE INDEX IF NOT EXISTS idx_admin_actions_timestamp ON AdminActions(timestamp)');
   db.run('CREATE INDEX IF NOT EXISTS idx_features_status ON FeatureRequests(status)');
@@ -822,12 +892,15 @@ const getEsportsTeamsLastUpdated = () => {
 // --- KOALA COINS ---
 const getKoalaBaseline = () => {
   return new Promise((resolve, reject) => {
-    db.all(`SELECT key, value FROM ServerSettings WHERE key IN ('koala_points_per_hour', 'koala_start_coins')`, (err, rows) => {
+    db.all(`SELECT key, value FROM ServerSettings WHERE key IN ('koala_points_per_hour', 'koala_start_coins', 'koala_coin_conversion_rate', 'koala_daily_mission_multiplier')`, (err, rows) => {
       if (err) reject(err);
       else {
-        const settings = { koala_points_per_hour: 10000, koala_start_coins: 10000 };
+        const settings = { koala_points_per_hour: 1000, koala_start_coins: 10000, koala_coin_conversion_rate: 0.01, koala_daily_mission_multiplier: 1.0 };
         if (rows) {
-          rows.forEach(r => settings[r.key] = parseInt(r.value, 10));
+          rows.forEach(r => {
+            if (r.key === 'koala_coin_conversion_rate' || r.key === 'koala_daily_mission_multiplier') settings[r.key] = parseFloat(r.value);
+            else settings[r.key] = parseInt(r.value, 10);
+          });
         }
         resolve(settings);
       }
@@ -844,6 +917,12 @@ const updateKoalaBaseline = (settings) => {
       if (settings.koala_start_coins !== undefined) {
         await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_start_coins', ?)`, [String(settings.koala_start_coins)], err => err ? rej(err) : res()));
       }
+      if (settings.koala_coin_conversion_rate !== undefined) {
+        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_coin_conversion_rate', ?)`, [String(settings.koala_coin_conversion_rate)], err => err ? rej(err) : res()));
+      }
+      if (settings.koala_daily_mission_multiplier !== undefined) {
+        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', ?)`, [String(settings.koala_daily_mission_multiplier)], err => err ? rej(err) : res()));
+      }
       resolve(true);
     } catch (e) {
       reject(e);
@@ -856,12 +935,22 @@ const addKoalaCoins = (userId, amountCents, reason) => {
     db.serialize(() => {
       db.run('BEGIN TRANSACTION');
       db.run(`UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?`, [amountCents, userId], function (err) {
-        if (err) return db.run('ROLLBACK', () => reject(err));
+        if (err) {
+          logError(`addKoalaCoins: Update user failed: ${err.message}`, err.stack, JSON.stringify({ userId, amountCents, reason }));
+          return db.run('ROLLBACK', () => reject(err));
+        }
       });
       db.run(`INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)`, [userId, amountCents, reason], function (err) {
-        if (err) return db.run('ROLLBACK', () => reject(err));
+        if (err) {
+          logError(`addKoalaCoins: Insert transaction failed: ${err.message}`, err.stack, JSON.stringify({ userId, amountCents, reason }));
+          return db.run('ROLLBACK', () => reject(err));
+        }
       });
-      db.run('COMMIT', () => {
+      db.run('COMMIT', (err) => {
+        if (err) {
+          logError(`addKoalaCoins: Commit failed: ${err.message}`, err.stack, JSON.stringify({ userId, amountCents, reason }));
+          return reject(err);
+        }
         // Return the new balance as a plain JS Number
         db.get(`SELECT CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id = ?`, [userId], (err, row) => {
           if (err) reject(err);
@@ -1243,6 +1332,244 @@ const getBettingAccuracyLeaderboard = () => {
   });
 };
 
+const recordGameScore = (userId, gameId, score, coinsEarned, sessionLog) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO GameScores (userId, gameId, score, coinsEarned, sessionLog) VALUES (?, ?, ?, ?, ?)',
+      [userId, gameId, score, coinsEarned, typeof sessionLog === 'object' ? JSON.stringify(sessionLog) : sessionLog],
+      function (err) {
+        if (err) {
+          logError(`recordGameScore: Insert failed: ${err.message}`, err.stack, JSON.stringify({ userId, gameId, score, coinsEarned }));
+          reject(err);
+        } else resolve({ id: this.lastID });
+      }
+    );
+  });
+};
+
+// --- NEW: Game Upgrades Helpers ---
+const getGameUpgradesConfig = (category = 'koala_flap') => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM GameUpgrades_Config WHERE category = ?', [category], (err, rows) => {
+      if (err) {
+        logError(`getGameUpgradesConfig failed: ${err.message}`, err.stack, category);
+        reject(err);
+      } else resolve(rows || []);
+    });
+  });
+};
+
+const getUserUpgrades = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM UserUpgrades WHERE userId = ?', [userId], (err, rows) => {
+      if (err) {
+        logError(`getUserUpgrades failed: ${err.message}`, err.stack, userId);
+        reject(err);
+      } else resolve(rows || []);
+    });
+  });
+};
+
+const purchaseUpgrade = (userId, upgradeId) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      // Start transaction early to lock for read-consistency
+      db.run('BEGIN TRANSACTION');
+
+      // 1. Get upgrade config
+      db.get('SELECT * FROM GameUpgrades_Config WHERE upgrade_id = ?', [upgradeId], (err, config) => {
+        if (err || !config) {
+          const msg = err ? err.message : 'Upgrade config not found';
+          logError(`purchaseUpgrade: Config fetch failed for ${upgradeId}: ${msg}`, err?.stack);
+          return db.run('ROLLBACK', () => reject(new Error(msg)));
+        }
+
+        // 2. Get user's current level & balance in one go if possible, but separate is fine for clarity
+        db.get('SELECT current_level FROM UserUpgrades WHERE userId = ? AND upgrade_id = ?', [userId, upgradeId], (err, row) => {
+          if (err) {
+            logError(`purchaseUpgrade: Level fetch failed: ${err.message}`, err.stack);
+            return db.run('ROLLBACK', () => reject(err));
+          }
+
+          const currentLevel = row ? row.current_level : 0;
+          if (currentLevel >= config.max_level) {
+            return db.run('ROLLBACK', () => reject(new Error('Das maximale Level für dieses Upgrade ist bereits erreicht.')));
+          }
+
+          const cost = config.base_price + (currentLevel * config.price_step);
+
+          db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (err, user) => {
+            if (err || !user) {
+              const msg = err ? err.message : 'User not found';
+              logError(`purchaseUpgrade: User fetch failed: ${msg}`, err?.stack);
+              return db.run('ROLLBACK', () => reject(new Error(msg)));
+            }
+
+            if (user.koala_balance < cost) {
+              return db.run('ROLLBACK', () => reject(new Error(`Nicht genügend KoalaCoins. Benötigt: ${cost}, Aktuell: ${user.koala_balance}`)));
+            }
+
+            // Perform updates
+            db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [cost, userId], (err) => {
+              if (err) {
+                logError(`purchaseUpgrade: Balance update failed: ${err.message}`, err.stack);
+                return db.run('ROLLBACK', () => reject(err));
+              }
+
+              db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', 
+                [userId, -cost, `Upgrade gekauft: ${config.display_name} (Level ${currentLevel + 1})`], (err) => {
+                if (err) {
+                  logError(`purchaseUpgrade: Transaction log failed: ${err.message}`, err.stack);
+                  return db.run('ROLLBACK', () => reject(err));
+                }
+
+                db.run('INSERT INTO UserUpgrades (userId, upgrade_id, current_level) VALUES (?, ?, 1) ON CONFLICT(userId, upgrade_id) DO UPDATE SET current_level = current_level + 1', 
+                  [userId, upgradeId], (err) => {
+                  if (err) {
+                    logError(`purchaseUpgrade: Level increment failed: ${err.message}`, err.stack);
+                    return db.run('ROLLBACK', () => reject(err));
+                  }
+
+                  db.run('COMMIT', (err) => {
+                    if (err) {
+                      logError(`purchaseUpgrade: Commit failed: ${err.message}`, err.stack);
+                      return reject(err);
+                    }
+                    resolve({ newLevel: currentLevel + 1, cost, newBalance: user.koala_balance - cost });
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+};
+
+const getGameLeaderboards = (gameId) => {
+  return new Promise((resolve, reject) => {
+    const highscoreQuery = `
+      SELECT u.displayName, u.id as userId, MAX(gs.score) as highscore
+      FROM GameScores gs
+      JOIN Users u ON gs.userId = u.id
+      WHERE gs.gameId = ?
+      GROUP BY gs.userId
+      ORDER BY highscore DESC
+      LIMIT 10
+    `;
+
+    const cumulativeQuery = `
+      SELECT u.displayName, u.id as userId, SUM(gs.coinsEarned) as totalEarned
+      FROM GameScores gs
+      JOIN Users u ON gs.userId = u.id
+      WHERE gs.gameId = ?
+      GROUP BY gs.userId
+      ORDER BY totalEarned DESC
+      LIMIT 10
+    `;
+
+    Promise.all([
+      new Promise((res, rej) => db.all(highscoreQuery, [gameId], (err, rows) => err ? rej(err) : res(rows))),
+      new Promise((res, rej) => db.all(cumulativeQuery, [gameId], (err, rows) => err ? rej(err) : res(rows)))
+    ])
+      .then(([highscores, cumulative]) => {
+        resolve({ highscores, cumulative });
+      })
+      .catch(reject);
+  });
+};
+
+function getAdminGameScores(gameId) {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT gs.*, u.displayName, u.username
+      FROM GameScores gs
+      JOIN Users u ON gs.userId = u.id
+      WHERE gs.gameId = ?
+      ORDER BY gs.createdAt DESC
+    `;
+    db.all(query, [gameId], (err, rows) => err ? reject(err) : resolve(rows));
+  });
+}
+
+function deleteGameScore(scoreId) {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM GameScores WHERE id = ?', [scoreId], (err) => err ? reject(err) : resolve());
+  });
+}
+
+function checkDailyMission(userId, missionId) {
+  const today = new Date().toISOString().split('T')[0];
+  return new Promise((resolve, reject) => {
+    db.get('SELECT last_completed_at FROM UserMissions WHERE userId = ? AND mission_id = ?', [userId, missionId], (err, row) => {
+      if (err) return reject(err);
+      if (row && row.last_completed_at === today) resolve(true);
+      else resolve(false);
+    });
+  });
+}
+
+function completeDailyMission(userId, missionId, rewardCents) {
+  const today = new Date().toISOString().split('T')[0];
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+      db.run('INSERT INTO UserMissions (userId, mission_id, last_completed_at) VALUES (?, ?, ?) ON CONFLICT(userId, mission_id) DO UPDATE SET last_completed_at = ?', 
+        [userId, missionId, today, today], (err) => {
+        if (err) return db.run('ROLLBACK', () => reject(err));
+        
+        db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [rewardCents, userId], (err) => {
+          if (err) return db.run('ROLLBACK', () => reject(err));
+          
+          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', 
+            [userId, rewardCents, `Daily Mission: ${missionId}`], (err) => {
+            if (err) return db.run('ROLLBACK', () => reject(err));
+            
+            db.run('COMMIT', (err) => err ? reject(err) : resolve());
+          });
+        });
+      });
+    });
+  });
+}
+
+function getChangelog() {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM Changelog ORDER BY createdAt DESC', (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+function addChangelogEntry(version, date, changes) {
+  return new Promise((resolve, reject) => {
+    db.run('INSERT INTO Changelog (version, date, changes) VALUES (?, ?, ?)', [version, date, changes], function (err) {
+      if (err) reject(err);
+      else resolve(this.lastID);
+    });
+  });
+}
+
+function updateChangelogEntry(id, version, date, changes) {
+  return new Promise((resolve, reject) => {
+    db.run('UPDATE Changelog SET version = ?, date = ?, changes = ? WHERE id = ?', [version, date, changes, id], function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+}
+
+function deleteChangelogEntry(id) {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM Changelog WHERE id = ?', [id], function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+}
+
 module.exports = {
   db,
   addUser,
@@ -1310,5 +1637,18 @@ module.exports = {
   updateFeatureStatus,
   updateFeatureAdminComment,
   deleteFeatureRequest,
-  getBettingAccuracyLeaderboard
+  getBettingAccuracyLeaderboard,
+  recordGameScore,
+  getGameLeaderboards,
+  getGameUpgradesConfig,
+  getUserUpgrades,
+  purchaseUpgrade,
+  getAdminGameScores,
+  deleteGameScore,
+  checkDailyMission,
+  completeDailyMission,
+  getChangelog,
+  addChangelogEntry,
+  updateChangelogEntry,
+  deleteChangelogEntry
 };

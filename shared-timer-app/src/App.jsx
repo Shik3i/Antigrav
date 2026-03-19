@@ -19,6 +19,9 @@ const KoalaDashboard = React.lazy(() => import('./pages/KoalaDashboard'));
 const GlobalBets = React.lazy(() => import('./pages/GlobalBets'));
 const Admin = React.lazy(() => import('./pages/Admin'));
 const FeatureRequests = React.lazy(() => import('./pages/FeatureRequests'));
+const KoalaFlap = React.lazy(() => import('./pages/KoalaFlap'));
+const GameLeaderboards = React.lazy(() => import('./pages/GameLeaderboards'));
+const Changelog = React.lazy(() => import('./pages/Changelog'));
 
 import NewsTicker from './components/NewsTicker';
 import Friends from './pages/Friends';
@@ -385,6 +388,9 @@ function InnerApp() {
                 <Route path="/extension-info" element={<ExtensionInfo />} />
                 <Route path="/admin" element={<Admin socket={globalSocket} />} />
                 <Route path="/features" element={<FeatureRequests />} />
+                <Route path="/changelog" element={<Changelog />} />
+                <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
+                <Route path="/games/leaderboard" element={<GameLeaderboards />} />
               </Routes>
             </React.Suspense>
           </main>

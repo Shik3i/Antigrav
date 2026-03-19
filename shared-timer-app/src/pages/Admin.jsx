@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Database, Plus, Trash2, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw } from 'lucide-react';
+import { Database, Plus, Trash2, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import EVENTS from '../socketEvents';
 
 const Admin = ({ socket }) => {
@@ -64,8 +65,14 @@ const Admin = ({ socket }) => {
     const [koalaBaselineStr, setKoalaBaselineStr] = useState('1.00');
     const [koalaStartCoins, setKoalaStartCoins] = useState(0);
     const [koalaStartCoinsStr, setKoalaStartCoinsStr] = useState('0.00');
+    const [koalaCoinRate, setKoalaCoinRate] = useState(0.01);
+    const [koalaCoinRateStr, setKoalaCoinRateStr] = useState('0.01');
     const [koalaTransactions, setKoalaTransactions] = useState({});
     const [expandedKoalaUser, setExpandedKoalaUser] = useState(null);
+    const [gameScores, setGameScores] = useState([]);
+    const [koalaDailyMissionMultiplier, setKoalaDailyMissionMultiplier] = useState(1.0);
+    const [koalaDailyMissionMultiplierStr, setKoalaDailyMissionMultiplierStr] = useState('1.0');
+    const [koalaFlapPayoutEnabled, setKoalaFlapPayoutEnabled] = useState(true);
 
     useEffect(() => {
         if (!token) {
@@ -118,6 +125,17 @@ const Admin = ({ socket }) => {
                     setKoalaStartCoins(baseline.koala_start_coins);
                     setKoalaStartCoinsStr((baseline.koala_start_coins / 100).toFixed(2));
                 }
+                if (baseline.koala_coin_conversion_rate !== undefined) {
+                    setKoalaCoinRate(baseline.koala_coin_conversion_rate);
+                    setKoalaCoinRateStr(baseline.koala_coin_conversion_rate.toString());
+                }
+                if (baseline.koala_daily_mission_multiplier !== undefined) {
+                    setKoalaDailyMissionMultiplier(baseline.koala_daily_mission_multiplier);
+                    setKoalaDailyMissionMultiplierStr(baseline.koala_daily_mission_multiplier.toString());
+                }
+                if (baseline.game_koalaflap_payout_enabled !== undefined) {
+                    setKoalaFlapPayoutEnabled(baseline.game_koalaflap_payout_enabled !== 'false');
+                }
             }
         });
         socket.on('KOALA_BASELINE_UPDATED', ({ success, baseline, error }) => {
@@ -129,6 +147,17 @@ const Admin = ({ socket }) => {
                 if (baseline.koala_start_coins !== undefined) {
                     setKoalaStartCoins(baseline.koala_start_coins);
                     setKoalaStartCoinsStr((baseline.koala_start_coins / 100).toFixed(2));
+                }
+                if (baseline.koala_coin_conversion_rate !== undefined) {
+                    setKoalaCoinRate(baseline.koala_coin_conversion_rate);
+                    setKoalaCoinRateStr(baseline.koala_coin_conversion_rate.toString());
+                }
+                if (baseline.koala_daily_mission_multiplier !== undefined) {
+                    setKoalaDailyMissionMultiplier(baseline.koala_daily_mission_multiplier);
+                    setKoalaDailyMissionMultiplierStr(baseline.koala_daily_mission_multiplier.toString());
+                }
+                if (baseline.game_koalaflap_payout_enabled !== undefined) {
+                    setKoalaFlapPayoutEnabled(baseline.game_koalaflap_payout_enabled !== 'false');
                 }
                 addLog('Success', 'KoalaCoins baseline updated.', 'success');
             } else {
@@ -592,6 +621,33 @@ const Admin = ({ socket }) => {
         }
     };
 
+    const handleFetchGameScores = async () => {
+        try {
+            const res = await axios.get('/api/admin/games/scores?gameId=koala_flap', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setGameScores(res.data);
+        } catch (err) {
+            console.error('Failed to fetch game scores:', err);
+            addLog('Error', 'Failed to load game highscores', 'error');
+        }
+    };
+
+    const handleDeleteGameScore = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this highscore entry?")) return;
+        try {
+            await axios.delete(`/api/admin/games/scores/${id}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setGameScores(prev => prev.filter(s => s.id !== id));
+            addLog('Success', 'Game score deleted.', 'success');
+        } catch (err) {
+            console.error('Failed to delete score:', err);
+            addLog('Error', 'Failed to delete score.', 'error');
+        }
+    };
+
+
     const formatDate = (isoStr) => {
         if (!isoStr) return '';
         const d = new Date(isoStr);
@@ -722,6 +778,12 @@ const Admin = ({ socket }) => {
                     onClick={() => setActiveTab('audit')}
                     style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <History size={16} /> Audit Logs
+                </button>
+                <button
+                    className={activeTab === 'game_scores' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => { setActiveTab('game_scores'); handleFetchGameScores(); }}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Gamepad2 size={16} /> Game Highscores
                 </button>
             </div>
 
@@ -1227,7 +1289,52 @@ const Admin = ({ socket }) => {
                                     min="0"
                                 />
                             </div>
-                            <button className="btn-primary" style={{ padding: '10px 24px', whiteSpace: 'nowrap' }} onClick={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { token: adminTokenRef.current, baseline: { koala_points_per_hour: koalaBaseline, koala_start_coins: koalaStartCoins } })}>
+                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Game Coin Rate</label>
+                                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>Val: {koalaCoinRate} / Coin</div>
+                                <input
+                                    type="number"
+                                    step="0.001"
+                                    className="input-primary"
+                                    style={{ width: '100%' }}
+                                    value={koalaCoinRateStr}
+                                    onChange={(e) => {
+                                        setKoalaCoinRateStr(e.target.value);
+                                        const parsed = parseFloat(e.target.value);
+                                        if (!isNaN(parsed)) setKoalaCoinRate(parsed);
+                                    }}
+                                    min="0"
+                                />
+                            </div>
+                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Mission Multiplier (x Baseline)</label>
+                                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>Val: {koalaDailyMissionMultiplierStr}x</div>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    className="input-primary"
+                                    style={{ width: '100%' }}
+                                    value={koalaDailyMissionMultiplierStr}
+                                    onChange={(e) => {
+                                        setKoalaDailyMissionMultiplierStr(e.target.value);
+                                        const parsed = parseFloat(e.target.value);
+                                        if (!isNaN(parsed)) setKoalaDailyMissionMultiplier(parsed);
+                                    }}
+                                    min="0"
+                                />
+                            </div>
+                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Minigame Payouts</label>
+                                <div style={{ fontSize: '0.75rem', color: koalaFlapPayoutEnabled ? '#22c55e' : '#ef4444', marginBottom: '8px' }}>{koalaFlapPayoutEnabled ? 'ENABLED' : 'DISABLED'}</div>
+                                <button 
+                                    className={`btn-${koalaFlapPayoutEnabled ? 'primary' : 'secondary'}`}
+                                    style={{ width: '100%', padding: '10px 0', border: '1px solid var(--border-color)', color: koalaFlapPayoutEnabled ? 'white' : 'var(--text-muted)' }}
+                                    onClick={() => setKoalaFlapPayoutEnabled(!koalaFlapPayoutEnabled)}
+                                >
+                                    {koalaFlapPayoutEnabled ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+                            <button className="btn-primary" style={{ padding: '10px 24px', whiteSpace: 'nowrap' }} onClick={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { token: adminTokenRef.current, baseline: { koala_points_per_hour: koalaBaseline, koala_start_coins: koalaStartCoins, koala_coin_conversion_rate: koalaCoinRate, koala_daily_mission_multiplier: koalaDailyMissionMultiplier, game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString() } })}>
                                 Save Configuration
                             </button>
                         </div>
@@ -1458,6 +1565,55 @@ const Admin = ({ socket }) => {
                     </div>
                 </div>
             )}
+
+            {/* TAB: GAME HIGHSCORES */}
+            {activeTab === 'game_scores' && (
+                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Gamepad2 size={24} color="var(--accent-primary)" />
+                            Game Highscores (KoalaFlap)
+                        </h3>
+                        <button className="btn-secondary" onClick={handleFetchGameScores}>Refresh</button>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>User</th>
+                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Score (Pipes)</th>
+                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Coins Earned</th>
+                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Date</th>
+                                    <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {gameScores.map(gs => (
+                                    <tr key={gs.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <td style={{ padding: '12px' }}>
+                                            <div style={{ fontWeight: 600 }}>{gs.displayName}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{gs.username}</div>
+                                        </td>
+                                        <td style={{ padding: '12px', fontWeight: 700, color: 'var(--accent-primary)' }}>{gs.score}</td>
+                                        <td style={{ padding: '12px' }}>{(gs.coinsEarned / 100).toFixed(2)} K</td>
+                                        <td style={{ padding: '12px' }}>{formatDate(gs.createdAt)}</td>
+                                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                                            <button className="btn-ghost" style={{ color: '#ef4444' }} onClick={() => handleDeleteGameScore(gs.id)}>
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {gameScores.length === 0 && (
+                                    <tr><td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No game scores found.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

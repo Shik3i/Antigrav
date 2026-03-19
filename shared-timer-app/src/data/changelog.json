@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "version": "2.1.1",
+    "date": "2026-03-19",
+    "changes": "- **KoalaFlap Minigame**: Unser erstes Arcade-Spiel ist live! Inklusive Upgrade-Shop (Leben, Crits, Multiplier), Fullscreen-Modus und perfekt abgestimmter Physik.\n- **System-Changelog**: Patchnotes werden nun automatisiert über das neue Backend-Modul ausgespielt."
+  },
+  {
+    "id": 0,
+    "version": "2.1.0",
+    "date": "2026-03-19",
+    "changes": "- **Feature Roadmap**: Neues Modul für geplante Features inkl. Superadmin AI-Export.\n- **UI Polish**: Optimierung der Room-Sidebar und Integration des Weather-Widgets.\n- **KoalaCoin Header**: Erste Integration der globalen Währung in das App-Layout."
+  }
+]

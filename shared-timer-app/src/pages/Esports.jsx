@@ -644,21 +644,19 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                              <a href={matchOdds.url} target="_blank" rel="noopener noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
                                                 style={{ 
-                                                    position: 'absolute',
-                                                    bottom: '12px',
-                                                    right: '12px',
                                                     color: 'var(--text-muted)', 
                                                     fontSize: '0.7rem', 
                                                     display: 'flex', 
                                                     alignItems: 'center', 
                                                     gap: '4px', 
                                                     textDecoration: 'none',
+                                                    whiteSpace: 'nowrap',
                                                     background: 'rgba(0,0,0,0.3)',
                                                     padding: '4px 8px',
                                                     borderRadius: '4px'
                                                 }}
                                             >
-                                                <ExternalLink size={10} /> Polymarket
+                                                <ExternalLink size={10} /> {isMatchDecided(matchOdds) ? 'Details' : 'Polymarket'}
                                             </a>
                                         </div>
 

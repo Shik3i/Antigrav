@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Lightbulb, ThumbsUp, ThumbsDown, Plus, Trash2, CheckCircle, 
-    Clock, Construction, AlertCircle, XCircle, Filter, ArrowUpDown, MessageSquare 
+    Clock, Construction, AlertCircle, XCircle, Filter, ArrowUpDown, MessageSquare, Download 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -132,6 +132,31 @@ const FeatureRequests = () => {
         }
     };
 
+    const handleExportAI = () => {
+        const date = new Date().toLocaleDateString();
+        let content = `### ANTIGRAVITY FEATURE ROADMAP EXPORT - ${date} ###\n`;
+        content += `Filter: ${filterStatus} | Sort: ${sortBy}\n`;
+        content += `--------------------------------------------------\n\n`;
+
+        filteredAndSortedFeatures.forEach(f => {
+            content += `[Status: ${f.status}] | Votes: ${f.score || 0}\n`;
+            content += `Title: ${f.title}\n`;
+            content += `Description: ${f.description || 'No description provided.'}\n`;
+            content += `Admin Response: ${f.adminComment || 'None'}\n`;
+            content += `--------------------------------------------------\n\n`;
+        });
+
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `roadmap_export_ai_${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const handleStatusUpdate = async (id, status) => {
         if (!user?.is_superadmin) return;
 
@@ -244,11 +269,18 @@ const FeatureRequests = () => {
                     <Lightbulb size={32} color="#fbbf24" />
                     <h1 style={{ margin: 0, fontSize: '2.5rem' }}>Feature Roadmap</h1>
                 </div>
-                {user && !isGuest && (
-                    <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-                        <Plus size={18} style={{ marginRight: '8px' }} /> Propose Feature
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {user?.is_superadmin && (
+                        <button className="btn-secondary" onClick={handleExportAI} title="Export for AI Analysis">
+                            <Download size={18} style={{ marginRight: '8px' }} /> Export for AI
+                        </button>
+                    )}
+                    {user && !isGuest && (
+                        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+                            <Plus size={18} style={{ marginRight: '8px' }} /> Propose Feature
+                        </button>
+                    )}
+                </div>
             </div>
 
             <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
