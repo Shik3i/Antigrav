@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History } from 'lucide-react';
+import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History, Grid3X3 } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import { useAuth } from '../context/AuthContext';
 import SharedTodo from './SharedTodo';
@@ -140,6 +140,10 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                             <NavLink to="/countdowns" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
                                 <Timer size={18} />
                                 Countdowns
+                            </NavLink>
+                            <NavLink to="/speedcube" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
+                                <Grid3X3 size={18} />
+                                Speedcube Timer
                             </NavLink>
                             <NavLink to="/highscores" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
                                 <BarChart3 size={18} />

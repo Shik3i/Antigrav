@@ -1,5 +1,11 @@
 [
   {
+    "id": 2,
+    "version": "2.2.0",
+    "date": "2026-03-19",
+    "changes": "- **Speedcube Timer**: Ein mechanischer Timer für Speedcubing ist nun verfügbar! Nutze die Leertaste zum Halten, Starten und Stoppen deiner Solves.\n- **Statistiken & Bests**: Die Seite zeigt dir nun direkt dein Personal Best (All-time) sowie deinen besten Wert des heutigen Tages an.\n- **Optimierte UX**: Die Seite scrollt nicht mehr, wenn du die Leertaste drückst. Der Timer läuft nun flüssig in Echtzeit mit 60 FPS.\n- **Data Sync**: Zeiten werden für Mitglieder in der DB gespeichert, Gäste nutzen automatisch den LocalStorage.\n- **Visuals**: Ein neues Rubiks-Cube Icon in der Sidebar und ein cleanes, modernes Timer-Design."
+  },
+  {
     "id": 1,
     "version": "2.1.1",
     "date": "2026-03-19",
