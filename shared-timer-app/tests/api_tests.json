@@ -47,7 +47,10 @@
             "endpoint": "/api/highscores",
             "method": "GET",
             "expectedStatus": 200,
-            "validateType": "array"
+            "validate": [
+                "topUsers",
+                "stats"
+            ]
         },
         {
             "name": "Action API Security (404 check)",

@@ -212,6 +212,18 @@ body {
   border-right: 1px solid var(--border-color);
 }
 
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .glass-card {
   background: var(--bg-card);
   backdrop-filter: blur(12px);

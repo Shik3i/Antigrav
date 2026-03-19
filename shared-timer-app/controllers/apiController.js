@@ -1,4 +1,6 @@
 const jwt = require('jsonwebtoken'); // used for secure invite links
+const fs = require('fs');
+const path = require('path');
 const dbLayer = require('../database');
 const roomManager = require('../roomManager');
 const EVENTS = require('../socketEvents');
@@ -1061,5 +1063,259 @@ exports.deleteFeatureRequest = async (req, res) => {
     } catch (err) {
         console.error('[Features] Error deleting:', err);
         res.status(500).json({ error: 'Failed to delete feature request' });
+    }
+};
+
+exports.submitKoalaFlapScore = async (req, res, next) => {
+    try {
+        const { score, coinsCollected, sessionLog, critCount } = req.body;
+        const userId = req.user?.id || req.user?.userId;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const safeCritCount = parseInt(critCount) || 0;
+
+        // Fetch user upgrades and server baseline
+        const [upgrades, baseline] = await Promise.all([
+            dbLayer.getUserUpgrades(userId),
+            dbLayer.getKoalaBaseline()
+        ]);
+
+        // Basic Backend Validation
+        // Each crit adds +9 to the expected count (since it's worth 10 but counted as 1 in coinsCollected base)
+        const maxExpected = (score * 2 + 20) + (safeCritCount * 10);
+        if (coinsCollected > maxExpected) {
+            return res.status(400).json({ error: 'Invalid game result: excessive coins' });
+        }
+        if (!sessionLog || !Array.isArray(sessionLog.events)) {
+             return res.status(400).json({ error: 'Invalid game log' });
+        }
+
+        // Calculate Bonuses
+        const coinUpgradeLevel = upgrades.find(u => u.upgrade_id === 'coin_base_value')?.current_level || 0;
+        const streakUpgradeLevel = upgrades.find(u => u.upgrade_id === 'hotstreak_multiplier')?.current_level || 0;
+        
+        const coinMultiplier = 1 + (coinUpgradeLevel * 0.2);
+        const streakMultiplier = 1 + (score * streakUpgradeLevel * 0.02); // 2% bonus per pipe per level
+        const totalMultiplier = coinMultiplier * streakMultiplier;
+
+        // Check if payout is enabled
+        const payoutEnabled = baseline.game_koalaflap_payout_enabled !== 'false'; // Default to true
+
+        // Effective coins is now pre-calculated in frontend (incl. 10x for crits)
+        const effectiveCoins = coinsCollected;
+
+        // Calculate earnings in cents
+        const conversionRate = baseline.koala_coin_conversion_rate || 1;
+        let totalEarningsCents = Math.floor(effectiveCoins * totalMultiplier * conversionRate * 100);
+        if (!payoutEnabled) totalEarningsCents = 0;
+
+        // Record the score
+        if (score > 0) {
+            await dbLayer.recordGameScore(userId, 'koala_flap', score, coinsCollected, sessionLog);
+        }
+
+        // Credit coins
+        let newBalanceCents = 0;
+        if (totalEarningsCents > 0) {
+            newBalanceCents = await dbLayer.addKoalaCoins(userId, totalEarningsCents, `KoalaFlap: Score ${score} (Coins: ${coinsCollected}, Crits: ${safeCritCount})`);
+        } else {
+            const user = await dbLayer.getUser(userId);
+            newBalanceCents = user?.koala_balance || 0;
+        }
+
+        // --- Daily Mission Logic ---
+        let missionAwarded = false;
+        let missionRewardValue = 0;
+        if (score >= 10 && payoutEnabled) {
+            const isCompleted = await dbLayer.checkDailyMission(userId, 'pipes_10_run');
+            if (!isCompleted) {
+                // Use hourly baseline * multiplier as daily reward
+                const hourlyBaseline = baseline.koala_points_per_hour || 1000;
+                const multiplier = parseFloat(baseline.koala_daily_mission_multiplier || '1.0');
+                missionRewardValue = Math.floor(hourlyBaseline * multiplier); 
+                await dbLayer.completeDailyMission(userId, 'pipes_10_run', missionRewardValue);
+                missionAwarded = true;
+                // Update balance local for response
+                newBalanceCents += missionRewardValue;
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            coinsEarned: totalEarningsCents / 100, 
+            newBalance: newBalanceCents / 100,
+            multiplier: totalMultiplier.toFixed(2),
+            missionAwarded,
+            missionReward: missionRewardValue / 100,
+            payoutDisabled: !payoutEnabled
+        });
+    } catch (err) {
+        console.error('[Games] Error submitting score:', err);
+        if (dbLayer.logError) await dbLayer.logError(`Score Submission Failed: ${err.message}`, err.stack, req.user?.id);
+        res.status(500).json({ error: 'Failed to submit score' });
+    }
+};
+
+exports.getGameLeaderboards = async (req, res, next) => {
+    try {
+        const gameId = req.query.gameId || 'koala_flap';
+        const leaderboards = await dbLayer.getGameLeaderboards(gameId);
+        res.json(leaderboards);
+    } catch (err) {
+        console.error('[Games] Error fetching leaderboards:', err);
+        res.status(500).json({ error: 'Failed to fetch leaderboards' });
+    }
+};
+
+exports.getGameUpgrades = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const category = req.query.category || 'koala_flap';
+
+        const [config, userLevels] = await Promise.all([
+            dbLayer.getGameUpgradesConfig(category),
+            userId ? dbLayer.getUserUpgrades(userId) : Promise.resolve([])
+        ]);
+
+        res.json({ config, userLevels });
+    } catch (err) {
+        console.error('[Games] Error fetching upgrades:', err);
+        res.status(500).json({ error: 'Failed to fetch upgrades' });
+    }
+};
+
+exports.purchaseGameUpgrade = async (req, res) => {
+    try {
+        const { upgradeId } = req.body;
+        const userId = req.user?.id || req.user?.userId;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!upgradeId) return res.status(400).json({ error: 'Upgrade ID required' });
+
+        const result = await dbLayer.purchaseUpgrade(userId, upgradeId);
+        
+        // Notify all sockets for this user to update balance (e.g. news ticker, floating panel)
+        const io = req.app?.get('socketio');
+        if (io) {
+            io.to(userId).emit('COIN_BALANCE_UPDATE', { balance: result.newBalance });
+        }
+
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('[Games] Error purchasing upgrade:', err);
+        const status = err.message.includes('Nicht genügend') || err.message.includes('maximale Level') ? 400 : 500;
+        if (dbLayer.logError) await dbLayer.logError(`Upgrade Purchase Failed (${req.body.upgradeId}): ${err.message}`, err.stack, req.user?.id);
+        res.status(status).json({ error: err.message || 'Failed to purchase upgrade' });
+    }
+};
+
+exports.updateAdminGameSettings = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const user = await dbLayer.getUser(userId);
+
+        if (!user || !user.is_superadmin) {
+            return res.status(403).json({ error: 'Nur Superadmins können Spieleeinstellungen ändern' });
+        }
+
+        const { koala_coin_conversion_rate, koala_daily_mission_reward } = req.body;
+        const updates = {};
+        if (koala_coin_conversion_rate !== undefined) updates.koala_coin_conversion_rate = koala_coin_conversion_rate;
+        if (koala_daily_mission_reward !== undefined) updates.koala_daily_mission_reward = koala_daily_mission_reward;
+
+        await dbLayer.updateKoalaBaseline(updates);
+        await dbLayer.logAdminAction(userId, user.username, 'UPDATE_GAME_SETTINGS', { updates });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Games] Error updating admin game settings:', err);
+        if (dbLayer.logError) await dbLayer.logError(`Admin Game Settings Update Failed: ${err.message}`, err.stack, req.user?.id);
+        res.status(500).json({ error: 'Spieleeinstellungen konnten nicht aktualisiert werden' });
+    }
+};
+
+exports.getAdminGameScores = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const user = await dbLayer.getUser(userId);
+        if (!user || !user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+
+        const gameId = req.query.gameId || 'koala_flap';
+        const scores = await dbLayer.getAdminGameScores(gameId);
+        res.json(scores);
+    } catch (err) {
+        console.error('[Admin] Error fetching game scores:', err);
+        res.status(500).json({ error: 'Failed to fetch game scores' });
+    }
+};
+
+exports.deleteAdminGameScore = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const user = await dbLayer.getUser(userId);
+        if (!user || !user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+
+        const { id } = req.params;
+        await dbLayer.deleteGameScore(id);
+        await dbLayer.logAdminAction(userId, user.username, 'DELETE_GAME_SCORE', { scoreId: id });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Admin] Error deleting game score:', err);
+        res.status(500).json({ error: 'Failed to delete game score' });
+    }
+};
+
+exports.getChangelog = async (req, res, next) => {
+    try {
+        const changelogPath = path.resolve(process.cwd(), 'src/data/changelog.json');
+        if (fs.existsSync(changelogPath)) {
+            const data = fs.readFileSync(changelogPath, 'utf8');
+            res.json(JSON.parse(data));
+        } else {
+            res.json([]);
+        }
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getMissionStatus = async (req, res) => {
+    try {
+        const { missionId } = req.query;
+        const userId = req.user?.id || req.user?.userId;
+        
+        let isCompleted = false;
+        if (userId) {
+            isCompleted = await dbLayer.checkDailyMission(userId, missionId);
+        }
+        
+        const baseline = await dbLayer.getKoalaBaseline();
+        const hourlyBaseline = baseline.koala_points_per_hour || 1000;
+        const multiplier = parseFloat(baseline.koala_daily_mission_multiplier || '1.0');
+        const reward = Math.floor(hourlyBaseline * multiplier);
+        res.json({ 
+            completed: isCompleted, 
+            reward: reward
+        });
+    } catch (err) {
+        console.error('[Games] Error fetching mission status:', err);
+        res.status(500).json({ error: 'Failed to fetch mission status' });
+    }
+};
+
+exports.getKoalaFlapConfig = async (req, res, next) => {
+    try {
+        const baseline = await dbLayer.getKoalaBaseline();
+        const hourlyBaseline = baseline.koala_points_per_hour || 1000;
+        const multiplier = parseFloat(baseline.koala_daily_mission_multiplier || '1.0');
+        res.json({
+            payoutEnabled: baseline.game_koalaflap_payout_enabled !== 'false',
+            dailyMissionReward: Math.floor(hourlyBaseline * multiplier),
+            dailyMissionMultiplier: multiplier
+        });
+    } catch (err) {
+        next(err);
     }
 };
