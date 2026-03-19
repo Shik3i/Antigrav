@@ -7,16 +7,25 @@ const ReactionBar = ({ activeReactions, sendReaction, isZenMode }) => {
         <>
             {/* Floating Reactions Overlay */}
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-                {activeReactions.map(r => (
-                    <div key={r.id} className="floating-emoji" style={{
-                        position: 'absolute',
-                        left: `${40 + Math.random() * 20}%`,
-                        bottom: '20%',
-                        fontSize: '2rem',
-                    }}>
-                        {r.emoji}
-                    </div>
-                ))}
+                {activeReactions.map(r => {
+                    const randomX = (Math.random() - 0.5) * 60; // Spread x axis slightly
+
+                    return (
+                        <span
+                            key={r.id}
+                            className="floating-emoji"
+                            style={{
+                                position: 'absolute',
+                                left: `calc(50% + ${randomX}px)`,
+                                bottom: '80px',
+                                fontSize: '2rem',
+                                filter: 'drop-shadow(0px 4px 8px rgba(0,0,0,0.4))'
+                            }}
+                        >
+                            {r.emoji}
+                        </span>
+                    );
+                })}
             </div>
 
             {/* Reaction Bar */}

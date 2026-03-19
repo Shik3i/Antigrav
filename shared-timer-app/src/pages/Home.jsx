@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Users, Clock, Plus } from 'lucide-react';
+import { Play, Users, Clock, Plus, UserCheck } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import { generateRandomRoomName } from '../utils/randomNames';
 
 const Home = ({ user, globalSocket }) => {
     const [activeRooms, setActiveRooms] = useState([]);
+    const [friendsList, setFriendsList] = useState([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [isPublicSelection, setIsPublicSelection] = useState('on');
     const navigate = useNavigate();
@@ -17,6 +18,33 @@ const Home = ({ user, globalSocket }) => {
     }, [showCreateModal]);
 
     useEffect(() => {
+        // Fetch initial list immediately so it shows up before any socket events trigger
+        fetch('/api/rooms', {
+            headers: localStorage.getItem('timerToken') ? {
+                'Authorization': `Bearer ${localStorage.getItem('timerToken')}`
+            } : {}
+        })
+            .then(res => res.json())
+            .then(data => {
+                // Only set if we haven't received a socket update yet
+                setActiveRooms(prev => prev.length === 0 ? data : prev);
+            })
+            .catch(console.error);
+
+        // Fetch user's friends to cross-reference later
+        if (localStorage.getItem('timerToken')) {
+            fetch('/api/friends', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('timerToken')}` }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        setFriendsList(data.filter(f => f.status === 'accepted').map(f => f.id));
+                    }
+                })
+                .catch(console.error);
+        }
+
         if (!globalSocket) return;
 
         globalSocket.on(EVENTS.ACTIVE_ROOMS, (rooms) => {
@@ -34,6 +62,7 @@ const Home = ({ user, globalSocket }) => {
         const fd = new FormData(e.target);
         const useName = fd.get('name');
         const isPublic = isPublicSelection === 'on';
+        const visibleToFriends = fd.get('visibleToFriends') === 'on';
         const defaultRole = fd.get('defaultRole') || 'read';
         const duration = parseFloat(fd.get('duration')) || 20;
 
@@ -49,7 +78,8 @@ const Home = ({ user, globalSocket }) => {
                     isPublic,
                     defaultRole,
                     defaultDurationMinutes: duration,
-                    ownerId: user.id
+                    ownerId: user.id,
+                    visibleToFriends
                 })
             });
             const data = await res.json();
@@ -81,29 +111,36 @@ const Home = ({ user, globalSocket }) => {
                         No active public rooms at the moment. Be the first to start one!
                     </div>
                 ) : (
-                    activeRooms.map((room) => (
-                        <div key={room.id} className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{room.name}</h3>
-                                {room.isRunning && (
-                                    <span style={{ fontSize: '0.7rem', padding: '4px 8px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--accent-primary)', borderRadius: '12px', fontWeight: 600 }}>RUNNING</span>
-                                )}
-                            </div>
+                    activeRooms.map((room) => {
+                        const isFriendRoom = friendsList.includes(room.ownerId);
 
-                            <div style={{ display: 'flex', gap: '16px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={16} /> {room.activeUsers} Active</span>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16} /> {room.defaultDurationMinutes}m</span>
-                            </div>
+                        return (
+                            <div key={room.id} className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', border: isFriendRoom ? '1px solid var(--accent-primary)' : undefined }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {isFriendRoom && <UserCheck size={18} color="var(--accent-primary)" title="Friend's Room" />}
+                                        <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{room.name}</h3>
+                                    </div>
+                                    {room.isRunning && (
+                                        <span style={{ fontSize: '0.7rem', padding: '4px 8px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--accent-primary)', borderRadius: '12px', fontWeight: 600 }}>RUNNING</span>
+                                    )}
+                                </div>
 
-                            <button
-                                className="btn-ghost"
-                                style={{ marginTop: 'auto', background: 'rgba(255,255,255,0.05)', justifyContent: 'center' }}
-                                onClick={() => navigate(`/room/${room.id}`)}
-                            >
-                                Join Room
-                            </button>
-                        </div>
-                    ))
+                                <div style={{ display: 'flex', gap: '16px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={16} /> {room.activeUsers} Active</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16} /> {room.defaultDurationMinutes}m</span>
+                                </div>
+
+                                <button
+                                    className="btn-ghost"
+                                    style={{ marginTop: 'auto', background: 'rgba(255,255,255,0.05)', justifyContent: 'center' }}
+                                    onClick={() => navigate(`/room/${room.id}`)}
+                                >
+                                    Join Room
+                                </button>
+                            </div>
+                        );
+                    })
                 )}
             </div>
 
@@ -143,13 +180,18 @@ const Home = ({ user, globalSocket }) => {
                                 </select>
                             </div>
 
-                            {isPublicSelection === 'on' && (
+                            {isPublicSelection === 'on' ? (
                                 <div className="animate-fade-in">
                                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>Default Permissions for Public Joiners</label>
                                     <select name="defaultRole" className="input-primary" defaultValue="read">
                                         <option value="read">Read-only (Recommended)</option>
                                         <option value="write">Admin (Everyone can control timer)</option>
                                     </select>
+                                </div>
+                            ) : (
+                                <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <input type="checkbox" name="visibleToFriends" id="visibleToFriends" style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
+                                    <label htmlFor="visibleToFriends" style={{ cursor: 'pointer', fontSize: '0.85rem' }}>Visible to my Friends</label>
                                 </div>
                             )}
 
