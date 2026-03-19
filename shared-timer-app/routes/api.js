@@ -111,4 +111,11 @@ router.get('/twitch/status', apiController.getTwitchStatus);
 // ─── Changelog ──────────────────────────────────────────────
 router.get('/changelog', apiController.getChangelog);
 
+// ─── Speedcube Timer ──────────────────────────────────────────
+const speedcubeController = require('../controllers/speedcubeController');
+router.get('/speedcube', authController.authenticateToken, speedcubeController.getTimes);
+router.post('/speedcube', authController.authenticateToken, speedcubeController.addTime);
+router.patch('/speedcube/:id/note', authController.authenticateToken, speedcubeController.updateNote);
+router.delete('/speedcube/:id', authController.authenticateToken, speedcubeController.deleteTime);
+
 module.exports = router;

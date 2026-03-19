@@ -20,6 +20,7 @@ const GlobalBets = React.lazy(() => import('./pages/GlobalBets'));
 const Admin = React.lazy(() => import('./pages/Admin'));
 const FeatureRequests = React.lazy(() => import('./pages/FeatureRequests'));
 const KoalaFlap = React.lazy(() => import('./pages/KoalaFlap'));
+const SpeedcubeTimer = React.lazy(() => import('./pages/SpeedcubeTimer'));
 const GameLeaderboards = React.lazy(() => import('./pages/GameLeaderboards'));
 const Changelog = React.lazy(() => import('./pages/Changelog'));
 
@@ -391,6 +392,7 @@ function InnerApp() {
                 <Route path="/changelog" element={<Changelog />} />
                 <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
                 <Route path="/games/leaderboard" element={<GameLeaderboards />} />
+                <Route path="/speedcube" element={<SpeedcubeTimer />} />
               </Routes>
             </React.Suspense>
           </main>
