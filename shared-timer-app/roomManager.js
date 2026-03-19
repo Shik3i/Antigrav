@@ -7,14 +7,19 @@ class RoomManager {
         this.rooms = new Map();
     }
 
-    // Create a new room in memory (called after DB validation)
-    createRoom(roomId, name = 'Focus Session', defaultDurationMinutes = 20) {
+    // Create a new room in memory
+    createRoom(roomId, name = 'Focus Session', defaultDurationMinutes = 20, isPublic = true, visibleToFriends = false, ownerId = null, defaultRole = 'read') {
         if (!this.rooms.has(roomId)) {
             this.rooms.set(roomId, {
                 id: roomId,
                 config: {
                     name: name,
                     durationMs: defaultDurationMinutes * 60 * 1000,
+                    defaultDurationMinutes: defaultDurationMinutes,
+                    isPublic: isPublic,
+                    visibleToFriends: visibleToFriends,
+                    ownerId: ownerId,
+                    defaultRole: defaultRole
                 },
                 state: {
                     isRunning: false,
@@ -25,11 +30,98 @@ class RoomManager {
                     isPomodoro: false,
                     pomodoroPhase: 'work', // 'work' or 'break'
                     pomodoroCycles: 0,
+                    // Auto-Restart
+                    autoRestart: true,
+                    // Workspace Features
+                    todos: [], // { id, text, completed, author }
+                    canvasLines: [], // array of lines drawn
+                    eventHistory: [], // array of { type, message, timestamp, userId }
+                    // Statistics
+                    stats: {
+                        totalCompletions: 0,
+                        userCompletions: {} // userId -> Number
+                    }
                 },
                 users: new Map(), // socketId -> { userId, displayName, role }
+                timeoutId: null // Reference to clear room if empty after 5 mins
             });
         }
         return this.rooms.get(roomId);
+    }
+
+    updateRoomInfo(roomId, newName, defaultRole) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            if (newName) room.config.name = newName;
+            if (defaultRole) room.config.defaultRole = defaultRole;
+            return true;
+        }
+        return false;
+    }
+
+    // Workspace Methods
+    addTodo(roomId, todo) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            room.state.todos.push(todo);
+            return true;
+        }
+        return false;
+    }
+
+    toggleTodo(roomId, todoId) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            const todo = room.state.todos.find(t => t.id === todoId);
+            if (todo) {
+                todo.completed = !todo.completed;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    deleteTodo(roomId, todoId) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            room.state.todos = room.state.todos.filter(t => t.id !== todoId);
+            return true;
+        }
+        return false;
+    }
+
+    drawCanvasLine(roomId, line) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            room.state.canvasLines.push(line);
+            return true;
+        }
+        return false;
+    }
+
+    clearCanvas(roomId) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            room.state.canvasLines = [];
+            return true;
+        }
+        return false;
+    }
+
+    // Event History
+    addEvent(roomId, type, message, userId = null) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            const newEvent = { type, message, timestamp: Date.now(), userId };
+            room.state.eventHistory.push(newEvent);
+
+            // Keep history lean (max 50 items)
+            if (room.state.eventHistory.length > 50) {
+                room.state.eventHistory.shift();
+            }
+            return newEvent;
+        }
+        return null;
     }
 
     // Get an existing room
@@ -39,17 +131,42 @@ class RoomManager {
 
     joinRoom(roomId, socketId, user) {
         const room = this.getRoom(roomId);
-        room.users.set(socketId, user);
+        if (room.timeoutId) {
+            clearTimeout(room.timeoutId);
+            room.timeoutId = null;
+        }
+        room.users.set(socketId, { ...user, socketId, metrics: { ping: 0, offset: 0 } });
         return room;
+    }
+
+    promoteUser(roomId, targetSocketId) {
+        const room = this.getRoom(roomId);
+        if (!room) return false;
+
+        console.log(`[DEBUG] promoteUser called for target: ${targetSocketId}`);
+        console.log(`[DEBUG] Current users in room:`, Array.from(room.users.keys()));
+
+        const targetUser = room.users.get(targetSocketId);
+        if (targetUser && targetUser.role !== 'write') {
+            targetUser.role = 'write';
+            return true;
+        }
+        return false;
     }
 
     leaveRoom(socketId) {
         for (const [roomId, room] of this.rooms.entries()) {
             if (room.users.has(socketId)) {
                 room.users.delete(socketId);
-                // Optional: delete room if empty and not running
-                if (room.users.size === 0 && !room.state.isRunning) {
-                    this.rooms.delete(roomId);
+                // Start a 5-minute timeout to delete room if it remains empty
+                if (room.users.size === 0) {
+                    room.timeoutId = setTimeout(() => {
+                        const r = this.getRoom(roomId);
+                        if (r && r.users.size === 0) {
+                            r.state.isRunning = false; // stop ticking
+                            this.rooms.delete(roomId);
+                        }
+                    }, 5 * 60 * 1000); // 5 minutes
                 }
                 return roomId;
             }
@@ -61,8 +178,8 @@ class RoomManager {
         const room = this.getRoom(roomId);
         if (!room) return false;
 
-        // If timer is finished (at 0), automatically reset to full duration before starting
-        if (room.state.remainingMs <= 0) {
+        // If timer is finished (at 0, or tiny floating negative), automatically reset to full duration before starting
+        if (room.state.remainingMs <= 50) {
             room.state.remainingMs = room.config.durationMs;
         }
 
@@ -97,9 +214,9 @@ class RoomManager {
 
     setDuration(roomId, minutes) {
         const room = this.getRoom(roomId);
-        room.config.durationMs = minutes * 60 * 1000;
-        // If not started yet, adjust current remaining time
-        if (!room.state.hasStarted || (!room.state.isRunning && room.state.remainingMs === room.config.durationMs)) {
+        room.config.durationMs = Math.round(minutes * 60 * 1000); // Ensures no floating point ms issues
+        // If the timer is not actively running, resetting the duration ALWAYS resets the remaining time
+        if (!room.state.isRunning) {
             room.state.remainingMs = room.config.durationMs;
         }
         return true;
@@ -111,10 +228,8 @@ class RoomManager {
             const elapsed = now - room.state.lastTickTime;
             room.state.remainingMs -= elapsed;
             room.state.lastTickTime = now;
-            if (room.state.remainingMs <= 0) {
-                room.state.remainingMs = 0;
-                room.state.isRunning = false;
-            }
+            // We DO NOT set isRunning = false here. 
+            // tick() must be the one to complete the timer so events fire properly.
         }
     }
 
@@ -132,6 +247,17 @@ class RoomManager {
                 if (room.state.remainingMs <= 0) {
                     room.state.remainingMs = 0;
                     room.state.isRunning = false;
+
+                    // Track completions
+                    if (!room.state.stats) room.state.stats = { totalCompletions: 0, userCompletions: {} };
+                    room.state.stats.totalCompletions++;
+                    for (const user of room.users.values()) {
+                        const uid = user.userId || user.id;
+                        if (uid) {
+                            room.state.stats.userCompletions[uid] = (room.state.stats.userCompletions[uid] || 0) + 1;
+                        }
+                    }
+
                     completedRooms.push(room);
                 }
             }
@@ -148,54 +274,51 @@ class RoomManager {
         }
 
         // Return a safe copy of the state
+        const safeState = { ...room.state };
+        if (safeState.remainingMs < 0) safeState.remainingMs = 0;
+
         return {
             id: room.id,
             config: { ...room.config },
-            state: { ...room.state },
+            state: safeState,
             users: Array.from(room.users.values())
         };
     }
 
-    togglePomodoro(roomId, enabled) {
+    togglePomodoro(roomId, enabled, pauseMinutes) {
         const room = this.getRoom(roomId);
         if (room) {
             room.state.isPomodoro = enabled;
             if (enabled) {
-                room.state.pomodoroPhase = 'work';
-                // Reset to 25/5 defaults when enabling if not already set
-                if (!room.config.pomodoro) {
-                    room.config.pomodoro = { workMinutes: 25, breakMinutes: 5 };
+                if (!room.config.pomodoro || pauseMinutes) {
+                    room.config.pomodoro = { pauseMinutes: parseFloat(pauseMinutes) || 5 };
                 }
-                // Also set current duration to work minutes
-                room.config.durationMs = room.config.pomodoro.workMinutes * 60 * 1000;
-                room.state.remainingMs = room.config.durationMs;
             }
             return true;
         }
         return false;
     }
 
-    advancePomodoro(roomId) {
+    toggleAutoRestart(roomId, enabled) {
         const room = this.getRoom(roomId);
-        if (!room || !room.state.isPomodoro) return null;
-
-        const config = room.config.pomodoro || { workMinutes: 25, breakMinutes: 5 };
-
-        if (room.state.pomodoroPhase === 'work') {
-            room.state.pomodoroPhase = 'break';
-            room.state.pomodoroCycles++;
-            room.config.durationMs = config.breakMinutes * 60 * 1000;
-        } else {
-            room.state.pomodoroPhase = 'work';
-            room.config.durationMs = config.workMinutes * 60 * 1000;
+        if (room) {
+            room.state.autoRestart = enabled;
+            return true;
         }
+        return false;
+    }
 
-        room.state.remainingMs = room.config.durationMs;
-        room.state.isRunning = true;
-        room.state.lastTickTime = Date.now();
-        room.state.hasStarted = true;
 
-        return room.state.pomodoroPhase;
+
+    updateMetrics(socketId, ping, offset) {
+        for (const room of this.rooms.values()) {
+            if (room.users.has(socketId)) {
+                const user = room.users.get(socketId);
+                user.metrics = { ping, offset };
+                return room.id; // Return roomId so we can broadcast
+            }
+        }
+        return null;
     }
 
     getUserBySocket(socketId) {

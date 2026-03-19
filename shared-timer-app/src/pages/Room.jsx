@@ -1,24 +1,48 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Maximize2, ChevronDown } from 'lucide-react';
+import { Maximize2, ChevronDown, Settings } from 'lucide-react';
 import Timer from '../components/Timer';
 import ReactionBar from '../components/ReactionBar';
 import MemberPanel from '../components/MemberPanel';
+import PersonalCounter from '../components/PersonalCounter';
 import EVENTS from '../socketEvents';
+import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
+import ClockWidget from '../components/ClockWidget';
+import WeatherWidget from '../components/WeatherWidget';
 
-const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode }) => {
+const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode, serverTimeOffset, setIsRightPanelOpen }) => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const navigate = useNavigate();
-    const [isMembersCollapsed, setIsMembersCollapsed] = useState(false);
+    const [isMembersCollapsed, setIsMembersCollapsed] = useState(true);
     const [activeReactions, setActiveReactions] = useState([]);
+    const [toasts, setToasts] = useState([]);
+    const [eventHistory, setEventHistory] = useState([]);
+    const [showCounter, setShowCounter] = useState(() => localStorage.getItem('showPersonalCounter') === 'true');
+
+    const toggleCounter = () => {
+        setShowCounter(prev => {
+            const next = !prev;
+            localStorage.setItem('showPersonalCounter', String(next));
+            return next;
+        });
+    };
 
     // Compute role early so hooks can reference it
-    const myUser = roomState?.users?.find(u => u.userId === user.id);
-    const userRole = myUser ? myUser.role : 'read';
+    const myUser = roomState?.users?.find(u =>
+        u.userId === user.id ||
+        u.id === user.id ||
+        u.socketId === socket?.id
+    );
+    const userRole = myUser?.role || 'read';
 
     // Sync URL ID with App's global active room
+    useEffect(() => {
+        setIsRightPanelOpen(!isMembersCollapsed);
+    }, [isMembersCollapsed, setIsRightPanelOpen]);
+
     useEffect(() => {
         if (id) {
             setActiveRoomId(prev => {
@@ -35,10 +59,11 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
         }
         return () => {
             setIsZenMode(false);
+            setIsRightPanelOpen(false); // Reset on unmount
         };
     }, [id, token, setActiveRoomId, setActiveToken, setIsZenMode]);
 
-    // Handle reactions
+    // Handle reactions and events
     useEffect(() => {
         if (!socket) return;
         const handleReaction = (data) => {
@@ -48,8 +73,48 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
                 setActiveReactions(prev => prev.filter(r => r.id !== rid));
             }, 3000);
         };
+
+        const handleRoomEvent = (data) => {
+            const eventId = Math.random().toString(36).substr(2, 9);
+            const newEvent = { ...data, id: eventId };
+
+            // Always add to history
+            setEventHistory(prev => [newEvent, ...prev]);
+
+            // Only add to toasts if the event wasn't triggered by this user
+            if (data.userId !== socket.id) {
+                setToasts(prev => [...prev, newEvent]);
+                setTimeout(() => {
+                    setToasts(prev => prev.filter(t => t.id !== eventId));
+                }, 4000);
+            }
+        };
+
+        const handleRoomEventSync = (history) => {
+            // Server provides an array of { id, type, message, timestamp, userId }
+            // Ensure each has an ID for React keys if not provided
+            const historyWithIds = history.map(ev => ev.id ? ev : { ...ev, id: Math.random().toString(36).substr(2, 9) });
+            // The history from server is chronologically sorted (oldest first). 
+            // We want newest first in state for the UI, so we reverse it.
+            setEventHistory(historyWithIds.reverse());
+        };
+
         socket.on(EVENTS.REACTION, handleReaction);
-        return () => socket.off(EVENTS.REACTION, handleReaction);
+
+        socket.on(EVENTS.ROOM_EVENT, handleRoomEvent);
+        socket.on(EVENTS.ROOM_EVENT_SYNC, handleRoomEventSync);
+        console.log('Listening to EVENTS.ROOM_EVENT:', EVENTS.ROOM_EVENT);
+
+        if (id) {
+            socket.emit('REQUEST_ROOM_EVENT_SYNC', { roomId: id });
+        }
+
+        return () => {
+            socket.off(EVENTS.REACTION, handleReaction);
+
+            socket.off(EVENTS.ROOM_EVENT, handleRoomEvent);
+            socket.off(EVENTS.ROOM_EVENT_SYNC, handleRoomEventSync);
+        };
     }, [socket]);
 
     // Keyboard Shortcuts
@@ -105,7 +170,7 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
 
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', height: '100%', display: 'flex', gap: '32px' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', gap: '0' }}>
 
             {/* Main Timer Area */}
             <div style={{
@@ -118,43 +183,146 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
                 transition: 'all 0.5s ease-in-out'
             }}>
                 {!isZenMode && (
-                    <h1 style={{ position: 'absolute', top: '32px', fontSize: '2rem', transition: 'opacity 0.3s' }}>
-                        {roomState.config.name || 'Timer Room'}
-                    </h1>
+                    <div className="room-header-bar">
+                        <h1 style={{ fontSize: '2rem', margin: 0, transition: 'opacity 0.3s', textAlign: 'center' }}>
+                            {roomState.config.name || 'Timer Room'}
+                        </h1>
+
+                        {/* Top-right button group: Portal to App.jsx header */}
+                        {createPortal(
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <button
+                                    className="btn-ghost desktop-only animate-fade-in"
+                                    onClick={() => setIsZenMode(!isZenMode)}
+                                    title="Toggle Zen Mode (Z)"
+                                    style={{ borderRadius: '50%', width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}
+                                >
+                                    <Maximize2 size={18} />
+                                </button>
+
+                                {isMembersCollapsed && (
+                                    <button
+                                        className="btn-ghost animate-fade-in"
+                                        onClick={() => setIsMembersCollapsed(false)}
+                                        title="Open Room Settings"
+                                        style={{ position: 'relative', borderRadius: '50%', width: '40px', height: '40px', padding: 0, justifyContent: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                    >
+                                        <Settings size={20} color="var(--text-main)" />
+                                        <span style={{
+                                            position: 'absolute', top: '-4px', right: '-4px', background: 'var(--accent-primary)', color: 'white', fontSize: '0.65rem', fontWeight: 700, width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(59,130,246,0.4)'
+                                        }}>
+                                            {roomState.users.length}
+                                        </span>
+                                    </button>
+                                )}
+                            </div>,
+                            document.getElementById('desktop-room-actions')
+                        )}
+                    </div>
+                )}
+
+                {isZenMode && (
+                    <button
+                        className="btn-ghost"
+                        onClick={() => setIsZenMode(false)}
+                        title="Exit Zen Mode (Z)"
+                        style={{ position: 'absolute', top: '24px', right: '24px', borderRadius: '50%', width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}
+                    >
+                        <ChevronDown size={20} />
+                    </button>
                 )}
 
                 <div style={{ transform: isZenMode ? 'scale(1.2)' : 'scale(1)', transition: 'transform 0.5s' }}>
-                    <Timer roomState={roomState} socket={socket} roomId={id} userRole={userRole} user={user} isZenMode={isZenMode} />
+                    <Timer roomState={roomState} socket={socket} roomId={id} userRole={userRole} user={user} isZenMode={isZenMode} serverTimeOffset={serverTimeOffset} />
                 </div>
 
-                <ReactionBar activeReactions={activeReactions} sendReaction={sendReaction} isZenMode={isZenMode} />
+                {/* Statistics display */}
+                {!isZenMode && roomState.state.stats && (
+                    <div className="animate-fade-in" style={{
+                        marginTop: '32px',
+                        display: 'flex',
+                        gap: '24px',
+                        background: 'rgba(20, 24, 30, 0.4)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid var(--border-color)',
+                        padding: '12px 24px',
+                        borderRadius: '50px',
+                        fontSize: '0.9rem',
+                        color: 'var(--text-muted)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                            <span>Room Completions: <strong style={{ color: 'var(--text-main)', marginLeft: '4px' }}>{roomState.state.stats.totalCompletions || 0}</strong></span>
+                        </div>
+                        <div style={{ width: '1px', background: 'var(--border-color)' }}></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>⭐</span>
+                            <span>Your Completions: <strong style={{ color: 'var(--accent-primary)', marginLeft: '4px' }}>{roomState.state.stats.userCompletions?.[user.id] || 0}</strong></span>
+                        </div>
+                    </div>
+                )}
 
-                <button
-                    className="btn-ghost"
-                    onClick={() => setIsZenMode(!isZenMode)}
-                    title="Toggle Zen Mode (Z)"
-                    style={{ position: 'absolute', top: '24px', right: '24px', borderRadius: '50%', width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}
-                >
-                    {isZenMode ? <ChevronDown size={20} /> : <Maximize2 size={18} />}
-                </button>
+                {user.preferences?.showReactions && (
+                    <ReactionBar activeReactions={activeReactions} sendReaction={sendReaction} isZenMode={isZenMode} />
+                )}
+
+                {/* Toasts Container */}
+                <div style={{
+                    position: 'absolute',
+                    bottom: '24px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    pointerEvents: 'none',
+                    alignItems: 'center',
+                    zIndex: 100
+                }}>
+                    {toasts.map(toast => (
+                        <div key={toast.id} className="glass-card animate-fade-in" style={{
+                            padding: '10px 20px',
+                            borderRadius: '24px',
+                            background: 'rgba(20, 24, 30, 0.85)',
+                            color: 'var(--text-main)',
+                            fontSize: '0.9rem',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+                        }}>
+                            {toast.message}
+                        </div>
+                    ))}
+                </div>
+
+                {!isZenMode && showCounter && (
+                    <div className="desktop-only">
+                        <PersonalCounter totalCompletions={roomState.state.stats?.totalCompletions || 0} />
+                    </div>
+                )}
             </div>
 
             {/* Context Sidebar */}
-            {!isZenMode && (
-                <MemberPanel
-                    roomState={roomState}
-                    userRole={userRole}
-                    isMembersCollapsed={isMembersCollapsed}
-                    setIsMembersCollapsed={setIsMembersCollapsed}
-                    togglePomodoro={togglePomodoro}
-                    copyInviteLink={copyInviteLink}
-                    roomTokens={roomTokens}
-                    socket={socket}
-                    roomId={id}
-                />
-            )}
+            {
+                !isZenMode && (
+                    <MemberPanel
+                        roomState={roomState}
+                        userRole={userRole}
+                        isMembersCollapsed={isMembersCollapsed}
+                        setIsMembersCollapsed={setIsMembersCollapsed}
+                        togglePomodoro={togglePomodoro}
+                        copyInviteLink={copyInviteLink}
+                        roomTokens={roomTokens}
+                        socket={socket}
+                        roomId={id}
+                        eventHistory={eventHistory}
+                        serverTimeOffset={serverTimeOffset}
+                        showCounter={showCounter}
+                        toggleCounter={toggleCounter}
+                    />
+                )
+            }
 
-        </div>
+        </div >
     );
 };
 

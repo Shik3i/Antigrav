@@ -1,0 +1,102 @@
+const express = require('express');
+const router = express.Router();
+const apiController = require('../controllers/apiController');
+const authController = require('../controllers/authController');
+const friendsController = require('../controllers/friendsController');
+const { body, validationResult } = require('express-validator');
+const xss = require('xss');
+
+// Basic validation middleware
+const validate = (req, res, next) => {
+    const errors = validationResult(req);
+    // Return the first error message clearly to the user
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0].msg });
+    }
+    next();
+};
+
+router.get('/highscores', apiController.getHighscores);
+router.get('/highscores/coins', apiController.getHighscoresCoins);
+router.get('/highscores/accuracy', apiController.getBettingAccuracy);
+router.get('/highscores/history', apiController.getActivityHistory);
+router.get('/news', apiController.getNews);
+router.get('/esports', apiController.getEsports);
+router.get('/esports/teams', apiController.getEsportsTeams);
+router.get('/esports/odds/polymarket', apiController.getPolymarketOdds);
+router.get('/esports/odds/backup', apiController.getTheOddsApi);
+router.post('/esports/bets', authController.authenticateToken, apiController.placeBet);
+router.get('/esports/bets', authController.authenticateToken, apiController.getBets);
+router.get('/esports/bets/recent', authController.optionalAuthenticateToken, apiController.getRecentBets);
+router.get('/koala/transactions', authController.authenticateToken, apiController.getKoalaTransactions);
+
+// Admin Bet Management
+router.get('/admin/bets', authController.authenticateToken, apiController.getAdminBets);
+router.post('/admin/bets/:id/status', authController.authenticateToken, apiController.updateAdminBetStatus);
+router.post('/admin/bets/trigger-resolver', authController.authenticateToken, apiController.triggerAdminBetResolver);
+router.get('/admin/actions', authController.authenticateToken, apiController.getAdminActions);
+
+router.post('/users', apiController.registerUser);
+router.get('/rooms', authController.optionalAuthenticateToken, apiController.getRooms);
+router.post('/rooms', [
+    body('name').trim().isLength({ min: 1, max: 30 }).withMessage('Room name must be 1-30 characters').customSanitizer(xss),
+    body('defaultDurationMinutes').optional().isFloat({ min: 1, max: 120 }),
+    body('isPublic').optional().isBoolean()
+], validate, apiController.createRoom);
+router.post('/rooms/:id/media', apiController.broadcastMediaCommand);
+
+// Auth & Accounts
+router.post('/auth/register', [
+    body('username').trim().isLength({ min: 3, max: 20 }).withMessage('Username must be 3-20 characters').customSanitizer(xss),
+    body('password').isLength({ min: 3 }).withMessage('Password must be at least 3 characters')
+], validate, authController.register);
+
+router.post('/auth/login', [
+    body('username').trim().customSanitizer(xss),
+    body('password').notEmpty()
+], validate, authController.login);
+router.get('/auth/users', authController.authenticateToken, authController.getUsers);
+router.put('/auth/users/:id/superadmin', authController.authenticateToken, authController.setSuperadmin);
+router.put('/auth/users/:id/password', authController.authenticateToken, authController.adminChangePassword);
+router.get('/auth/users/:id/friends', authController.authenticateToken, authController.getUserFriendsAdmin);
+router.delete('/auth/users/:id', authController.authenticateToken, authController.deleteUser);
+
+// Banning endpoints
+router.get('/auth/banned', authController.authenticateToken, authController.getBannedUsersList);
+router.post('/auth/users/:id/ban', authController.authenticateToken, authController.banUserAdmin);
+router.delete('/auth/users/:id/ban', authController.authenticateToken, authController.unbanUserAdmin);
+
+router.get('/auth/me', authController.authenticateToken, authController.getMe);
+router.put('/auth/me/password', authController.authenticateToken, authController.changeOwnPassword);
+
+// Friends
+router.post('/friends/request', authController.authenticateToken, friendsController.sendRequest);
+router.post('/friends/accept', authController.authenticateToken, friendsController.acceptRequest);
+router.post('/friends/remove', authController.authenticateToken, friendsController.removeFriend);
+router.get('/friends', authController.authenticateToken, friendsController.getFriends);
+
+router.get('/test/rooms', apiController.testDbRooms);
+router.get('/test/esports', apiController.testEsports);
+router.post('/test/rooms/:id/action', apiController.testRoomAction);
+
+// Countdowns
+router.get('/countdowns', authController.optionalAuthenticateToken, apiController.getCountdowns);
+router.post('/countdowns', authController.authenticateToken, apiController.createCountdown);
+router.delete('/countdowns/:id', authController.authenticateToken, apiController.deleteCountdown);
+
+// Feature Roadmap
+router.get('/features', authController.optionalAuthenticateToken, apiController.getFeatureRequests);
+router.post('/features', authController.authenticateToken, apiController.createFeatureRequest);
+router.post('/features/:id/vote', authController.optionalAuthenticateToken, apiController.voteFeatureRequest);
+router.put('/features/:id/status', authController.authenticateToken, apiController.updateFeatureStatus);
+router.put('/features/:id/comment', authController.authenticateToken, apiController.updateFeatureAdminComment);
+router.delete('/features/:id', authController.authenticateToken, apiController.deleteFeatureRequest);
+
+// ─── Error Logging ──────────────────────────────────────────
+router.get('/errors', authController.authenticateToken, apiController.getErrorLogs);
+router.delete('/errors', authController.authenticateToken, apiController.clearErrorLogs);
+router.delete('/errors/:id', authController.authenticateToken, apiController.deleteErrorLog);
+
+router.get('/twitch/status', apiController.getTwitchStatus);
+
+module.exports = router;
