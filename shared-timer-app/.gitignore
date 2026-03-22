@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets & Data
+.env
+data/*.db
+data/*.db-shm
+data/*.db-wal
+*.sqlite
+*.db
+
+# Logs
+server_log*.txt

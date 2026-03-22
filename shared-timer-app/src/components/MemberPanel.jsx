@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Link, X, Clock, Timer, History, Settings as SettingsIcon, Tv, Play, Pause, Plug, UserPlus, UserCheck, ChevronDown } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import Avatar from './Avatar';
+import UserContextMenu from './UserContextMenu';
 
 const InviteFriendsDropdown = ({ socket, roomId, friends, isOpen, setIsOpen }) => {
     if (!localStorage.getItem('timerToken')) return null;
@@ -110,9 +111,10 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
                 {roomState.users.map((u, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Avatar user={u} size={28} style={{ background: 'var(--bg-card)', fontSize: '0.8rem' }} />
-                        <span style={{ fontSize: '0.9rem', flex: 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {u.displayName}
+                        <UserContextMenu username={u.username || u.name || u.displayName} userId={u.userId}>
+                            <Avatar user={u} size={28} style={{ background: 'var(--bg-card)', fontSize: '0.8rem' }} />
+                            <span style={{ fontSize: '0.9rem', flex: 1, display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                {u.displayName}
                             {friends.some(f => f.username === u.username) && <UserCheck size={14} color="#10b981" title="Mutual Friend" />}
                             {u.preferences?.hasExtension && <Plug size={12} color="var(--accent-primary)" title="Media Sync Extension Installed" />}
                             {(u.metrics || u.userId === userRole?.id) && (
@@ -129,6 +131,7 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                                 />
                             )}
                         </span>
+                        </UserContextMenu>
                         {u.role === 'write' ? (
                             <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', padding: '2px 6px', background: 'rgba(59,130,246,0.1)', borderRadius: '4px' }}>Admin</span>
                         ) : (

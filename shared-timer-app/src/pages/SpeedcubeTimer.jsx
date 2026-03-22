@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Trash2, Edit3, Save, X, Timer, Grid3X3, Trophy, Zap } from 'lucide-react';
+import { Clock, Trash2, Edit3, Save, X, Timer, Grid3X3, Trophy, Zap, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const formatTime = (ms) => {
@@ -213,37 +213,72 @@ const SpeedcubeTimer = () => {
                     {status === 'running' && "Press [Space] to stop"}
                 </p>
 
-                {/* Stats Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '32px' }}>
+                {/* Stats Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '32px' }}>
                     {(() => {
                         const allTimeBest = history.length > 0 ? Math.min(...history.map(h => h.time_ms)) : 0;
                         const todayStr = new Date().toISOString().split('T')[0];
                         const todayHistory = history.filter(h => h.createdAt.startsWith(todayStr));
                         const bestToday = todayHistory.length > 0 ? Math.min(...todayHistory.map(h => h.time_ms)) : 0;
 
+                        const calculateAoX = (arr, x) => {
+                            if (arr.length < x) return 0;
+                            const recent = arr.slice(0, x).map(h => h.time_ms).sort((a, b) => a - b);
+                            recent.shift();
+                            recent.pop();
+                            return recent.reduce((a, b) => a + b, 0) / recent.length;
+                        };
+                        const ao5 = calculateAoX(history, 5);
+                        const ao10 = calculateAoX(history, 10);
+                        const ao100 = calculateAoX(history, 100);
+
                         return (
                             <>
-                                <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: '4px solid #f59e0b' }}>
-                                    <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '10px', borderRadius: '12px' }}>
-                                        <Trophy size={24} color="#f59e0b" />
+                                {/* Top Row: Bests */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                                    <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: '4px solid #f59e0b', background: 'rgba(245, 158, 11, 0.05)' }}>
+                                        <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '10px', borderRadius: '12px' }}>
+                                            <Trophy size={24} color="#f59e0b" />
+                                        </div>
+                                        <div style={{ textAlign: 'left' }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Personal Best</div>
+                                            <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'monospace', color: '#f59e0b' }}>
+                                                {allTimeBest > 0 ? formatTime(allTimeBest) : '--:--.---'}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ textAlign: 'left' }}>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Personal Best</div>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'monospace', color: '#f59e0b' }}>
-                                            {allTimeBest > 0 ? formatTime(allTimeBest) : '--:--.---'}
+                                    <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: '4px solid var(--accent-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
+                                        <div style={{ background: 'rgba(59, 130, 246, 0.15)', padding: '10px', borderRadius: '12px' }}>
+                                            <Zap size={24} color="var(--accent-primary)" />
+                                        </div>
+                                        <div style={{ textAlign: 'left' }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Best Today</div>
+                                            <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--accent-primary)' }}>
+                                                {bestToday > 0 ? formatTime(bestToday) : '--:--.---'}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: '4px solid var(--accent-primary)' }}>
-                                    <div style={{ background: 'rgba(59, 130, 246, 0.15)', padding: '10px', borderRadius: '12px' }}>
-                                        <Zap size={24} color="var(--accent-primary)" />
-                                    </div>
-                                    <div style={{ textAlign: 'left' }}>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Best Today</div>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--accent-primary)' }}>
-                                            {bestToday > 0 ? formatTime(bestToday) : '--:--.---'}
+
+                                {/* Bottom Row: Averages */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                                    {[
+                                        { label: 'Ao5', value: ao5, color: '#ec4899', icon: <TrendingUp size={24} color="#ec4899" /> },
+                                        { label: 'Ao10', value: ao10, color: '#8b5cf6', icon: <TrendingUp size={24} color="#8b5cf6" /> },
+                                        { label: 'Ao100', value: ao100, color: '#14b8a6', icon: <TrendingUp size={24} color="#14b8a6" /> }
+                                    ].map((stat) => (
+                                        <div key={stat.label} className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: `4px solid ${stat.color}` }}>
+                                            <div style={{ background: `${stat.color}25`, padding: '10px', borderRadius: '12px' }}>
+                                                {stat.icon}
+                                            </div>
+                                            <div style={{ textAlign: 'left' }}>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'monospace', color: stat.color }}>
+                                                    {stat.value > 0 ? formatTime(stat.value) : '--:--.---'}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </>
                         );

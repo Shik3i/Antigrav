@@ -305,9 +305,11 @@ const authenticateToken = (req, res, next) => {
 
     jwt.verify(token, JWT_SECRET, async (err, decoded) => {
         if (err) {
-            console.warn('[AUTH] JWT verification failed:', err.message);
+            console.warn('[AUTH] JWT verification failed:', err.message, 'for token starts with:', token.substring(0, 10));
             return res.status(403).json({ error: 'Token is invalid or expired' });
         }
+        
+        console.log('[AUTH] Token verified for userId:', decoded.userId || decoded.id);
 
         try {
             const user = await dbLayer.getUser(decoded.userId || decoded.id);

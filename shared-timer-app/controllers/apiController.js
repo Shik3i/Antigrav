@@ -821,7 +821,7 @@ async function getTwitchAccessToken() {
 }
 
 exports.getTwitchStatus = async (req, res) => {
-    const channels = ['handofblood', 'eintrachtspandau', 'tolkin', 'lec', 'lck'];
+    const channels = ['handofblood', 'eintrachtspandau', 'tolkin', 'lec', 'lck', 'riotgames'];
     const token = await getTwitchAccessToken();
     const clientId = process.env.TWITCH_CLIENT_ID;
 
@@ -847,12 +847,7 @@ exports.getTwitchStatus = async (req, res) => {
         const liveStreams = response.data.data || [];
         const status = channels.map(login => {
             const stream = liveStreams.find(s => s.user_login.toLowerCase() === login.toLowerCase());
-            let isLive = !!stream;
-            
-            // Special rule for HandOfBlood: only "Online" if category is LoL
-            if (login.toLowerCase() === 'handofblood' && stream) {
-                isLive = stream.game_name === 'League of Legends';
-            }
+            let isLive = !!stream && stream.game_name === 'League of Legends';
 
             return {
                 user_login: login,
@@ -992,13 +987,13 @@ exports.getFeatureRequests = async (req, res) => {
 
 exports.createFeatureRequest = async (req, res) => {
     try {
-        const { title, description } = req.body;
+        const { title, description, type } = req.body;
         if (!title) return res.status(400).json({ error: 'Title is required' });
 
         const userId = req.user?.id || req.user?.userId;
         const userName = req.user?.displayName || req.user?.username || 'Unknown';
 
-        const id = await dbLayer.createFeatureRequest(userId, userName, sanitize(title), sanitize(description || ''));
+        const id = await dbLayer.createFeatureRequest(userId, userName, sanitize(title), sanitize(description || ''), sanitize(type || 'Feature'));
         res.status(201).json({ id, message: 'Feature request created' });
     } catch (err) {
         console.error('[Features] Error creating:', err);
@@ -1106,8 +1101,9 @@ exports.submitKoalaFlapScore = async (req, res, next) => {
         const effectiveCoins = coinsCollected;
 
         // Calculate earnings in cents
+        // Use Math.round instead of floor to ensure decimal multiplier gains are not immediately truncated (e.g. 50 * 1.2 = 60)
         const conversionRate = baseline.koala_coin_conversion_rate || 1;
-        let totalEarningsCents = Math.floor(effectiveCoins * totalMultiplier * conversionRate * 100);
+        let totalEarningsCents = Math.round(effectiveCoins * totalMultiplier * (conversionRate * 100));
         if (!payoutEnabled) totalEarningsCents = 0;
 
         // Record the score
@@ -1317,5 +1313,48 @@ exports.getKoalaFlapConfig = async (req, res, next) => {
         });
     } catch (err) {
         next(err);
+    }
+};
+
+exports.getUserProfile = async (req, res, next) => {
+    try {
+        const username = req.params.username;
+        const dbLayer = require('../database');
+        const user = await dbLayer.getUserByUsername(username);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const profileData = {
+            id: user.id,
+            username: user.username,
+            displayName: user.displayName,
+            koala_balance: user.koala_balance,
+            preferences: typeof user.preferences === 'string' ? JSON.parse(user.preferences) : user.preferences,
+            joinedAt: user.createdAt
+        };
+
+        const { ACHIEVEMENTS_CONFIG } = require('../config/achievements');
+        const [bets, transactions, achievements] = await Promise.all([
+            dbLayer.getUserBets(user.id, 10),
+            dbLayer.getKoalaTransactions(user.id, 10),
+            dbLayer.getUserAchievements(user.id)
+        ]);
+
+        const claimedMilestones = (achievements || []).map(a => {
+            const config = ACHIEVEMENTS_CONFIG.find(c => c.id === a.achievementId);
+            return config ? { ...config, claimedAt: a.claimedAt } : null;
+        }).filter(Boolean);
+
+        res.json({
+            user: profileData,
+            recentBets: bets || [],
+            recentTransactions: transactions || [],
+            claimedAchievements: claimedMilestones
+        });
+    } catch (err) {
+        console.error('[API] Error fetching user profile:', err);
+        res.status(500).json({ error: 'Failed to fetch user profile' });
     }
 };

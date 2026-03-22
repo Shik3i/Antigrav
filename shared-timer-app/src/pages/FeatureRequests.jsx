@@ -155,6 +155,24 @@ const FeatureRequests = () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+
+        const aiPrompt = `Im Anhang findest du eine .txt-Datei mit gesammelten Feature-Requests und Votes aus unserer Community. 
+
+Deine Aufgabe als technischer Projektmanager ist es, diese Liste zu analysieren und daraus einen perfekten, hochdetaillierten Arbeits-Prompt für unseren autonomen Coding-Agenten "Antigravity" zu schreiben.
+
+Schreibe den Prompt aus meiner Perspektive an den Agenten, sodass ich deinen Text einfach nur kopieren und bei Antigravity einfügen muss.
+
+Der von dir generierte Prompt MUSS zwingend folgende Elemente enthalten:
+1. Eine klare, logisch strukturierte Zusammenfassung der umzusetzenden Features aus der angehängten Datei (ignoriere unwichtigen Quatsch, fokussiere dich auf die Top-Features).
+2. Die strikte Anweisung an den Agenten: "Erstelle IMMER zuerst einen detaillierten, schrittweisen Implementierungsplan, bevor du anfängst zu programmieren oder Dateien zu ändern."
+3. Die strikte Anweisung an den Agenten: "Bevor du vorgenommene Code-Änderungen testest, musst du zwingend das Skript 'restart_server.bat' ausführen, um den Server neu zu starten und sicherzugehen, dass die Änderungen aktiv sind."
+4. Den Hinweis an den Agenten: "Die Anwendung läuft lokal auf Port 3001. Alle Tests müssen über diesen Port erfolgen."`;
+
+        navigator.clipboard.writeText(aiPrompt).then(() => {
+            console.log("AI-Prompt in die Zwischenablage kopiert.");
+        }).catch(err => {
+            console.error('Fehler beim Kopieren in die Zwischenablage:', err);
+        });
     };
 
     const handleStatusUpdate = async (id, status) => {
@@ -363,15 +381,11 @@ const FeatureRequests = () => {
                 </div>
             </div>
 
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>Loading features...</div>
-            ) : filteredAndSortedFeatures.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px' }} className="glass-card">
-                    <p style={{ color: 'var(--text-muted)' }}>No feature requests match your criteria.</p>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {filteredAndSortedFeatures.map(feature => (
+            {(() => {
+                const activeFeatures = filteredAndSortedFeatures.filter(f => f.status !== 'Completed' && f.status !== 'Rejected');
+                const archivedFeatures = filteredAndSortedFeatures.filter(f => f.status === 'Completed' || f.status === 'Rejected');
+                
+                const renderFeatureCard = (feature) => (
                         <div key={feature.id} className="glass-card slide-up" style={{ padding: '24px', display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '40px' }}>
                                 <button 
@@ -504,9 +518,45 @@ const FeatureRequests = () => {
                                 )}
                             </div>
                         </div>
-                    ))}
-                </div>
-            )}
+                );
+
+                return (
+                    <>
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '40px' }}>Loading features...</div>
+                        ) : filteredAndSortedFeatures.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px' }} className="glass-card">
+                                <p style={{ color: 'var(--text-muted)' }}>No feature requests match your criteria.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                                {/* Active Features */}
+                                {activeFeatures.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        {activeFeatures.map(renderFeatureCard)}
+                                    </div>
+                                )}
+
+                                {/* Archived Features */}
+                                {archivedFeatures.length > 0 && (
+                                    <details className="glass-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
+                                        <summary style={{ 
+                                            cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', 
+                                            fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
+                                            outline: 'none', listStyle: 'none'
+                                        }}>
+                                            Archived Features (Completed / Rejected) - {archivedFeatures.length}
+                                        </summary>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+                                            {archivedFeatures.map(renderFeatureCard)}
+                                        </div>
+                                    </details>
+                                )}
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
         </div>
     );
 };

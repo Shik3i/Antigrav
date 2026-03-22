@@ -810,8 +810,17 @@ module.exports = function (io) {
                 // koala_points_per_hour is stored in cents (e.g. 10000 = 100.00 coins per hour)
                 const coinsToAward = Math.floor((durationMinutes / 60) * settings.koala_points_per_hour);
 
-                // Record completion in DB for every user present
+                // Extract unique users to prevent multiple payouts for users with multiple tabs
+                const uniqueUsers = new Map();
                 room.users.forEach(user => {
+                    const id = user.userId || user.id;
+                    if (id && !uniqueUsers.has(id)) {
+                        uniqueUsers.set(id, user);
+                    }
+                });
+
+                // Record completion in DB for every unique user present
+                Array.from(uniqueUsers.values()).forEach(user => {
                     dbLayer.addUser(user.userId || user.id, user.displayName || user.username).then(() => {
                         dbLayer.recordTimerCompletion(user.userId || user.id, room.id, room.config.name, durationMinutes).catch(console.error);
 
@@ -819,12 +828,19 @@ module.exports = function (io) {
                         if (coinsToAward > 0) {
                             dbLayer.addKoalaCoins(user.userId || user.id, coinsToAward, `Completed ${Math.round(durationMinutes)}m timer`).then(newBalance => {
                                 // Notify user about earnings (amount shown as display coins, not cents)
-                                io.to(user.socketId).emit('KOALA_COINS_EARNED', {
-                                    amount: coinsToAward,
-                                    newBalance: newBalance
-                                });
-                                // Live coin update broadcast
+                                // Broadcast to ALL sockets of this user, not just this specific socket reference
                                 broadcastCoinUpdate(io, user.userId || user.id, newBalance);
+                                
+                                // To show the UI popup, we need to find all sockets for this user
+                                const userSockets = Array.from(room.users.values()).filter(u => (u.userId || u.id) === (user.userId || user.id));
+                                userSockets.forEach(uSocket => {
+                                    if (uSocket.socketId) {
+                                        io.to(uSocket.socketId).emit('KOALA_COINS_EARNED', {
+                                            amount: coinsToAward,
+                                            newBalance: newBalance
+                                        });
+                                    }
+                                });
                             }).catch(console.error);
                         }
                     }).catch(console.error);

@@ -54,7 +54,7 @@ const Avatar = ({ user, size = 32, style = {} }) => {
     if (teamImage) {
         return (
             <div style={{ ...baseStyle, background: 'rgba(255,255,255,0.1)' }}>
-                <img src={teamImage} alt={fanTeam || 'Fan Team'} style={{ width: '70%', height: '70%', objectFit: 'contain' }} />
+                <img src={teamImage} alt={fanTeam || 'Fan Team'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
         );
     }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trophy, Coins, TrendingUp, ShieldCheck } from 'lucide-react';
+import Avatar from '../components/Avatar';
+import UserContextMenu from '../components/UserContextMenu';
 
 const GameLeaderboards = () => {
     const [leaderboards, setLeaderboards] = useState({ highscores: [], cumulative: [] });
@@ -60,7 +62,12 @@ const GameLeaderboards = () => {
                                 }}>
                                     {index + 1}
                                 </span>
-                                <span style={{ fontWeight: 500 }}>{row.displayName}</span>
+                                <UserContextMenu username={row.username || row.name || row.displayName} userId={row.userId}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Avatar user={{ username: row.username || row.name || row.displayName, preferences: typeof row.preferences === 'string' ? JSON.parse(row.preferences) : row.preferences }} size={24} />
+                                        <span style={{ fontWeight: 500 }}>{row.displayName}</span>
+                                    </div>
+                                </UserContextMenu>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: index === 0 ? '#f59e0b' : 'inherit' }}>
                                 {type === 'score' ? row.highscore : row.totalEarned.toLocaleString()}

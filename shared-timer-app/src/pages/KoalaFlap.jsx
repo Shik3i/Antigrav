@@ -253,8 +253,22 @@ const KoalaFlap = ({ user, token }) => {
         const styles = getComputedStyle(document.documentElement);
         const accentColor = styles.getPropertyValue('--accent-primary').trim() || '#3b82f6';
         const borderColor = styles.getPropertyValue('--border-color').trim() || 'rgba(255,255,255,0.1)';
+        let lastTime = performance.now();
+        const frameInterval = 1000 / 60; // 60 FPS cap
         
-        const update = () => {
+        const update = (timestamp) => {
+            const currentTime = timestamp || performance.now();
+            const deltaTime = currentTime - lastTime;
+            
+            if (deltaTime < frameInterval) {
+                animationId = requestAnimationFrame(update);
+                return;
+            }
+            
+            // Allow catch-up for slight delays, but prevent huge jumps (e.g. if tab was inactive)
+            if (deltaTime > 200) lastTime = currentTime - frameInterval;
+            else lastTime = currentTime - (deltaTime % frameInterval);
+
             const g = gameRef.current;
             g.frame++;
             setSurvivedTime(Date.now() - g.startTime);
@@ -497,19 +511,24 @@ const KoalaFlap = ({ user, token }) => {
 
             {/* Daily Mission Card */}
             {user && payoutEnabled && (
-                <div style={{ width: '100%', background: 'rgba(255,255,255,0.02)', padding: '12px 20px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ width: '100%', background: dailyMission.completed ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.02)', padding: '12px 20px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: dailyMission.completed ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(255,255,255,0.05)', opacity: dailyMission.completed ? 0.8 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ background: dailyMission.completed ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', padding: '10px', borderRadius: '12px' }}>
-                            <Zap size={20} color={dailyMission.completed ? '#22c55e' : '#fbbf24'} />
+                            {dailyMission.completed ? <ShieldCheck size={20} color="#22c55e" /> : <Zap size={20} color="#fbbf24" />}
                         </div>
                         <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Daily Mission</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pass 10 pipes in one run</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', color: dailyMission.completed ? '#22c55e' : 'inherit' }}>
+                                Daily Mission
+                                {dailyMission.completed && <ShieldCheck size={14} color="#22c55e" />}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: dailyMission.completed ? '#22c55e' : 'var(--text-muted)' }}>
+                                {dailyMission.completed ? 'Heute bereits abgeschlossen!' : 'Überlebe 10 Röhren in einem Run'}
+                            </div>
                         </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 800, color: dailyMission.completed ? '#22c55e' : '#fbbf24', fontSize: '1.2rem' }}>
-                            {dailyMission.completed ? 'ERLEDIGT' : `+ ${(dailyMission.reward/100).toFixed(0)} KC`}
+                        <div style={{ fontWeight: 800, color: dailyMission.completed ? '#22c55e' : '#fbbf24', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {dailyMission.completed ? <ShieldCheck size={20} /> : `+ ${(dailyMission.reward/100).toFixed(0)} KC`}
                         </div>
                     </div>
                 </div>
@@ -674,15 +693,15 @@ const KoalaFlap = ({ user, token }) => {
                                                 <span style={{ fontWeight: 700 }}>{item.display_name}</span>
                                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Lvl {userLevel} / {item.max_level}</span>
                                             </div>
-                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
                                                 {item.description}
                                                 <div style={{ marginTop: '6px', color: '#fbbf24', fontWeight: 600, fontSize: '0.75rem' }}>
-                                                    {item.upgrade_id === 'coin_base_value' && `Aktuell: ${((5 * (1 + userLevel * 0.2)) / 100).toFixed(2)} KC / Münze`}
+                                                    {item.upgrade_id === 'coin_base_value' && `Aktuell: ${(1 + userLevel * 0.2).toFixed(1)}x Multiplikator (entspricht ${((1 * (1 + userLevel * 0.2)) / 100).toFixed(2)} KC pro Standard-Münze)`}
                                                     {item.upgrade_id === 'extra_lives' && `Aktuell: +${userLevel} ❤️ Start-Leben`}
-                                                    {item.upgrade_id === 'crit_coins' && `Aktuell: ${userLevel}% Crit-Chance (10x Wert)`}
-                                                    {item.upgrade_id === 'hotstreak_multiplier' && `Aktuell: +${(userLevel * 2)}% Bonus pro passierter Röhre`}
+                                                    {item.upgrade_id === 'crit_coins' && `Aktuell: ${userLevel}% Chance auf Crit-Münzen (10x Wert)`}
+                                                    {item.upgrade_id === 'hotstreak_multiplier' && `Aktuell: +${(userLevel * 2)}% Bonus pro überlebter Röhre (am Ende addiert)`}
                                                 </div>
-                                            </p>
+                                            </div>
                                             
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
