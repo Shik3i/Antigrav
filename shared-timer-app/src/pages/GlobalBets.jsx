@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, TrendingUp, TrendingDown, Target, Clock, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import UserContextMenu from '../components/UserContextMenu';
+import Avatar from '../components/Avatar';
 
 const GlobalBets = () => {
     const { token } = useAuth();
@@ -17,7 +19,12 @@ const GlobalBets = () => {
                 const res = await fetch('/api/esports/bets/recent?days=7');
                 if (!res.ok) throw new Error('Failed to load community bets');
                 const data = await res.json();
-                setBets(data || []);
+                // Parse userPreferences JSON for each bet
+                const parsed = (data || []).map(bet => ({
+                    ...bet,
+                    parsedPreferences: bet.userPreferences ? (() => { try { return JSON.parse(bet.userPreferences); } catch { return {}; } })() : {}
+                }));
+                setBets(parsed);
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -68,11 +75,11 @@ const GlobalBets = () => {
         );
     }
 
-    // Group bets by day
+    // Group bets by matchName
     const groupedBets = bets.reduce((acc, bet) => {
-        const dateKey = new Date(bet.createdAt).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-        if (!acc[dateKey]) acc[dateKey] = [];
-        acc[dateKey].push(bet);
+        const matchKey = bet.matchName || 'Unknown Match';
+        if (!acc[matchKey]) acc[matchKey] = [];
+        acc[matchKey].push(bet);
         return acc;
     }, {});
 
@@ -121,20 +128,20 @@ const GlobalBets = () => {
                 </div>
             </div>
 
-            {/* Bets List grouped by day */}
+            {/* Bets List grouped by match */}
             {Object.keys(groupedBets).length === 0 ? (
                 <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     <Target size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
                     <p>No bets have been placed in the last 7 days.</p>
                 </div>
             ) : (
-                Object.entries(groupedBets).map(([day, dayBets]) => (
-                    <div key={day} style={{ marginBottom: '24px' }}>
-                        <h3 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 12px 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            {day}
+                Object.entries(groupedBets).map(([matchName, matchBets]) => (
+                    <div key={matchName} style={{ marginBottom: '24px' }}>
+                        <h3 style={{ fontSize: '0.9rem', color: 'var(--text-main)', margin: '0 0 12px 4px', fontWeight: 600 }}>
+                            {matchName}
                         </h3>
                         <div className="glass-card" style={{ overflow: 'hidden' }}>
-                            {dayBets.map((bet, idx) => {
+                            {matchBets.map((bet, idx) => {
                                 const statusColor = getStatusColor(bet.status);
                                 const potentialWin = ((bet.stake * bet.odds) / 100).toFixed(0);
                                 return (
@@ -144,7 +151,7 @@ const GlobalBets = () => {
                                             display: 'flex',
                                             alignItems: 'center',
                                             padding: '14px 20px',
-                                            borderBottom: idx < dayBets.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                                            borderBottom: idx < matchBets.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                                             gap: '16px',
                                             transition: 'background 0.2s',
                                         }}
@@ -164,16 +171,18 @@ const GlobalBets = () => {
 
                                         {/* Main Info */}
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                                                <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                                                    {bet.userName || 'Unknown'}
-                                                </span>
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                                    → {bet.chosenTeam}
-                                                </span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                <UserContextMenu username={bet.userName || bet.name || bet.displayName || 'Unknown'} userId={bet.userId}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <Avatar user={{ displayName: bet.userName, preferences: bet.parsedPreferences }} size={20} />
+                                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                                            {bet.userName || 'Unknown'}
+                                                        </span>
+                                                    </div>
+                                                </UserContextMenu>
                                             </div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {bet.matchName}
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                Picked: <strong style={{ color: 'var(--text-main)' }}>{bet.chosenTeam}</strong>
                                             </div>
                                         </div>
 

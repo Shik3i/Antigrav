@@ -48,6 +48,7 @@ db.serialize(() => {
   db.run("ALTER TABLE Users ADD COLUMN is_superadmin BOOLEAN DEFAULT 0", () => { });
   db.run("ALTER TABLE Users ADD COLUMN lastActive DATETIME", () => { });
   db.run("ALTER TABLE Users ADD COLUMN koala_balance INTEGER DEFAULT 0", () => { });
+  db.run("ALTER TABLE Users ADD COLUMN last_daily_claim DATETIME", () => { });
 
   // ServerSettings: stores global app configurations
   db.run(`CREATE TABLE IF NOT EXISTS ServerSettings (
@@ -58,7 +59,7 @@ db.serialize(() => {
     db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_points_per_hour', '1000')`);
     db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_start_coins', '10000')`);
     db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', '1.0')`);
-    db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', '1.0')`);
+    db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('achievement_reward_multiplier', '2.5')`);
   });
 
   // KoalaTransactions: logs coin additions and deductions
@@ -78,6 +79,16 @@ db.serialize(() => {
     reason TEXT,
     bannedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(id) REFERENCES Users(id)
+  )`);
+
+  // UserAchievements: stores claimed milestone achievements and daily claims
+  db.run(`CREATE TABLE IF NOT EXISTS UserAchievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    achievementId TEXT NOT NULL,
+    claimedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id),
+    UNIQUE(userId, achievementId)
   )`);
 
   // Rooms table is no longer used (managed in RAM via roomManager.js)
@@ -225,6 +236,7 @@ db.serialize(() => {
 
   // Migration: Add adminComment to FeatureRequests
   db.run("ALTER TABLE FeatureRequests ADD COLUMN adminComment TEXT", () => { });
+  db.run("ALTER TABLE FeatureRequests ADD COLUMN type TEXT DEFAULT 'Feature'", () => { });
 
   db.run(`CREATE TABLE IF NOT EXISTS FeatureVotes (
     requestId INTEGER NOT NULL,
@@ -315,6 +327,12 @@ db.serialize(() => {
     FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
   )`);
   db.run('CREATE INDEX IF NOT EXISTS idx_speedcube_userId ON SpeedcubeTimes(userId)');
+  
+  // AchievementSettings: stores per-achievement multipliers
+  db.run(`CREATE TABLE IF NOT EXISTS AchievementSettings (
+    achievementId TEXT PRIMARY KEY,
+    multiplier REAL DEFAULT 1.0
+  )`);
 });
 
 // Speedcube Helpers
@@ -499,7 +517,7 @@ const getHighscores = (limit = 10) => {
   return new Promise((resolve, reject) => {
     // 1. Top Users by total focus time (hours), also returning session count
     const queryUsers = `
-      SELECT u.displayName, 
+      SELECT u.id, u.username, u.displayName, u.preferences,
         ROUND(SUM(CASE WHEN te.durationMinutes IS NULL OR te.durationMinutes = '' THEN 20 ELSE te.durationMinutes END) / 60.0, 1) as totalCompleted,
         COUNT(te.id) as sessionCount
       FROM Users u
@@ -597,7 +615,7 @@ const getActivityHistory = (days = 30) => {
 
 const getTopUsersByCoins = (limit = 10) => {
   return new Promise((resolve, reject) => {
-    db.all(`SELECT id, displayName, koala_balance FROM Users WHERE koala_balance > 0 ORDER BY koala_balance DESC LIMIT ?`, [limit], (err, rows) => {
+    db.all(`SELECT id as userId, username, displayName, preferences, koala_balance FROM Users WHERE koala_balance > 0 ORDER BY koala_balance DESC LIMIT ?`, [limit], (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -940,13 +958,13 @@ const getEsportsTeamsLastUpdated = () => {
 // --- KOALA COINS ---
 const getKoalaBaseline = () => {
   return new Promise((resolve, reject) => {
-    db.all(`SELECT key, value FROM ServerSettings WHERE key IN ('koala_points_per_hour', 'koala_start_coins', 'koala_coin_conversion_rate', 'koala_daily_mission_multiplier')`, (err, rows) => {
+    db.all(`SELECT key, value FROM ServerSettings WHERE key IN ('koala_points_per_hour', 'koala_start_coins', 'koala_coin_conversion_rate', 'koala_daily_mission_multiplier', 'achievement_reward_multiplier')`, (err, rows) => {
       if (err) reject(err);
       else {
-        const settings = { koala_points_per_hour: 1000, koala_start_coins: 10000, koala_coin_conversion_rate: 0.01, koala_daily_mission_multiplier: 1.0 };
+        const settings = { koala_points_per_hour: 1000, koala_start_coins: 10000, koala_coin_conversion_rate: 0.01, koala_daily_mission_multiplier: 1.0, achievement_reward_multiplier: 2.5 };
         if (rows) {
           rows.forEach(r => {
-            if (r.key === 'koala_coin_conversion_rate' || r.key === 'koala_daily_mission_multiplier') settings[r.key] = parseFloat(r.value);
+            if (r.key === 'koala_coin_conversion_rate' || r.key === 'koala_daily_mission_multiplier' || r.key === 'achievement_reward_multiplier') settings[r.key] = parseFloat(r.value);
             else settings[r.key] = parseInt(r.value, 10);
           });
         }
@@ -970,6 +988,9 @@ const updateKoalaBaseline = (settings) => {
       }
       if (settings.koala_daily_mission_multiplier !== undefined) {
         await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', ?)`, [String(settings.koala_daily_mission_multiplier)], err => err ? rej(err) : res()));
+      }
+      if (settings.achievement_reward_multiplier !== undefined) {
+        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('achievement_reward_multiplier', ?)`, [String(settings.achievement_reward_multiplier)], err => err ? rej(err) : res()));
       }
       resolve(true);
     } catch (e) {
@@ -1123,9 +1144,9 @@ const createBet = (userId, matchName, chosenTeam, polymarketTeam, stake, odds, p
   });
 };
 
-const getUserBets = (userId) => {
+const getUserBets = (userId, limit = 50) => {
   return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM Bets WHERE userId = ? ORDER BY createdAt DESC', [userId], (err, rows) => {
+    db.all('SELECT * FROM Bets WHERE userId = ? ORDER BY createdAt DESC LIMIT ?', [userId, limit], (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -1174,7 +1195,7 @@ const getAllBetsAdmin = () => {
 const getRecentBets = (days = 7) => {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT b.*, u.displayName as userName
+      SELECT b.*, u.displayName as userName, u.preferences as userPreferences
       FROM Bets b
       LEFT JOIN Users u ON b.userId = u.id
       WHERE b.createdAt >= datetime('now', '-' || ? || ' days')
@@ -1284,16 +1305,25 @@ const getAdminActions = (limit = 100) => {
 };
 
 // ─── Feature Request Roadmap ─────────────────────────────────────
-const createFeatureRequest = (userId, userName, title, description) => {
+const createFeatureRequest = (userId, userName, title, description, type = 'Feature') => {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO FeatureRequests (userId, userName, title, description) VALUES (?, ?, ?, ?)',
-      [userId, userName, title, description],
+      'INSERT INTO FeatureRequests (userId, userName, title, description, type) VALUES (?, ?, ?, ?, ?)',
+      [userId, userName, title, description, type],
       function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       }
     );
+  });
+};
+
+const getUserFeatureRequestCount = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT COUNT(*) as count FROM FeatureRequests WHERE userId = ?', [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.count : 0);
+    });
   });
 };
 
@@ -1354,12 +1384,15 @@ const deleteFeatureRequest = (requestId) => {
   });
 };
 
+
 const getBettingAccuracyLeaderboard = () => {
   return new Promise((resolve, reject) => {
     const query = `
       SELECT 
           u.id as userId, 
-          u.displayName, 
+          u.displayName,
+          u.username,
+          u.preferences,
           COUNT(*) as totalPredictions,
           SUM(CASE WHEN t.status = 'won' THEN 1 ELSE 0 END) as correctPredictions,
           (CAST(SUM(CASE WHEN t.status = 'won' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*)) * 100 as winRate
@@ -1498,7 +1531,7 @@ const purchaseUpgrade = (userId, upgradeId) => {
 const getGameLeaderboards = (gameId) => {
   return new Promise((resolve, reject) => {
     const highscoreQuery = `
-      SELECT u.displayName, u.id as userId, MAX(gs.score) as highscore
+      SELECT u.displayName, u.username, u.preferences, u.id as userId, MAX(gs.score) as highscore
       FROM GameScores gs
       JOIN Users u ON gs.userId = u.id
       WHERE gs.gameId = ?
@@ -1508,7 +1541,7 @@ const getGameLeaderboards = (gameId) => {
     `;
 
     const cumulativeQuery = `
-      SELECT u.displayName, u.id as userId, SUM(gs.coinsEarned) as totalEarned
+      SELECT u.displayName, u.username, u.preferences, u.id as userId, SUM(gs.coinsEarned) as totalEarned
       FROM GameScores gs
       JOIN Users u ON gs.userId = u.id
       WHERE gs.gameId = ?
@@ -1618,6 +1651,183 @@ function deleteChangelogEntry(id) {
   });
 }
 
+// ─── Achievements & Daily Bonus ────────────────────────────────
+const getUserAchievements = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT achievementId, claimedAt FROM UserAchievements WHERE userId = ?`, [userId], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const claimAchievement = (userId, achievementId) => {
+  return new Promise((resolve, reject) => {
+    db.run(`INSERT INTO UserAchievements (userId, achievementId) VALUES (?, ?)`, [userId, achievementId], function(err) {
+      if (err) reject(err);
+      else resolve(this.lastID);
+    });
+  });
+};
+
+const updateDailyClaimTime = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.run(`UPDATE Users SET last_daily_claim = CURRENT_TIMESTAMP WHERE id = ?`, [userId], function(err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+};
+
+const getUserTimerCount = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(*) as count FROM TimerEvents WHERE userId = ?`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.count : 0);
+    });
+  });
+};
+
+const getUserDailyClaim = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT last_daily_claim FROM Users WHERE id = ?`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.last_daily_claim : null);
+    });
+  });
+};
+
+const getUserWonMatchCount = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(DISTINCT matchName) as count FROM Bets WHERE userId = ? AND status = 'won'`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.count : 0);
+    });
+  });
+};
+
+const getUserGameRoundCount = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(*) as count FROM GameScores WHERE userId = ? AND gameId = 'koala_flap'`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.count : 0);
+    });
+  });
+};
+
+// ─── Special Achievement Queries ─────────────────────────────
+const hasEarlyBirdTimer = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(*) as c FROM TimerEvents WHERE userId = ? AND CAST(strftime('%H', completedAt) AS INTEGER) BETWEEN 5 AND 7`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row && row.c > 0 ? 1 : 0);
+    });
+  });
+};
+
+const hasNightOwlTimer = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(*) as c FROM TimerEvents WHERE userId = ? AND CAST(strftime('%H', completedAt) AS INTEGER) BETWEEN 0 AND 3`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row && row.c > 0 ? 1 : 0);
+    });
+  });
+};
+
+const hasWeekendWarrior = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`
+      SELECT COUNT(*) as c FROM (
+        SELECT strftime('%Y-%W', completedAt) as yw
+        FROM TimerEvents
+        WHERE userId = ?
+        GROUP BY yw
+        HAVING SUM(CASE WHEN strftime('%w', completedAt) = '6' THEN 1 ELSE 0 END) > 0
+           AND SUM(CASE WHEN strftime('%w', completedAt) = '0' THEN 1 ELSE 0 END) > 0
+      )
+    `, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row && row.c > 0 ? 1 : 0);
+    });
+  });
+};
+
+const getUserBalance = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT koala_balance FROM Users WHERE id = ?`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.koala_balance : 0);
+    });
+  });
+};
+
+const hasUnderdogWin = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(*) as c FROM Bets WHERE userId = ? AND status = 'won' AND odds > 3.0`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row && row.c > 0 ? 1 : 0);
+    });
+  });
+};
+
+const hasLoyalFanWin = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`
+      SELECT COUNT(*) as c FROM Bets b
+      JOIN Users u ON b.userId = u.id
+      WHERE b.userId = ? AND b.status = 'won'
+        AND u.preferences IS NOT NULL
+        AND b.chosenTeam = JSON_EXTRACT(u.preferences, '$.fanTeam')
+    `, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row && row.c > 0 ? 1 : 0);
+    });
+  });
+};
+
+const getUserVoteCount = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT COUNT(DISTINCT requestId) as count FROM FeatureVotes WHERE userId = ?`, [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.count : 0);
+    });
+  });
+};
+
+const getUserZeroScoreStreak = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT score FROM GameScores WHERE userId = ? AND gameId = 'koala_flap' ORDER BY createdAt DESC`, [userId], (err, rows) => {
+      if (err) return reject(err);
+      if (!rows || rows.length === 0) return resolve(0);
+      // Count the current consecutive streak of score=0 from most recent
+      let streak = 0;
+      for (const row of rows) {
+        if (row.score === 0) streak++;
+        else break;
+      }
+      resolve(streak);
+    });
+  });
+};
+
+const getAchievementSettings = () => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM AchievementSettings', (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const updateAchievementSetting = (achievementId, multiplier) => {
+  return new Promise((resolve, reject) => {
+    db.run('INSERT OR REPLACE INTO AchievementSettings (achievementId, multiplier) VALUES (?, ?)', [achievementId, multiplier], (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+};
+
 module.exports = {
   db,
   addUser,
@@ -1680,6 +1890,7 @@ module.exports = {
   logAdminAction,
   getAdminActions,
   createFeatureRequest,
+  getUserFeatureRequestCount,
   getFeatureRequests,
   voteFeatureRequest,
   updateFeatureStatus,
@@ -1691,6 +1902,13 @@ module.exports = {
   getGameUpgradesConfig,
   getUserUpgrades,
   purchaseUpgrade,
+  getUserAchievements,
+  claimAchievement,
+  updateDailyClaimTime,
+  getUserTimerCount,
+  getUserDailyClaim,
+  getUserWonMatchCount,
+  getUserGameRoundCount,
   getAdminGameScores,
   deleteGameScore,
   checkDailyMission,
@@ -1702,5 +1920,16 @@ module.exports = {
   addSpeedcubeTime,
   getSpeedcubeTimes,
   updateSpeedcubeNote,
-  deleteSpeedcubeTime
+  deleteSpeedcubeTime,
+  hasEarlyBirdTimer,
+  hasNightOwlTimer,
+  hasWeekendWarrior,
+  getUserBalance,
+  hasUnderdogWin,
+  hasLoyalFanWin,
+  getUserVoteCount,
+  getUserZeroScoreStreak,
+  getAchievementSettings,
+  updateAchievementSetting,
+  getUserFeatureRequestCount
 };

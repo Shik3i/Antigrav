@@ -23,6 +23,9 @@ const KoalaFlap = React.lazy(() => import('./pages/KoalaFlap'));
 const SpeedcubeTimer = React.lazy(() => import('./pages/SpeedcubeTimer'));
 const GameLeaderboards = React.lazy(() => import('./pages/GameLeaderboards'));
 const Changelog = React.lazy(() => import('./pages/Changelog'));
+const UserProfile = React.lazy(() => import('./pages/UserProfile'));
+const Achievements = React.lazy(() => import('./pages/Achievements'));
+const AdminAchievements = React.lazy(() => import('./pages/AdminAchievements'));
 
 import NewsTicker from './components/NewsTicker';
 import Friends from './pages/Friends';
@@ -382,17 +385,20 @@ function InnerApp() {
                 <Route path="/highscores" element={<Highscores />} />
                 <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={globalSocket} />} />
                 <Route path="/koala-dashboard" element={<KoalaDashboard />} />
+                <Route path="/achievements" element={<Achievements />} />
                 <Route path="/countdowns" element={<Countdowns user={user} />} />
                 <Route path="/global-bets" element={<GlobalBets />} />
                 <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={globalSocket} />} />
                 <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="/extension-info" element={<ExtensionInfo />} />
                 <Route path="/admin" element={<Admin socket={globalSocket} />} />
+                <Route path="/admin/achievements" element={<AdminAchievements />} />
                 <Route path="/features" element={<FeatureRequests />} />
                 <Route path="/changelog" element={<Changelog />} />
                 <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
                 <Route path="/games/leaderboard" element={<GameLeaderboards />} />
                 <Route path="/speedcube" element={<SpeedcubeTimer />} />
+                <Route path="/profile/:username" element={<UserProfile />} />
               </Routes>
             </React.Suspense>
           </main>

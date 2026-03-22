@@ -46,6 +46,7 @@ router.post('/admin/bets/trigger-resolver', authController.authenticateToken, ap
 router.get('/admin/actions', authController.authenticateToken, apiController.getAdminActions);
 
 router.post('/users', apiController.registerUser);
+router.get('/users/profile/:username', apiController.getUserProfile);
 router.get('/rooms', authController.optionalAuthenticateToken, apiController.getRooms);
 router.post('/rooms', [
     body('name').trim().isLength({ min: 1, max: 30 }).withMessage('Room name must be 1-30 characters').customSanitizer(xss),
@@ -110,6 +111,15 @@ router.get('/twitch/status', apiController.getTwitchStatus);
 
 // ─── Changelog ──────────────────────────────────────────────
 router.get('/changelog', apiController.getChangelog);
+
+// ─── Achievements ─────────────────────────────────────────────
+const achievementsController = require('../controllers/achievementsController');
+router.get('/achievements/status', authController.authenticateToken, achievementsController.getStatus);
+router.post('/achievements/claim/:id', authController.authenticateToken, achievementsController.claimAchievement);
+
+// Admin Achievements
+router.get('/admin/achievements/settings', authController.authenticateToken, achievementsController.getAdminSettings);
+router.post('/admin/achievements/settings', authController.authenticateToken, achievementsController.updateAdminSettings);
 
 // ─── Speedcube Timer ──────────────────────────────────────────
 const speedcubeController = require('../controllers/speedcubeController');

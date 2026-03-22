@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy, Medal, Award, Calendar, Clock, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import UserContextMenu from '../components/UserContextMenu';
+import Avatar from '../components/Avatar';
 
 const Highscores = () => {
     const [data, setData] = useState({ topUsers: [], topCoins: [], stats: {} });
@@ -17,10 +19,16 @@ const Highscores = () => {
             fetch('/api/highscores/coins').then(res => res.json())
         ])
             .then(([timerData, coinData]) => {
+                const parsePrefs = (u) => {
+                    if (typeof u.preferences === 'string') {
+                        try { u.preferences = JSON.parse(u.preferences); } catch (e) {}
+                    }
+                    return u;
+                };
                 setData({
-                    topUsers: timerData.topUsers || [],
+                    topUsers: (timerData.topUsers || []).map(parsePrefs),
                     stats: timerData.stats || {},
-                    topCoins: coinData || []
+                    topCoins: (coinData || []).map(parsePrefs)
                 });
                 setLoading(false);
             })
@@ -41,7 +49,12 @@ const Highscores = () => {
         if (activeTab === 'accuracy' && accuracyData.length === 0) {
             fetch('/api/highscores/accuracy')
                 .then(res => res.json())
-                .then(setAccuracyData)
+                .then(data => setAccuracyData((data || []).map(u => {
+                    if (typeof u.preferences === 'string') {
+                        try { u.preferences = JSON.parse(u.preferences); } catch (e) {}
+                    }
+                    return u;
+                })))
                 .catch(console.error);
         }
     }, [activeTab]);
@@ -150,7 +163,12 @@ const Highscores = () => {
                                                 {getRankIcon(index)}
                                             </td>
                                             <td style={{ padding: '16px 24px' }}>
-                                                <div style={{ fontWeight: 500, marginBottom: '4px' }}>{score.displayName}</div>
+                                                <UserContextMenu username={score.username || score.name || score.displayName} userId={score.id || score.userId}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                                                        <Avatar user={{ username: score.username || score.name || score.displayName, preferences: typeof score.preferences === 'string' ? JSON.parse(score.preferences) : score.preferences }} size={24} />
+                                                        <div style={{ fontWeight: 500 }}>{score.displayName}</div>
+                                                    </div>
+                                                </UserContextMenu>
                                                 <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
                                                     <div style={{ width: `${barWidth}%`, height: '100%', background: 'var(--accent-gradient)', borderRadius: '2px' }}></div>
                                                 </div>
@@ -191,7 +209,12 @@ const Highscores = () => {
                                                 {getRankIcon(index)}
                                             </td>
                                             <td style={{ padding: '16px 24px' }}>
-                                                <div style={{ fontWeight: 500, marginBottom: '4px' }}>{score.displayName}</div>
+                                                <UserContextMenu username={score.username || score.name || score.displayName} userId={score.id || score.userId}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                                                        <Avatar user={{ username: score.username || score.name || score.displayName, preferences: typeof score.preferences === 'string' ? JSON.parse(score.preferences) : score.preferences }} size={24} />
+                                                        <div style={{ fontWeight: 500 }}>{score.displayName}</div>
+                                                    </div>
+                                                </UserContextMenu>
                                                 <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
                                                     <div style={{ width: `${barWidth}%`, height: '100%', background: 'linear-gradient(90deg, #f59e0b, #d97706)', borderRadius: '2px' }}></div>
                                                 </div>
@@ -239,7 +262,12 @@ const Highscores = () => {
                                                 {getRankIcon(index)}
                                             </td>
                                             <td style={{ padding: '16px 24px' }}>
-                                                <div style={{ fontWeight: 500 }}>{score.displayName}</div>
+                                                <UserContextMenu username={score.username || score.name || score.displayName} userId={score.id || score.userId}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        <Avatar user={{ username: score.username || score.name || score.displayName, preferences: typeof score.preferences === 'string' ? JSON.parse(score.preferences) : score.preferences }} size={24} />
+                                                        <div style={{ fontWeight: 500 }}>{score.displayName}</div>
+                                                    </div>
+                                                </UserContextMenu>
                                             </td>
                                             <td style={{ padding: '16px 24px', textAlign: 'right', color: 'var(--text-muted)' }}>
                                                 {score.totalPredictions}

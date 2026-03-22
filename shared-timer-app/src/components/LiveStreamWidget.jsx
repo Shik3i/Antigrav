@@ -23,7 +23,8 @@ const LiveStreamWidget = () => {
         { id: 'eintrachtspandau', name: 'Eintracht Spandau' },
         { id: 'tolkin', name: 'Tolkin' },
         { id: 'lec', name: 'LEC' },
-        { id: 'lck', name: 'LCK' }
+        { id: 'lck', name: 'LCK' },
+        { id: 'riotgames', name: 'Riot Games' }
     ];
 
     const fetchStatus = async () => {

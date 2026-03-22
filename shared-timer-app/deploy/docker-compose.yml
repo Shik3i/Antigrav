@@ -1,0 +1,36 @@
+services:
+  shared-timer:
+    image: shared-timer-app:latest
+    container_name: SyncTimer
+    restart: always
+    ports:
+      - "3001:3001"
+
+    environment:
+      - TZ=Europe/Berlin
+      - NODE_ENV=production
+      - DB_PATH=/app/data/timer.db
+      - THE_ODDS_API_KEY=29bafe6cd2bcbb56439a0cc7dd4a9380
+      - HOST_OS=Unraid
+      - HOST_HOSTNAME=unraidBox
+      - HOST_CONTAINERNAME=SyncTimer
+
+    volumes:
+      - synctimer-db-storage:/app/data
+
+    labels:
+      - "net.unraid.docker.managed=dockerman"
+
+    pids_limit: 2048
+
+    networks:
+      bond0_network:
+        ipv4_address: 192.168.178.106
+
+volumes:
+  synctimer-db-storage:
+
+networks:
+  bond0_network:
+    external: true
+    name: bond0

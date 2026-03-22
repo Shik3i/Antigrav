@@ -1,9 +1,33 @@
 [
   {
+    "id": 6,
+    "version": "2.2.4",
+    "date": "2026-03-22",
+    "changes": "- **Achievements 2.0**: Komplettes Refactoring mit sequenziellen Ketten für Timer, Esports und KoalaFlap.\n- **Spezial-Erfolge**: 8 neue kreative Meilensteine wie \"Frühaufsteher\", \"Nachteule\" und \"Weekend Warrior\".\n- **Sicherheit & Fixes**: Crash beim Abholen des Daily Bonus behoben; Implementierung von DB-Level Schutz gegen Double-Claim Exploits.\n- **Admin & UI**: Sidebar erlaubt nun direkten Superadmin-Zugriff auf das Admin Panel; Vereinheitlichung der Avatar-Größen in globalen Statistiken."
+  },
+  {
+    "id": 5,
+    "version": "2.2.3",
+    "date": "2026-03-22",
+    "changes": "- **Erfolge & Boni**: Neues Belohnungssystem unter `/achievements` mit täglichem Login-Bonus und Meilenstein-Trophäen.\n- **Statistik-Avatare**: Fehler behoben, bei dem Avatare in den globalen Bestenlisten nicht angezeigt wurden.\n- **SQL-Optimierung**: Erweiterung der Highscore-Abfragen um User-Präferenzen für eine konsistente visuelle Darstellung."
+  },
+  {
+    "id": 4,
+    "version": "2.2.2",
+    "date": "2026-03-22",
+    "changes": "- **Roadmap-Archiv**: Abgeschlossene und abgelehnte Tickets werden nun in einem einklappbaren Bereich am Ende der Liste gesammelt.\n- **AI-Prompt Export**: Die \"Export für AI\" Funktion kopiert nun zusätzlich einen fertigen Arbeits-Prompt für KI-Agenten in die Zwischenablage.\n- **Sidebar-Gedächtnis**: Der Status (ein-/ausgeklappt) der Seitenleisten-Kategorien wird nun dauerhaft im Browser gespeichert.\n- **Speedcube Averages**: Anzeige von Ao5, Ao10 und Ao100 Durchschnitten nach offiziellen WCA-Regeln.\n- **KoalaFlap FPS-Fix**: Die Spielphysik wurde auf 60 FPS normalisiert, um eine konsistente Geschwindigkeit auf allen Monitoren (60Hz bis 240Hz+) zu garantieren.\n- **UX & Fixes**: Diverse Korrekturen an Profil-Verlinkungen und Integration von Avataren in allen globalen Bestenlisten."
+  },
+  {
+    "id": 3,
+    "version": "2.2.1",
+    "date": "2026-03-22",
+    "changes": "- **UX Updates**: Alle ungenutzten Navigationselemente sind nun eingeklappt eingefahren, um ein cleaneres UI zu erzeugen.\n- **Roadmap 2.0**: Tickets haben jetzt fest zugeordnete Typen (Feature/Bug) und werden nach Abschluss am Ende sortiert.\n- **Timer Persistenz**: Raumeinstellungen wie Dauer, Sichtbarkeit und Rolle werden ab jetzt im Browser gespeichert.\n- **Bugfixes**: Der Tab-Coin-Exploit wurde vollständig behoben; Die Flappy-Auszahlungsraten-Beschreibungen wurden in KoalaFlap korrigiert."
+  },
+  {
     "id": 2,
     "version": "2.2.0",
     "date": "2026-03-19",
-    "changes": "- **Speedcube Timer**: Ein mechanischer Timer für Speedcubing ist nun verfügbar! Nutze die Leertaste zum Halten, Starten und Stoppen deiner Solves.\n- **Statistiken & Bests**: Die Seite zeigt dir nun direkt dein Personal Best (All-time) sowie deinen besten Wert des heutigen Tages an.\n- **Optimierte UX**: Die Seite scrollt nicht mehr, wenn du die Leertaste drückst. Der Timer läuft nun flüssig in Echtzeit mit 60 FPS.\n- **Data Sync**: Zeiten werden für Mitglieder in der DB gespeichert, Gäste nutzen automatisch den LocalStorage.\n- **Visuals**: Ein neues Rubiks-Cube Icon in der Sidebar und ein cleanes, modernes Timer-Design."
+    "changes": "- **Speedcube Timer**: Ein mechanischer Timer für Speedcubing ist nun verfügbar! Nutze die Leertaste zum Halten, Starten und Stoppen deiner Solves.\n- **Statistiken & Bests**: Die Seite zeigt dir nun direkt dein Personal Best (All-time) sowie deinen besten Wert des heutigen Tages an.\n\n- **Data Sync**: Zeiten werden für Mitglieder in der DB gespeichert, Gäste nutzen automatisch den LocalStorage."
   },
   {
     "id": 1,

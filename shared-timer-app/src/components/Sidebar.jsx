@@ -12,12 +12,22 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const navigate = useNavigate();
     const { isGuest, logout } = useAuth();
     const isRoomRoute = location.pathname.startsWith('/room/');
-    const [expandedSections, setExpandedSections] = useState({
-        timers: true,
-        esports: true,
-        games: true,
-        tools: false
+    const [expandedSections, setExpandedSections] = useState(() => {
+        try {
+            const saved = localStorage.getItem('sidebar_expanded_sections');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { }
+        return {
+            timers: false,
+            esports: false,
+            games: false,
+            tools: false
+        };
     });
+
+    useEffect(() => {
+        localStorage.setItem('sidebar_expanded_sections', JSON.stringify(expandedSections));
+    }, [expandedSections]);
 
     const containerStyle = {
         width: '260px',
@@ -177,6 +187,10 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                 <TrendingUp size={18} color="#10b981" />
                                 Financial Dashboard
                             </NavLink>
+                            <NavLink to="/achievements" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
+                                <Trophy size={18} color="#facc15" />
+                                Achievements & Boni
+                            </NavLink>
                         </div>
                     )}
                 </div>
@@ -230,7 +244,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                 Changelog
                             </NavLink>
                             {user?.is_superadmin && (
-                                <NavLink to="/admin" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
+                                <NavLink to="/admin" onClick={() => { sessionStorage.setItem('admin_token', 'Bearer Entangled-Napping7-Custodian'); onClose(); }} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
                                     <Users size={18} color="var(--accent-primary)" />
                                     Admin Panel
                                 </NavLink>

@@ -72,6 +72,8 @@ const Admin = ({ socket }) => {
     const [gameScores, setGameScores] = useState([]);
     const [koalaDailyMissionMultiplier, setKoalaDailyMissionMultiplier] = useState(1.0);
     const [koalaDailyMissionMultiplierStr, setKoalaDailyMissionMultiplierStr] = useState('1.0');
+    const [achievementRewardMultiplier, setAchievementRewardMultiplier] = useState(2.5);
+    const [achievementRewardMultiplierStr, setAchievementRewardMultiplierStr] = useState('2.5');
     const [koalaFlapPayoutEnabled, setKoalaFlapPayoutEnabled] = useState(true);
 
     useEffect(() => {
@@ -133,6 +135,10 @@ const Admin = ({ socket }) => {
                     setKoalaDailyMissionMultiplier(baseline.koala_daily_mission_multiplier);
                     setKoalaDailyMissionMultiplierStr(baseline.koala_daily_mission_multiplier.toString());
                 }
+                if (baseline.achievement_reward_multiplier !== undefined) {
+                    setAchievementRewardMultiplier(baseline.achievement_reward_multiplier);
+                    setAchievementRewardMultiplierStr(baseline.achievement_reward_multiplier.toString());
+                }
                 if (baseline.game_koalaflap_payout_enabled !== undefined) {
                     setKoalaFlapPayoutEnabled(baseline.game_koalaflap_payout_enabled !== 'false');
                 }
@@ -155,6 +161,10 @@ const Admin = ({ socket }) => {
                 if (baseline.koala_daily_mission_multiplier !== undefined) {
                     setKoalaDailyMissionMultiplier(baseline.koala_daily_mission_multiplier);
                     setKoalaDailyMissionMultiplierStr(baseline.koala_daily_mission_multiplier.toString());
+                }
+                if (baseline.achievement_reward_multiplier !== undefined) {
+                    setAchievementRewardMultiplier(baseline.achievement_reward_multiplier);
+                    setAchievementRewardMultiplierStr(baseline.achievement_reward_multiplier.toString());
                 }
                 if (baseline.game_koalaflap_payout_enabled !== undefined) {
                     setKoalaFlapPayoutEnabled(baseline.game_koalaflap_payout_enabled !== 'false');
@@ -1324,6 +1334,23 @@ const Admin = ({ socket }) => {
                                 />
                             </div>
                             <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Achievement Multiplier</label>
+                                <div style={{ fontSize: '0.75rem', color: '#a855f7', marginBottom: '8px' }}>Val: {achievementRewardMultiplierStr}x Stunden</div>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    className="input-primary"
+                                    style={{ width: '100%' }}
+                                    value={achievementRewardMultiplierStr}
+                                    onChange={(e) => {
+                                        setAchievementRewardMultiplierStr(e.target.value);
+                                        const parsed = parseFloat(e.target.value);
+                                        if (!isNaN(parsed)) setAchievementRewardMultiplier(parsed);
+                                    }}
+                                    min="0"
+                                />
+                            </div>
+                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
                                 <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Minigame Payouts</label>
                                 <div style={{ fontSize: '0.75rem', color: koalaFlapPayoutEnabled ? '#22c55e' : '#ef4444', marginBottom: '8px' }}>{koalaFlapPayoutEnabled ? 'ENABLED' : 'DISABLED'}</div>
                                 <button 
@@ -1334,7 +1361,7 @@ const Admin = ({ socket }) => {
                                     {koalaFlapPayoutEnabled ? 'ON' : 'OFF'}
                                 </button>
                             </div>
-                            <button className="btn-primary" style={{ padding: '10px 24px', whiteSpace: 'nowrap' }} onClick={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { token: adminTokenRef.current, baseline: { koala_points_per_hour: koalaBaseline, koala_start_coins: koalaStartCoins, koala_coin_conversion_rate: koalaCoinRate, koala_daily_mission_multiplier: koalaDailyMissionMultiplier, game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString() } })}>
+                            <button className="btn-primary" style={{ padding: '10px 24px', whiteSpace: 'nowrap' }} onClick={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { token: adminTokenRef.current, baseline: { koala_points_per_hour: koalaBaseline, koala_start_coins: koalaStartCoins, koala_coin_conversion_rate: koalaCoinRate, koala_daily_mission_multiplier: koalaDailyMissionMultiplier, achievement_reward_multiplier: achievementRewardMultiplier, game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString() } })}>
                                 Save Configuration
                             </button>
                         </div>

@@ -8,12 +8,12 @@ const Home = ({ user, globalSocket }) => {
     const [activeRooms, setActiveRooms] = useState([]);
     const [friendsList, setFriendsList] = useState([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [isPublicSelection, setIsPublicSelection] = useState('on');
+    const [isPublicSelection, setIsPublicSelection] = useState(localStorage.getItem('timer_room_isPublic') || 'on');
     const navigate = useNavigate();
 
     useEffect(() => {
         if (!showCreateModal) {
-            setIsPublicSelection('on'); // Reset on close
+            setIsPublicSelection(localStorage.getItem('timer_room_isPublic') || 'on'); // Reset on close
         }
     }, [showCreateModal]);
 
@@ -65,6 +65,12 @@ const Home = ({ user, globalSocket }) => {
         const visibleToFriends = fd.get('visibleToFriends') === 'on';
         const defaultRole = fd.get('defaultRole') || 'read';
         const duration = parseFloat(fd.get('duration')) || 20;
+
+        // Save preferences
+        localStorage.setItem('timer_room_isPublic', isPublicSelection);
+        localStorage.setItem('timer_room_visibleToFriends', visibleToFriends);
+        localStorage.setItem('timer_room_defaultRole', defaultRole);
+        localStorage.setItem('timer_room_duration', duration);
 
         const roomId = Math.random().toString(36).substr(2, 6); // simple short ID
 
@@ -164,7 +170,7 @@ const Home = ({ user, globalSocket }) => {
 
                             <div>
                                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>Duration (Minutes)</label>
-                                <input type="number" name="duration" className="input-primary" defaultValue={20} min={0.01} step="any" max={120} required />
+                                <input type="number" name="duration" className="input-primary" defaultValue={localStorage.getItem('timer_room_duration') || 20} min={0.01} step="any" max={120} required />
                             </div>
 
                             <div>
@@ -183,14 +189,14 @@ const Home = ({ user, globalSocket }) => {
                             {isPublicSelection === 'on' ? (
                                 <div className="animate-fade-in">
                                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>Default Permissions for Public Joiners</label>
-                                    <select name="defaultRole" className="input-primary" defaultValue="read">
+                                    <select name="defaultRole" className="input-primary" defaultValue={localStorage.getItem('timer_room_defaultRole') || 'read'}>
                                         <option value="read">Read-only (Recommended)</option>
                                         <option value="write">Admin (Everyone can control timer)</option>
                                     </select>
                                 </div>
                             ) : (
                                 <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                                    <input type="checkbox" name="visibleToFriends" id="visibleToFriends" style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
+                                    <input type="checkbox" name="visibleToFriends" id="visibleToFriends" defaultChecked={localStorage.getItem('timer_room_visibleToFriends') === 'true'} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
                                     <label htmlFor="visibleToFriends" style={{ cursor: 'pointer', fontSize: '0.85rem' }}>Visible to my Friends</label>
                                 </div>
                             )}
