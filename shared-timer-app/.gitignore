@@ -33,3 +33,7 @@ data/*.db-wal
 
 # Logs
 server_log*.txt
+
+# Build / Deploy Artifacts
+*.tar
+deploy/
