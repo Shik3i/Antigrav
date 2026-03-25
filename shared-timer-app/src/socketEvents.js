@@ -101,6 +101,17 @@ const EVENTS = {
 
     ADMIN_BROADCAST_MESSAGE: 'admin_broadcast_message',
     GLOBAL_ANNOUNCEMENT: 'global_announcement',
+
+    // Admin Scratchcard Pools
+    GET_ADMIN_SCRATCHCARD_POOLS: 'get_admin_scratchcard_pools',
+    ADMIN_SCRATCHCARD_POOLS_DATA: 'admin_scratchcard_pools_data',
+    ADD_ADMIN_SCRATCHCARD_POOL_TEAM: 'add_admin_scratchcard_pool_team',
+    DELETE_ADMIN_SCRATCHCARD_POOL_TEAM: 'delete_admin_scratchcard_pool_team',
+
+    // Admin Scratchcard Config / Economy
+    GET_ADMIN_SCRATCHCARD_ECONOMY: 'get_admin_scratchcard_economy',
+    ADMIN_SCRATCHCARD_ECONOMY_DATA: 'admin_scratchcard_economy_data',
+    UPDATE_ADMIN_SCRATCHCARD_ECONOMY: 'update_admin_scratchcard_economy',
 };
 
 export default EVENTS;

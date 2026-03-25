@@ -203,6 +203,79 @@ module.exports = function (io) {
             }
         });
 
+        // --- Scratchcard Pools Admin ---
+        socket.on(EVENTS.GET_ADMIN_SCRATCHCARD_POOLS, async ({ token }) => {
+            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+                socket.emit(EVENTS.ERROR, 'Unauthorized');
+                return;
+            }
+            try {
+                const pools = await dbLayer.getScratchcardPools();
+                socket.emit(EVENTS.ADMIN_SCRATCHCARD_POOLS_DATA, pools);
+            } catch (err) {
+                socket.emit(EVENTS.ERROR, 'Failed to fetch scratchcard pools');
+            }
+        });
+
+        socket.on(EVENTS.ADD_ADMIN_SCRATCHCARD_POOL_TEAM, async ({ token, cardType, teamCode }) => {
+            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+                socket.emit(EVENTS.ERROR, 'Unauthorized');
+                return;
+            }
+            try {
+                await dbLayer.addScratchcardPoolTeam(cardType, teamCode);
+                await dbLayer.logAdminAction(socket.user.userId, socket.user.username, 'ADD_SCRATCHCARD_POOL', { cardType, teamCode });
+                const pools = await dbLayer.getScratchcardPools();
+                socket.emit(EVENTS.ADMIN_SCRATCHCARD_POOLS_DATA, pools);
+            } catch (err) {
+                socket.emit(EVENTS.ERROR, err.message || 'Failed to add team to scratchcard pool');
+            }
+        });
+
+        socket.on(EVENTS.DELETE_ADMIN_SCRATCHCARD_POOL_TEAM, async ({ token, cardType, teamCode }) => {
+            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+                socket.emit(EVENTS.ERROR, 'Unauthorized');
+                return;
+            }
+            try {
+                await dbLayer.removeScratchcardPoolTeam(cardType, teamCode);
+                await dbLayer.logAdminAction(socket.user.userId, socket.user.username, 'DELETE_SCRATCHCARD_POOL', { cardType, teamCode });
+                const pools = await dbLayer.getScratchcardPools();
+                socket.emit(EVENTS.ADMIN_SCRATCHCARD_POOLS_DATA, pools);
+            } catch (err) {
+                socket.emit(EVENTS.ERROR, 'Failed to remove team from scratchcard pool');
+            }
+        });
+
+        // --- Scratchcard Economy Config ---
+        socket.on(EVENTS.GET_ADMIN_SCRATCHCARD_ECONOMY, async ({ token }) => {
+            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+                socket.emit(EVENTS.ERROR, 'Unauthorized');
+                return;
+            }
+            try {
+                const configs = await dbLayer.getScratchcardConfigs();
+                socket.emit(EVENTS.ADMIN_SCRATCHCARD_ECONOMY_DATA, configs);
+            } catch (err) {
+                socket.emit(EVENTS.ERROR, 'Failed to fetch scratchcard configs');
+            }
+        });
+
+        socket.on(EVENTS.UPDATE_ADMIN_SCRATCHCARD_ECONOMY, async ({ token, cardType, price, winChance, rewardAmount }) => {
+            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+                socket.emit(EVENTS.ERROR, 'Unauthorized');
+                return;
+            }
+            try {
+                await dbLayer.updateScratchcardConfig(cardType, price, winChance, rewardAmount);
+                await dbLayer.logAdminAction(socket.user.userId, socket.user.username, 'UPDATE_SCRATCHCARD_ECONOMY', { cardType, price, winChance, rewardAmount });
+                const configs = await dbLayer.getScratchcardConfigs();
+                socket.emit(EVENTS.ADMIN_SCRATCHCARD_ECONOMY_DATA, configs);
+            } catch (err) {
+                socket.emit(EVENTS.ERROR, err.message || 'Failed to update scratchcard config');
+            }
+        });
+
         // --- Cache Admin ---
         socket.on(EVENTS.GET_ADMIN_CACHE, async ({ token }) => {
             if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }

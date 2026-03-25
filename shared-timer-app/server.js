@@ -37,6 +37,26 @@ console.error = function(...args) {
     }
     originalConsoleError.apply(console, args);
 };
+
+process.on('uncaughtException', (err) => {
+    originalConsoleError('FATAL UNCAUGHT EXCEPTION:', err);
+    if (dbLayer && dbLayer.logError) {
+        dbLayer.logError('FATAL UNCAUGHT EXCEPTION: ' + err.message, err.stack, 'process.on').finally(() => {
+            process.exit(1);
+        });
+    } else {
+        process.exit(1);
+    }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    originalConsoleError('FATAL UNHANDLED REJECTION:', reason);
+    if (dbLayer && dbLayer.logError) {
+        const msg = reason instanceof Error ? reason.message : JSON.stringify(reason);
+        const stack = reason instanceof Error ? reason.stack : undefined;
+        dbLayer.logError('FATAL UNHANDLED REJECTION: ' + msg, stack, 'process.on');
+    }
+});
 // ────────────────────────────────────────────────────────────────────────────
 
 const roomManager = require('./roomManager');

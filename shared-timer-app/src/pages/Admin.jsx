@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Database, Plus, Trash2, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2 } from 'lucide-react';
+import { Database, Plus, Trash2, Save, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2, TrendingUp, LayoutDashboard, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EVENTS from '../socketEvents';
@@ -27,25 +27,141 @@ const Admin = ({ socket }) => {
     const [errorLogs, setErrorLogs] = useState([]);
     const [betsList, setBetsList] = useState([]);
     const [auditLogs, setAuditLogs] = useState([]);
-
-    // Action logs
+    const [scratchcardPacks, setScratchcardPacks] = useState([]);
+    const [isEditingPack, setIsEditingPack] = useState(null); // id or 'new'
+    const [packForm, setPackForm] = useState({
+        name: '', region_label: '', scope: 'Regional', price: 1000, 
+        win_chance: 0.25, reward_amount: 5000, is_weighted: false, 
+        max_daily_limit: 0, is_active: true, is_special: false
+    });
+    const [packTeams, setPackTeams] = useState([]); // List of team codes for the current pack
+    const [globalMessage, setGlobalMessage] = useState('');
+    const [navbarSettings, setNavbarSettings] = useState([]);
     const [logs, setLogs] = useState([]);
 
+    const handleFetchNavbarSettings = async () => {
+        try {
+            const res = await axios.get('/api/admin/navbar-settings', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setNavbarSettings(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error('Error fetching navbar settings:', err);
+        }
+    };
+
+    const handleSaveNavbarSettings = async () => {
+        try {
+            await axios.post('/api/admin/navbar-settings', { settings: navbarSettings }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Navbar settings saved.', 'success');
+        } catch (err) {
+            console.error('Error saving navbar settings:', err);
+            addLog('Error', 'Failed to save navbar settings.', 'error');
+        }
+    };
+
+    const handleFetchPacks = async () => {
+        try {
+            const res = await axios.get('/api/admin/scratchcards/packs', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setScratchcardPacks(res.data);
+        } catch (err) {
+            console.error('Error fetching packs:', err);
+        }
+    };
+
+    const handleSavePack = async () => {
+        try {
+            const payload = {
+                pack: {
+                    ...packForm,
+                    price: parseInt(packForm.price),
+                    win_chance: parseFloat(packForm.win_chance) / 100,
+                    reward_amount: parseInt(packForm.reward_amount),
+                    is_weighted: !!packForm.is_weighted,
+                    max_daily_limit: parseInt(packForm.max_daily_limit) || 0,
+                    is_active: !!packForm.is_active,
+                    is_special: !!packForm.is_special
+                },
+                teams: packTeams
+            };
+
+            if (isEditingPack === 'new') {
+                await axios.post('/api/admin/scratchcards/packs', payload, {
+                    headers: { 'Authorization': `Bearer ${globalToken}` }
+                });
+                addLog('Success', 'Scratchcard pack created.', 'success');
+            } else {
+                await axios.put(`/api/admin/scratchcards/packs/${isEditingPack}`, payload, {
+                    headers: { 'Authorization': `Bearer ${globalToken}` }
+                });
+                addLog('Success', 'Scratchcard pack updated.', 'success');
+            }
+            setIsEditingPack(null);
+            handleFetchPacks();
+        } catch (err) {
+            console.error('Error saving pack:', err);
+            addLog('Error', 'Failed to save pack.', 'error');
+        }
+    };
+
+    const handleDeletePack = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this pack?")) return;
+        try {
+            await axios.delete(`/api/admin/scratchcards/packs/${id}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Pack deleted.', 'success');
+            handleFetchPacks();
+        } catch (err) {
+            console.error('Error deleting pack:', err);
+        }
+    };
+
+    const handleEditPack = async (id) => {
+        try {
+            const res = await axios.get(`/api/admin/scratchcards/packs/${id}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            const { pack, teams } = res.data;
+            setPackForm({
+                name: pack.name,
+                region_label: pack.region_label || '',
+                scope: pack.scope,
+                price: pack.price,
+                win_chance: (pack.win_chance * 100).toString(),
+                reward_amount: pack.reward_amount || 0,
+                is_weighted: !!pack.is_weighted,
+                max_daily_limit: pack.max_daily_limit || 0,
+                is_active: !!pack.is_active,
+                is_special: !!pack.is_special
+            });
+            setPackTeams(teams.map(t => t.team_code));
+            setIsEditingPack(id);
+        } catch (err) {
+            console.error('Error loading pack details:', err);
+        }
+    };
+    const handleBroadcastMessage = () => {
+        if (!globalMessage.trim()) return;
+        socket.emit('ADMIN_BROADCAST_MESSAGE', { token, message: globalMessage });
+        setGlobalMessage('');
+        addLog('Broadcast', 'Global message sent to all users.', 'success');
+    };
+
+    const moveTeam = (index, direction) => {
+        const newTeams = [...packTeams];
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= newTeams.length) return;
+        [newTeams[index], newTeams[newIndex]] = [newTeams[newIndex], newTeams[index]];
+        setPackTeams(newTeams);
+    };
     const addLog = (title, message, status) => {
         const id = Math.random().toString(36).substr(2, 9);
         setLogs(prev => [{ id, title, message, status, timestamp: Date.now() }, ...prev].slice(0, 50));
-    };
-
-    // Broadcast
-    const [globalMessage, setGlobalMessage] = useState('');
-
-    const handleBroadcastMessage = () => {
-        if (!globalMessage.trim()) return;
-        if (!window.confirm(`Are you sure you want to broadcast this message to ALL online users?\n\n"${globalMessage}"`)) return;
-
-        socket.emit(EVENTS.ADMIN_BROADCAST_MESSAGE, { token, message: globalMessage });
-        setGlobalMessage('');
-        alert("Broadcast sent via websocket.");
     };
 
     const globalToken = localStorage.getItem('timerToken');
@@ -56,6 +172,10 @@ const Admin = ({ socket }) => {
     const [availableTeams, setAvailableTeams] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [esportsLastUpdated, setEsportsLastUpdated] = useState(null);
+
+    // Scratchcard Pool Admin States
+    const [poolSearchInput, setPoolSearchInput] = useState('');
+    const [activePoolDropdown, setActivePoolDropdown] = useState(null);
 
     // Friends State (hoisted for useEffect dependency array to avoid TDZ)
     const [expandedUserFriends, setExpandedUserFriends] = useState(null);
@@ -99,7 +219,6 @@ const Admin = ({ socket }) => {
             }
             setLoading(false);
         };
-
         const handleError = (msg) => {
             if (msg === 'Unauthorized admin access' || msg === 'Unauthorized') {
                 sessionStorage.removeItem('admin_token');
@@ -114,6 +233,7 @@ const Admin = ({ socket }) => {
         socket.on(EVENTS.ADMIN_CACHE_DATA, handleCache);
         socket.on(EVENTS.ADMIN_ACTIVITY_DATA, handleActivity);
         socket.on(EVENTS.ADMIN_ROOMS_DATA, handleRooms);
+        socket.on(EVENTS.DB_ESPORTS_TEAMS_DATA, handleAllTeamsData);
         socket.on(EVENTS.DB_ESPORTS_TEAMS_DATA, handleAllTeamsData);
         socket.on(EVENTS.ERROR, handleError);
 
@@ -195,6 +315,7 @@ const Admin = ({ socket }) => {
             socket.emit(EVENTS.GET_ADMIN_ACTIVITY, { token });
             socket.emit(EVENTS.GET_ADMIN_ROOMS, { token });
             socket.emit(EVENTS.GET_DB_ESPORTS_TEAMS);
+            socket.emit(EVENTS.GET_DB_ESPORTS_TEAMS);
             socket.emit('ADMIN_GET_KOALA_BASELINE', { token });
         };
 
@@ -248,8 +369,11 @@ const Admin = ({ socket }) => {
     }, [activeTab]);
 
     useEffect(() => {
-        if (activeTab === 'audit' && auditLogs.length === 0) {
-            handleFetchAuditLogs();
+        if (activeTab === 'scratchcards') {
+            handleFetchPacks();
+        }
+        if (activeTab === 'navbar') {
+            handleFetchNavbarSettings();
         }
     }, [activeTab]);
 
@@ -794,6 +918,18 @@ const Admin = ({ socket }) => {
                     onClick={() => { setActiveTab('game_scores'); handleFetchGameScores(); }}
                     style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <Gamepad2 size={16} /> Game Highscores
+                </button>
+                <button
+                    className={activeTab === 'scratchcards' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => setActiveTab('scratchcards')}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Dices size={16} /> Scratchcard Pools
+                </button>
+                <button
+                    className={activeTab === 'navbar' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => setActiveTab('navbar')}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <LayoutDashboard size={16} /> Sidebar Settings
                 </button>
             </div>
 
@@ -1637,6 +1773,386 @@ const Admin = ({ socket }) => {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB: DYNAMIC SCRATCHCARD PACKS */}
+            {activeTab === 'scratchcards' && (
+                <div className="animate-fade-in">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div>
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Dices size={24} color="var(--accent-primary)" />
+                                Dynamic Scratchcard Packs
+                            </h3>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
+                                Manage entire scratchcard sets, their teams, and win conditions.
+                            </p>
+                        </div>
+                        <button className="btn-primary" onClick={() => {
+                            setPackForm({ name: '', region_label: '', scope: 'Regional', price: 1000, win_chance: '25', reward_amount: 5000, is_weighted: false, max_daily_limit: 0, is_active: true, is_special: false });
+                            setPackTeams([]);
+                            setIsEditingPack('new');
+                        }}>
+                            <Plus size={18} style={{ marginRight: '8px' }} /> Create New Pack
+                        </button>
+                    </div>
+
+                    {isEditingPack && (
+                        <div className="glass-card" style={{ padding: '32px', marginBottom: '32px', border: '2px solid var(--accent-primary)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h4 style={{ margin: 0 }}>{isEditingPack === 'new' ? 'Create New Scratchcard Pack' : 'Edit Pack'}</h4>
+                                <button className="btn-ghost" onClick={() => setIsEditingPack(null)}>Cancel</button>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Pack Name (e.g. "LEC WINTER")</label>
+                                    <input type="text" className="input-primary" style={{ width: '100%' }} value={packForm.name} onChange={e => setPackForm({...packForm, name: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Region Label (e.g. "Europe")</label>
+                                    <input type="text" className="input-primary" style={{ width: '100%' }} value={packForm.region_label} onChange={e => setPackForm({...packForm, region_label: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Scope</label>
+                                    <select className="input-primary" style={{ width: '100%' }} value={packForm.scope} onChange={e => setPackForm({...packForm, scope: e.target.value})}>
+                                        <option value="Regional">Classic (Blue Theme)</option>
+                                        <option value="International">Premium (Gold Theme)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Price (KC)</label>
+                                    <input type="number" className="input-primary" style={{ width: '100%' }} value={packForm.price} onChange={e => setPackForm({...packForm, price: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Win Chance (%)</label>
+                                    <input type="number" className="input-primary" style={{ width: '100%' }} value={packForm.win_chance} onChange={e => setPackForm({...packForm, win_chance: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{packForm.is_weighted ? 'Weighted Rewards (Rank Based)' : 'Fixed Win Amount (KC)'}</label>
+                                    {packForm.is_weighted ? (
+                                        <div style={{ padding: '12px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px', fontSize: '0.8rem', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                                            Jackpot: <span style={{ color: '#fbbf24', fontWeight: 700 }}>20.0x</span> Preis. Verwendet biquadratische Formel (Potenz 4) für faire Gewichtung. Letzter Platz gibt 2.0x (Geld verdoppelt).
+                                        </div>
+                                    ) : (
+                                        <input type="number" className="input-primary" style={{ width: '100%' }} value={packForm.reward_amount} onChange={e => setPackForm({...packForm, reward_amount: e.target.value})} />
+                                    )}
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Max. tägliches Limit pro User (0 = unbegrenzt)</label>
+                                    <input type="number" className="input-primary" style={{ width: '100%' }} value={packForm.max_daily_limit} onChange={e => setPackForm({...packForm, max_daily_limit: e.target.value})} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={packForm.is_weighted} onChange={e => setPackForm({...packForm, is_weighted: e.target.checked})} />
+                                        Weighted Rewards
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={packForm.is_active} onChange={e => setPackForm({...packForm, is_active: e.target.checked})} />
+                                        Active
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#ec4899' }}>
+                                        <input type="checkbox" checked={packForm.is_special} onChange={e => setPackForm({...packForm, is_special: e.target.checked})} />
+                                        ✨ Special (Pink)
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                        <h5 style={{ margin: 0 }}>Team Pool ({packTeams.length})</h5>
+                                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{packForm.is_weighted ? 'Top = highest multiplier, Bottom = 1.0x' : 'All equal chance'}</p>
+                                    </div>
+                                    <div style={{ position: 'relative', marginBottom: '16px' }}>
+                                        <input
+                                            type="text"
+                                            className="input-primary"
+                                            style={{ width: '100%', fontSize: '0.85rem' }}
+                                            value={poolSearchInput}
+                                            onChange={(e) => {
+                                                setPoolSearchInput(e.target.value);
+                                                setActivePoolDropdown('current');
+                                            }}
+                                            onFocus={() => setActivePoolDropdown('current')}
+                                            onBlur={() => setTimeout(() => setActivePoolDropdown(null), 200)}
+                                            placeholder="Search team to add..."
+                                            autoComplete="off"
+                                        />
+                                        {activePoolDropdown === 'current' && poolSearchInput && (
+                                            <div style={{
+                                                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                                                background: '#1a1b26', border: '1px solid var(--border-color)', borderRadius: '8px',
+                                                maxHeight: '180px', overflowY: 'auto', marginTop: '4px', boxShadow: '0 8px 16px rgba(0,0,0,0.6)'
+                                            }}>
+                                                {availableTeams
+                                                    .filter(t => t.name?.toLowerCase().includes(poolSearchInput.toLowerCase()) || t.code?.toLowerCase().includes(poolSearchInput.toLowerCase()))
+                                                    .filter(t => !packTeams.includes(t.code))
+                                                    .slice(0, 8)
+                                                    .map(team => (
+                                                        <div
+                                                            key={team.code}
+                                                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                                            onClick={() => {
+                                                                setPackTeams([...packTeams, team.code]);
+                                                                setPoolSearchInput('');
+                                                            }}
+                                                            onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.08)'}
+                                                            onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                {team.image && <img src={team.image} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />}
+                                                                <span style={{ color: 'white', fontSize: '0.85rem' }}>{team.name}</span>
+                                                            </div>
+                                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 'bold' }}>{team.code}</span>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto', padding: '4px' }}>
+                                        {packTeams.map((code, idx) => {
+                                            const team = availableTeams.find(t => t.code === code) || { name: code, code };
+                                            return (
+                                                <div key={code} style={{ 
+                                                    display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', 
+                                                    background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)'
+                                                }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-primary)', minWidth: '24px' }}>#{idx + 1}</span>
+                                                    {team.image && <img src={team.image} alt="" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{team.name}</div>
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{team.code}</div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                        <button className="btn-ghost" style={{ padding: '4px' }} disabled={idx === 0} onClick={() => moveTeam(idx, -1)}>↑</button>
+                                                        <button className="btn-ghost" style={{ padding: '4px' }} disabled={idx === packTeams.length - 1} onClick={() => moveTeam(idx, 1)}>↓</button>
+                                                        <button className="btn-ghost" style={{ padding: '4px', color: '#ef4444' }} onClick={() => setPackTeams(packTeams.filter(c => c !== code))}>
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {packTeams.length === 0 && <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>No teams added yet.</div>}
+                                    </div>
+                                </div>
+
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <h5 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <TrendingUp size={18} color="var(--accent-primary)" />
+                                        Economy Balancing Tool
+                                    </h5>
+                                    
+                                    {packForm.is_weighted && packTeams.length > 1 ? (() => {
+                                        const N = packTeams.length;
+                                        let sumMultipliers = 0;
+                                        for (let r = 1; r <= N; r++) {
+                                            const multiplier = 2 + 18 * Math.pow((N - r) / (N - 1), 4);
+                                            sumMultipliers += multiplier;
+                                        }
+                                        const avgMultiplier = sumMultipliers / N;
+                                        const recommendedWinChance = (0.80 / avgMultiplier) * 100;
+                                        
+                                        return (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Durchschnittlicher Gewinn:</span>
+                                                    <span style={{ fontWeight: 700, color: 'white' }}>{avgMultiplier.toFixed(2)}-fach</span>
+                                                </div>
+                                                <div style={{ padding: '12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                                    <div style={{ color: '#4ade80', fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase' }}>Empfohlene Gewinnchance (80% RTP)</div>
+                                                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white' }}>~ {recommendedWinChance.toFixed(1)}%</div>
+                                                </div>
+                                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>
+                                                    Basierend auf biquadratischer Formel (Potenz 4) und {N} Teams. Min 2.0x, Max 20.0x. Ein RTP von 80% sorgt für eine stabile Economy.
+                                                </p>
+                                            </div>
+                                        );
+                                    })() : (
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>
+                                            Füge mindestens 2 Teams hinzu und aktiviere "Weighted Rewards" für die Analyse.
+                                        </div>
+                                    )}
+
+                                    <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <button className="btn-primary" style={{ padding: '12px 32px' }} onClick={handleSavePack}>
+                                            <Save size={18} style={{ marginRight: '8px' }} /> {isEditingPack === 'new' ? 'Create' : 'Save Changes'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                        {scratchcardPacks.map(pack => (
+                            <div key={pack.id} className="glass-card" style={{ padding: '24px', border: pack.is_active ? '1px solid var(--border-color)' : '1px dashed rgba(255,0,0,0.3)', opacity: pack.is_active ? 1 : 0.7 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                    <div>
+                                        <h4 style={{ margin: 0 }}>{pack.name}</h4>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>{pack.region_label || 'No Region'} • {pack.scope === 'International' ? 'Premium' : 'Classic'}{pack.is_special ? ' • ✨ Special' : ''}</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button className="btn-ghost" style={{ padding: '6px' }} onClick={() => handleEditPack(pack.id)} title="Edit Pack">
+                                            <Monitor size={16} />
+                                        </button>
+                                        <button className="btn-ghost" style={{ padding: '6px', color: '#ef4444' }} onClick={() => handleDeletePack(pack.id)} title="Delete Pack">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px' }}>
+                                    <div>
+                                        <span style={{ color: 'var(--text-muted)' }}>Price:</span> {pack.price} KC
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'var(--text-muted)' }}>Win:</span> {(pack.win_chance * 100).toFixed(1)}%
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'var(--text-muted)' }}>Type:</span> {pack.is_weighted ? 'Weighted' : 'Fixed'}
+                                    </div>
+                                    <div>
+                                        <span style={{ color: 'var(--text-muted)' }}>Limit:</span> {pack.max_daily_limit > 0 ? pack.max_daily_limit : 'None'}
+                                    </div>
+                                    <div style={{ color: pack.is_active ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                                        {pack.is_active ? 'Active' : 'Inactive'}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {activeTab === 'navbar' && (
+                <div className="animate-fade-in">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div>
+                            <h2 style={{ margin: 0 }}>Navigation Settings</h2>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Steuere die Sichtbarkeit und Reihenfolge der Links in der Sidebar.</p>
+                        </div>
+                        <button className="btn-primary" onClick={handleSaveNavbarSettings} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <Save size={18} /> Save Changes
+                        </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        {['Timers', 'Esports', 'Games', 'System'].map(category => {
+                            const categoryItems = navbarSettings.filter(item => item.category === category);
+                            if (categoryItems.length === 0) return null;
+
+                            return (
+                                <div key={category} className="glass-card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div style={{ width: '8px', height: '24px', background: 'var(--accent-primary)', borderRadius: '4px' }}></div>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem', letterSpacing: '0.02em' }}>{category}</h3>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{categoryItems.length} Links</span>
+                                    </div>
+
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <thead>
+                                                <tr style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</th>
+                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Path</th>
+                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Visible</th>
+                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Order</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {categoryItems.map((item, nestedIndex) => {
+                                                    const globalIndex = navbarSettings.findIndex(n => n.key === item.key);
+                                                    const isFirst = nestedIndex === 0;
+                                                    const isLast = nestedIndex === categoryItems.length - 1;
+
+                                                    return (
+                                                        <tr key={item.key} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
+                                                            <td style={{ padding: '14px 24px', fontWeight: 600 }}>{item.label}</td>
+                                                            <td style={{ padding: '14px 24px', fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.path}</td>
+                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
+                                                                {item.key === 'admin' ? (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            checked={true} 
+                                                                            disabled={true}
+                                                                            style={{ transform: 'scale(1.2)', opacity: 0.5, cursor: 'not-allowed' }}
+                                                                        />
+                                                                        <span style={{ fontSize: '0.65rem', color: '#a855f7', fontWeight: 700 }}>Superadmin only</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={!!item.isVisible} 
+                                                                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                                                                        onChange={(e) => {
+                                                                            const newSettings = [...navbarSettings];
+                                                                            const idx = newSettings.findIndex(n => n.key === item.key);
+                                                                            newSettings[idx].isVisible = e.target.checked ? 1 : 0;
+                                                                            setNavbarSettings(newSettings);
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                            </td>
+                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                                                    <button 
+                                                                        className="btn-ghost" 
+                                                                        style={{ padding: '6px', opacity: isFirst ? 0.2 : 1 }}
+                                                                        disabled={isFirst}
+                                                                        title="Move Up"
+                                                                        onClick={() => {
+                                                                            const newSettings = [...navbarSettings];
+                                                                            const neighbor = categoryItems[nestedIndex - 1];
+                                                                            const idxSelf = newSettings.findIndex(n => n.key === item.key);
+                                                                            const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
+                                                                            
+                                                                            const tempOrder = newSettings[idxSelf].sortOrder;
+                                                                            newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
+                                                                            newSettings[idxNeighbor].sortOrder = tempOrder;
+                                                                            
+                                                                            newSettings.sort((a,b) => a.sortOrder - b.sortOrder);
+                                                                            setNavbarSettings(newSettings);
+                                                                        }}
+                                                                    >
+                                                                        <ChevronUp size={16} />
+                                                                    </button>
+                                                                    <button 
+                                                                        className="btn-ghost" 
+                                                                        style={{ padding: '6px', opacity: isLast ? 0.2 : 1 }}
+                                                                        disabled={isLast}
+                                                                        title="Move Down"
+                                                                        onClick={() => {
+                                                                            const newSettings = [...navbarSettings];
+                                                                            const neighbor = categoryItems[nestedIndex + 1];
+                                                                            const idxSelf = newSettings.findIndex(n => n.key === item.key);
+                                                                            const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
+                                                                            
+                                                                            const tempOrder = newSettings[idxSelf].sortOrder;
+                                                                            newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
+                                                                            newSettings[idxNeighbor].sortOrder = tempOrder;
+                                                                            
+                                                                            newSettings.sort((a,b) => a.sortOrder - b.sortOrder);
+                                                                            setNavbarSettings(newSettings);
+                                                                        }}
+                                                                    >
+                                                                        <ChevronDown size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}

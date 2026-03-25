@@ -1,5 +1,29 @@
 [
   {
+    "id": 10,
+    "version": "2.5.0",
+    "date": "2026-03-25",
+    "changes": "- **Navigation Admin 2.0**: Neugestaltung der Navigations-Einstellungen mit kategorisierter Block-Struktur (Glass-Cards) und smarter In-Block-Sortierung.\n- **Admin Panel Integration**: Das Admin-Panel ist nun fester Bestandteil der System-Kategorie und kann flexibel sortiert werden; Sichtbarkeit bleibt superadmin-geschützt.\n- **System Cleanup**: Nicht funktionale \"Friends\" Links entfernt; Routen-Audit durchgeführt und fehlerhafte Pfade (Features) korrigiert.\n- **Polymarket Trigger**: Wettauswertung auf Echtzeit-Events via Polymarket umgestellt für maximale Zuverlässigkeit."
+  },
+  {
+    "id": 9,
+    "version": "2.4.0",
+    "date": "2026-03-23",
+    "changes": "- **Scratchcards 3.0**: Einführung von \"Special\" Tickets (pinkes Design), Umstellung auf die biquadratische 20x-Jackpot-Kurve und Integration von Info-Modals für Quoten & Multiplikatoren.\n- **Game Leaderboards 3.0**: Einzelsortierbare Tabellen pro Spiel. KoalaFlap zeigt nun Streak & Ingame-Coins; Scratch & Win zeigt Gesamtgewinn & gewonnene Lose.\n- **Feature Roadmap 3.0**: Trennung nach Typen (Bug vs. Feature) inkl. Filter-Optionen, Status-Badges und überarbeitetem Einreichungs-Formular.\n- **UI & Economy Refinement**: Kategorien in \"Classic\" und \"Premium\" umbenannt; Maximale Auszahlungsgrenzen auf 160x (Blackout) für gewichtete Lose angehoben."
+  },
+  {
+    "id": 8,
+    "version": "2.3.2",
+    "date": "2026-03-23",
+    "changes": "- **Scratchcard Shop 2.0**: Aufteilung in \"Classic\" und \"Premium\" Kategorien für bessere Übersicht.\n- **Game-Economy Fix**: Das \"Hotstreak-Multiplier\" Upgrade in KoalaFlap wurde entfernt, um die Spielwirtschaft zu schützen.\n- **Game Leaderboards 2.0**: Vollständig überarbeitetes Layout mit getrennten Reihen für KoalaFlap und ScratchCards inkl. KC-Währungsformat.\n- **Globaler Mute-Fix**: Rubbellose respektieren nun zuverlässig die globale Stummschaltung.\n- **Winner UI Refined**: Erweiterte Live-Listen mit Avataren, Top-Gewinnen und Most-Won-Leaderboard."
+  },
+  {
+    "id": 7,
+    "version": "2.3.1",
+    "date": "2026-03-23",
+    "changes": "- **Scratchcard Minigame**: Das neue Rubbellos-System ist da! Inklusive Multi-Line Wins (bis zu 8 Gewinnlinien gleichzeitig), visuellem Gewinner-Archiv, dynamischen Gewinnchancen und \"EPISCHEN\" Jackpot-Animationen."
+  },
+  {
     "id": 6,
     "version": "2.2.4",
     "date": "2026-03-22",

@@ -138,7 +138,7 @@ const KoalaFlap = ({ user, token }) => {
             setCritCoinsChance(critLevel * 0.01); // 1% per level
 
             // Fetch Daily Mission status
-            const missionRes = await axios.get('/api/games/mission/status?missionId=daily_pipes_10', {
+            const missionRes = await axios.get('/api/games/mission/status?missionId=pipes_10_run', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setDailyMission({
@@ -273,13 +273,17 @@ const KoalaFlap = ({ user, token }) => {
             g.frame++;
             setSurvivedTime(Date.now() - g.startTime);
 
-            // Progressive Difficulty Calculations - Tied to time survived (60s for max diff)
+            // Progressive Difficulty Calculations - Infinite Scaling
             const surviveDuration = Date.now() - g.startTime;
-            const maxDifficultyTime = 60000; // 60 seconds
-            const progress = Math.min(surviveDuration / maxDifficultyTime, 1);
+            const maxDifficultyTime = 300000; // Reach "max" base difficulty at 5 minutes, but continue scaling
+            const progress = surviveDuration / maxDifficultyTime;
+            
+            // Speed continues to increase indefinitely
             const currentSpeed = devSettings.startSpeed + progress * (devSettings.maxSpeed - devSettings.startSpeed);
-            const currentPipeSpacing = devSettings.startPipeSpacing - progress * (devSettings.startPipeSpacing - devSettings.minPipeSpacing);
-            const currentGapVariance = devSettings.startGapVariance + progress * (devSettings.maxGapVariance - devSettings.startGapVariance);
+            
+            // Pipe spacing and variance cap out at their respective min/max for playability
+            const currentPipeSpacing = Math.max(devSettings.minPipeSpacing, devSettings.startPipeSpacing - progress * (devSettings.startPipeSpacing - devSettings.minPipeSpacing));
+            const currentGapVariance = Math.min(devSettings.maxGapVariance, devSettings.startGapVariance + progress * (devSettings.maxGapVariance - devSettings.startGapVariance));
 
             // Bird Physics - with terminal velocity and hanging effect
             g.birdVelocity += devSettings.gravity;
@@ -684,7 +688,6 @@ const KoalaFlap = ({ user, token }) => {
                                         <div style={{ background: 'var(--accent-gradient)', padding: '12px', borderRadius: '12px' }}>
                                             {item.upgrade_id === 'extra_lives' && <Heart size={24} color="#fff" />}
                                             {item.upgrade_id === 'coin_base_value' && <Zap size={24} color="#fff" />}
-                                            {item.upgrade_id === 'hotstreak_multiplier' && <TrendingUp size={24} color="#fff" />}
                                             {item.upgrade_id === 'crit_coins' && <Award size={24} color="#fff" />}
                                         </div>
                                         
@@ -699,7 +702,6 @@ const KoalaFlap = ({ user, token }) => {
                                                     {item.upgrade_id === 'coin_base_value' && `Aktuell: ${(1 + userLevel * 0.2).toFixed(1)}x Multiplikator (entspricht ${((1 * (1 + userLevel * 0.2)) / 100).toFixed(2)} KC pro Standard-Münze)`}
                                                     {item.upgrade_id === 'extra_lives' && `Aktuell: +${userLevel} ❤️ Start-Leben`}
                                                     {item.upgrade_id === 'crit_coins' && `Aktuell: ${userLevel}% Chance auf Crit-Münzen (10x Wert)`}
-                                                    {item.upgrade_id === 'hotstreak_multiplier' && `Aktuell: +${(userLevel * 2)}% Bonus pro überlebter Röhre (am Ende addiert)`}
                                                 </div>
                                             </div>
                                             

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Lightbulb, ThumbsUp, ThumbsDown, Plus, Trash2, CheckCircle, 
-    Clock, Construction, AlertCircle, XCircle, Filter, ArrowUpDown, MessageSquare, Download 
+    Clock, Construction, AlertCircle, XCircle, Filter, ArrowUpDown, MessageSquare, Download, Bug, Sparkles 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,9 +13,11 @@ const FeatureRequests = () => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [error, setError] = useState('');
+    const [featureType, setFeatureType] = useState('Feature');
     
     // Sort & Filter State
     const [filterStatus, setFilterStatus] = useState('All');
+    const [filterType, setFilterType] = useState('All'); // 'All', 'Bug', 'Feature'
     const [sortBy, setSortBy] = useState('votes'); // 'votes' or 'newest'
     
     // Admin Comment State
@@ -75,12 +77,13 @@ const FeatureRequests = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ title, description })
+                body: JSON.stringify({ title, description, type: featureType })
             });
 
             if (res.ok) {
                 setTitle('');
                 setDescription('');
+                setFeatureType('Feature');
                 setShowForm(false);
                 fetchFeatures();
             } else {
@@ -240,9 +243,14 @@ Der von dir generierte Prompt MUSS zwingend folgende Elemente enthalten:
     const filteredAndSortedFeatures = useMemo(() => {
         let result = [...features];
         
-        // Filter
+        // Filter by status
         if (filterStatus !== 'All') {
             result = result.filter(f => f.status === filterStatus);
+        }
+        
+        // Filter by type
+        if (filterType !== 'All') {
+            result = result.filter(f => (f.type || 'Feature') === filterType);
         }
         
         // Sort
@@ -258,7 +266,7 @@ Der von dir generierte Prompt MUSS zwingend folgende Elemente enthalten:
         });
         
         return result;
-    }, [features, filterStatus, sortBy]);
+    }, [features, filterStatus, filterType, sortBy]);
 
     const getStatusIcon = (status) => {
         switch (status) {
@@ -331,6 +339,17 @@ Der von dir generierte Prompt MUSS zwingend folgende Elemente enthalten:
                                 placeholder="Explain why this feature would be useful..."
                             />
                         </div>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem' }}>Type</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button type="button" className="btn-ghost" style={{ padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', background: featureType === 'Feature' ? 'rgba(251, 191, 36, 0.15)' : 'transparent', border: featureType === 'Feature' ? '1px solid rgba(251, 191, 36, 0.3)' : '1px solid rgba(255,255,255,0.1)' }} onClick={() => setFeatureType('Feature')}>
+                                    <Sparkles size={14} color="#fbbf24" /> Feature
+                                </button>
+                                <button type="button" className="btn-ghost" style={{ padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', background: featureType === 'Bug' ? 'rgba(239, 68, 68, 0.15)' : 'transparent', border: featureType === 'Bug' ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.1)' }} onClick={() => setFeatureType('Bug')}>
+                                    <Bug size={14} color="#ef4444" /> Bug
+                                </button>
+                            </div>
+                        </div>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                             <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
                             <button type="submit" className="btn-primary">Submit Proposal</button>
@@ -367,6 +386,28 @@ Der von dir generierte Prompt MUSS zwingend folgende Elemente enthalten:
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Type Filter */}
+                    <div style={{ display: 'flex', gap: '4px', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '12px' }}>
+                        {['All', 'Feature', 'Bug'].map(type => (
+                            <button 
+                                key={type}
+                                className={`btn-ghost ${filterType === type ? 'active' : ''}`}
+                                style={{ 
+                                    padding: '4px 10px', fontSize: '0.75rem', 
+                                    whiteSpace: 'nowrap',
+                                    background: filterType === type ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                    border: filterType === type ? '1px solid var(--border-color)' : '1px solid transparent',
+                                    display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
+                                onClick={() => setFilterType(type)}
+                            >
+                                {type === 'Bug' && <Bug size={12} color="#ef4444" />}
+                                {type === 'Feature' && <Sparkles size={12} color="#fbbf24" />}
+                                {type}
+                            </button>
+                        ))}
+                    </div>
+
                     <ArrowUpDown size={16} color="var(--text-muted)" />
                     <select 
                         className="btn-ghost" 
@@ -415,13 +456,25 @@ Der von dir generierte Prompt MUSS zwingend folgende Elemente enthalten:
                                             Proposed by {feature.userName} on {new Date(feature.createdAt).toLocaleDateString()}
                                         </span>
                                     </div>
-                                    <div style={{ 
-                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', 
-                                        borderRadius: '20px', background: getStatusColor(feature.status),
-                                        fontSize: '0.8rem', fontWeight: 600
-                                    }}>
-                                        {getStatusIcon(feature.status)}
-                                        {feature.status}
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <div style={{ 
+                                            display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', 
+                                            borderRadius: '12px', 
+                                            background: (feature.type || 'Feature') === 'Bug' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+                                            border: (feature.type || 'Feature') === 'Bug' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(251, 191, 36, 0.2)',
+                                            fontSize: '0.7rem', fontWeight: 700
+                                        }}>
+                                            {(feature.type || 'Feature') === 'Bug' ? <Bug size={12} color="#ef4444" /> : <Sparkles size={12} color="#fbbf24" />}
+                                            <span style={{ color: (feature.type || 'Feature') === 'Bug' ? '#ef4444' : '#fbbf24' }}>{feature.type || 'Feature'}</span>
+                                        </div>
+                                        <div style={{ 
+                                            display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', 
+                                            borderRadius: '20px', background: getStatusColor(feature.status),
+                                            fontSize: '0.8rem', fontWeight: 600
+                                        }}>
+                                            {getStatusIcon(feature.status)}
+                                            {feature.status}
+                                        </div>
                                     </div>
                                 </div>
                                 
