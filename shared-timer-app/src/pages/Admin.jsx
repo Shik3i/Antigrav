@@ -417,8 +417,15 @@ const Admin = ({ socket }) => {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
             const data = await res.json();
-            if (res.ok) alert(data.message);
-            else alert(data.error || "Failed finding action");
+            if (res.ok) {
+                const summary = `Resolver beendet: ${data.message}\n\n` +
+                                `- Offene Wetten gefunden: ${data.unresolvedFound || 0}\n` +
+                                `- Verarbeitete Paarungen: ${data.matchesProcessed || 0}\n` +
+                                `- Erfolgreich aufgelöst: ${data.betsResolved || 0}`;
+                alert(summary);
+            } else {
+                alert(data.error || "Fehler beim Starten des Resolvers");
+            }
         } catch (err) {
             console.error(err);
         }

@@ -194,6 +194,7 @@ db.serialize(() => {
 
   // Migration: Add polymarketTeam to Bets
   db.run("ALTER TABLE Bets ADD COLUMN polymarketTeam TEXT", () => { });
+  db.run("ALTER TABLE Bets ADD COLUMN league TEXT", () => { });
 
   // ErrorLogs: persistent storage for server-side errors
   db.run(`CREATE TABLE IF NOT EXISTS ErrorLogs (
@@ -252,10 +253,27 @@ db.serialize(() => {
     gameId TEXT NOT NULL,
     score INTEGER NOT NULL,
     coinsEarned INTEGER NOT NULL,
-    sessionLog TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(userId) REFERENCES Users(id)
   )`);
+
+  // Phase 19 Migration: Remove sessionLog column from GameScores
+  db.all("PRAGMA table_info(GameScores)", (err, cols) => {
+    if (!err && cols && cols.some(c => c.name === 'sessionLog')) {
+      console.log("[Migration] Removing sessionLog column from GameScores...");
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        db.run("CREATE TABLE GameScores_new (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT NOT NULL, gameId TEXT NOT NULL, score INTEGER NOT NULL, coinsEarned INTEGER NOT NULL, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(userId) REFERENCES Users(id))");
+        db.run("INSERT INTO GameScores_new (id, userId, gameId, score, coinsEarned, createdAt) SELECT id, userId, gameId, score, coinsEarned, createdAt FROM GameScores");
+        db.run("DROP TABLE GameScores");
+        db.run("ALTER TABLE GameScores_new RENAME TO GameScores");
+        db.run("COMMIT", (err) => {
+          if (err) console.error("[Migration] Failed to remove sessionLog column:", err);
+          else console.log("[Migration] Successfully removed sessionLog column.");
+        });
+      });
+    }
+  });
 
   // --- NEW: Game Upgrades & Config ---
   db.run(`CREATE TABLE IF NOT EXISTS GameUpgrades_Config (
@@ -1388,11 +1406,11 @@ const clearErrorLogs = () => {
 };
 
 // ─── Bets ──────────────────────────────────────────────
-const createBet = (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate) => {
+const createBet = (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league) => {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO Bets (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate],
+      'INSERT INTO Bets (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league],
       function (err) {
         if (err) reject(err);
         else resolve({ id: this.lastID });
@@ -1416,7 +1434,7 @@ const getUnresolvedPastBets = () => {
     const query = `
       SELECT * FROM Bets 
       WHERE status = 'open' 
-      AND datetime(eventDate) <= datetime('now', '-3 hours')
+      AND datetime(eventDate) <= datetime('now', '-1 hours')
     `;
     db.all(query, [], (err, rows) => {
       if (err) reject(err);
@@ -1525,7 +1543,10 @@ const getRecentBets = (days = 7) => {
       FROM Bets b
       LEFT JOIN Users u ON b.userId = u.id
       WHERE b.createdAt >= datetime('now', '-' || ? || ' days')
-      ORDER BY b.createdAt DESC
+      ORDER BY 
+        CASE WHEN b.status = 'open' THEN 0 ELSE 1 END ASC,
+        CASE WHEN b.status = 'open' THEN b.eventDate END ASC,
+        b.eventDate DESC
     `;
     db.all(query, [days], (err, rows) => {
       if (err) reject(err);
@@ -1793,11 +1814,11 @@ const getBettingAccuracyLeaderboard = () => {
   });
 };
 
-const recordGameScore = (userId, gameId, score, coinsEarned, sessionLog) => {
+const recordGameScore = (userId, gameId, score, coinsEarned) => {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO GameScores (userId, gameId, score, coinsEarned, sessionLog) VALUES (?, ?, ?, ?, ?)',
-      [userId, gameId, score, coinsEarned, typeof sessionLog === 'object' ? JSON.stringify(sessionLog) : sessionLog],
+      'INSERT INTO GameScores (userId, gameId, score, coinsEarned) VALUES (?, ?, ?, ?)',
+      [userId, gameId, score, coinsEarned],
       function (err) {
         if (err) {
           logError(`recordGameScore: Insert failed: ${err.message}`, err.stack, JSON.stringify({ userId, gameId, score, coinsEarned }));

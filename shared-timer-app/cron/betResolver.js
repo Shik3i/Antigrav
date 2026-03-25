@@ -3,12 +3,20 @@ const axios = require('axios');
 
 const resolveBets = async () => {
     console.log('[betResolver] Starting bet resolution cycle...');
+    const startTime = new Date();
+    let stats = { processedMatches: 0, resolvedBets: 0, fails: 0, unresolvedCount: 0 };
+
     try {
         const unresolvedBets = await dbLayer.getUnresolvedPastBets();
+        stats.unresolvedCount = unresolvedBets ? unresolvedBets.length : 0;
+
         if (!unresolvedBets || unresolvedBets.length === 0) {
             console.log('[betResolver] No unresolved past bets found.');
-            return;
+            return stats;
         }
+
+        // LOG 1: Initial find
+        await dbLayer.logError(`Bet Resolver: Found ${unresolvedBets.length} unresolved bets older than 1 hour.`, 'INFO_LOG', `Total bets: ${unresolvedBets.length}`);
 
         console.log(`[betResolver] Found ${unresolvedBets.length} unresolved past bets. Fetching data for ${new Set(unresolvedBets.map(b => b.matchName)).size} unique matches...`);
 
@@ -35,15 +43,13 @@ const resolveBets = async () => {
             return normA.includes(normB) || normB.includes(normA);
         };
 
-        let processedCount = 0;
-        let successCount = 0;
-        let failCount = 0;
-
         for (const slug of Object.keys(groupedBets)) {
             const betsInGroup = groupedBets[slug];
             const matchName = betsInGroup[0]?.matchName || 'Unknown Match';
             
-            console.log(`[betResolver] Processing match: "${matchName}" (Slug: ${slug}, Bets: ${betsInGroup.length})`);
+            // LOG 2: Processing group
+            console.log(`[betResolver] Processing group for slug: ${slug} with ${betsInGroup.length} bets.`);
+            await dbLayer.logError(`Bet Resolver: Processing slug "${slug}" for match "${matchName}"`, 'INFO_LOG', `Bets in group: ${betsInGroup.length}`);
 
             try {
                 const response = await axios.get(`https://gamma-api.polymarket.com/events`, {
@@ -52,7 +58,9 @@ const resolveBets = async () => {
                 });
 
                 if (!response.data || response.data.length === 0) {
-                    console.log(`[betResolver] No Polymarket event found for slug: ${slug}`);
+                    // LOG 3: No data
+                    console.log(`[betResolver] Polymarket API returned no event for slug: ${slug}`);
+                    await dbLayer.logError(`Bet Resolver: Polymarket API returned no event for slug: ${slug}`, 'INFO_LOG', matchName);
                     continue;
                 }
 
@@ -95,28 +103,28 @@ const resolveBets = async () => {
                         
                         if (result.success) {
                             console.log(`[betResolver] Bet ${bet.id} resolved as ${winStatus.toUpperCase()}.`);
-                            successCount++;
+                            stats.resolvedBets++;
                         } else {
                             console.log(`[betResolver] Bet ${bet.id} skip: ${result.reason}`);
                         }
                     } catch (betErr) {
                         console.error(`[betResolver] Critical error processing individual bet ${bet.id}:`, betErr.message);
-                        failCount++;
+                        stats.fails++;
                     }
                 }
-                processedCount++;
+                stats.processedMatches++;
             } catch (matchErr) {
                 console.error(`[betResolver] FAILED to process match "${matchName}" (Slug: ${slug}). Error:`, matchErr.message);
-                if (matchErr.stack) console.error(matchErr.stack);
                 dbLayer.logError('Bet Resolver Match Error: ' + matchName, matchErr.stack, slug);
-                failCount++;
+                stats.fails++;
             }
         }
-        console.log(`[betResolver] Cycle finished. Processed: ${processedCount} matches, Success: ${successCount} bets, Fails: ${failCount}.`);
+        console.log(`[betResolver] Cycle finished. Processed: ${stats.processedMatches} matches, Resolved: ${stats.resolvedBets} bets, Fails: ${stats.fails}.`);
+        return stats;
     } catch (err) {
         console.error('[betResolver] CRITICAL GLOBAL ERROR:', err.message);
-        if (err.stack) console.error(err.stack);
         dbLayer.logError('Bet Resolver Global Error', err.stack);
+        return { ...stats, success: false, error: err.message };
     }
 };
 

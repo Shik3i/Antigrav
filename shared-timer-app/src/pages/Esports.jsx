@@ -270,7 +270,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                     stake: stakeCents,
                     odds: bettingState.odds,
                     polymarketUrl: bettingState.url,
-                    eventDate: bettingState.eventDate
+                    eventDate: bettingState.eventDate,
+                    league: bettingState.league
                 })
             });
             const data = await res.json();
@@ -482,11 +483,12 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                  odds: Math.max(1.01, (100 / (t1Outcome.pct || 1))).toFixed(2),
                                                  url: matchOdds.url,
                                                  matchName: `${match.team1.name} vs ${match.team2.name}`,
-                                                 eventDate: match.startTime,
-                                                 stakeInput: '1.00',
-                                                 polymarketTeam1: t1Outcome.name,
-                                                 polymarketTeam2: t2Outcome.name,
-                                                 polymarketTeam: t1Outcome.name
+                                                  eventDate: match.startTime,
+                                                  stakeInput: '1.00',
+                                                  league: match.league,
+                                                  polymarketTeam1: t1Outcome.name,
+                                                  polymarketTeam2: t2Outcome.name,
+                                                  polymarketTeam: t1Outcome.name
                                              });
                                          } else {
                                              setBettingState(null);
@@ -627,11 +629,12 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                                 odds: Math.max(1.01, (100 / (t1Outcome.pct || 1))).toFixed(2),
                                                                 url: matchOdds.url,
                                                                 matchName: `${match.team1.name} vs ${match.team2.name}`,
-                                                                eventDate: match.startTime,
-                                                                stakeInput: '1.00', // Default to 1.00 KC
-                                                                polymarketTeam1: t1Outcome.name,
-                                                                polymarketTeam2: t2Outcome.name,
-                                                                polymarketTeam: t1Outcome.name
+                                                                 eventDate: match.startTime,
+                                                                 stakeInput: '1.00', // Default to 1.00 KC
+                                                                 league: match.league,
+                                                                 polymarketTeam1: t1Outcome.name,
+                                                                 polymarketTeam2: t2Outcome.name,
+                                                                 polymarketTeam: t1Outcome.name
                                                             });
                                                         } else {
                                                             setBettingState(null); // Toggle close

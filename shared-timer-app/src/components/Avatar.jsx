@@ -14,11 +14,15 @@ const fetchTeams = () => {
     return fetchingPromise;
 };
 
-const Avatar = ({ user, size = 32, style = {} }) => {
-    const [teamImage, setTeamImage] = useState(null);
+const Avatar = React.memo(({ user, size = 32, style = {}, src = null }) => {
+    const [teamImage, setTeamImage] = useState(src);
     const fanTeam = user?.preferences?.fanTeam;
 
     useEffect(() => {
+        if (src) {
+            setTeamImage(src);
+            return;
+        }
         if (!fanTeam) {
             setTeamImage(null);
             return;
@@ -31,7 +35,7 @@ const Avatar = ({ user, size = 32, style = {} }) => {
                 }
             }
         });
-    }, [fanTeam]);
+    }, [fanTeam, src]);
 
     const initial = (user?.displayName || '?').charAt(0).toUpperCase();
 
@@ -64,6 +68,6 @@ const Avatar = ({ user, size = 32, style = {} }) => {
             {initial}
         </div>
     );
-};
+});
 
 export default Avatar;

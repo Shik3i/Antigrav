@@ -713,12 +713,16 @@ exports.triggerAdminBetResolver = async (req, res, next) => {
     try {
         const { resolveBets } = require('../cron/betResolver');
         
-        // Execute the cron logic directly but as fire-and-forget so we don't hang the request
-        resolveBets()
-            .then(() => console.log('[Admin Bets] Manual trigger of resolveBets finished'))
-            .catch(e => console.error('[Admin Bets] Manual trigger error:', e));
+        // Execute the cron logic directly and wait for results
+        const stats = await resolveBets();
 
-        res.json({ success: true, message: 'Bet resolver started manually in the background' });
+        res.json({ 
+            success: true, 
+            message: 'Resolver finished', 
+            matchesProcessed: stats?.processedMatches || 0,
+            betsResolved: stats?.resolvedBets || 0,
+            unresolvedFound: stats?.unresolvedCount || 0
+        });
     } catch (err) {
         console.error('[Admin Bets] Trigger error:', err);
         res.status(500).json({ error: 'Failed' });
@@ -951,7 +955,8 @@ exports.placeBet = async (req, res, next) => {
         await dbLayer.addKoalaCoins(userId, -parsedStake, `Bet placed on ${chosenTeam}`);
 
         // Create bet
-        const bet = await dbLayer.createBet(userId, sanitize(matchName), sanitize(chosenTeam), sanitize(polymarketTeam || chosenTeam), parsedStake, odds, polymarketUrl, eventDate);
+        const { league } = req.body;
+        const bet = await dbLayer.createBet(userId, sanitize(matchName), sanitize(chosenTeam), sanitize(polymarketTeam || chosenTeam), parsedStake, odds, polymarketUrl, eventDate, league);
 
         res.status(201).json({ success: true, betId: bet.id });
     } catch (err) {
@@ -1143,9 +1148,20 @@ exports.submitKoalaFlapScore = async (req, res, next) => {
 
         if (!payoutEnabled) totalEarningsCents = 0;
 
-        // Record the score
+        // ─── Session Log Removal ────────────────────────────────────────────
+        // Detailed session logs (telemetry) have been removed for performance.
+        // The parameter is ignored if sent by legacy clients.
+
+        // Record the score (Safe block: Payout takes priority)
         if (score > 0) {
-            await dbLayer.recordGameScore(userId, 'koala_flap', score, coinsCollected, sessionLog);
+            try {
+                await dbLayer.recordGameScore(userId, 'koala_flap', score, coinsCollected);
+            } catch (scoreErr) {
+                console.error('[Games] Failed to record score, proceeding with payout:', scoreErr.message);
+                if (dbLayer.logError) {
+                    await dbLayer.logError(`Score Recording Failed (User: ${userId}, Score: ${score}): ${scoreErr.message}`, scoreErr.stack);
+                }
+            }
         }
 
         // Credit coins
