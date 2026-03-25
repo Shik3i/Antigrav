@@ -26,6 +26,8 @@ const Changelog = React.lazy(() => import('./pages/Changelog'));
 const UserProfile = React.lazy(() => import('./pages/UserProfile'));
 const Achievements = React.lazy(() => import('./pages/Achievements'));
 const AdminAchievements = React.lazy(() => import('./pages/AdminAchievements'));
+const Scratchcards = React.lazy(() => import('./pages/ScratchcardShop'));
+const RiftDefense = React.lazy(() => import('./pages/RiftDefense'));
 
 import NewsTicker from './components/NewsTicker';
 import Friends from './pages/Friends';
@@ -398,6 +400,8 @@ function InnerApp() {
                 <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
                 <Route path="/games/leaderboard" element={<GameLeaderboards />} />
                 <Route path="/speedcube" element={<SpeedcubeTimer />} />
+                <Route path="/scratchcards" element={<Scratchcards />} />
+                <Route path="/games/rift-defense" element={<RiftDefense />} />
                 <Route path="/profile/:username" element={<UserProfile />} />
               </Routes>
             </React.Suspense>

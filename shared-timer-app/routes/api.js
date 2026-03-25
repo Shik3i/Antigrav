@@ -3,6 +3,7 @@ const router = express.Router();
 const apiController = require('../controllers/apiController');
 const authController = require('../controllers/authController');
 const friendsController = require('../controllers/friendsController');
+const riftDefenseController = require('../controllers/riftDefenseController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -44,6 +45,11 @@ router.get('/admin/bets', authController.authenticateToken, apiController.getAdm
 router.post('/admin/bets/:id/status', authController.authenticateToken, apiController.updateAdminBetStatus);
 router.post('/admin/bets/trigger-resolver', authController.authenticateToken, apiController.triggerAdminBetResolver);
 router.get('/admin/actions', authController.authenticateToken, apiController.getAdminActions);
+
+// Navbar Settings
+router.get('/navbar-settings', apiController.getPublicNavbarSettings);
+router.get('/admin/navbar-settings', authController.authenticateToken, apiController.getAdminNavbarSettings);
+router.post('/admin/navbar-settings', authController.authenticateToken, apiController.updateNavbarSettings);
 
 router.post('/users', apiController.registerUser);
 router.get('/users/profile/:username', apiController.getUserProfile);
@@ -127,5 +133,29 @@ router.get('/speedcube', authController.authenticateToken, speedcubeController.g
 router.post('/speedcube', authController.authenticateToken, speedcubeController.addTime);
 router.patch('/speedcube/:id/note', authController.authenticateToken, speedcubeController.updateNote);
 router.delete('/speedcube/:id', authController.authenticateToken, speedcubeController.deleteTime);
+
+// ─── Scratchcards ─────────────────────────────────────────────
+router.get('/scratchcards/config', authController.optionalAuthenticateToken, apiController.getScratchcardConfig);
+router.get('/scratchcards/stats', apiController.getGlobalScratchcardStats);
+router.get('/scratchcards/chart', apiController.getScratchcardLeaderboardData);
+router.post('/scratchcards/buy', authController.authenticateToken, apiController.buyScratchcard);
+router.post('/scratchcards/claim', authController.authenticateToken, apiController.claimScratchcard);
+
+// Admin Scratchcard Pack Management
+router.get('/admin/scratchcards/packs', authController.authenticateToken, apiController.getScratchcardPacks);
+router.get('/admin/scratchcards/packs/:id', authController.authenticateToken, apiController.getScratchcardPackFull);
+router.post('/admin/scratchcards/packs', authController.authenticateToken, apiController.adminCreateScratchPack);
+router.put('/admin/scratchcards/packs/:id', authController.authenticateToken, apiController.adminUpdateScratchPack);
+router.delete('/admin/scratchcards/packs/:id', authController.authenticateToken, apiController.adminDeleteScratchPack);
+
+// ─── LEC Rift Defense ──────────────────────────────────────────
+router.get('/rift-defense/shop-config', authController.authenticateToken, riftDefenseController.getShopConfig);
+router.post('/rift-defense/buy-capsule', authController.authenticateToken, riftDefenseController.buyCapsule);
+router.get('/rift-defense/inventory', authController.authenticateToken, riftDefenseController.getInventory);
+router.post('/rift-defense/combine', authController.authenticateToken, riftDefenseController.combineTowers);
+router.post('/rift-defense/combine-all', authController.authenticateToken, riftDefenseController.combineAllTowers);
+router.post('/rift-defense/scrap', authController.authenticateToken, riftDefenseController.scrapTower);
+router.post('/rift-defense/save-stats', authController.authenticateToken, riftDefenseController.saveStats);
+router.get('/rift-defense/leaderboards', riftDefenseController.getLeaderboards);
 
 module.exports = router;

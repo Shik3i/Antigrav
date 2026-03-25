@@ -10,6 +10,10 @@ const { XMLParser } = require('fast-xml-parser');
 
 const JWT_SECRET = require('../jwtSecret');
 
+// Performance Protection: Debounce for immediate bet resolution trigger
+let lastBetResolutionTrigger = 0;
+const BET_RESOLUTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes between automated triggers via API calls
+
 exports.getHighscores = async (req, res, next) => {
     try {
         const scores = await dbLayer.getHighscores(20);
@@ -80,6 +84,7 @@ exports.fetchEsportsData = async (forceRefresh = false) => {
         });
 
         let events = response.data?.data?.schedule?.events || [];
+        
 
         // We want events that haven't finished yet (state: unstarted or inProgress)
         // No strict league filtering here, so that favorites from minor leagues can be found.
@@ -310,6 +315,7 @@ exports.fetchPolymarketOddsData = async (forceRefreshMatch = null) => {
         }
     }
 
+    let triggerResolution = false;
     const fetchedOdds = allLolEvents.map(event => {
         const markets = event.markets || [];
 
@@ -340,6 +346,11 @@ exports.fetchPolymarketOddsData = async (forceRefreshMatch = null) => {
             const outcomeNames = JSON.parse(winnerMarket.outcomes);
             const outcomePrices = JSON.parse(winnerMarket.outcomePrices || '[]');
 
+            // Trigger resolution if any outcome has hit 100% (price 1.0)
+            if (outcomePrices.some(p => parseFloat(p) === 1)) {
+                triggerResolution = true;
+            }
+
             return {
                 id: event.id,
                 slug: event.slug,
@@ -362,6 +373,19 @@ exports.fetchPolymarketOddsData = async (forceRefreshMatch = null) => {
     } else {
         polymarketCache.data = fetchedOdds;
         polymarketCache.timestamp = now;
+    }
+
+    // Trigger immediate resolution if a completed match was found and cooldown allows
+    if (triggerResolution) {
+        if (now - lastBetResolutionTrigger >= BET_RESOLUTION_COOLDOWN) {
+            lastBetResolutionTrigger = now;
+            const { resolveBets } = require('../cron/betResolver');
+            console.log('[API] Polymarket price 1.0 detected. Auto-triggering bet resolver...');
+            resolveBets().catch(e => {
+                console.error('[API] Auto-trigger bet resolver error:', e.message);
+                dbLayer.logError('Auto-trigger bet resolver error', e.stack);
+            });
+        }
     }
 
     return polymarketCache.data;
@@ -1088,11 +1112,8 @@ exports.submitKoalaFlapScore = async (req, res, next) => {
 
         // Calculate Bonuses
         const coinUpgradeLevel = upgrades.find(u => u.upgrade_id === 'coin_base_value')?.current_level || 0;
-        const streakUpgradeLevel = upgrades.find(u => u.upgrade_id === 'hotstreak_multiplier')?.current_level || 0;
-        
         const coinMultiplier = 1 + (coinUpgradeLevel * 0.2);
-        const streakMultiplier = 1 + (score * streakUpgradeLevel * 0.02); // 2% bonus per pipe per level
-        const totalMultiplier = coinMultiplier * streakMultiplier;
+        const totalMultiplier = coinMultiplier;
 
         // Check if payout is enabled
         const payoutEnabled = baseline.game_koalaflap_payout_enabled !== 'false'; // Default to true
@@ -1101,9 +1122,25 @@ exports.submitKoalaFlapScore = async (req, res, next) => {
         const effectiveCoins = coinsCollected;
 
         // Calculate earnings in cents
-        // Use Math.round instead of floor to ensure decimal multiplier gains are not immediately truncated (e.g. 50 * 1.2 = 60)
         const conversionRate = baseline.koala_coin_conversion_rate || 1;
         let totalEarningsCents = Math.round(effectiveCoins * totalMultiplier * (conversionRate * 100));
+        
+        // ECONOMY SAFETY: Max 20 KoalaCoins (2000 cents) per round
+        const MAX_PAYOUT_CENTS = 2000; 
+        if (totalEarningsCents > MAX_PAYOUT_CENTS && payoutEnabled) {
+            console.warn(`[Economy] Payout cap hit for user ${userId}: ${totalEarningsCents} cents capped to ${MAX_PAYOUT_CENTS}`);
+            // Log to AdminActions for transparency
+            const user = await dbLayer.getUser(userId);
+            dbLayer.logAdminAction('SYSTEM', 'KoalaFlap Economy', 'PAYOUT_CAP_HIT', { 
+                userId, 
+                username: user?.username || 'Unknown', 
+                originalEarnings: totalEarningsCents / 100, 
+                score 
+            }).catch(e => console.error('Failed to log economy warning:', e));
+            
+            totalEarningsCents = MAX_PAYOUT_CENTS;
+        }
+
         if (!payoutEnabled) totalEarningsCents = 0;
 
         // Record the score
@@ -1356,5 +1393,359 @@ exports.getUserProfile = async (req, res, next) => {
     } catch (err) {
         console.error('[API] Error fetching user profile:', err);
         res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+};
+
+// ─── Scratchcard Minigame ─────────────────────────────────────
+exports.getScratchcardPacks = async (req, res) => {
+    try {
+        const packs = await dbLayer.getScratchcardPacks();
+        const enrichedPacks = await Promise.all(packs.map(async (p) => {
+            const teams = await dbLayer.getScratchcardPackTeams(p.id);
+            let maxWinPerLine = 0;
+            if (p.is_weighted) {
+                // Rank-1 multiplier is always 10.0
+                maxWinPerLine = p.price * 10;
+            } else {
+                maxWinPerLine = p.reward_amount || (p.price * 5);
+            }
+            return {
+                ...p,
+                max_win: maxWinPerLine * 8, // 8-line jackpot
+                teams: teams
+            };
+        }));
+        res.json(enrichedPacks);
+    } catch (err) {
+        console.error('getScratchcardPacks error:', err);
+        res.status(500).json({ error: 'Failed to fetch packs' });
+    }
+};
+
+exports.getScratchcardConfig = async (req, res) => {
+    try {
+        const userId = req.user?.userId || req.user?.id;
+        const packs = await dbLayer.getScratchcardPacks();
+        const activePacks = packs.filter(p => p.is_active);
+        
+        // Enhance packs with team counts and user-specific daily counts
+        const enhancedPacks = await Promise.all(activePacks.map(async (pack) => {
+            const teams = await dbLayer.getScratchcardPackTeams(pack.id);
+            let userDailyCount = 0;
+            if (userId && pack.max_daily_limit > 0) {
+                userDailyCount = await dbLayer.getUserDailyPackCount(userId, pack.id);
+            }
+            
+            return {
+                ...pack,
+                teams_count: teams.length,
+                teams: teams.map(t => ({ team_code: t.team_code, position: t.position })),
+                userDailyCount
+            };
+        }));
+        
+        res.json(enhancedPacks);
+    } catch (err) {
+        console.error('getScratchcardConfig error:', err);
+        res.status(500).json({ error: 'Failed to fetch config' });
+    }
+};
+
+exports.getGlobalScratchcardStats = async (req, res) => {
+    try {
+        const stats = await dbLayer.getGlobalScratchcardStats();
+        
+        const [latestWinners, topWinners, leaderboard] = await Promise.all([
+            dbLayer.getLatestScratchcardWinners(10),
+            dbLayer.getTopScratchcardWinners(10),
+            dbLayer.getScratchcardLeaderboard(10)
+        ]);
+
+        const formatWinners = (winners) => winners.map(w => {
+            let parsedGrid = [];
+            try {
+                parsedGrid = (typeof w.grid === 'string') ? JSON.parse(w.grid) : (w.grid || []);
+            } catch (e) { parsedGrid = []; }
+
+            let parsedPrefs = {};
+            try {
+                parsedPrefs = (typeof w.preferences === 'string') ? JSON.parse(w.preferences) : (w.preferences || {});
+            } catch (e) { parsedPrefs = {}; }
+
+            return { ...w, grid: parsedGrid, preferences: parsedPrefs };
+        });
+
+        res.json({ 
+            ...stats, 
+            latestWinners: formatWinners(latestWinners),
+            topWinners: formatWinners(topWinners),
+            leaderboard: formatWinners(leaderboard) // Reuse same formatting for avatars
+        });
+    } catch (err) {
+        console.error('getGlobalScratchcardStats error:', err);
+        res.status(500).json({ error: 'Failed to fetch global stats' });
+    }
+};
+
+exports.getScratchcardLeaderboardData = async (req, res) => {
+    try {
+        const data = await dbLayer.getScratchcardLeaderboardData();
+        // Transform for chart (convert strings to numbers)
+        const chartData = data.map(row => ({
+            day: row.day,
+            dailyWin: Number(row.dailyWin)
+        }));
+        res.json(chartData);
+    } catch (err) {
+        console.error('getScratchcardLeaderboardData error:', err);
+        res.status(500).json({ error: 'Failed to fetch chart data' });
+    }
+};
+
+const WINNING_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Cols
+    [0, 4, 8], [2, 4, 6]             // Diagonals
+];
+
+function generateScratchcardGrid(teams, shouldWin) {
+    let grid = new Array(9).fill(null);
+    if (!teams || teams.length < 3) return grid; // At least 3 teams for a grid
+
+    if (shouldWin) {
+        const winningTeam = teams[Math.floor(Math.random() * teams.length)];
+        const line = WINNING_LINES[Math.floor(Math.random() * WINNING_LINES.length)];
+        line.forEach(index => { grid[index] = winningTeam.code; });
+
+        for (let i = 0; i < 9; i++) {
+            if (grid[i] === null) {
+                grid[i] = teams[Math.floor(Math.random() * teams.length)].code;
+            }
+        }
+    } else {
+        let attempts = 0;
+        while (attempts < 50) {
+            for (let i = 0; i < 9; i++) {
+                grid[i] = teams[Math.floor(Math.random() * teams.length)].code;
+            }
+            const hasWin = WINNING_LINES.some(line => 
+                grid[line[0]] && (grid[line[0]] === grid[line[1]]) && (grid[line[1]] === grid[line[2]])
+            );
+            if (!hasWin) break;
+            attempts++;
+        }
+
+        // Final Fail-Safe Check: If the 50 attempts somehow failed (only possible with very small team pools),
+        // we force a guaranteed, but organic-looking loser pattern.
+        const finalWinCheck = WINNING_LINES.some(line => 
+            grid[line[0]] && (grid[line[0]] === grid[line[1]]) && (grid[line[1]] === grid[line[2]])
+        );
+        if (finalWinCheck) {
+            const t1 = teams[0].code;
+            const t2 = teams[1].code;
+            const t3 = teams[2].code;
+            // Pattern (A-B-C, A-C-B, B-A-C) is mathematically guaranteed to have NO wins (rows, cols, diags).
+            grid = [
+                t1, t2, t3,
+                t1, t3, t2,
+                t2, t1, t3
+            ];
+        }
+    }
+    return grid;
+}
+
+function findAllWinningLines(grid) {
+    const wins = [];
+    for (const line of WINNING_LINES) {
+        if (grid[line[0]] && (grid[line[0]] === grid[line[1]]) && (grid[line[1]] === grid[line[2]])) {
+            wins.push({ line, code: grid[line[0]] });
+        }
+    }
+    return wins;
+}
+
+exports.buyScratchcard = async (req, res, next) => {
+    try {
+        const { packId } = req.body;
+        const userId = req.user?.userId || req.user?.id;
+
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+        if (!packId) return res.status(400).json({ error: 'Pack ID required' });
+
+        const pack = await dbLayer.getScratchcardPack(packId);
+        if (!pack || !pack.is_active) {
+            return res.status(400).json({ error: 'Invalid or inactive scratchcard pack' });
+        }
+
+        // Check daily limit
+        if (pack.max_daily_limit > 0) {
+            const dailyCount = await dbLayer.getUserDailyPackCount(userId, packId);
+            if (dailyCount >= pack.max_daily_limit) {
+                return res.status(400).json({ error: 'Tägliches Kauflimit erreicht (Daily Limit Reached)' });
+            }
+        }
+
+        const user = await dbLayer.getUser(userId);
+        if (!user || user.koala_balance < pack.price) {
+            return res.status(400).json({ error: 'Not enough KoalaCoins' });
+        }
+
+        const packTeams = await dbLayer.getScratchcardPackTeams(packId);
+        if (!packTeams || packTeams.length < 3) {
+            return res.status(400).json({ error: 'Dieses Los ist aktuell nicht verfügbar. Zu wenig Teams hinterlegt.' });
+        }
+        
+        const teams = packTeams.map(pt => ({ code: pt.team_code }));
+
+        const shouldWin = Math.random() < pack.win_chance;
+        const grid = generateScratchcardGrid(teams, shouldWin);
+        
+        const winningLines = findAllWinningLines(grid);
+        let winAmount = 0;
+
+        for (const win of winningLines) {
+            if (pack.is_weighted) {
+                const teamData = packTeams.find(t => t.team_code === win.code);
+                const rank = (teamData ? teamData.position : 0) + 1; // 1-based rank
+                const N = packTeams.length;
+                
+                // Biquadratic Rank-Based Multiplier (Power 4)
+                // Multiplier = 2 + 18 * ((N - r) / (N - 1))^4
+                // Min 2.0x (last place), Max 20.0x (first place)
+                let multiplier = 2.0;
+                if (N > 1) {
+                    const term = (N - rank) / (N - 1);
+                    multiplier = 2 + 18 * Math.pow(term, 4);
+                } else {
+                    multiplier = 20.0;
+                }
+                
+                winAmount += Math.floor(pack.price * multiplier);
+            } else {
+                winAmount += (pack.reward_amount || (pack.price * 5));
+            }
+        }
+
+        const result = await dbLayer.purchaseScratchcardTransaction(userId, packId, pack.name, pack.price, grid, winAmount);
+
+        res.json({
+            id: result.id,
+            grid: result.grid,
+            winAmount: result.winAmount,
+            price: pack.price,
+            winningLines // Include all lines for frontend highlighting
+        });
+    } catch (err) {
+        console.error('[Scratchcard] Purchase error:', err);
+        res.status(500).json({ error: 'Failed to process purchase' });
+    }
+};
+
+// Admin Pack Management
+exports.adminCreateScratchPack = async (req, res) => {
+    try {
+        const { pack, teams } = req.body; // teams as [code1, code2, ...] in order
+        const newPack = await dbLayer.createScratchcardPack(pack);
+        if (teams && Array.isArray(teams)) {
+            await dbLayer.setScratchcardPackTeams(newPack.id, teams);
+        }
+        res.json({ success: true, pack: newPack });
+    } catch (err) {
+        console.error('adminCreateScratchPack error:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.adminUpdateScratchPack = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { pack, teams } = req.body;
+        await dbLayer.updateScratchcardPack(id, pack);
+        if (teams && Array.isArray(teams)) {
+            await dbLayer.setScratchcardPackTeams(id, teams);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('adminUpdateScratchPack error:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.adminDeleteScratchPack = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await dbLayer.deleteScratchcardPack(id);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('adminDeleteScratchPack error:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.getScratchcardPackFull = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pack = await dbLayer.getScratchcardPack(id);
+        const teams = await dbLayer.getScratchcardPackTeams(id);
+        res.json({ pack, teams });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.claimScratchcard = async (req, res, next) => {
+    try {
+        const { id } = req.body;
+        const userId = req.user?.userId || req.user?.id;
+
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+        if (!id) return res.status(400).json({ error: 'Card ID required' });
+        
+        console.log(`[Scratchcard] User ${userId} claiming card ${id}`);
+
+        // dbLayer.claimScratchcard handles verification, status update, balance update, and transaction logging
+        const result = await dbLayer.claimScratchcard(id, userId);
+        
+        res.json({ success: true, winAmount: result.winAmount, price: result.price });
+    } catch (err) {
+        console.error('[Scratchcard] Claim error:', err);
+        // Map common error messages to user-friendly ones if needed
+        const errorMsg = err.message === 'Scratchcard not found' || err.message === 'Scratchcard already claimed or invalid'
+            ? err.message
+            : 'Failed to claim reward';
+        res.status(err.status || 500).json({ error: errorMsg });
+    }
+};
+
+// Navbar Settings
+exports.getPublicNavbarSettings = async (req, res, next) => {
+    try {
+        const settings = await dbLayer.getNavbarSettings(false);
+        res.json(settings);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getAdminNavbarSettings = async (req, res, next) => {
+    try {
+        const settings = await dbLayer.getNavbarSettings(true);
+        res.json(settings);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateNavbarSettings = async (req, res, next) => {
+    try {
+        const { settings } = req.body;
+        if (!settings || !Array.isArray(settings)) {
+            return res.status(400).json({ error: 'Settings must be an array' });
+        }
+        await dbLayer.updateNavbarSettings(settings);
+        res.json({ success: true });
+    } catch (err) {
+        next(err);
     }
 };

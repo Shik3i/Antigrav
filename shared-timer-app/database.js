@@ -271,12 +271,15 @@ db.serialize(() => {
     db.run(`INSERT OR IGNORE INTO GameUpgrades_Config (upgrade_id, display_name, description, base_price, price_step, max_level, category) VALUES 
       ('coin_base_value', 'Münz-Wert', 'Erhöht den KoalaCoin-Basiswert jeder Münze um +20% pro Level.', 500, 250, 10, 'koala_flap'),
       ('extra_lives', 'Extra-Leben', 'Jedes Level gewährt ein zusätzliches Herz zu Rundenbeginn.', 1000, 500, 3, 'koala_flap'),
-      ('crit_coins', 'Crit Coins', 'Erhöht die Chance auf den 10-fachen Münzwert um +1% pro Level.', 1500, 750, 10, 'koala_flap'),
-      ('hotstreak_multiplier', 'Hotstreak-Multiplier', 'Je mehr Röhren man passiert, desto schneller steigen die Belohnungen.', 750, 400, 5, 'koala_flap')`);
+      ('crit_coins', 'Crit Coins', 'Erhöht die Chance auf den 10-fachen Münzwert um +1% pro Level.', 1500, 750, 10, 'koala_flap')`);
     
     // Update existing descriptions if needed (since INSERT OR IGNORE won't update them)
     db.run("UPDATE GameUpgrades_Config SET description = 'Erhöht den KoalaCoin-Basiswert jeder Münze um +20% pro Level.' WHERE upgrade_id = 'coin_base_value'");
     db.run("UPDATE GameUpgrades_Config SET description = 'Jedes Level gewährt ein zusätzliches Herz zu Rundenbeginn.' WHERE upgrade_id = 'extra_lives'");
+
+    // Phase 15: Clean up Hotstreak-Multiplier (Removed for economy reasons)
+    db.run("DELETE FROM GameUpgrades_Config WHERE upgrade_id = 'hotstreak_multiplier'");
+    db.run("DELETE FROM UserUpgrades WHERE upgrade_id = 'hotstreak_multiplier'");
   });
 
   db.run(`CREATE TABLE IF NOT EXISTS UserUpgrades (
@@ -300,9 +303,41 @@ db.serialize(() => {
     FOREIGN KEY(userId) REFERENCES Users(id)
   )`);
 
-  db.run('CREATE INDEX IF NOT EXISTS idx_gamescores_userId ON GameScores(userId)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_gamescores_gameId ON GameScores(gameId)');
-  db.run('CREATE INDEX IF NOT EXISTS idx_gamescores_score ON GameScores(score)');
+  // ScratchcardPools: Manual superadmin assignment of teams to scratchcard types
+  db.run(`CREATE TABLE IF NOT EXISTS ScratchcardPools (
+    card_type TEXT NOT NULL,
+    team_code TEXT NOT NULL,
+    PRIMARY KEY(card_type, team_code)
+  )`);
+
+  // ScratchcardConfigs: Superadmin configuration for economy (price, win chance, reward)
+  db.run(`CREATE TABLE IF NOT EXISTS ScratchcardConfigs (
+    card_type TEXT PRIMARY KEY,
+    price INTEGER NOT NULL,
+    win_chance REAL NOT NULL,
+    reward_amount INTEGER NOT NULL
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS scratchcard_packs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    region_label TEXT,
+    scope TEXT NOT NULL CHECK (scope IN ('Regional', 'International')),
+    price INTEGER NOT NULL,
+    win_chance REAL DEFAULT 0.3,
+    reward_amount INTEGER, -- For non-weighted fixed reward
+    is_weighted BOOLEAN DEFAULT 0,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS scratchcard_pack_teams (
+    pack_id INTEGER NOT NULL,
+    team_code TEXT NOT NULL,
+    position INTEGER DEFAULT 0,
+    PRIMARY KEY(pack_id, team_code),
+    FOREIGN KEY(pack_id) REFERENCES scratchcard_packs(id) ON DELETE CASCADE
+  )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS Changelog (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -317,6 +352,27 @@ db.serialize(() => {
   db.run('CREATE INDEX IF NOT EXISTS idx_admin_actions_timestamp ON AdminActions(timestamp)');
   db.run('CREATE INDEX IF NOT EXISTS idx_features_status ON FeatureRequests(status)');
 
+  // Phase 3 Migration: Add max_daily_limit to scratchcard_packs
+  db.run("ALTER TABLE scratchcard_packs ADD COLUMN max_daily_limit INTEGER DEFAULT 0", (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error("Migration error adding max_daily_limit:", err);
+    }
+  });
+
+  // Phase 18 Migration: Add is_special to scratchcard_packs
+  db.run("ALTER TABLE scratchcard_packs ADD COLUMN is_special BOOLEAN DEFAULT 0", (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error("Migration error adding is_special:", err);
+    }
+  });
+
+  // Phase 18 Migration: Add type column to FeatureRequests
+  db.run("ALTER TABLE FeatureRequests ADD COLUMN type TEXT DEFAULT 'Feature'", (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error("Migration error adding type to FeatureRequests:", err);
+    }
+  });
+
   // SpeedcubeTimes: stores cube timer results
   db.run(`CREATE TABLE IF NOT EXISTS SpeedcubeTimes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -328,11 +384,98 @@ db.serialize(() => {
   )`);
   db.run('CREATE INDEX IF NOT EXISTS idx_speedcube_userId ON SpeedcubeTimes(userId)');
   
+  // Scratchcards: stores purchased but not yet claimed cards
+  db.run(`CREATE TABLE IF NOT EXISTS Scratchcards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    type TEXT NOT NULL,
+    grid TEXT NOT NULL,
+    winAmount INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'purchased',
+    price INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id)
+  )`);
+  
+  // Phase 14 Migration: Add price to Scratchcards
+  db.run("ALTER TABLE Scratchcards ADD COLUMN price INTEGER DEFAULT 0", (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error("Migration error adding price to Scratchcards:", err);
+    }
+  });
+  db.run('CREATE INDEX IF NOT EXISTS idx_scratchcards_userId ON Scratchcards(userId)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_scratchcards_status ON Scratchcards(status)');
+
   // AchievementSettings: stores per-achievement multipliers
   db.run(`CREATE TABLE IF NOT EXISTS AchievementSettings (
     achievementId TEXT PRIMARY KEY,
     multiplier REAL DEFAULT 1.0
   )`);
+
+  // --- LEC Rift Defense ---
+  db.run(`CREATE TABLE IF NOT EXISTS RiftDefense_Towers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    teamCode TEXT NOT NULL,
+    starLevel INTEGER DEFAULT 1,
+    rarityTier INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+  db.run("ALTER TABLE RiftDefense_Towers ADD COLUMN rarityTier INTEGER DEFAULT 0", () => { });
+  db.run('CREATE INDEX IF NOT EXISTS idx_riftdefense_userId ON RiftDefense_Towers(userId)');
+
+  db.run(`CREATE TABLE IF NOT EXISTS RiftDefense_Stats (
+    userId TEXT PRIMARY KEY,
+    highestWave INTEGER DEFAULT 0,
+    totalMinionsKilled INTEGER DEFAULT 0,
+    totalBossesKilled INTEGER DEFAULT 0,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+
+  // --- NavbarSettings ---
+  db.run(`CREATE TABLE IF NOT EXISTS NavbarSettings (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    path TEXT NOT NULL,
+    category TEXT DEFAULT 'Other',
+    isVisible BOOLEAN DEFAULT 1,
+    sortOrder INTEGER DEFAULT 0
+  )`, () => {
+    // Seed default menu items
+    const defaults = [
+      ['dashboard', 'Sync Timers', '/', 'Timers', 1, 1],
+      ['countdowns', 'Countdowns', '/countdowns', 'Timers', 1, 2],
+      ['speedcube', 'Speedcube Timer', '/speedcube', 'Timers', 1, 3],
+      ['statistics', 'Statistics', '/highscores', 'Timers', 1, 4],
+      ['esports', 'Esports', '/esports', 'Esports', 1, 1],
+      ['esports-bets', 'Community Bets', '/global-bets', 'Esports', 1, 2],
+      ['financial-dashboard', 'Financial Dashboard', '/koala-dashboard', 'Esports', 1, 3],
+      ['achievements', 'Achievements & Boni', '/achievements', 'Esports', 1, 4],
+      ['koala-flap', 'KoalaFlap', '/games/koalaflap', 'Games', 1, 1],
+      ['scratch-cards', 'Scratchcards', '/scratchcards', 'Games', 1, 2],
+      ['rift-defense', 'LEC Rift Defense', '/games/rift-defense', 'Games', 1, 3],
+      ['game-leaderboards', 'Game Leaderboards', '/games/leaderboard', 'Games', 1, 4],
+      ['settings', 'Settings', '/settings', 'System', 1, 1],
+      ['roadmap', 'Feature Roadmap', '/features', 'System', 1, 2],
+      ['changelog', 'Changelog', '/changelog', 'System', 1, 3],
+      ['admin', 'Admin Panel', '/admin', 'System', 1, 4]
+    ];
+    
+    defaults.forEach(([key, label, path, category, isVisible, sortOrder]) => {
+      db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) VALUES (?, ?, ?, ?, ?, ?)`, 
+        [key, label, path, category, isVisible, sortOrder]);
+    });
+
+    // Migration: Remove dead friends link and ensure admin link exists
+    db.run("DELETE FROM NavbarSettings WHERE key = 'friends'");
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('admin', 'Admin Panel', '/admin', 'System', 1, 4)`);
+    
+    // Fix: Feature Roadmap path (was /roadmap, should be /features)
+    db.run("UPDATE NavbarSettings SET path = '/features' WHERE key = 'roadmap'");
+  });
 });
 
 // Speedcube Helpers
@@ -794,6 +937,120 @@ const deleteTeamMapping = (id) => {
   });
 };
 
+// ─── Scratchcards Helpers ─────────────────────────────────────
+const createScratchcard = (userId, packId, grid, winAmount) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO Scratchcards (userId, type, grid, winAmount) VALUES (?, ?, ?, ?)',
+      [userId, String(packId), JSON.stringify(grid), winAmount],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, userId, packId, grid, winAmount, status: 'purchased' });
+      }
+    );
+  });
+};
+
+const purchaseScratchcardTransaction = (userId, packId, packName, price, grid, winAmount) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+
+      // 1. Check & Deduct Balance
+      db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (err, user) => {
+        if (err || !user || user.koala_balance < price) {
+          db.run('ROLLBACK');
+          return reject(err || new Error('Insufficient balance or user not found'));
+        }
+
+        db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [price, userId], (updErr) => {
+          if (updErr) {
+            db.run('ROLLBACK');
+            return reject(updErr);
+          }
+
+          // 2. Create Scratchcard (This atomic insert effectively records the "buy" for the daily limit count)
+          db.run(
+            'INSERT INTO Scratchcards (userId, type, grid, winAmount, status, price) VALUES (?, ?, ?, ?, ?, ?)',
+            [userId, String(packId), JSON.stringify(grid), winAmount, 'purchased', price],
+            function (insErr) {
+              if (insErr) {
+                db.run('ROLLBACK');
+                return reject(insErr);
+              }
+              const cardId = this.lastID;
+
+              // 3. Log Transaction
+              db.run(
+                'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+                [userId, -price, `Purchased Scratchcard: ${packName} (ID: ${cardId})`],
+                (txErr) => {
+                  if (txErr) {
+                    db.run('ROLLBACK');
+                    return reject(txErr);
+                  }
+
+                  db.run('COMMIT', (commitErr) => {
+                    if (commitErr) reject(commitErr);
+                    else resolve({ id: cardId, grid, winAmount });
+                  });
+                }
+              );
+            }
+          );
+        });
+      });
+    });
+  });
+};
+
+const getScratchcard = (id) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM Scratchcards WHERE id = ?', [id], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+};
+
+const getUserPurchasedScratchcard = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM Scratchcards WHERE userId = ? AND status = "purchased" ORDER BY createdAt DESC LIMIT 1', [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+};
+
+const claimScratchcard = (id, userId) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.get('SELECT winAmount, status, price FROM Scratchcards WHERE id = ? AND userId = ?', [id, userId], (err, card) => {
+        if (err) return reject(err);
+        if (!card) return reject(new Error('Scratchcard not found'));
+        if (card.status !== 'purchased') return reject(new Error('Scratchcard already claimed or invalid'));
+
+        db.run('UPDATE Scratchcards SET status = "claimed" WHERE id = ?', [id], function (updateErr) {
+          if (updateErr) return reject(updateErr);
+          
+          if (card.winAmount > 0) {
+            db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [card.winAmount, userId], (coinErr) => {
+              if (coinErr) return reject(coinErr);
+              // Log transaction
+              db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, card.winAmount, `Scratchcard Win (ID: ${id})`], (txErr) => {
+                if (txErr) return reject(txErr);
+                resolve({ success: true, winAmount: card.winAmount, price: card.price });
+              });
+            });
+          } else {
+            resolve({ success: true, winAmount: 0, price: card.price });
+          }
+        });
+      });
+    });
+  });
+};
+
 // ─── Admin Dashboard Helpers ─────────────────────────────────────
 const getAllTimerCompletions = () => {
   return new Promise((resolve, reject) => {
@@ -1168,6 +1425,75 @@ const getUnresolvedPastBets = () => {
   });
 };
 
+const hasUnresolvedBetsForMatch = (nameOrUrl) => {
+  console.log('[DEBUG-TEST] DB Query sucht nach nameOrUrl:', nameOrUrl);
+  
+  // Peeking at a sample from the DB (temporary debug helper)
+  db.get('SELECT matchName FROM Bets LIMIT 1', (err, row) => {
+    if (row) console.log('[DEBUG-TEST] Beispiel-Eintrag aus der Spalte matchName:', row.matchName);
+  });
+
+  return new Promise((resolve, reject) => {
+    // Check both matchName and polymarketUrl as fallback
+    db.get('SELECT COUNT(*) as count FROM Bets WHERE (matchName = ? OR polymarketUrl = ?) AND status = ?', [nameOrUrl, nameOrUrl, 'open'], (err, row) => {
+      if (err) reject(err);
+      else resolve(row?.count > 0);
+    });
+  });
+};
+
+const resolveBetAtomic = (betId, newStatus, payoutAmount, reason) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+
+      db.get('SELECT status, userId FROM Bets WHERE id = ?', [betId], (err, row) => {
+        if (err) {
+          db.run('ROLLBACK');
+          return reject(err);
+        }
+        if (!row) {
+          db.run('ROLLBACK');
+          return reject(new Error('Bet not found'));
+        }
+        if (row.status !== 'open') {
+          // Already resolved by another process!
+          db.run('COMMIT');
+          return resolve({ success: false, reason: 'Already resolved' });
+        }
+
+        db.run('UPDATE Bets SET status = ? WHERE id = ?', [newStatus, betId], (err) => {
+          if (err) {
+            db.run('ROLLBACK');
+            return reject(err);
+          }
+
+          if (payoutAmount > 0) {
+            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+              [row.userId, payoutAmount, reason], (err) => {
+                if (err) {
+                  db.run('ROLLBACK');
+                  return reject(err);
+                }
+                db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [payoutAmount, row.userId], (err) => {
+                  if (err) {
+                    db.run('ROLLBACK');
+                    return reject(err);
+                  }
+                  db.run('COMMIT');
+                  resolve({ success: true });
+                });
+              });
+          } else {
+            db.run('COMMIT');
+            resolve({ success: true });
+          }
+        });
+      });
+    });
+  });
+};
+
 const updateBetStatus = (betId, newStatus) => {
   return new Promise((resolve, reject) => {
     db.run('UPDATE Bets SET status = ? WHERE id = ?', [newStatus, betId], function (err) {
@@ -1324,6 +1650,60 @@ const getUserFeatureRequestCount = (userId) => {
       if (err) reject(err);
       else resolve(row ? row.count : 0);
     });
+  });
+};
+
+const getScratchcardPools = () => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM ScratchcardPools', [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const addScratchcardPoolTeam = (cardType, teamCode) => {
+  return new Promise((resolve, reject) => {
+    db.run('INSERT OR IGNORE INTO ScratchcardPools (card_type, team_code) VALUES (?, ?)', [cardType, teamCode], function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+};
+
+const removeScratchcardPoolTeam = (cardType, teamCode) => {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM ScratchcardPools WHERE card_type = ? AND team_code = ?', [cardType, teamCode], function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+};
+
+const getScratchcardConfigs = () => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM ScratchcardConfigs', [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const updateScratchcardConfig = (cardType, price, winChance, rewardAmount) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO ScratchcardConfigs (card_type, price, win_chance, reward_amount) 
+       VALUES (?, ?, ?, ?) 
+       ON CONFLICT(card_type) DO UPDATE SET 
+       price = excluded.price, 
+       win_chance = excluded.win_chance, 
+       reward_amount = excluded.reward_amount`,
+      [cardType, price, winChance, rewardAmount],
+      function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      }
+    );
   });
 };
 
@@ -1585,7 +1965,8 @@ function checkDailyMission(userId, missionId) {
   return new Promise((resolve, reject) => {
     db.get('SELECT last_completed_at FROM UserMissions WHERE userId = ? AND mission_id = ?', [userId, missionId], (err, row) => {
       if (err) return reject(err);
-      if (row && row.last_completed_at === today) resolve(true);
+      // Use startsWith to handle both 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS' formats
+      if (row && row.last_completed_at && row.last_completed_at.startsWith(today)) resolve(true);
       else resolve(false);
     });
   });
@@ -1828,8 +2209,112 @@ const updateAchievementSetting = (achievementId, multiplier) => {
   });
 };
 
+const getGlobalScratchcardStats = () => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT COUNT(*) as total_sold, SUM(winAmount) as total_won FROM Scratchcards', [], (err, row) => {
+      if (err) reject(err);
+      else resolve({
+        total_sold: row?.total_sold || 0,
+        total_won: row?.total_won || 0
+      });
+    });
+  });
+};
+
+const getLatestScratchcardWinners = (limit = 10) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT s.id, s.userId, u.username, u.preferences, s.winAmount, s.createdAt, s.grid, COALESCE(p.name, s.type) as packName 
+      FROM Scratchcards s 
+      JOIN Users u ON s.userId = u.id 
+      LEFT JOIN scratchcard_packs p ON s.type = CAST(p.id AS TEXT) OR s.type = p.name
+      WHERE s.winAmount > 0 AND s.status = 'claimed' 
+      ORDER BY s.createdAt DESC 
+      LIMIT ?
+    `;
+    db.all(query, [limit], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getTopScratchcardWinners = (limit = 10) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT s.id, s.userId, u.username, u.preferences, s.winAmount, s.createdAt, s.grid, COALESCE(p.name, s.type) as packName 
+      FROM Scratchcards s 
+      JOIN Users u ON s.userId = u.id 
+      LEFT JOIN scratchcard_packs p ON s.type = CAST(p.id AS TEXT) OR s.type = p.name
+      WHERE s.winAmount > 0 AND s.status = 'claimed' 
+      ORDER BY s.winAmount DESC 
+      LIMIT ?
+    `;
+    db.all(query, [limit], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getScratchcardLeaderboard = (limit = 10) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT s.userId, u.username, u.preferences,
+        SUM(s.winAmount) as totalWin,
+        COUNT(s.id) as ticketsWon,
+        (SELECT COUNT(*) FROM Scratchcards s2 WHERE s2.userId = s.userId) as totalBought
+      FROM Scratchcards s
+      JOIN Users u ON s.userId = u.id
+      WHERE s.winAmount > 0 AND s.status = 'claimed'
+      GROUP BY s.userId
+      ORDER BY totalWin DESC
+      LIMIT ?
+    `;
+    db.all(query, [limit], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getScratchcardLeaderboardData = () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT date(createdAt) as day, SUM(winAmount) as dailyWin
+      FROM Scratchcards
+      WHERE status = 'claimed' AND winAmount > 0
+      GROUP BY day
+      ORDER BY day ASC
+    `;
+    db.all(query, [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getUserDailyPackCount = (userId, packId) => {
+  return new Promise((resolve, reject) => {
+    // Check count for today (UTC)
+    const today = new Date().toISOString().split('T')[0];
+    db.get(
+      'SELECT COUNT(*) as count FROM Scratchcards WHERE userId = ? AND type = ? AND date(createdAt) = date(?)',
+      [userId, String(packId), today],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.count || 0);
+      }
+    );
+  });
+};
+
 module.exports = {
   db,
+  getGlobalScratchcardStats,
+  getLatestScratchcardWinners,
+  getUserDailyPackCount,
+  purchaseScratchcardTransaction,
   addUser,
   updateUserName,
   getUser,
@@ -1883,6 +2368,8 @@ module.exports = {
   createBet,
   getUserBets,
   getUnresolvedPastBets,
+  hasUnresolvedBetsForMatch,
+  resolveBetAtomic,
   updateBetStatus,
   getAllBetsAdmin,
   getRecentBets,
@@ -1931,5 +2418,193 @@ module.exports = {
   getUserZeroScoreStreak,
   getAchievementSettings,
   updateAchievementSetting,
-  getUserFeatureRequestCount
+  getUserFeatureRequestCount,
+  createScratchcard,
+  getScratchcard,
+  getUserPurchasedScratchcard,
+  claimScratchcard,
+  getScratchcardPools,
+  addScratchcardPoolTeam,
+  removeScratchcardPoolTeam,
+  getScratchcardConfigs,
+  updateScratchcardConfig,
+  getLatestScratchcardWinners,
+  getTopScratchcardWinners,
+  getScratchcardLeaderboard,
+  getScratchcardLeaderboardData,
+  // Dynamic Scratchcard Packs
+  getScratchcardPacks: () => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM scratchcard_packs ORDER BY created_at DESC', (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  },
+  getScratchcardPack: (id) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM scratchcard_packs WHERE id = ?', [id], (err, row) => err ? reject(err) : resolve(row));
+    });
+  },
+  createScratchcardPack: (pack) => {
+    const { name, region_label, scope, price, win_chance, reward_amount, is_weighted, max_daily_limit, is_active, is_special } = pack;
+    return new Promise((resolve, reject) => {
+      db.run(`INSERT INTO scratchcard_packs (name, region_label, scope, price, win_chance, reward_amount, is_weighted, max_daily_limit, is_active, is_special) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, region_label, scope, price, win_chance || 0.3, reward_amount || 0, is_weighted ? 1 : 0, max_daily_limit || 0, is_active ? 1 : 0, is_special ? 1 : 0],
+        function (err) { err ? reject(err) : resolve({ id: this.lastID, ...pack }); }
+      );
+    });
+  },
+  updateScratchcardPack: (id, pack) => {
+    const { name, region_label, scope, price, win_chance, reward_amount, is_weighted, max_daily_limit, is_active, is_special } = pack;
+    return new Promise((resolve, reject) => {
+      db.run(`UPDATE scratchcard_packs SET name=?, region_label=?, scope=?, price=?, win_chance=?, reward_amount=?, is_weighted=?, max_daily_limit=?, is_active=?, is_special=? WHERE id=?`,
+        [name, region_label, scope, price, win_chance, reward_amount, is_weighted ? 1 : 0, max_daily_limit || 0, is_active ? 1 : 0, is_special ? 1 : 0, id],
+        function (err) { err ? reject(err) : resolve(this.changes); }
+      );
+    });
+  },
+  deleteScratchcardPack: (id) => {
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM scratchcard_packs WHERE id = ?', [id], function (err) { err ? reject(err) : resolve(this.changes); });
+    });
+  },
+  // Scratchcard Pack Teams
+  getScratchcardPackTeams: (packId) => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM scratchcard_pack_teams WHERE pack_id = ? ORDER BY position ASC', [packId], (err, rows) => err ? reject(err) : resolve(rows || []));
+    });
+  },
+  setScratchcardPackTeams: (packId, teamCodes) => {
+    // teamCodes is an array of strings in order
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        db.run('DELETE FROM scratchcard_pack_teams WHERE pack_id = ?', [packId], (err) => {
+          if (err) return db.run('ROLLBACK', () => reject(err));
+          const stmt = db.prepare('INSERT INTO scratchcard_pack_teams (pack_id, team_code, position) VALUES (?, ?, ?)');
+          teamCodes.forEach((code, idx) => stmt.run(packId, code, idx));
+          stmt.finalize((err) => {
+            if (err) return db.run('ROLLBACK', () => reject(err));
+            db.run('COMMIT', (err) => err ? reject(err) : resolve());
+          });
+        });
+      });
+    });
+  },
+
+  // --- LEC Rift Defense Helpers ---
+  addRiftDefenseTower: (userId, teamCode, starLevel = 1, rarityTier = 0) => {
+    return new Promise((resolve, reject) => {
+      db.run('INSERT INTO RiftDefense_Towers (userId, teamCode, starLevel, rarityTier) VALUES (?, ?, ?, ?)', [userId, teamCode, starLevel, rarityTier], function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, userId, teamCode, starLevel, rarityTier });
+      });
+    });
+  },
+
+  getUserRiftDefenseTowers: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM RiftDefense_Towers WHERE userId = ? ORDER BY starLevel DESC, teamCode ASC', [userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  deleteRiftDefenseTowers: (userId, teamCode, starLevel, limit) => {
+    return new Promise((resolve, reject) => {
+      db.run(`DELETE FROM RiftDefense_Towers WHERE id IN (SELECT id FROM RiftDefense_Towers WHERE userId = ? AND teamCode = ? AND starLevel = ? LIMIT ?)`, 
+      [userId, teamCode, starLevel, limit], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  scrapRiftDefenseTower: (id, userId) => {
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM RiftDefense_Towers WHERE id = ? AND userId = ?', [id, userId], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  updateRiftDefenseStats: (userId, highestWave, minionsKilled, bossesKilled) => {
+    return new Promise((resolve, reject) => {
+      db.run(`
+        INSERT INTO RiftDefense_Stats (userId, highestWave, totalMinionsKilled, totalBossesKilled, updatedAt)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(userId) DO UPDATE SET
+          highestWave = MAX(highestWave, excluded.highestWave),
+          totalMinionsKilled = totalMinionsKilled + excluded.totalMinionsKilled,
+          totalBossesKilled = totalBossesKilled + excluded.totalBossesKilled,
+          updatedAt = CURRENT_TIMESTAMP
+      `, [userId, highestWave, minionsKilled, bossesKilled], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  getRiftDefenseLeaderboards: () => {
+    return new Promise((resolve, reject) => {
+      const qWave = `SELECT r.userId, u.username, u.displayName, u.preferences, r.highestWave as value FROM RiftDefense_Stats r JOIN Users u ON r.userId = u.id ORDER BY r.highestWave DESC LIMIT 50`;
+      const qMinions = `SELECT r.userId, u.username, u.displayName, u.preferences, r.totalMinionsKilled as value FROM RiftDefense_Stats r JOIN Users u ON r.userId = u.id ORDER BY r.totalMinionsKilled DESC LIMIT 50`;
+      const qBosses = `SELECT r.userId, u.username, u.displayName, u.preferences, r.totalBossesKilled as value FROM RiftDefense_Stats r JOIN Users u ON r.userId = u.id ORDER BY r.totalBossesKilled DESC LIMIT 50`;
+      
+      Promise.all([
+        new Promise((res, rej) => db.all(qWave, [], (err, rows) => err ? rej(err) : res(rows))),
+        new Promise((res, rej) => db.all(qMinions, [], (err, rows) => err ? rej(err) : res(rows))),
+        new Promise((res, rej) => db.all(qBosses, [], (err, rows) => err ? rej(err) : res(rows)))
+      ]).then(([highestWave, totalMinions, totalBosses]) => {
+        resolve({ highestWave, totalMinions, totalBosses });
+      }).catch(reject);
+    });
+  },
+
+  getNavbarSettings: (adminOnly = false) => {
+    return new Promise((resolve, reject) => {
+      const query = adminOnly 
+        ? 'SELECT * FROM NavbarSettings ORDER BY sortOrder ASC'
+        : 'SELECT * FROM NavbarSettings WHERE isVisible = 1 ORDER BY sortOrder ASC';
+      db.all(query, [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  updateNavbarSettings: (settings) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        let completed = 0;
+        let hasError = false;
+
+        if (settings.length === 0) {
+          db.run('COMMIT');
+          return resolve();
+        }
+
+        settings.forEach(item => {
+          db.run(
+            'UPDATE NavbarSettings SET isVisible = ?, sortOrder = ? WHERE key = ?',
+            [item.isVisible ? 1 : 0, item.sortOrder, item.key],
+            (err) => {
+              if (err) hasError = true;
+              completed++;
+              if (completed === settings.length) {
+                if (hasError) {
+                  db.run('ROLLBACK');
+                  reject(new Error('Failed to update some navbar settings'));
+                } else {
+                  db.run('COMMIT');
+                  resolve();
+                }
+              }
+            }
+          );
+        });
+      });
+    });
+  }
 };

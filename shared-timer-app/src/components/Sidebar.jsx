@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History, Grid3X3 } from 'lucide-react';
+import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History, Grid3X3, Shield } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import { useAuth } from '../context/AuthContext';
 import SharedTodo from './SharedTodo';
@@ -121,6 +121,50 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const myUser = roomState?.users?.find(u => u.userId === user.id);
     const isWrite = myUser?.role === 'write';
 
+    const [navSettings, setNavSettings] = useState([]);
+    const [loadingNav, setLoadingNav] = useState(true);
+
+    useEffect(() => {
+        const fetchNav = async () => {
+            try {
+                const res = await fetch('/api/navbar-settings');
+                const data = await res.json();
+                setNavSettings(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.error('Failed to fetch navbar settings:', err);
+            } finally {
+                setLoadingNav(false);
+            }
+        };
+        fetchNav();
+    }, []);
+
+    const iconMap = {
+        'dashboard': <LayoutDashboard size={18} />,
+        'countdowns': <Timer size={18} />,
+        'speedcube': <Grid3X3 size={18} />,
+        'statistics': <BarChart3 size={18} />,
+        'esports': <Trophy size={18} color="#3b82f6" />,
+        'esports-bets': <Target size={18} color="#f59e0b" />,
+        'financial-dashboard': <TrendingUp size={18} color="#10b981" />,
+        'achievements': <Trophy size={18} color="#facc15" />,
+        'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
+        'scratch-cards': <Grid3X3 size={18} color="#fbbf24" />,
+        'rift-defense': <Shield size={18} color="#10b981" />,
+        'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
+        'settings': <Settings size={18} />,
+        'roadmap': <Lightbulb size={18} color="#fbbf24" />,
+        'changelog': <History size={18} color="#94a3b8" />,
+        'admin': <Shield size={18} color="var(--accent-primary)" />,
+    };
+
+    const categories = ['Timers', 'Esports', 'Games', 'System'];
+    const groupedNav = navSettings.reduce((acc, curr) => {
+        if (!acc[curr.category]) acc[curr.category] = [];
+        acc[curr.category].push(curr);
+        return acc;
+    }, {});
+
     return (
         <aside className={`glass-panel sidebar-drawer ${isOpen ? 'open' : ''}`} style={containerStyle}>
             <Link to="/" onClick={onClose} style={{ padding: '0 8px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}>
@@ -131,127 +175,52 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
             </Link>
 
             <nav style={navStyle}>
-                {/* --- Timers Section --- */}
-                <div className="nav-section">
-                    <button 
-                        className="btn-ghost section-header" 
-                        onClick={() => setExpandedSections(p => ({ ...p, timers: !p.timers }))}
-                        style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
-                    >
-                        <span>Timers & Countdowns</span>
-                        {expandedSections.timers ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-                    {expandedSections.timers && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
-                            <NavLink to="/" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <LayoutDashboard size={18} />
-                                Sync Timers
-                            </NavLink>
-                            <NavLink to="/countdowns" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Timer size={18} />
-                                Countdowns
-                            </NavLink>
-                            <NavLink to="/speedcube" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Grid3X3 size={18} />
-                                Speedcube Timer
-                            </NavLink>
-                            <NavLink to="/highscores" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <BarChart3 size={18} />
-                                Statistics
-                            </NavLink>
-                        </div>
-                    )}
-                </div>
+                {categories.map((cat) => {
+                    const items = groupedNav[cat] || [];
+                    const sectionKey = cat.toLowerCase();
+                    if (items.length === 0) return null;
 
-                {/* --- Esports Section --- */}
-                <div className="nav-section" style={{ marginTop: '12px' }}>
-                    <button 
-                        className="btn-ghost section-header" 
-                        onClick={() => setExpandedSections(p => ({ ...p, esports: !p.esports }))}
-                        style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
-                    >
-                        <span>Esports & Bets</span>
-                        {expandedSections.esports ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-                    {expandedSections.esports && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
-                            <NavLink to="/esports" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Trophy size={18} color="#3b82f6" />
-                                Esports
-                            </NavLink>
-                            <NavLink to="/global-bets" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Target size={18} color="#f59e0b" />
-                                Community Bets
-                            </NavLink>
-                            <NavLink to="/koala-dashboard" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <TrendingUp size={18} color="#10b981" />
-                                Financial Dashboard
-                            </NavLink>
-                            <NavLink to="/achievements" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Trophy size={18} color="#facc15" />
-                                Achievements & Boni
-                            </NavLink>
-                        </div>
-                    )}
-                </div>
-
-                {/* --- Games Section --- */}
-                <div className="nav-section" style={{ marginTop: '12px' }}>
-                    <button 
-                        className="btn-ghost section-header" 
-                        onClick={() => setExpandedSections(p => ({ ...p, games: !p.games }))}
-                        style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
-                    >
-                        <span>Games</span>
-                        {expandedSections.games ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-                    {expandedSections.games && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
-                            <NavLink to="/games/koalaflap" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Gamepad2 size={18} color="#ec4899" />
-                                KoalaFlap
-                            </NavLink>
-                            <NavLink to="/games/leaderboard" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Trophy size={18} color="#f59e0b" />
-                                Game Leaderboards
-                            </NavLink>
-                        </div>
-                    )}
-                </div>
-
-                {/* --- Tools & Misc --- */}
-                <div className="nav-section" style={{ marginTop: '12px' }}>
-                    <button 
-                        className="btn-ghost section-header" 
-                        onClick={() => setExpandedSections(p => ({ ...p, tools: !p.tools }))}
-                        style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
-                    >
-                        <span>System</span>
-                        {expandedSections.tools ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-                    {expandedSections.tools && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
-                            <NavLink to="/settings" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Settings size={18} />
-                                Settings
-                            </NavLink>
-                            <NavLink to="/features" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <Lightbulb size={18} color="#fbbf24" />
-                                Feature Roadmap
-                            </NavLink>
-                            <NavLink to="/changelog" onClick={onClose} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                <History size={18} color="#94a3b8" />
-                                Changelog
-                            </NavLink>
-                            {user?.is_superadmin && (
-                                <NavLink to="/admin" onClick={() => { sessionStorage.setItem('admin_token', 'Bearer Entangled-Napping7-Custodian'); onClose(); }} className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} style={{ justifyContent: 'flex-start' }}>
-                                    <Users size={18} color="var(--accent-primary)" />
-                                    Admin Panel
-                                </NavLink>
+                    return (
+                        <div key={cat} className="nav-section" style={{ marginTop: cat === 'Timers' ? '0' : '12px' }}>
+                            <button 
+                                className="btn-ghost section-header" 
+                                onClick={() => setExpandedSections(p => ({ ...p, [sectionKey]: !p[sectionKey] }))}
+                                style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
+                            >
+                                <span>{cat}</span>
+                                {expandedSections[sectionKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </button>
+                            {expandedSections[sectionKey] && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
+                                    {items.map(item => {
+                                        // Safety check: only superadmins can see the Admin Panel link
+                                        if (item.key === 'admin' && !user?.is_superadmin) return null;
+                                        
+                                        return (
+                                            <NavLink 
+                                                key={item.key} 
+                                                to={item.path} 
+                                                onClick={() => {
+                                                    if (item.key === 'admin') {
+                                                        sessionStorage.setItem('admin_token', 'Bearer Entangled-Napping7-Custodian');
+                                                    }
+                                                    onClose();
+                                                }} 
+                                                className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 
+                                                style={{ justifyContent: 'flex-start' }}
+                                            >
+                                                {iconMap[item.key] || <ListTodo size={18} />}
+                                                {item.label}
+                                            </NavLink>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
-                    )}
-                </div>
+                    );
+                })}
+
+
             </nav>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '4px', marginTop: '16px' }}>

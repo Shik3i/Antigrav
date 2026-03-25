@@ -27,7 +27,8 @@ export const ALARM_SOUNDS = {
     TWINKLE: 'Magic Twinkle',
     ARCADE: 'Retro Arcade',
     ECHO_DROP: 'Echo Drop',
-    SIREN: 'Emergency Siren'
+    SIREN: 'Emergency Siren',
+    COIN_JINGLE: 'Coin Jingle'
 };
 
 export const playAlarmSound = (soundType) => {
@@ -401,4 +402,69 @@ export const playPingSound = () => {
         osc.start(t + delay);
         osc.stop(t + delay + 0.35);
     });
+};
+
+export const playCoinJingle = () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('scratch_muted') === 'true') return;
+    const ctx = getAudioContext();
+    const t = ctx.currentTime;
+    const freqs = [1046.50, 1318.51, 1567.98, 2093.00, 2637.02, 3135.96]; // C6, E6, G6, C7, E7, G7
+    freqs.forEach((freq, idx) => {
+        const delay = idx * 0.05;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + delay);
+        gain.gain.setValueAtTime(0, t + delay);
+        gain.gain.linearRampToValueAtTime(0.2, t + delay + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + delay + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t + delay);
+        osc.stop(t + delay + 0.6);
+    });
+};
+
+export const playScratchEffect = () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('scratch_muted') === 'true') return;
+    const ctx = getAudioContext();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'square'; // Noisy base
+    osc.frequency.setValueAtTime(100 + Math.random() * 200, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1000, t);
+
+    gain.gain.setValueAtTime(0.02, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.1);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.1);
+};
+
+export const playPurchaseSound = () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('scratch_muted') === 'true') return;
+    const ctx = getAudioContext();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.linearRampToValueAtTime(1320, t + 0.1);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+    gain.gain.linearRampToValueAtTime(0, t + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
 };
