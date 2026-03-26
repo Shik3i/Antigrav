@@ -1,5 +1,11 @@
 [
   {
+    "id": 12,
+    "version": "2.7.0",
+    "date": "2026-03-26",
+    "changes": "- **Shared Countdowns**: Einführung von zustandslosen, teilbaren Fullscreen-Timern via URL-Parameter (Zeitzonen-sicher).\n- **Monochrome Theme**: Ein neues, radikal minimalistisches Dark-Theme für maximale Konzentration.\n- **Kiosk-Mode & Theme Sync**: Überarbeitete Fullscreen-Logik mit nativem CSS-Inheritance und Scroll-Lock für ein immersives Erlebnis.\n- **Backend Optimierung**: Reduzierung von Log-Spam in der Countdown-API zur Steigerung der Stabilität.\n- **UI Polish**: Verbesserte Navigation und 404-Fehlerseite Integration."
+  },
+  {
     "id": 11,
     "version": "2.6.0",
     "date": "2026-03-26",

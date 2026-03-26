@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Timer, Plus, Trash2, Globe, Eye, Lock, X } from 'lucide-react';
+import { Timer, Plus, Trash2, Globe, Eye, Lock, X, Maximize, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Countdowns = ({ user }) => {
@@ -14,6 +14,7 @@ const Countdowns = ({ user }) => {
     const [formPublic, setFormPublic] = useState(false);
     const [formLocal, setFormLocal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [copiedId, setCopiedId] = useState(null);
 
     const isSuperadmin = user?.is_superadmin || false;
 
@@ -126,6 +127,21 @@ const Countdowns = ({ user }) => {
                 if (res.ok) await fetchCountdowns();
             } catch (err) { console.error('Failed to delete countdown:', err); }
         }
+    };
+
+    const handleShare = (c) => {
+        const url = new URL(window.location.origin + '/c');
+        url.searchParams.set('title', c.eventName);
+        url.searchParams.set('target', new Date(c.targetDate).getTime());
+        
+        navigator.clipboard.writeText(url.toString());
+        setCopiedId(c.id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const handleFullscreen = (c) => {
+        const url = `/c?title=${encodeURIComponent(c.eventName)}&target=${new Date(c.targetDate).getTime()}`;
+        window.location.href = url;
     };
 
     const canDelete = (c) => {
@@ -278,22 +294,65 @@ const Countdowns = ({ user }) => {
                                             {past ? 'abgelaufen' : 'verbleibend'}
                                         </div>
                                     </div>
-                                    {canDelete(c) && (
+                                    <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
                                         <button
-                                            onClick={() => handleDelete(c)}
+                                            onClick={() => handleFullscreen(c)}
                                             style={{
-                                                background: 'rgba(239,68,68,0.1)', border: 'none',
+                                                background: 'rgba(139,92,246,0.1)', border: 'none',
                                                 borderRadius: '8px', padding: '8px', cursor: 'pointer',
-                                                color: '#ef4444', display: 'flex', alignItems: 'center',
+                                                color: '#8b5cf6', display: 'flex', alignItems: 'center',
                                                 transition: 'background 0.2s'
                                             }}
-                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
-                                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
-                                            title="Delete countdown"
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139,92,246,0.2)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139,92,246,0.1)'}
+                                            title="Fullscreen view"
                                         >
-                                            <Trash2 size={16} />
+                                            <Maximize size={16} />
                                         </button>
-                                    )}
+
+                                        <button
+                                            onClick={() => handleShare(c)}
+                                            style={{
+                                                background: 'rgba(16,185,129,0.1)', border: 'none',
+                                                borderRadius: '8px', padding: '8px', cursor: 'pointer',
+                                                color: '#10b981', display: 'flex', alignItems: 'center',
+                                                transition: 'background 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.2)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(16,185,129,0.1)'}
+                                            title="Share link"
+                                        >
+                                            <LinkIcon size={16} />
+                                        </button>
+
+                                        {copiedId === c.id && (
+                                            <div style={{
+                                                position: 'absolute', top: '-35px', left: '50%', transform: 'translateX(-50%)',
+                                                background: '#10b981', color: 'white', padding: '4px 8px', borderRadius: '4px',
+                                                fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10,
+                                                boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+                                            }}>
+                                                Copied!
+                                            </div>
+                                        )}
+
+                                        {canDelete(c) && (
+                                            <button
+                                                onClick={() => handleDelete(c)}
+                                                style={{
+                                                    background: 'rgba(239,68,68,0.1)', border: 'none',
+                                                    borderRadius: '8px', padding: '8px', cursor: 'pointer',
+                                                    color: '#ef4444', display: 'flex', alignItems: 'center',
+                                                    transition: 'background 0.2s'
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                                                title="Delete countdown"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );

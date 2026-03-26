@@ -740,13 +740,15 @@ exports.triggerAdminBetResolver = async (req, res, next) => {
 exports.getCountdowns = async (req, res) => {
     try {
         const userId = req.user?.id || req.user?.userId || null;
+        /*
         if (req.user) {
             console.log(`[Countdowns] Fetching for user: ${userId} (${req.user.username || 'unknown'})`);
         } else {
             console.log(`[Countdowns] Fetching for guest/unauthenticated user`);
         }
+        */
         const countdowns = await dbLayer.getCountdowns(userId);
-        console.log(`[Countdowns] Returning ${countdowns.length} items for user ${userId}`);
+        // console.log(`[Countdowns] Returning ${countdowns.length} items for user ${userId}`);
         res.json(countdowns);
     } catch (err) {
         console.error('[Countdowns] Error fetching:', err);
@@ -771,7 +773,7 @@ exports.createCountdown = async (req, res) => {
             return res.status(403).json({ error: 'Only superadmins can create global countdowns' });
         }
 
-        console.log(`[Countdowns] Creating: ${eventName} for user ${userId} (isAdmin: ${isAdmin}, isPublic: ${isPublic})`);
+        // console.log(`[Countdowns] Creating: ${eventName} for user ${userId} (isAdmin: ${isAdmin}, isPublic: ${isPublic})`);
 
         const result = await dbLayer.createCountdown(
             sanitize(eventName),
