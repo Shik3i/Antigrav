@@ -191,7 +191,7 @@ const Admin = ({ socket }) => {
         setLogs(prev => [{ id, title, message, status, timestamp: Date.now() }, ...prev].slice(0, 50));
     };
 
-    const globalToken = localStorage.getItem('timerToken');
+    const globalToken = sessionStorage.getItem('admin_token') || localStorage.getItem('timerToken');
 
     // Forms
     const [originalCode, setOriginalCode] = useState('');

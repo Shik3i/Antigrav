@@ -225,6 +225,9 @@ db.serialize(() => {
   db.run('CREATE INDEX IF NOT EXISTS idx_countdowns_visibility ON Countdowns(isPublic, isGlobal)');
   db.run('CREATE INDEX IF NOT EXISTS idx_friends_userId ON Friends(userId)');
   db.run('CREATE INDEX IF NOT EXISTS idx_friends_friendId ON Friends(friendId)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_users_koalabalance ON Users(koala_balance);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_bets_userid ON Bets(userId);');
+  db.run('CREATE INDEX IF NOT EXISTS idx_bets_status ON Bets(status);');
 
   // ─── New Admin & Feature Roadmap Tables ──────────────────────
   db.run(`CREATE TABLE IF NOT EXISTS AdminActions (
@@ -644,6 +647,7 @@ db.serialize(() => {
     });
   });
   
+
   // Signal database is ready and mirror initial logs
   db.run("SELECT 1", () => {
     console.log('Database initialized and ready for system logging');
