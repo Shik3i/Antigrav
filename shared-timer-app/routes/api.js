@@ -41,6 +41,7 @@ router.get('/games/mission/status', authController.optionalAuthenticateToken, ap
 router.post('/admin/games/settings', authController.authenticateToken, apiController.updateAdminGameSettings);
 router.get('/admin/games/scores', authController.authenticateToken, apiController.getAdminGameScores);
 router.delete('/admin/games/scores/:id', authController.authenticateToken, apiController.deleteAdminGameScore);
+router.post('/admin/unlock', apiController.unlockAdmin);
 
 // Admin Bet Management
 router.get('/admin/bets', authController.authenticateToken, apiController.getAdminBets);

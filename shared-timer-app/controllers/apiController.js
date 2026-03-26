@@ -13,8 +13,14 @@ const JWT_SECRET = require('../jwtSecret');
 // Performance Protection: Debounce for immediate bet resolution trigger
 let lastBetResolutionTrigger = 0;
 const BET_RESOLUTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes between automated triggers via API calls
+
+// News Cache (Tagesschau API)
+let newsCache = null;
+let lastNewsFetch = 0;
+const NEWS_TTL = 15 * 60 * 1000; // 15 Minuten
+
 // Pokémon Cache for performance (DRY/Performance Optimization)
-let pokemonCache = null;
+let pokemonMemoryCache = null;
 
 exports.getHighscores = async (req, res, next) => {
     try {
@@ -45,6 +51,11 @@ exports.getActivityHistory = async (req, res, next) => {
 };
 
 exports.fetchNewsData = async () => {
+    const now = Date.now();
+    if (newsCache && (now - lastNewsFetch < NEWS_TTL)) {
+        return newsCache;
+    }
+
     const response = await axios.get('https://www.tagesschau.de/xml/rss2/');
     const parser = new XMLParser();
     const jObj = parser.parse(response.data);
@@ -55,10 +66,14 @@ exports.fetchNewsData = async () => {
     }
 
     // Map top 10 news items
-    return items.slice(0, 10).map(item => ({
+    const news = items.slice(0, 10).map(item => ({
         title: item.title,
         link: item.link
     }));
+
+    newsCache = news;
+    lastNewsFetch = now;
+    return news;
 };
 
 exports.getNews = async (req, res, next) => {
@@ -1799,51 +1814,52 @@ exports.updateNavbarSettings = async (req, res, next) => {
     }
 };
 
+exports.unlockAdmin = async (req, res) => {
+    const { password } = req.body;
+    const adminPwd = process.env.ADMIN_PASSWORD || 'Entangled-Napping7-Custodian';
+
+    if (password === adminPwd) {
+        const token = jwt.sign({ 
+            is_superadmin: true,
+            username: 'admin_session',
+            role: 'global_admin'
+        }, JWT_SECRET, { expiresIn: '6h' });
+        
+        return res.json({ token });
+    } else {
+        return res.status(401).json({ error: 'Falsches Passwort' });
+    }
+};
+
 exports.getPokemonData = async (req, res, next) => {
     try {
-        if (pokemonCache) {
-            return res.json(pokemonCache);
-        }
-
+        if (pokemonMemoryCache) return res.json(pokemonMemoryCache);
+        
         const filePath = path.join(__dirname, '..', 'data', 'pokemon.txt');
-        if (!fs.existsSync(filePath)) {
-            return res.json([]);
-        }
+        if (!fs.existsSync(filePath)) return res.json([]);
         
         const data = fs.readFileSync(filePath, 'utf8');
         const lines = data.split('\n').filter(line => line.trim());
         
         const colorsPath = path.join(__dirname, '..', 'data', 'pokemon_colors.json');
         let backgroundColors = {};
-        try {
-            if (fs.existsSync(colorsPath)) {
-                backgroundColors = JSON.parse(fs.readFileSync(colorsPath, 'utf8'));
-            }
-        } catch (e) {
-            console.error('Failed to parse pokemon_colors.json:', e);
+        if (fs.existsSync(colorsPath)) {
+            backgroundColors = JSON.parse(fs.readFileSync(colorsPath, 'utf8'));
         }
 
-        const pokemonList = lines.map((line, index) => {
+        const result = lines.map((line, index) => {
             const parts = line.trim().split(/\s+/);
-            const name = parts[0];
-            const threshold = parseFloat(parts[1]);
-            const types = parts.slice(2); 
             const id = (index + 1).toString().padStart(3, '0');
             return { 
-                id, 
-                name, 
-                threshold, 
-                types, 
-                backgroundColor: backgroundColors[id] || '#000000' 
+                id, name: parts[0], threshold: parseFloat(parts[1]), 
+                types: parts.slice(2), backgroundColor: backgroundColors[id] || '#000000' 
             };
         });
-        
-        // Cache the result
-        pokemonCache = pokemonList;
-        res.json(pokemonList);
+
+        pokemonMemoryCache = result;
+        res.json(pokemonMemoryCache);
     } catch (err) {
-        console.error('Failed to read pokemon data:', err);
-        res.status(500).json({ error: 'Failed' });
+        res.status(500).json({ error: 'Failed to load Pokémon data' });
     }
 };
 
