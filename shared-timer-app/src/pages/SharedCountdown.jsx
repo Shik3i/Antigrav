@@ -37,7 +37,8 @@ const SharedCountdown = () => {
     }, [target]);
 
     const handleClose = () => {
-        if (window.history.state && window.history.state.idx > 0) {
+        // Prüfe auf React Router State ODER eine Browser-History > 2 (oft 1 oder 2 bei neuen Tabs)
+        if ((window.history.state && window.history.state.idx > 0) || window.history.length > 2) {
             navigate(-1);
         } else {
             navigate('/');
