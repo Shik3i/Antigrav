@@ -36,6 +36,14 @@ const SharedCountdown = () => {
         return () => clearInterval(interval);
     }, [target]);
 
+    const handleClose = () => {
+        if (window.history.state && window.history.state.idx > 0) {
+            navigate(-1);
+        } else {
+            navigate('/');
+        }
+    };
+
     if (!target) {
         return (
             <div 
@@ -60,7 +68,7 @@ const SharedCountdown = () => {
         >
             {/* Close Button */}
             <button 
-                onClick={() => navigate('/')}
+                onClick={handleClose}
                 style={{
                     position: 'absolute', top: '2rem', right: '2rem', cursor: 'pointer', opacity: 0.5, 
                     transition: 'opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1)', color: 'var(--text-main)', 
