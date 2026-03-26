@@ -14,6 +14,7 @@ const THEMES = [
     { id: 'ocean', label: 'Ocean', colors: ['#081229', '#0ea5e9', '#2dd4bf'] },
     { id: 'synthwave', label: 'Synth', colors: ['#160f29', '#d946ef', '#8b5cf6'] },
     { id: 'sunset', label: 'Sunset', colors: ['#271318', '#f97316', '#ef4444'] },
+    { id: 'monochrome', label: 'Monochrome', colors: ['#121212', '#1e1e1e', '#ffffff'] },
 ];
 
 
@@ -659,7 +660,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.6.0
+                    Version 2.7.0
                 </div>
             </div>
         </div>
