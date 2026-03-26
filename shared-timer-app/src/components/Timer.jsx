@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Play, Pause, RotateCcw, Repeat } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
-import { selectNextPokemon } from '../utils/pokemonUtils';
+import { getNextPokemon } from '../utils/pokemonUtils';
 import { useAuth } from '../context/AuthContext';
 
 const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTimeOffset = 0 }) => {
@@ -102,7 +102,7 @@ const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTim
                 fetch('/api/pokemon')
                     .then(res => res.json())
                     .then(list => {
-                        const nextP = selectNextPokemon(list, pokemonTheme);
+                        const nextP = getNextPokemon(list, pokemonTheme);
                         if (nextP) {
                             setUser(prev => ({
                                 ...prev,

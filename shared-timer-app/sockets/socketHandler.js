@@ -408,12 +408,12 @@ module.exports = function (io) {
                 // Determine the true ID of the joining user (authenticated via socket or passed by client)
                 const joiningUserId = socket.user ? socket.user.userId : userId;
 
-                console.log(`[DEBUG PERM] Room ownerId: ${memConfig.ownerId}, joiningUserId: ${joiningUserId}, socket.user:`, socket.user ? socket.user.userId : 'undefined', `token: ${token}`);
+                // console.log(`[DEBUG PERM] Room ownerId: ${memConfig.ownerId}, joiningUserId: ${joiningUserId}, socket.user:`, socket.user ? socket.user.userId : 'undefined', `token: ${token}`);
 
                 if (memConfig.ownerId && String(joiningUserId) === String(memConfig.ownerId)) {
                     // Room creator always gets write admin rights, regardless of token
                     role = 'write';
-                    console.log(`[DEBUG PERM] Granted 'write' because owner matches`);
+                    // console.log(`[DEBUG PERM] Granted 'write' because owner matches`);
                 } else if (token) {
                     try {
                         const decoded = jwt.verify(token, JWT_SECRET);
@@ -472,7 +472,7 @@ module.exports = function (io) {
                 const user = { userId: finalUserId, displayName: sanitize(finalDisplayName), role, preferences: finalPreferences };
                 const isNewJoin = currentRoomId !== roomId;
 
-                console.log(`[DEBUG] JOIN_ROOM: socket.id=${socket.id}, role=${role}`);
+                // console.log(`[DEBUG] JOIN_ROOM: socket.id=${socket.id}, role=${role}`);
 
                 roomManager.joinRoom(roomId, socket.id, user);
                 socket.join(roomId);

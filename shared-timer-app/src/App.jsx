@@ -41,8 +41,8 @@ import useEsportsNotifications from './hooks/useEsportsNotifications';
 import GlobalAudioController from './components/GlobalAudioController';
 import LiveStreamWidget from './components/LiveStreamWidget';
 import './index.css';
-import { User, Settings as SettingsIcon, LogOut, Menu, X, Timer as TimerIcon, BarChart3, Bell, Shield, Heart, Sparkles, RefreshCw, ChevronRight } from 'lucide-react';
-import { selectNextPokemon } from './utils/pokemonUtils';
+import { User, Settings as SettingsIcon, LogOut, Menu, X, Timer as TimerIcon, BarChart3, Bell, Shield, Heart, Sparkles, RefreshCw, ChevronRight, Clock } from 'lucide-react';
+import { getNextPokemon } from './utils/pokemonUtils';
 import { useAuth } from './context/AuthContext';
 
 // Global styles for the app container
@@ -207,11 +207,6 @@ function InnerApp() {
     const pokemonTheme = user?.preferences?.pokemonTheme;
     if (pokemonTheme?.active && pokemonTheme?.id) {
       document.documentElement.dataset.pokemonMode = "true";
-      document.body.style.backgroundImage = `url('/assets/pokemon/${pokemonTheme.id}.jpg')`;
-      document.body.style.backgroundColor = pokemonTheme.backgroundColor || '#000000';
-      document.body.style.backgroundSize = 'contain';
-      document.body.style.backgroundRepeat = 'no-repeat';
-      document.body.style.backgroundPosition = 'center';
       
       // Contrast Logic: threshold > 0.6 is LIGHT
       if (parseFloat(pokemonTheme.threshold) > 0.6) {
@@ -220,7 +215,7 @@ function InnerApp() {
         document.documentElement.classList.remove('pokemon-light-mode');
       }
 
-      const typeColors = pokemonTheme.types?.map(t => configs.colors[t] || '#333') || ['#3b82f6'];
+      const typeColors = pokemonTheme.types?.map(t => pokemonConfigs?.colors?.[t] || '#333') || ['#3b82f6'];
       const primaryColor = typeColors[0];
       const secondaryColor = typeColors[1] || primaryColor;
       
@@ -230,7 +225,6 @@ function InnerApp() {
     } else {
       document.documentElement.dataset.pokemonMode = "false";
       document.documentElement.classList.remove('pokemon-light-mode');
-      document.body.style.backgroundImage = '';
       document.documentElement.style.removeProperty('--accent-primary');
       document.documentElement.style.removeProperty('--accent-secondary');
       document.documentElement.style.removeProperty('--accent-gradient');
@@ -338,7 +332,7 @@ function InnerApp() {
       fetch('/api/pokemon')
         .then(res => res.json())
         .then(list => {
-          const nextP = selectNextPokemon(list, pokemonTheme);
+          const nextP = getNextPokemon(list, pokemonTheme);
           if (nextP) {
             setUser(prev => ({
               ...prev,
@@ -367,6 +361,25 @@ function InnerApp() {
   return (
       <>
       <GlobalAudioController socket={globalSocket} roomState={roomState} />
+      
+      {/* Pokemon Background Layer */}
+      {user?.preferences?.pokemonTheme?.active && user?.preferences?.pokemonTheme?.id && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundImage: `url('/assets/pokemon/${user.preferences.pokemonTheme.id}.jpg')`,
+          backgroundColor: user.preferences.pokemonTheme.backgroundColor || '#000000',
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          zIndex: -10,
+          pointerEvents: 'none'
+        }} />
+      )}
+
       <div className={`app-container ${globalAnnouncement ? 'has-banner' : ''}`} style={appStyle}>
 
         {globalAnnouncement && (

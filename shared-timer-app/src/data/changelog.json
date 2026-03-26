@@ -1,5 +1,11 @@
 [
   {
+    "id": 14,
+    "version": "2.9.0",
+    "date": "2026-03-26",
+    "changes": "- **Pokémon Themes**: Über 1000+ neue Pokémon-Hintergründe inklusive Typ-basierter Akzentfarben und automatischer Rotation.\n- **Mega-Accordions**: Komplette Restrukturierung der Einstellungen in vier übersichtliche Hauptkategorien.\n- **Sicherheits-Audit**: Entfernung sensibler Debug-Logs im Backend und Optimierung der Admin-Authentifizierung."
+  },
+  {
     "id": 13,
     "version": "2.8.0",
     "date": "2026-03-26",
