@@ -113,6 +113,7 @@ router.delete('/features/:id', authController.authenticateToken, apiController.d
 // ─── Error Logging ──────────────────────────────────────────
 router.get('/errors', authController.authenticateToken, apiController.getErrorLogs);
 router.get('/admin/system-logs', authController.authenticateToken, apiController.getSystemLogs); // [NEW]
+router.delete('/admin/system-logs', authController.authenticateToken, apiController.deleteAllSystemLogs); // [NEW]
 router.delete('/errors', authController.authenticateToken, apiController.clearErrorLogs);
 router.delete('/errors/:id', authController.authenticateToken, apiController.deleteErrorLog);
 
@@ -178,5 +179,12 @@ router.post('/colorsync/submit', authController.authenticateToken, colorSyncCont
 router.post('/colorsync/lobby', authController.authenticateToken, colorSyncController.createLobby);
 router.get('/colorsync/lobby/:uuid', colorSyncController.getLobbyData);
 router.post('/colorsync/lobby/:uuid/submit', authController.authenticateToken, colorSyncController.submitLobbyScore);
+router.get('/colorsync/daily-status', authController.authenticateToken, colorSyncController.checkDailyStatus);
+router.get('/colorsync/daily-stats', colorSyncController.getDailyStats);
+
+router.get('/pokemon', apiController.getPokemonData);
+router.get('/pokemon/configs', apiController.getPublicPokemonConfigs);
+router.get('/admin/pokemon-configs', authController.authenticateToken, apiController.getPokemonConfigs);
+router.post('/admin/pokemon-configs/update', authController.authenticateToken, apiController.updatePokemonConfigs);
 
 module.exports = router;

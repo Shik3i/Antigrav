@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Terminal, Volume2, BellRing, Palette, Trophy, Download, Star, Heart, Search, X } from 'lucide-react';
+import {
+    User, Mail, Lock, Shield, Bell, Heart, Palette, Timer, Volume2, Globe, Monitor, Sidebar,
+    ChevronDown, ChevronUp, Save, Trash2, Plus, Sparkles, RefreshCw, X, Search, Gamepad2, Trophy, Star
+} from 'lucide-react';
+import { selectNextPokemon } from '../utils/pokemonUtils';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import Friends from './Friends';
 
@@ -17,6 +21,26 @@ const THEMES = [
     { id: 'monochrome', label: 'Monochrome', colors: ['#121212', '#1e1e1e', '#ffffff'] },
 ];
 
+const POKEMON_TYPES = [
+    { id: 'normal', color: '#A8A878' },
+    { id: 'fire', color: '#F08030' },
+    { id: 'water', color: '#6890F0' },
+    { id: 'grass', color: '#78C850' },
+    { id: 'electric', color: '#F8D030' },
+    { id: 'ice', color: '#98D8D8' },
+    { id: 'fighting', color: '#C03028' },
+    { id: 'poison', color: '#A040A0' },
+    { id: 'ground', color: '#E0C068' },
+    { id: 'flying', color: '#A890F0' },
+    { id: 'psychic', color: '#F85888' },
+    { id: 'bug', color: '#A8B820' },
+    { id: 'rock', color: '#B8A038' },
+    { id: 'ghost', color: '#705898' },
+    { id: 'dragon', color: '#7038F8' },
+    { id: 'dark', color: '#705848' },
+    { id: 'steel', color: '#B8B8D0' },
+    { id: 'fairy', color: '#EE99AC' }
+];
 
 
 const ESPORTS_LEAGUES = [
@@ -29,6 +53,21 @@ const ESPORTS_LEAGUES = [
     { id: 'International', label: 'International (MSI, Worlds)', color: '#14b8a6' },
 ];
 
+const SettingsSection = ({ title, icon, defaultOpen = false, children }) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px', marginTop: '12px' }}>
+            <div onClick={() => setIsOpen(!isOpen)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {icon} {title}
+                </h3>
+                {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </div>
+            {isOpen && <div className="animate-fade-in" style={{ marginTop: '24px' }}>{children}</div>}
+        </div>
+    );
+};
+
 const Settings = ({ user, setUser, socket }) => {
     const [name, setName] = useState(user.displayName);
     const [saved, setSaved] = useState(false);
@@ -39,6 +78,11 @@ const Settings = ({ user, setUser, socket }) => {
         return localStorage.getItem('hideLiveStreamWidget') !== 'true';
     });
 
+    const [pokemonList, setPokemonList] = useState([]);
+    const [pokemonConfigs, setPokemonConfigs] = useState(null);
+    const [pokemonSearch, setPokemonSearch] = useState('');
+    const [isPokemonAccordionOpen, setIsPokemonAccordionOpen] = useState(false);
+
     useEffect(() => {
         fetch('/api/esports/teams')
             .then(res => res.json())
@@ -46,6 +90,16 @@ const Settings = ({ user, setUser, socket }) => {
                 if (Array.isArray(data)) setEsportsTeams(data);
             })
             .catch(console.error);
+
+        fetch('/api/pokemon')
+            .then(res => res.json())
+            .then(data => setPokemonList(data))
+            .catch(err => console.error('Failed to fetch pokemon list', err));
+
+        fetch('/api/pokemon/configs')
+            .then(res => res.json())
+            .then(setPokemonConfigs)
+            .catch(err => console.error('Failed to fetch pokemon configs', err));
     }, []);
 
     // Add password state
@@ -180,36 +234,36 @@ const Settings = ({ user, setUser, socket }) => {
             <h1 style={{ marginBottom: '32px' }}>Settings</h1>
 
             <div className="glass-card" style={{ padding: '32px' }}>
-                <h3 style={{ marginBottom: '8px' }}>Profile Identity</h3>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
-                    Choose a name that other users will see when you join a room or appear on the highscores.
-                </p>
+                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <SettingsSection title="Profile Identity" icon={<User size={20} />} defaultOpen={true}>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
+                            Choose a name that other users will see when you join a room or appear on the highscores.
+                        </p>
 
-                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>
-                            Display Name
-                        </label>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <input
-                                type="text"
-                                className="input-primary"
-                                style={{ flex: 1 }}
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Enter your display name"
-                                maxLength={20}
-                            />
-                            <button type="submit" className="btn-primary" style={{ whiteSpace: 'nowrap' }}>
-                                {saved ? 'Saved!' : 'Save Name'}
-                            </button>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>
+                                Display Name
+                            </label>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <input
+                                    type="text"
+                                    className="input-primary"
+                                    style={{ flex: 1 }}
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Enter your display name"
+                                    maxLength={20}
+                                />
+                                <button type="submit" className="btn-primary" style={{ whiteSpace: 'nowrap' }}>
+                                    {saved ? 'Saved!' : 'Save Name'}
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </SettingsSection>
 
                     {/* ─── Password Change (Registered Users Only) ─── */}
                     {!(user.username && user.username.startsWith('_guest')) && (
-                        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                            <h3 style={{ marginBottom: '8px', fontSize: '1.2rem' }}>Change Password</h3>
+                        <SettingsSection title="Change Password" icon={<Lock size={20} />}>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
                                 Update your account password securely.
                             </p>
@@ -225,22 +279,18 @@ const Settings = ({ user, setUser, socket }) => {
                                 <button className="btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handlePasswordChange}>Update</button>
                             </div>
                             {pwdMessage && <p style={{ fontSize: '0.85rem', marginTop: '8px', color: pwdMessage.includes('success') ? '#10b981' : '#ef4444' }}>{pwdMessage}</p>}
-                        </div>
+                        </SettingsSection>
                     )}
 
                     {/* ─── Friends Management ─── */}
                     {!(user.username && user.username.startsWith('_guest')) && (
-                        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                            {console.log('[Settings] Rendering Friends...')}
+                        <SettingsSection title="Friends & Social" icon={<Heart size={20} />}>
                             <Friends socket={socket} embedded={true} />
-                        </div>
+                        </SettingsSection>
                     )}
 
                     {/* ─── Theme Picker ─── */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                        <h3 style={{ marginBottom: '8px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Palette size={20} /> Color Theme
-                        </h3>
+                    <SettingsSection title="Color Theme" icon={<Palette size={20} />}>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
                             Choose a visual theme for the entire app.
                         </p>
@@ -266,11 +316,255 @@ const Settings = ({ user, setUser, socket }) => {
                                 </label>
                             ))}
                         </div>
-                    </div>
+                    </SettingsSection>
 
-                    {/* ─── Timer Visual ─── */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                        <h3 style={{ marginBottom: '8px', fontSize: '1.2rem' }}>Timer Style</h3>
+                    <SettingsSection title="Pokémon Themes" icon={<Gamepad2 size={20} color="#ef4444" />}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                When a Pokémon background is active, it overrides your normal theme and syncs the accent color to the Pokémon's type.
+                            </p>
+
+                            {/* Search Pokémon */}
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    Search Specific Pokémon (ID or Name)
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    <input
+                                        type="text"
+                                        className="input-primary"
+                                        placeholder="e.g. 025 or Pikachu"
+                                        style={{ paddingLeft: '40px' }}
+                                        value={pokemonSearch}
+                                        onChange={(e) => setPokemonSearch(e.target.value)}
+                                    />
+
+                                    {Array.isArray(pokemonList) && pokemonSearch.length > 1 && (
+                                        <div style={{
+                                            position: 'absolute', top: '100%', left: 0, right: 0,
+                                            background: '#1e242e', border: '1px solid var(--border-color)',
+                                            borderRadius: '8px', marginTop: '4px', maxHeight: '200px',
+                                            overflowY: 'auto', zIndex: 100, boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                                        }}>
+                                            {pokemonList
+                                                .filter(p => p.name.includes(pokemonSearch.toLowerCase()) || p.id.includes(pokemonSearch))
+                                                .slice(0, 10)
+                                                .map(p => (
+                                                    <div
+                                                        key={p.id}
+                                                        onClick={() => {
+                                                            updatePref('pokemonTheme', {
+                                                                ...user.preferences.pokemonTheme,
+                                                                active: true,
+                                                                mode: 'specific',
+                                                                id: p.id,
+                                                                name: p.name,
+                                                                types: p.types,
+                                                                threshold: p.threshold,
+                                                                backgroundColor: p.backgroundColor
+                                                            });
+                                                            setPokemonSearch('');
+                                                        }}
+                                                        style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' }}
+                                                        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                                                        onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                                    >
+                                                        <span>#{p.id} {p.name.charAt(0).toUpperCase() + p.name.slice(1)}</span>
+                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                            {p.types.map(t => (
+                                                                <span key={t} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: POKEMON_TYPES.find(pt => pt.id === t)?.color || '#333' }}>{t}</span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Type Selection Grid */}
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    Type-Based Theme (Random from Type)
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '8px' }}>
+                                    {POKEMON_TYPES.map(type => (
+                                            <button
+                                            key={type.id}
+                                            type="button"
+                                            onClick={() => {
+                                                    const randomP = selectNextPokemon(pokemonList, { ...user.preferences.pokemonTheme, mode: 'type', selectedType: type.id });
+                                                    if (randomP) {
+                                                        updatePref('pokemonTheme', {
+                                                            ...user.preferences.pokemonTheme,
+                                                            active: true,
+                                                            mode: 'type',
+                                                            selectedType: type.id,
+                                                            id: randomP.id,
+                                                            name: randomP.name,
+                                                            types: randomP.types,
+                                                            threshold: randomP.threshold,
+                                                            backgroundColor: randomP.backgroundColor
+                                                        });
+                                                    }
+                                                }}
+                                            className={`btn-ghost ${user.preferences.pokemonTheme?.selectedType === type.id && user.preferences.pokemonTheme?.mode === 'type' ? 'active' : ''}`}
+                                            style={{
+                                                padding: '8px 4px', fontSize: '0.75rem', textTransform: 'capitalize',
+                                                border: `1px solid ${(pokemonConfigs?.colors?.[type.id] || type.color)}44`,
+                                                background: user.preferences.pokemonTheme?.selectedType === type.id && user.preferences.pokemonTheme?.mode === 'type' ? `${(pokemonConfigs?.colors?.[type.id] || type.color)}22` : 'transparent'
+                                            }}
+                                        >
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: (pokemonConfigs?.colors?.[type.id] || type.color) }} /> {type.id}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Global Toggles */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                <button
+                                    type="button"
+                                    className={`btn-primary ${user.preferences.pokemonTheme?.mode === 'random' ? 'active' : ''}`}
+                                    style={{ flex: 1, minWidth: '150px', background: user.preferences.pokemonTheme?.mode === 'random' ? 'var(--accent-gradient)' : 'rgba(255,255,255,0.05)', color: user.preferences.pokemonTheme?.mode === 'random' ? 'white' : 'var(--text-main)', border: '1px solid var(--border-color)' }}
+                                    onClick={() => {
+                                            const randomP = selectNextPokemon(pokemonList, { ...user.preferences.pokemonTheme, mode: 'random' });
+                                            if (randomP) {
+                                                updatePref('pokemonTheme', {
+                                                    ...user.preferences.pokemonTheme,
+                                                    active: true,
+                                                    mode: 'random',
+                                                    id: randomP.id,
+                                                    name: randomP.name,
+                                                    types: randomP.types,
+                                                    threshold: randomP.threshold,
+                                                    backgroundColor: randomP.backgroundColor
+                                                });
+                                            }
+                                        }}
+                                >
+                                    <Sparkles size={16} /> Global Random
+                                </button>
+
+                                {user.preferences.pokemonTheme?.active && (
+                                    <button
+                                        type="button"
+                                        className="btn-ghost"
+                                        style={{ color: '#ef4444' }}
+                                        onClick={() => updatePref('pokemonTheme', { ...user.preferences.pokemonTheme, active: false })}
+                                    >
+                                        <X size={16} /> Disable Pokémon Theme
+                                    </button>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={user.preferences.pokemonTheme?.slideshow || false}
+                                        onChange={(e) => updatePref('pokemonTheme', { ...user.preferences.pokemonTheme, slideshow: e.target.checked })}
+                                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                    />
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Slideshow Mode</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rotate every 5 minutes</span>
+                                    </div>
+                                </label>
+
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={user.preferences.pokemonTheme?.timerSync || false}
+                                        onChange={(e) => updatePref('pokemonTheme', { ...user.preferences.pokemonTheme, timerSync: e.target.checked })}
+                                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                    />
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Timer Sync</span>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rotate when timer hits 0</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Brightness Filter */}
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    Brightness Limit (for Random / Slideshow)
+                                </label>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    {['all', 'light', 'dark'].map(mode => (
+                                        <button
+                                            key={mode}
+                                            type="button"
+                                            onClick={() => updatePref('pokemonTheme', { ...user.preferences.pokemonTheme, brightnessFilter: mode })}
+                                            className={`btn-ghost ${ (user.preferences.pokemonTheme?.brightnessFilter || 'all') === mode ? 'active' : ''}`}
+                                            style={{
+                                                flex: 1, padding: '8px', fontSize: '0.8rem', textTransform: 'capitalize',
+                                                background: (user.preferences.pokemonTheme?.brightnessFilter || 'all') === mode ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                                                border: (user.preferences.pokemonTheme?.brightnessFilter || 'all') === mode ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
+                                            }}
+                                        >
+                                            {mode === 'all' ? 'Alle anzeigen' : mode === 'light' ? 'Nur helle Pokémon' : 'Nur dunkle Pokémon'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px' }}>
+                                    Light: Threshold &gt; 0.6 | Dark: Threshold &le; 0.6
+                                </p>
+                            </div>
+
+                            {user.preferences.pokemonTheme?.active && (
+                                <div style={{
+                                    padding: '16px',
+                                    background: user.preferences.pokemonTheme.types?.length > 1
+                                        ? `linear-gradient(135deg, ${(pokemonConfigs?.colors?.[user.preferences.pokemonTheme.types[0]] || '#3b82f6')}22, ${(pokemonConfigs?.colors?.[user.preferences.pokemonTheme.types[1]] || '#3b82f6')}22)`
+                                        : `${(pokemonConfigs?.colors?.[user.preferences.pokemonTheme.types[0]] || '#3b82f6')}22`,
+                                    borderRadius: '12px',
+                                    border: `1px solid ${(pokemonConfigs?.colors?.[user.preferences.pokemonTheme.types[0]] || '#3b82f6')}88`,
+                                    display: 'flex', alignItems: 'center', gap: '16px'
+                                }}>
+                                    <img
+                                        src={`/assets/pokemon/${user.preferences.pokemonTheme.id}.jpg`}
+                                        alt="Current Pokemon"
+                                        style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Currently Displaying:</div>
+                                        <div style={{ fontWeight: 700, fontSize: '1.1rem', textTransform: 'capitalize' }}>
+                                            #{user.preferences.pokemonTheme.id} {user.preferences.pokemonTheme.name}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                            {user.preferences.pokemonTheme.types?.map(t => (
+                                                <span key={t} style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: pokemonConfigs?.colors?.[t] || POKEMON_TYPES.find(pt => pt.id === t)?.color || '#333' }}>{t}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-ghost"
+                                        style={{ marginLeft: 'auto' }}
+                                        onClick={() => {
+                                                const nextP = selectNextPokemon(pokemonList, user.preferences.pokemonTheme);
+                                                if (nextP) updatePref('pokemonTheme', {
+                                                    ...user.preferences.pokemonTheme,
+                                                    id: nextP.id,
+                                                    name: nextP.name,
+                                                    types: nextP.types,
+                                                    threshold: nextP.threshold,
+                                                    backgroundColor: nextP.backgroundColor
+                                                });
+                                            }}
+                                    >
+                                        <RefreshCw size={18} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </SettingsSection>
+
+                    <SettingsSection title="Timer Visual & Zen Mode" icon={<Timer size={20} />}>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
                             Customize how the timer looks for you.
                         </p>
@@ -325,13 +619,9 @@ const Settings = ({ user, setUser, socket }) => {
                                 <div className={`pref-card ${user.preferences?.timerVisual === 'ring' ? 'active' : ''}`}>Thin Ring</div>
                             </label>
                         </div>
-                    </div>
+                    </SettingsSection>
 
-                    {/* ─── Audio ─── */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                        <h3 style={{ marginBottom: '8px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Volume2 size={20} /> Audio Preferences
-                        </h3>
+                    <SettingsSection title="Global Sound & Notifications" icon={<Volume2 size={20} />}>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
                             Choose the sound that plays when the timer hits zero.
                         </p>
@@ -387,15 +677,11 @@ const Settings = ({ user, setUser, socket }) => {
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>seconds before end</span>
                             </div>
                         </div>
-                    </div>
+                    </SettingsSection>
 
-                    {/* ─── Esports Notifications ─── */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                        <h3 style={{ marginBottom: '8px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Trophy size={20} /> Esports Notifications
-                        </h3>
+                    <SettingsSection title="Esports Preferences & Betting" icon={<Trophy size={20} />}>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
-                            Get a toast and push notification when matches from your selected leagues start.
+                            Get notified when matches from your selected leagues start. This also affects which matches appear in your betting dashboard.
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {ESPORTS_LEAGUES.map(league => (
@@ -418,16 +704,22 @@ const Settings = ({ user, setUser, socket }) => {
                                 </label>
                             ))}
                         </div>
-                    </div>
+                    </SettingsSection>
 
-                    {/* ─── Favorite Teams & Fan Team ─── */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                        <h3 style={{ marginBottom: '8px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Star size={20} /> Favorite Teams & Global Avatar
-                        </h3>
+                    <SettingsSection title="Favorite Teams & Global Avatar" icon={<Star size={20} />}>
                         <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
                             Select up to 10 favorite teams. Choose one team as your <strong>Fan Team</strong> to use their logo as your global avatar.
                         </p>
+                        
+                        <div style={{ 
+                            background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', 
+                            borderRadius: '8px', padding: '12px', marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center' 
+                        }}>
+                             <Shield size={20} color="#f59e0b" style={{ flexShrink: 0 }} />
+                             <span style={{ fontSize: '0.85rem', color: '#f59e0b', fontStyle: 'italic' }}>
+                                 <strong>Priorisierung:</strong> Globale Benachrichtigungen (Toast/Push) ignorieren die oben gewählten Ligen, wenn eines deiner Favoriten-Teams spielt. Deine Favoriten werden immer priorisiert!
+                             </span>
+                        </div>
                         
                         {/* Search and Add */}
                         <div style={{ marginBottom: '16px' }}>
@@ -503,7 +795,7 @@ const Settings = ({ user, setUser, socket }) => {
                                         <button 
                                             type="button"
                                             onClick={() => toggleFavoriteTeam(code)}
-                                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '4px', padding: '4px', ':hover': { color: 'var(--text-primary)' } }}
+                                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '4px', padding: '4px' }}
                                         >
                                             <X size={14} />
                                         </button>
@@ -514,11 +806,9 @@ const Settings = ({ user, setUser, socket }) => {
                                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No favorite teams selected.</div>
                             )}
                         </div>
-                    </div>
+                    </SettingsSection>
 
-                    {/* ─── Other Features ─── */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                        <h3 style={{ marginBottom: '8px', fontSize: '1.2rem' }}>Other Features</h3>
+                    <SettingsSection title="Other Preferences" icon={<Monitor size={20} />}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                                 <input
@@ -580,7 +870,7 @@ const Settings = ({ user, setUser, socket }) => {
                                 <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show Local Weather Widget</span>
                             </label>
                         </div>
-                    </div>
+                    </SettingsSection>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
                         <button type="submit" className="btn-primary">
@@ -590,16 +880,14 @@ const Settings = ({ user, setUser, socket }) => {
                     </div>
                 </form>
 
-                {/* ─── Admin Access ─── */}
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px', marginTop: '32px' }}>
-                    <h3 style={{ marginBottom: '8px', fontSize: '1.2rem', color: 'var(--text-muted)' }}>Admin Access & User Management</h3>
-
+                <SettingsSection title="Server Admin Panel" icon={<Shield size={20} />}>
                     {canManageUsers ? (
                         <div>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
                                 You have full access to Server Settings and User Management.
                             </p>
                             <button
+                                type="button"
                                 className="btn-primary"
                                 onClick={() => {
                                     if (isSuperAdmin) {
@@ -622,6 +910,7 @@ const Settings = ({ user, setUser, socket }) => {
                                 id="admin-password-input"
                             />
                             <button
+                                type="button"
                                 className="btn-ghost"
                                 onClick={() => {
                                     const pwd = document.getElementById('admin-password-input').value;
@@ -637,7 +926,7 @@ const Settings = ({ user, setUser, socket }) => {
                             </button>
                         </div>
                     )}
-                </div>
+                </SettingsSection>
             </div>
 
             <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
@@ -660,7 +949,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.7.0
+                    Version 2.8.0
                 </div>
             </div>
         </div>

@@ -64,7 +64,7 @@ const SharedCountdown = () => {
                 position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
                 background: 'var(--bg-color)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', 
                 alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', padding: '20px',
-                fontFamily: 'Inter, system-ui, -apple-system, sans-serif', zIndex: 9999, overflow: 'hidden'
+                fontFamily: 'Inter, system-ui, -apple-system, sans-serif', zIndex: 9999
             }}
         >
             {/* Close Button */}

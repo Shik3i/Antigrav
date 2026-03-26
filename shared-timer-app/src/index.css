@@ -451,6 +451,16 @@ h4 {
 }
 
 /* Mobile Header & Sidebar */
+.mobile-hide {
+  display: flex;
+}
+
+@media (max-width: 768px) {
+  .mobile-hide {
+    display: none !important;
+  }
+}
+
 .mobile-header {
   display: none;
   align-items: center;
@@ -761,3 +771,45 @@ body.zen-mode .news-ticker-wrapper {
     text-align: left;
   }
 }
+
+/* ─── Pokémon Mode Overrides ─── */
+[data-pokemon-mode="true"] body {
+  background-size: contain !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-repeat: no-repeat !important;
+  background-color: #000 !important;
+  --bg-image: none !important; /* Disable theme gradients */
+}
+
+/* Semi-transparent overlay for readability */
+[data-pokemon-mode="true"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Ensure the background doesn't show through components that should be solid */
+[data-pokemon-mode="true"] .sidebar,
+[data-pokemon-mode="true"] .card,
+[data-pokemon-mode="true"] .glass-panel {
+  background: rgba(20, 24, 30, 0.8) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* ─── Pokémon Light Mode (Force Light Theme) ─── */
+[data-pokemon-mode="true"].pokemon-light-mode {
+  --text-main: #1a202c !important;
+  --text-muted: #4a5568 !important;
+  --bg-sidebar: rgba(255, 255, 255, 0.7) !important;
+  --bg-card: rgba(255, 255, 255, 0.9) !important;
+  --border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-pokemon-mode="true"].pokemon-light-mode body::after {
+  background: rgba(255, 255, 255, 0.4) !important;
+}
+

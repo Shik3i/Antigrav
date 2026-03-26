@@ -1,5 +1,11 @@
 [
   {
+    "id": 13,
+    "version": "2.8.0",
+    "date": "2026-03-26",
+    "changes": "- **Pokémon System Optimierung**: Implementierung eines globalen Backend-Caches für Pokémon-Daten zur massiven Reduzierung der API-Latenz.\n- **Frontend DRY Refactoring**: Zentralisierung der Pokémon-Auswahllogik in einer neuen Utility-Klasse (`pokemonUtils.js`) zur Code-Bereinigung.\n- **Settings UI Overhaul**: Vollständige Umstellung der Einstellungen auf ein modernes Accordion-Layout für bessere Übersichtlichkeit.\n- **UX Verbesserungen**: Hinzufügen von Priorisierungs-Hinweisen für Favoriten-Teams und Vereinheitlichung der Speicher-Aktionen.\n- **Stabilitäts-Fixes**: Behebung von JSX-Syntaxfehlern im Einstellungsmenü."
+  },
+  {
     "id": 12,
     "version": "2.7.0",
     "date": "2026-03-26",
