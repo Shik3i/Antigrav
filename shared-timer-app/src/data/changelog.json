@@ -1,5 +1,11 @@
 [
   {
+    "id": 11,
+    "version": "2.6.0",
+    "date": "2026-03-26",
+    "changes": "- **System-Logging 2.0**: Einführung einer dedizierten SystemLogs Datenbank mit 24h-Retention-Policy und Admin-UI Integration.\n- **Noise Reduction**: Entfernung hochfrequenter Terminal-Logs (Auth & Sockets) zur Steigerung der I/O-Performance.\n- **Bet-Resolver Stabilität**: Fix für \"Premature Refunds\" durch intelligente Oracle-Warteschleife; Synchronisation mit Frontend \"BEENDET\"-Status.\n- **Performance & Crash-Protection**: SQLite RAM-Optimierung (WAL, Normal Sync), Volatile Socket-Ticks und Circular-JSON Schutz in Fehler-Logs.\n- **UI-Speedup**: Implementierung von Image Lazy-Loading für Avatare und Match-Logos."
+  },
+  {
     "id": 10,
     "version": "2.5.0",
     "date": "2026-03-25",

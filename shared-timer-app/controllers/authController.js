@@ -309,7 +309,7 @@ const authenticateToken = (req, res, next) => {
             return res.status(403).json({ error: 'Token is invalid or expired' });
         }
         
-        console.log('[AUTH] Token verified for userId:', decoded.userId || decoded.id);
+        // console.log('[AUTH] Token verified for userId:', decoded.userId || decoded.id);
 
         try {
             const user = await dbLayer.getUser(decoded.userId || decoded.id);

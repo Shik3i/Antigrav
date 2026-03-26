@@ -56,7 +56,7 @@ module.exports = function (io) {
     });
 
     io.on('connection', (socket) => {
-        console.log(`User connected: ${socket.id}`);
+        // console.log(`User connected: ${socket.id}`);
 
         if (socket.user) {
             const userId = socket.user.userId;
@@ -862,7 +862,7 @@ module.exports = function (io) {
                 }
             }
 
-            console.log(`User disconnected: ${socket.id}, Reason: ${reason}`);
+            // console.log(`User disconnected: ${socket.id}, Reason: ${reason}`);
         });
     });
 
@@ -943,7 +943,7 @@ module.exports = function (io) {
         // To keep clients synced exactly without drift, broadcast state every second
         roomManager.rooms.forEach((room, roomId) => {
             if (room.state.isRunning) {
-                io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
+                io.volatile.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
             }
         });
     }, 1000); // 1Hz sync is enough since clients will animate the visual themselves

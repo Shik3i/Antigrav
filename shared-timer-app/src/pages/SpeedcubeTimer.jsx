@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Trash2, Edit3, Save, X, Timer, Grid3X3, Trophy, Zap, TrendingUp } from 'lucide-react';
+import { Clock, Trash2, Edit3, Save, X, Timer, Grid3X3, Trophy, Zap, TrendingUp, Eye, EyeOff, RefreshCw, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const formatTime = (ms) => {
@@ -7,6 +7,35 @@ const formatTime = (ms) => {
     const seconds = Math.floor((ms % 60000) / 1000);
     const milliseconds = Math.floor(ms % 1000);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+};
+
+const generateScramble = () => {
+    const moves = ['U', 'D', 'L', 'R', 'F', 'B'];
+    const modifiers = ['', "'", '2'];
+    const scramble = [];
+    let lastMove = '';
+    let lastAxis = '';
+
+    const axisMap = {
+        'U': 'UD', 'D': 'UD',
+        'L': 'LR', 'R': 'LR',
+        'F': 'FB', 'B': 'FB'
+    };
+
+    for (let i = 0; i < 20; i++) {
+        let move;
+        let axis;
+        do {
+            move = moves[Math.floor(Math.random() * moves.length)];
+            axis = axisMap[move];
+        } while (move === lastMove || (axis === lastAxis && move === scramble[scramble.length - 1]?.split('')[0]));
+
+        const modifier = modifiers[Math.floor(Math.random() * modifiers.length)];
+        scramble.push(move + modifier);
+        lastMove = move;
+        lastAxis = axis;
+    }
+    return scramble.join(' ');
 };
 
 const SpeedcubeTimer = () => {
@@ -17,9 +46,17 @@ const SpeedcubeTimer = () => {
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editingNoteValue, setEditingNoteValue] = useState('');
     
+    const [currentScramble, setCurrentScramble] = useState('');
+    const [showScramble, setShowScramble] = useState(true);
+    const [showScrambleHistoryId, setShowScrambleHistoryId] = useState(null);
+    
     const startTimeRef = useRef(0);
     const timerIdRef = useRef(null);
     const isHoldingSpaceRef = useRef(false);
+
+    useEffect(() => {
+        setCurrentScramble(generateScramble());
+    }, []);
 
     // Fetch history
     const fetchHistory = useCallback(async () => {
@@ -51,11 +88,13 @@ const SpeedcubeTimer = () => {
 
     // Save result
     const saveResult = async (time_ms) => {
+        const scramble = currentScramble;
         const newEntry = {
             id: isGuest ? Date.now() : null, // Temp ID for guest
             userId: user?.id || 'guest',
             time_ms,
             note: '',
+            scramble,
             createdAt: new Date().toISOString()
         };
 
@@ -71,7 +110,7 @@ const SpeedcubeTimer = () => {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ time_ms, note: '' })
+                    body: JSON.stringify({ time_ms, note: '', scramble })
                 });
                 if (res.ok) {
                     fetchHistory();
@@ -80,6 +119,7 @@ const SpeedcubeTimer = () => {
                 console.error('Failed to save speedcube time:', err);
             }
         }
+        setCurrentScramble(generateScramble());
     };
 
     const handleDelete = async (id) => {
@@ -194,17 +234,54 @@ const SpeedcubeTimer = () => {
                     style={{ 
                         padding: '60px 20px', 
                         fontSize: '6rem', 
-                        fontFamily: 'monospace',
+                        fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
                         color: status === 'ready' ? '#10b981' : (status === 'running' ? 'var(--text-main)' : 'var(--text-muted)'),
                         textShadow: status === 'ready' ? '0 0 30px rgba(16, 185, 129, 0.4)' : 'none',
-                        transition: 'color 0.1s ease',
+                        transition: 'all 0.1s ease',
+                        fontVariantNumeric: 'tabular-nums',
                         display: 'flex',
+                        flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        minHeight: '200px'
+                        minHeight: '280px',
+                        position: 'relative'
                     }}
                 >
-                    {formatTime(time)}
+                    {showScramble && currentScramble && status !== 'running' && (
+                        <div style={{ 
+                            fontSize: '1.25rem', 
+                            color: 'var(--text-main)', 
+                            marginBottom: '30px', 
+                            maxWidth: '80%', 
+                            lineHeight: '1.6',
+                            fontWeight: 500,
+                            letterSpacing: '0.02em'
+                        }}>
+                            {currentScramble}
+                        </div>
+                    )}
+                    <div>{formatTime(time)}</div>
+
+                    {status === 'idle' && (
+                        <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '8px' }}>
+                            <button 
+                                onClick={() => setShowScramble(!showScramble)} 
+                                className="btn-ghost" 
+                                title={showScramble ? "Hide Scramble" : "Show Scramble"}
+                                style={{ padding: '8px', background: 'rgba(255,255,255,0.05)' }}
+                            >
+                                {showScramble ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                            <button 
+                                onClick={() => setCurrentScramble(generateScramble())} 
+                                className="btn-ghost" 
+                                title="New Scramble"
+                                style={{ padding: '8px', background: 'rgba(255,255,255,0.05)' }}
+                            >
+                                <RefreshCw size={20} />
+                            </button>
+                        </div>
+                    )}
                 </div>
                 
                 <p style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '1.1rem' }}>
@@ -221,16 +298,16 @@ const SpeedcubeTimer = () => {
                         const todayHistory = history.filter(h => h.createdAt.startsWith(todayStr));
                         const bestToday = todayHistory.length > 0 ? Math.min(...todayHistory.map(h => h.time_ms)) : 0;
 
-                        const calculateAoX = (arr, x) => {
-                            if (arr.length < x) return 0;
-                            const recent = arr.slice(0, x).map(h => h.time_ms).sort((a, b) => a - b);
-                            recent.shift();
-                            recent.pop();
-                            return recent.reduce((a, b) => a + b, 0) / recent.length;
+                        const calculateAverage = (arr, x) => {
+                            if (arr.length === 0) return 0;
+                            const count = Math.min(arr.length, x);
+                            const recent = arr.slice(0, count).map(h => h.time_ms);
+                            return recent.reduce((a, b) => a + b, 0) / count;
                         };
-                        const ao5 = calculateAoX(history, 5);
-                        const ao10 = calculateAoX(history, 10);
-                        const ao100 = calculateAoX(history, 100);
+                        const avg5 = calculateAverage(history, 5);
+                        const avg10 = calculateAverage(history, 10);
+                        const avg50 = calculateAverage(history, 50);
+                        const avg100 = calculateAverage(history, 100);
 
                         return (
                             <>
@@ -263,9 +340,10 @@ const SpeedcubeTimer = () => {
                                 {/* Bottom Row: Averages */}
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                                     {[
-                                        { label: 'Ao5', value: ao5, color: '#ec4899', icon: <TrendingUp size={24} color="#ec4899" /> },
-                                        { label: 'Ao10', value: ao10, color: '#8b5cf6', icon: <TrendingUp size={24} color="#8b5cf6" /> },
-                                        { label: 'Ao100', value: ao100, color: '#14b8a6', icon: <TrendingUp size={24} color="#14b8a6" /> }
+                                        { label: 'Ø 5', value: avg5, color: '#ec4899', icon: <TrendingUp size={24} color="#ec4899" /> },
+                                        { label: 'Ø 10', value: avg10, color: '#8b5cf6', icon: <TrendingUp size={24} color="#8b5cf6" /> },
+                                        { label: 'Ø 50', value: avg50, color: '#3b82f6', icon: <TrendingUp size={24} color="#3b82f6" /> },
+                                        { label: 'Ø 100', value: avg100, color: '#14b8a6', icon: <TrendingUp size={24} color="#14b8a6" /> }
                                     ].map((stat) => (
                                         <div key={stat.label} className="glass-card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', borderLeft: `4px solid ${stat.color}` }}>
                                             <div style={{ background: `${stat.color}25`, padding: '10px', borderRadius: '12px' }}>
@@ -314,7 +392,48 @@ const SpeedcubeTimer = () => {
                                             {new Date(item.createdAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </td>
                                         <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: '1.1rem', color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
-                                            {formatTime(item.time_ms)}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {formatTime(item.time_ms)}
+                                                {item.scramble && (
+                                                    <div style={{ position: 'relative' }}>
+                                                        <button 
+                                                            className="btn-ghost" 
+                                                            style={{ padding: '4px', color: 'var(--text-muted)' }}
+                                                            onMouseEnter={() => setShowScrambleHistoryId(item.id)}
+                                                            onMouseLeave={() => setShowScrambleHistoryId(null)}
+                                                            onClick={() => setShowScrambleHistoryId(showScrambleHistoryId === item.id ? null : item.id)}
+                                                        >
+                                                            <Info size={14} />
+                                                        </button>
+                                                        {showScrambleHistoryId === item.id && (
+                                                            <div style={{ 
+                                                                position: 'absolute', 
+                                                                bottom: '100%', 
+                                                                left: '50%', 
+                                                                transform: 'translateX(-50%)', 
+                                                                marginBottom: '10px',
+                                                                background: 'var(--bg-color)', 
+                                                                border: '1px solid var(--accent-primary)',
+                                                                padding: '12px',
+                                                                borderRadius: '8px',
+                                                                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                                                width: '320px',
+                                                                zIndex: 1000,
+                                                                fontSize: '0.9rem',
+                                                                color: 'var(--text-main)',
+                                                                pointerEvents: 'auto',
+                                                                textAlign: 'center',
+                                                                fontWeight: 400,
+                                                                lineHeight: '1.4'
+                                                            }}>
+                                                                <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--accent-primary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Scramble</div>
+                                                                <div style={{ fontFamily: 'monospace', wordBreak: 'break-word' }}>{item.scramble}</div>
+                                                                <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--accent-primary)' }}></div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td style={{ padding: '12px 16px', flex: 1 }}>
                                             {editingNoteId === item.id ? (

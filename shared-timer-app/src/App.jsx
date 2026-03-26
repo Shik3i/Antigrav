@@ -28,6 +28,8 @@ const Achievements = React.lazy(() => import('./pages/Achievements'));
 const AdminAchievements = React.lazy(() => import('./pages/AdminAchievements'));
 const Scratchcards = React.lazy(() => import('./pages/ScratchcardShop'));
 const RiftDefense = React.lazy(() => import('./pages/RiftDefense'));
+const LoLIdleGame = React.lazy(() => import('./pages/LoLIdleGame'));
+const ColorSyncGame = React.lazy(() => import('./pages/ColorSyncGame'));
 
 import NewsTicker from './components/NewsTicker';
 import Friends from './pages/Friends';
@@ -402,6 +404,9 @@ function InnerApp() {
                 <Route path="/speedcube" element={<SpeedcubeTimer />} />
                 <Route path="/scratchcards" element={<Scratchcards />} />
                 <Route path="/games/rift-defense" element={<RiftDefense />} />
+                <Route path="/games/lol-idle" element={<LoLIdleGame user={user} token={token} />} />
+                <Route path="/color-sync" element={<ColorSyncGame user={user} token={token} />} />
+                <Route path="/color-sync/lobby/:uuid" element={<ColorSyncGame user={user} token={token} />} />
                 <Route path="/profile/:username" element={<UserProfile />} />
               </Routes>
             </React.Suspense>
