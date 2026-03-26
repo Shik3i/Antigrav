@@ -1,5 +1,11 @@
 [
   {
+    "id": 15,
+    "version": "2.10.0",
+    "date": "2026-03-26",
+    "changes": "- **Security Refactor**: Admin-Passwort-Prüfung ins Backend mit JWT-Authentifizierung verschoben.\n- **Performance Caching**: 15-Minuten-Cache für Tagesschau-News und persistenter Memory-Cache für Pokémon-Daten zur Reduzierung von Disk-I/O.\n- **Database Optimization**: Hinzufügen von SQLite-Indizes für schnellere Abfragen bei User-Balance und Wetten.\n- **PWA Integration**: App ist nun als Progressive Web App installierbar inkl. Service Worker."
+  },
+  {
     "id": 14,
     "version": "2.9.0",
     "date": "2026-03-26",
