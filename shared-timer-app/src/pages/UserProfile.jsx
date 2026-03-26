@@ -6,6 +6,30 @@ import { useAuth } from '../context/AuthContext';
 
 const formatCoins = (cents) => (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const formatLastActive = (timestamp) => {
+    if (!timestamp) return 'Unbekannt';
+    
+    // SQLite CURRENT_TIMESTAMP is 'YYYY-MM-DD HH:MM:SS' (UTC)
+    const utcTimestamp = timestamp.includes('Z') || timestamp.includes('+') 
+        ? timestamp 
+        : timestamp.replace(' ', 'T') + 'Z';
+    
+    const now = new Date();
+    const lastActive = new Date(utcTimestamp);
+    const diffInSeconds = Math.floor((now.getTime() - lastActive.getTime()) / 1000);
+    
+    console.log('[DEBUG] lastActive raw:', timestamp);
+    console.log('[DEBUG] lastActive parsed:', lastActive.toISOString());
+    console.log('[DEBUG] now:', now.toISOString());
+    console.log('[DEBUG] diffInSeconds:', diffInSeconds);
+
+    if (diffInSeconds < 60) return 'Gerade online';
+    if (diffInSeconds < 3600) return `Vor ${Math.floor(diffInSeconds / 60)} Min.`;
+    if (diffInSeconds < 86400) return `Vor ${Math.floor(diffInSeconds / 3600)} Std.`;
+    if (diffInSeconds < 172800) return 'Gestern';
+    return lastActive.toLocaleDateString();
+};
+
 const UserProfile = () => {
     const { user: authUser } = useAuth();
     const { username } = useParams();
@@ -53,10 +77,14 @@ const UserProfile = () => {
                         {user.displayName}
                         <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)', fontWeight: 500 }}>@{user.username}</span>
                     </h1>
-                    <div style={{ display: 'flex', gap: '24px', color: 'var(--text-muted)', fontSize: '1rem' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={16} /> Joined {new Date(user.joinedAt).toLocaleDateString()}</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: 600, background: 'rgba(245, 158, 11, 0.1)', padding: '4px 12px', borderRadius: '12px' }}>
-                            <Coins size={16} /> {formatCoins(user.koala_balance || 0)} KC
+                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Calendar size={14} /> Angemeldet: {new Date(user.joinedAt).toLocaleDateString()}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 600 }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (new Date() - new Date(user.lastActive) < 60000) ? '#10b981' : '#71717a', boxShadow: (new Date() - new Date(user.lastActive) < 60000) ? '0 0 10px #10b981' : 'none' }}></div>
+                            Zuletzt online: {formatLastActive(user.lastActive)}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: 600, background: 'rgba(245, 158, 11, 0.1)', padding: '2px 10px', borderRadius: '10px' }}>
+                            <Coins size={14} /> {formatCoins(user.koala_balance || 0)} KC
                         </span>
                     </div>
                 </div>

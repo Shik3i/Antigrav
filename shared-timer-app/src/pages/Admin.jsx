@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EVENTS from '../socketEvents';
 
+const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
+
 const Admin = ({ socket }) => {
     const navigate = useNavigate();
     const token = sessionStorage.getItem('admin_token');
@@ -39,6 +41,7 @@ const Admin = ({ socket }) => {
     const [navbarSettings, setNavbarSettings] = useState([]);
     const [logs, setLogs] = useState([]);
     const [systemLogs, setSystemLogs] = useState([]); // [NEW]
+    const [pokemonConfigs, setPokemonConfigs] = useState({ settings: { contrast_threshold: '0.6' }, colors: {} });
 
     const handleFetchNavbarSettings = async () => {
         try {
@@ -60,6 +63,29 @@ const Admin = ({ socket }) => {
         } catch (err) {
             console.error('Error saving navbar settings:', err);
             addLog('Error', 'Failed to save navbar settings.', 'error');
+        }
+    };
+
+    const handleFetchPokemonConfigs = async () => {
+        try {
+            const res = await axios.get('/api/admin/pokemon-configs', {
+                headers: { 'Authorization': `Bearer ${globalToken || localStorage.getItem('timerToken')}` }
+            });
+            setPokemonConfigs(res.data);
+        } catch (err) {
+            console.error('Error fetching pokemon configs:', err);
+        }
+    };
+
+    const handleSavePokemonConfigs = async () => {
+        try {
+            await axios.post('/api/admin/pokemon-configs/update', pokemonConfigs, {
+                headers: { 'Authorization': `Bearer ${globalToken || localStorage.getItem('timerToken')}` }
+            });
+            addLog('Success', 'Pokémon configurations saved.', 'success');
+        } catch (err) {
+            console.error('Error saving pokemon configs:', err);
+            addLog('Error', 'Failed to save Pokémon configurations.', 'error');
         }
     };
 
@@ -379,6 +405,9 @@ const Admin = ({ socket }) => {
         if (activeTab === 'navbar') {
             handleFetchNavbarSettings();
         }
+        if (activeTab === 'pokemon') {
+            handleFetchPokemonConfigs();
+        }
     }, [activeTab]);
 
     const handleFetchBets = () => {
@@ -503,6 +532,22 @@ const Admin = ({ socket }) => {
                 console.error(err);
                 setLoading(false);
             });
+    };
+
+    const handleClearSystemLogs = () => {
+        if (!window.confirm("Bist du sicher, dass du ALLE System-Logs löschen möchtest?")) return;
+        fetch('/api/admin/system-logs', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${globalToken}` }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    setSystemLogs([]);
+                    addLog('Success', 'All system logs cleared.', 'success');
+                }
+            })
+            .catch(err => console.error(err));
     };
 
     const handleClearErrorLogs = () => {
@@ -963,6 +1008,12 @@ const Admin = ({ socket }) => {
                     onClick={() => setActiveTab('navbar')}
                     style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <LayoutDashboard size={16} /> Sidebar Settings
+                </button>
+                <button
+                    className={activeTab === 'pokemon' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => setActiveTab('pokemon')}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Dices size={16} /> Pokémon Config
                 </button>
             </div>
 
@@ -1603,6 +1654,14 @@ const Admin = ({ socket }) => {
                         </h3>
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button className="btn-secondary" onClick={handleFetchSystemLogs}>Refresh</button>
+                            <button 
+                                className="btn-ghost" 
+                                style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }} 
+                                onClick={handleClearSystemLogs}
+                            >
+                                <Trash2 size={16} />
+                                Logs löschen
+                            </button>
                         </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
@@ -2241,6 +2300,66 @@ const Admin = ({ socket }) => {
                 </div>
             )}
 
+            {/* TAB: POKEMON CONFIG */}
+            {activeTab === 'pokemon' && (
+                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <h3 style={{ margin: 0 }}>Pokémon System Configuration</h3>
+                        <button className="btn-primary" onClick={handleSavePokemonConfigs} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Save size={18} /> Save Changes
+                        </button>
+                    </div>
+
+                    <div style={{ marginBottom: '32px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <h4 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--accent-primary)' }}>Global Settings</h4>
+                        <div style={{ maxWidth: '400px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Contrast Threshold (0.0 - 1.0)</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <input 
+                                    type="range" 
+                                    min="0" max="1" step="0.01" 
+                                    style={{ flex: 1 }}
+                                    value={pokemonConfigs.settings?.contrast_threshold || 0.6}
+                                    onChange={(e) => setPokemonConfigs(prev => ({ 
+                                        ...prev, 
+                                        settings: { ...prev.settings, contrast_threshold: e.target.value } 
+                                    }))}
+                                />
+                                <span style={{ fontWeight: 'bold', minWidth: '40px' }}>{pokemonConfigs.settings?.contrast_threshold || 0.6}</span>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                Higher value = Pokémon needs to be "lighter" to trigger Light Mode. Default: 0.6.
+                            </p>
+                        </div>
+                    </div>
+
+                    <h4 style={{ marginBottom: '16px' }}>Type Color Mapping</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                        {POKEMON_TYPES.map(type => (
+                            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                <div style={{ 
+                                    width: '24px', height: '24px', borderRadius: '50%', 
+                                    background: pokemonConfigs.colors?.[type] || '#333',
+                                    border: '2px solid rgba(255,255,255,0.2)'
+                                }} />
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '4px' }}>{type}</div>
+                                    <input 
+                                        type="text" 
+                                        className="input-primary" 
+                                        style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                                        value={pokemonConfigs.colors?.[type] || ''}
+                                        onChange={(e) => setPokemonConfigs(prev => ({
+                                            ...prev,
+                                            colors: { ...prev.colors, [type]: e.target.value }
+                                        }))}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

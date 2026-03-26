@@ -13,6 +13,8 @@ const JWT_SECRET = require('../jwtSecret');
 // Performance Protection: Debounce for immediate bet resolution trigger
 let lastBetResolutionTrigger = 0;
 const BET_RESOLUTION_COOLDOWN = 10 * 60 * 1000; // 10 minutes between automated triggers via API calls
+// Pokémon Cache for performance (DRY/Performance Optimization)
+let pokemonCache = null;
 
 exports.getHighscores = async (req, res, next) => {
     try {
@@ -922,6 +924,17 @@ exports.getSystemLogs = async (req, res) => {
     }
 };
 
+exports.deleteAllSystemLogs = async (req, res) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        await dbLayer.clearSystemLogs();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('deleteAllSystemLogs error:', err);
+        res.status(500).json({ error: 'Failed to clear system logs' });
+    }
+};
+
 exports.deleteErrorLog = async (req, res) => {
     if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
     const { id } = req.params;
@@ -1404,7 +1417,8 @@ exports.getUserProfile = async (req, res, next) => {
             displayName: user.displayName,
             koala_balance: user.koala_balance,
             preferences: typeof user.preferences === 'string' ? JSON.parse(user.preferences) : user.preferences,
-            joinedAt: user.createdAt
+            joinedAt: user.createdAt,
+            lastActive: user.lastActive
         };
 
         const { ACHIEVEMENTS_CONFIG } = require('../config/achievements');
@@ -1779,6 +1793,88 @@ exports.updateNavbarSettings = async (req, res, next) => {
             return res.status(400).json({ error: 'Settings must be an array' });
         }
         await dbLayer.updateNavbarSettings(settings);
+        res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getPokemonData = async (req, res, next) => {
+    try {
+        if (pokemonCache) {
+            return res.json(pokemonCache);
+        }
+
+        const filePath = path.join(__dirname, '..', 'data', 'pokemon.txt');
+        if (!fs.existsSync(filePath)) {
+            return res.json([]);
+        }
+        
+        const data = fs.readFileSync(filePath, 'utf8');
+        const lines = data.split('\n').filter(line => line.trim());
+        
+        const colorsPath = path.join(__dirname, '..', 'data', 'pokemon_colors.json');
+        let backgroundColors = {};
+        try {
+            if (fs.existsSync(colorsPath)) {
+                backgroundColors = JSON.parse(fs.readFileSync(colorsPath, 'utf8'));
+            }
+        } catch (e) {
+            console.error('Failed to parse pokemon_colors.json:', e);
+        }
+
+        const pokemonList = lines.map((line, index) => {
+            const parts = line.trim().split(/\s+/);
+            const name = parts[0];
+            const threshold = parseFloat(parts[1]);
+            const types = parts.slice(2); 
+            const id = (index + 1).toString().padStart(3, '0');
+            return { 
+                id, 
+                name, 
+                threshold, 
+                types, 
+                backgroundColor: backgroundColors[id] || '#000000' 
+            };
+        });
+        
+        // Cache the result
+        pokemonCache = pokemonList;
+        res.json(pokemonList);
+    } catch (err) {
+        console.error('Failed to read pokemon data:', err);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
+
+exports.getPokemonConfigs = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.is_superadmin) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const configs = await dbLayer.getPokemonConfigs();
+        res.json(configs);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getPublicPokemonConfigs = async (req, res, next) => {
+    try {
+        const configs = await dbLayer.getPokemonConfigs();
+        res.json(configs);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updatePokemonConfigs = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.is_superadmin) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        const { settings, colors } = req.body;
+        await dbLayer.updatePokemonConfigs(settings, colors);
         res.json({ success: true });
     } catch (err) {
         next(err);

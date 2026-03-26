@@ -12,22 +12,24 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const navigate = useNavigate();
     const { isGuest, logout } = useAuth();
     const isRoomRoute = location.pathname.startsWith('/room/');
-    const [expandedSections, setExpandedSections] = useState(() => {
+    const [openGroup, setOpenGroup] = useState(() => {
         try {
-            const saved = localStorage.getItem('sidebar_expanded_sections');
-            if (saved) return JSON.parse(saved);
+            const saved = localStorage.getItem('sidebar_open_group');
+            if (saved) {
+                // If it looks like legacy JSON (object or array), ignore it
+                if (saved.startsWith('{') || saved.startsWith('[')) {
+                    return null;
+                }
+                return saved;
+            }
         } catch (e) { }
-        return {
-            timers: false,
-            esports: false,
-            games: false,
-            tools: false
-        };
+        return null;
     });
 
     useEffect(() => {
-        localStorage.setItem('sidebar_expanded_sections', JSON.stringify(expandedSections));
-    }, [expandedSections]);
+        if (openGroup) localStorage.setItem('sidebar_open_group', openGroup);
+        else localStorage.removeItem('sidebar_open_group');
+    }, [openGroup]);
 
     const containerStyle = {
         width: '260px',
@@ -186,13 +188,13 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         <div key={cat} className="nav-section" style={{ marginTop: cat === 'Timers' ? '0' : '12px' }}>
                             <button 
                                 className="btn-ghost section-header" 
-                                onClick={() => setExpandedSections(p => ({ ...p, [sectionKey]: !p[sectionKey] }))}
+                                onClick={() => setOpenGroup(p => p === sectionKey ? null : sectionKey)}
                                 style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
                             >
                                 <span>{cat}</span>
-                                {expandedSections[sectionKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                {openGroup === sectionKey ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             </button>
-                            {expandedSections[sectionKey] && (
+                            {openGroup === sectionKey && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
                                     {items.map(item => {
                                         // Safety check: only superadmins can see the Admin Panel link

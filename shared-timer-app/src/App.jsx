@@ -41,7 +41,8 @@ import useEsportsNotifications from './hooks/useEsportsNotifications';
 import GlobalAudioController from './components/GlobalAudioController';
 import LiveStreamWidget from './components/LiveStreamWidget';
 import './index.css';
-import { Menu, Clock } from 'lucide-react';
+import { User, Settings as SettingsIcon, LogOut, Menu, X, Timer as TimerIcon, BarChart3, Bell, Shield, Heart, Sparkles, RefreshCw, ChevronRight } from 'lucide-react';
+import { selectNextPokemon } from './utils/pokemonUtils';
 import { useAuth } from './context/AuthContext';
 
 // Global styles for the app container
@@ -54,11 +55,21 @@ const appStyle = {
 // Flex flow replaces contentStyle
 
 // We will instantiate the socket inside App to control its lifecycle
-const DEFAULT_LEAGUES = ['LCK', 'LEC', 'Prime League'];
+const DEFAULT_LEAGUES = ['LEC', 'LCS', 'LCK', 'LPL', 'VCT_LOCK_IN', 'VCT_EMEA', 'VCT_AMERICAS', 'VCT_PACIFIC'];
+
+const POKEMON_TYPES_MAP = {
+  normal: '#A8A878', fire: '#F08030', water: '#6890F0', grass: '#78C850',
+  electric: '#F8D030', ice: '#98D8D8', fighting: '#C03028', poison: '#A040A0',
+  ground: '#E0C068', flying: '#A890F0', psychic: '#F85888', bug: '#A8B820',
+  rock: '#B8A038', ghost: '#705898', dragon: '#7038F8', dark: '#705848',
+  steel: '#B8B8D0', fairy: '#EE99AC'
+};
 
 function InnerApp() {
   const { user, setUser, token } = useAuth();
+  const [pokemonConfigs, setPokemonConfigs] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [activeRoomId, setActiveRoomId] = useState(() => localStorage.getItem('activeRoomId') || null);
   const [activeToken, setActiveToken] = useState(() => localStorage.getItem('activeToken') || null);
@@ -181,9 +192,49 @@ function InnerApp() {
   }, []);
 
   useEffect(() => {
+    fetch('/api/pokemon/configs')
+      .then(res => res.json())
+      .then(setPokemonConfigs)
+      .catch(err => console.error('Failed to fetch pokemon configs:', err));
+  }, []);
+
+  useEffect(() => {
     // Apply theme
     const theme = user?.preferences?.theme || 'neon';
     document.documentElement.dataset.theme = theme;
+
+    // Apply Pokemon Theme
+    const pokemonTheme = user?.preferences?.pokemonTheme;
+    if (pokemonTheme?.active && pokemonTheme?.id) {
+      document.documentElement.dataset.pokemonMode = "true";
+      document.body.style.backgroundImage = `url('/assets/pokemon/${pokemonTheme.id}.jpg')`;
+      document.body.style.backgroundColor = pokemonTheme.backgroundColor || '#000000';
+      document.body.style.backgroundSize = 'contain';
+      document.body.style.backgroundRepeat = 'no-repeat';
+      document.body.style.backgroundPosition = 'center';
+      
+      // Contrast Logic: threshold > 0.6 is LIGHT
+      if (parseFloat(pokemonTheme.threshold) > 0.6) {
+        document.documentElement.classList.add('pokemon-light-mode');
+      } else {
+        document.documentElement.classList.remove('pokemon-light-mode');
+      }
+
+      const typeColors = pokemonTheme.types?.map(t => configs.colors[t] || '#333') || ['#3b82f6'];
+      const primaryColor = typeColors[0];
+      const secondaryColor = typeColors[1] || primaryColor;
+      
+      document.documentElement.style.setProperty('--accent-primary', primaryColor);
+      document.documentElement.style.setProperty('--accent-secondary', secondaryColor);
+      document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`);
+    } else {
+      document.documentElement.dataset.pokemonMode = "false";
+      document.documentElement.classList.remove('pokemon-light-mode');
+      document.body.style.backgroundImage = '';
+      document.documentElement.style.removeProperty('--accent-primary');
+      document.documentElement.style.removeProperty('--accent-secondary');
+      document.documentElement.style.removeProperty('--accent-gradient');
+    }
 
     // Notify server of preference change (like hasExtension) if in room
     if (globalSocket?.connected && activeRoomId) {
@@ -245,9 +296,10 @@ function InnerApp() {
     globalSocket.on(EVENTS.ERROR, handleError);
     globalSocket.on(EVENTS.ROOM_INVITE, (data) => {
       if (window.confirm(`${data.inviterName} has invited you to join the room "${data.roomName}". Join now?`)) {
-        window.location.href = `/room/${data.roomId}`;
+        navigate(`/room/${data.roomId}`);
       }
     });
+
     globalSocket.on(EVENTS.INVITE_TOKENS, handleTokens);
 
     const handleOutboundSync = (e) => {
@@ -273,10 +325,42 @@ function InnerApp() {
       globalSocket.off(EVENTS.INVITE_TOKENS, handleTokens);
       globalSocket.off(EVENTS.EXTENSION_MESSAGE, handleExtensionMessage);
       window.removeEventListener('EXTENSION_OUTBOUND_EVENT', handleOutboundSync);
-      // Removed globalSocket.emit('leave_room'); from here because React StrictMode triggers Mount -> Unmount -> Mount instantly, 
-      // causing us to leave the room right after joining.
+      globalSocket.off(EVENTS.ROOM_INVITE);
     };
   }, [activeRoomId, activeToken, user?.id, globalSocket]);
+
+  // Pokémon Slideshow Logic
+  useEffect(() => {
+    const pokemonTheme = user?.preferences?.pokemonTheme;
+    if (!pokemonTheme?.active || !pokemonTheme?.slideshow) return;
+
+    const rotate = () => {
+      fetch('/api/pokemon')
+        .then(res => res.json())
+        .then(list => {
+          const nextP = selectNextPokemon(list, pokemonTheme);
+          if (nextP) {
+            setUser(prev => ({
+              ...prev,
+              preferences: {
+                ...prev.preferences,
+                pokemonTheme: { 
+                  ...prev.preferences.pokemonTheme, 
+                  id: nextP.id, 
+                  name: nextP.name, 
+                  types: nextP.types, 
+                  threshold: nextP.threshold,
+                  backgroundColor: nextP.backgroundColor
+                }
+              }
+            }));
+          }
+        });
+    };
+
+    const interval = setInterval(rotate, 5 * 60 * 1000); // 5 minutes
+    return () => clearInterval(interval);
+  }, [user.preferences.pokemonTheme?.active, user.preferences.pokemonTheme?.slideshow, user.preferences.pokemonTheme?.mode, user.preferences.pokemonTheme?.selectedType]);
 
   if (!globalSocket) return null;
 
@@ -337,9 +421,9 @@ function InnerApp() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ transform: 'scale(0.85)', transformOrigin: 'right center', display: 'flex', gap: '8px' }}>
-                  {(user.preferences?.showClock ?? true) && <ClockWidget />}
+                  {(user.preferences?.showClock ?? true) && <div className="mobile-hide"><ClockWidget /></div>}
                   {user?.id && (user.preferences?.showKoalaCoins ?? true) && <KoalaCoinWidget balance={user.koala_balance || 0} />}
-                  {(user.preferences?.showWeather ?? false) && <WeatherWidget />}
+                  {(user.preferences?.showWeather ?? false) && <div className="mobile-hide"><WeatherWidget /></div>}
                 </div>
                 <div id="mobile-room-actions"></div>
               </div>

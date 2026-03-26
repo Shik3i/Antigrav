@@ -61,14 +61,83 @@ exports.getRandomColor = (req, res) => {
 exports.submitScore = (req, res) => {
     const { score, target_color, guessed_color, mode } = req.body;
     const userId = req.user.userId;
+    const today = new Date().toISOString().split('T')[0];
 
-    const query = `INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, ?)`;
-    db.db.run(query, [userId, score, target_color, guessed_color, mode], function(err) {
-        if (err) {
-            console.error('Error saving ColorSync score:', err);
-            return res.status(500).json({ error: 'Failed to save score' });
-        }
-        res.json({ success: true, id: this.lastID });
+    // Handle Daily Lock
+    if (mode === 'DAILY') {
+        const checkQuery = `SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`;
+        db.db.get(checkQuery, [userId, today], (err, existing) => {
+            if (err) return res.status(500).json({ error: 'Database error' });
+            if (existing) return res.status(403).json({ error: 'You have already played today\'s challenge.' });
+
+            // Save to Daily Results
+            const dailyQuery = `INSERT INTO ColorSync_DailyResults (userId, score, guessed_color, date) VALUES (?, ?, ?, ?)`;
+            db.db.run(dailyQuery, [userId, score, guessed_color, today], (err) => {
+                if (err) console.error('Error saving daily result:', err);
+            });
+
+            // Fall through to general score saving
+            saveGeneralScore();
+        });
+    } else {
+        saveGeneralScore();
+    }
+
+    function saveGeneralScore() {
+        const query = `INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, ?)`;
+        db.db.run(query, [userId, score, target_color, guessed_color, mode], function(err) {
+            if (err) {
+                console.error('Error saving ColorSync score:', err);
+                return res.status(500).json({ error: 'Failed to save score' });
+            }
+            res.json({ success: true, id: this.lastID });
+        });
+    }
+};
+
+exports.checkDailyStatus = (req, res) => {
+    const userId = req.user.userId;
+    const today = new Date().toISOString().split('T')[0];
+    const query = `SELECT * FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`;
+    
+    db.db.get(query, [userId, today], (err, result) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        res.json({ played: !!result, result });
+    });
+};
+
+exports.getDailyStats = (req, res) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const statsQuery = `
+        SELECT 
+            AVG(score) as avgScore,
+            COUNT(*) as participantCount
+        FROM ColorSync_DailyResults 
+        WHERE date = ?
+    `;
+
+    const leaderboardQuery = `
+        SELECT r.score, u.displayName
+        FROM ColorSync_DailyResults r
+        JOIN Users u ON r.userId = u.id
+        WHERE r.date = ?
+        ORDER BY r.score DESC
+        LIMIT 3
+    `;
+
+    db.db.get(statsQuery, [today], (err, stats) => {
+        if (err) return res.status(500).json({ error: 'Failed to fetch stats' });
+
+        db.db.all(leaderboardQuery, [today], (err, topPerformers) => {
+            if (err) return res.status(500).json({ error: 'Failed to fetch leaderboard' });
+
+            res.json({
+                avgScore: stats.avgScore ? parseFloat(stats.avgScore.toFixed(1)) : 0,
+                participantCount: stats.participantCount || 0,
+                topPerformers: topPerformers || []
+            });
+        });
     });
 };
 
@@ -145,6 +214,18 @@ exports.submitLobbyScore = (req, res) => {
                 console.error('Error submitting lobby score:', err);
                 return res.status(500).json({ error: 'Failed to submit score' });
             }
+
+            // Also log to general scores for persistence
+            const lobbyColorQuery = `SELECT target_color FROM ColorSync_Lobbies WHERE id = ?`;
+            db.db.get(lobbyColorQuery, [uuid], (err, lobby) => {
+                if (lobby) {
+                    const target = JSON.parse(lobby.target_color);
+                    const targetHex = `#${((1 << 24) + (target.r << 16) + (target.g << 8) + target.b).toString(16).slice(1)}`;
+                    const generalQuery = `INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, 'LOBBY')`;
+                    db.db.run(generalQuery, [userId, score, targetHex, guessed_color]);
+                }
+            });
+
             res.json({ success: true });
         });
     });

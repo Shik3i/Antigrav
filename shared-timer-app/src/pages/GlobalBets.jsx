@@ -121,7 +121,9 @@ const GlobalBets = () => {
     }
 
     // Split and group bets
-    const upcomingBets = bets.filter(b => b.status === 'open');
+    const now = new Date();
+    const upcomingBets = bets.filter(b => b.status === 'open' && new Date(b.eventDate) >= now);
+    const awaitingBets = bets.filter(b => b.status === 'open' && new Date(b.eventDate) < now);
     const pastBets = bets.filter(b => b.status !== 'open');
 
     const groupFunction = (acc, bet) => {
@@ -137,6 +139,7 @@ const GlobalBets = () => {
     };
 
     const groupedUpcoming = Object.values(upcomingBets.reduce(groupFunction, {}));
+    const groupedAwaiting = Object.values(awaitingBets.reduce(groupFunction, {}));
     const groupedPast = Object.values(pastBets.reduce(groupFunction, {}));
 
     const MatchGroup = ({ group, isUpcoming }) => {
@@ -344,10 +347,25 @@ const GlobalBets = () => {
                 </div>
                 {groupedUpcoming.length === 0 ? (
                     <div className="glass-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>
-                        No open bets at the moment.
+                        No upcoming bets at the moment.
                     </div>
                 ) : (
                     groupedUpcoming.map(group => <MatchGroup key={group.name + group.date} group={group} isUpcoming={true} />)
+                )}
+            </div>
+
+            {/* AWAITING RESOLVE SECTION */}
+            <div style={{ marginBottom: '48px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <CalendarClock size={20} color="#f59e0b" />
+                    <h2 style={{ margin: 0, fontSize: '1.4rem' }}>In Progress / Awaiting Resolve</h2>
+                </div>
+                {groupedAwaiting.length === 0 ? (
+                    <div className="glass-card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>
+                        No matches currently in progress.
+                    </div>
+                ) : (
+                    groupedAwaiting.map(group => <MatchGroup key={group.name + group.date} group={group} isUpcoming={true} />)
                 )}
             </div>
 

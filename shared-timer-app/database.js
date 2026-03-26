@@ -535,6 +535,17 @@ db.serialize(() => {
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS ColorSync_DailyResults (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT NOT NULL,
+      score REAL NOT NULL,
+      guessed_color TEXT NOT NULL,
+      date TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(userId, date),
+      FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+    )`);
+
     db.run(`CREATE TABLE IF NOT EXISTS ColorSync_Lobbies (
       id TEXT PRIMARY KEY,
       creatorId TEXT NOT NULL,
@@ -607,6 +618,30 @@ db.serialize(() => {
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
             VALUES ('colorsync', 'Color Sync', '/color-sync', 'Games', 1, 6)`);
     db.run("UPDATE NavbarSettings SET sortOrder = 6 WHERE key = 'colorsync' AND category = 'Games'");
+
+    // ─── Pokemon System Tables ───────────────────────────────────
+    db.run(`CREATE TABLE IF NOT EXISTS PokemonSettings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )`, () => {
+      db.run(`INSERT OR IGNORE INTO PokemonSettings (key, value) VALUES ('contrast_threshold', '0.6')`);
+    });
+
+    db.run(`CREATE TABLE IF NOT EXISTS PokemonTypeColors (
+      type_name TEXT PRIMARY KEY,
+      hex_color TEXT NOT NULL
+    )`, () => {
+      const defaultColors = [
+        ['normal', '#A8A878'], ['fire', '#F08030'], ['water', '#6890F0'], ['grass', '#78C850'],
+        ['electric', '#F8D030'], ['ice', '#98D8D8'], ['fighting', '#C03028'], ['poison', '#A040A0'],
+        ['ground', '#E0C068'], ['flying', '#A890F0'], ['psychic', '#F85888'], ['bug', '#A8B820'],
+        ['rock', '#B8A038'], ['ghost', '#705898'], ['dragon', '#7038F8'], ['dark', '#705848'],
+        ['steel', '#B8B8D0'], ['fairy', '#EE99AC']
+      ];
+      defaultColors.forEach(([name, hex]) => {
+        db.run(`INSERT OR IGNORE INTO PokemonTypeColors (type_name, hex_color) VALUES (?, ?)`, [name, hex]);
+      });
+    });
   });
   
   // Signal database is ready and mirror initial logs
@@ -2490,6 +2525,18 @@ const getSystemLogs = () => {
   });
 };
 
+/**
+ * Flush all system logs from the database.
+ */
+const clearSystemLogs = () => {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM SystemLogs', function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+};
+
 module.exports = {
   // --- LoL Idle Game (Road to Worlds) Helpers ---
   getIdleProfile: (userId) => {
@@ -3052,7 +3099,52 @@ module.exports = {
     });
   },
 
+  getPokemonConfigs: () => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM PokemonSettings', [], (err, settingsRows) => {
+        if (err) return reject(err);
+        db.all('SELECT * FROM PokemonTypeColors', [], (err, colorRows) => {
+          if (err) return reject(err);
+          
+          const settings = {};
+          settingsRows.forEach(r => settings[r.key] = r.value);
+          
+          const colors = {};
+          colorRows.forEach(r => colors[r.type_name] = r.hex_color);
+          
+          resolve({ settings, colors });
+        });
+      });
+    });
+  },
+
+  updatePokemonConfigs: (settings, colors) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        if (settings) {
+          Object.entries(settings).forEach(([key, value]) => {
+            db.run('INSERT OR REPLACE INTO PokemonSettings (key, value) VALUES (?, ?)', [key, String(value)]);
+          });
+        }
+        
+        if (colors) {
+          Object.entries(colors).forEach(([type, hex]) => {
+            db.run('INSERT OR REPLACE INTO PokemonTypeColors (type_name, hex_color) VALUES (?, ?)', [type, hex]);
+          });
+        }
+        
+        db.run('COMMIT', (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
+  },
+
   logSystemEvent, // [NEW]
   getSystemLogs,  // [NEW]
+  clearSystemLogs, // [NEW]
   dbLayer: { db } // For direct access if needed
 };

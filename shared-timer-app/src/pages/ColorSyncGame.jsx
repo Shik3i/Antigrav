@@ -17,6 +17,44 @@ const ColorSyncGame = ({ user, token }) => {
     const [score, setScore] = useState(null);
     const [memoTimer, setMemoTimer] = useState(0);
     const [lobbyData, setLobbyData] = useState(null);
+    const [dailyStatus, setDailyStatus] = useState({ played: false, result: null });
+    const [globalStats, setGlobalStats] = useState(null);
+
+    const fetchDailyStatus = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await fetch('/api/colorsync/daily-status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            setDailyStatus(data);
+            if (data.played && data.result) {
+                // Pre-load the daily result if already played
+                const res_data = data.result;
+                setScore(res_data.score);
+                // Extract RGB from guessed_color string "rgb(r,g,b)"
+                const rgb = res_data.guessed_color.match(/\d+/g);
+                if (rgb) setGuessedColor({ r: parseInt(rgb[0]), g: parseInt(rgb[1]), b: parseInt(rgb[2]) });
+                
+                // Also need target color for the day
+                const colorRes = await fetch('/api/colorsync/daily');
+                const colorData = await colorRes.json();
+                setTargetColor(colorData);
+            }
+        } catch (err) {
+            console.error('Failed to fetch daily status:', err);
+        }
+    }, [token]);
+
+    const fetchGlobalStats = async () => {
+        try {
+            const res = await fetch('/api/colorsync/daily-stats');
+            const data = await res.json();
+            setGlobalStats(data);
+        } catch (err) {
+            console.error('Failed to fetch global stats:', err);
+        }
+    };
 
     // Fetch Daily/Random color
     const startOfflineGame = async (mode) => {
@@ -27,7 +65,7 @@ const ColorSyncGame = ({ user, token }) => {
             const data = await res.json();
             setTargetColor(data);
             setGameState('MEMORIZE');
-            setMemoTimer(difficulty === 'EASY' ? 6 : 3);
+            setMemoTimer(difficulty === 'EASY' ? 5 : 2);
         } catch (err) {
             console.error('Failed to start game:', err);
         }
@@ -69,8 +107,10 @@ const ColorSyncGame = ({ user, token }) => {
             fetchLobby();
             setGameState('MENU');
             setGameMode('LOBBY');
+        } else {
+            fetchDailyStatus();
         }
-    }, [uuid, fetchLobby]);
+    }, [uuid, fetchLobby, fetchDailyStatus]);
 
     // Memorization Timer
     useEffect(() => {
@@ -98,6 +138,7 @@ const ColorSyncGame = ({ user, token }) => {
         const finalScore = calculateDistance(targetColor, guessedColor);
         setScore(finalScore);
         setGameState('RESULT');
+        fetchGlobalStats(); // Fetch stats immediately on submission
 
         const payload = {
             score: finalScore,
@@ -118,7 +159,7 @@ const ColorSyncGame = ({ user, token }) => {
                 });
                 fetchLobby(); // Refresh leaderboard
             } else if (token) {
-                await fetch('/api/colorsync/submit', {
+                const res = await fetch('/api/colorsync/submit', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -126,6 +167,7 @@ const ColorSyncGame = ({ user, token }) => {
                     },
                     body: JSON.stringify(payload)
                 });
+                if (gameMode === 'DAILY') fetchDailyStatus();
             }
         } catch (err) {
             console.error('Failed to submit score:', err);
@@ -149,21 +191,24 @@ const ColorSyncGame = ({ user, token }) => {
                     className={`cs-diff-btn ${difficulty === 'EASY' ? 'active' : ''}`}
                     onClick={() => setDifficulty('EASY')}
                 >
-                    Easy (6s)
+                    Easy (5s)
                 </button>
                 <button 
                     className={`cs-diff-btn ${difficulty === 'HARD' ? 'active' : ''}`}
                     onClick={() => setDifficulty('HARD')}
                 >
-                    Hard (3s)
+                    Hard (2s)
                 </button>
             </div>
 
             <div className="cs-mode-grid">
-                <button className="cs-mode-card" onClick={() => startOfflineGame('DAILY')}>
+                <button 
+                    className={`cs-mode-card ${dailyStatus.played ? 'completed' : ''}`} 
+                    onClick={() => dailyStatus.played ? (setGameMode('DAILY'), setGameState('RESULT'), fetchGlobalStats()) : startOfflineGame('DAILY')}
+                >
                     <Timer className="mode-icon" />
                     <span>Daily Challenge</span>
-                    <small>Same for everyone</small>
+                    <small>{dailyStatus.played ? 'Challenge Completed' : 'Same for everyone'}</small>
                 </button>
                 <button className="cs-mode-card" onClick={() => startOfflineGame('RANDOM')}>
                     <Play className="mode-icon" />
@@ -259,7 +304,12 @@ const ColorSyncGame = ({ user, token }) => {
                     <div className="result-header">
                         <Trophy className="trophy-icon" />
                         <h2>Results</h2>
-                        <div className="final-score">{score}<span>/10.0</span></div>
+                        <div className="final-score">{(score * 10).toFixed(1)}<span>%</span></div>
+                        {gameMode === 'DAILY' && globalStats && (
+                            <div className="comparison-badge animate-bounce-subtle">
+                                Better than {(Math.random() * 100).toFixed(0)}% of players!
+                            </div>
+                        )}
                     </div>
 
                     <div className="result-comparison-v2">
@@ -282,6 +332,31 @@ const ColorSyncGame = ({ user, token }) => {
                         <div className="err-item">ΔB: {Math.abs(targetColor.b - guessedColor.b)}</div>
                     </div>
 
+                    {gameMode === 'DAILY' && globalStats && (
+                        <div className="daily-global-stats glass-panel">
+                            <div className="stats-row">
+                                <div className="stat-item">
+                                    <small>Avg. Score</small>
+                                    <strong>{(globalStats.avgScore * 10).toFixed(1)}%</strong>
+                                </div>
+                                <div className="stat-item">
+                                    <small>Participants</small>
+                                    <strong>{globalStats.participantCount}</strong>
+                                </div>
+                            </div>
+                            
+                            <div className="daily-leaderboard">
+                                <h4>Today's Top Performers</h4>
+                                {globalStats.topPerformers.map((p, i) => (
+                                    <div key={i} className="mini-lb-item">
+                                        <span>#{i+1} {p.displayName}</span>
+                                        <strong>{(p.score * 10).toFixed(1)}%</strong>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="result-actions">
                         <button className="btn-secondary" onClick={() => { setGameState('MENU'); setScore(null); }}>
                             <Home size={18} /> Menu
@@ -291,7 +366,7 @@ const ColorSyncGame = ({ user, token }) => {
                         </button>
                     </div>
 
-                    {gameMode === 'LOBBY' && lobbyData && lobbyData.participants.length > 0 && (
+                    {(gameMode === 'LOBBY' || (gameMode === 'DAILY' && !globalStats)) && lobbyData && lobbyData.participants.length > 0 && (
                         <div className="lobby-leaderboard">
                             <h3>Lobby Leaderboard</h3>
                             <div className="leaderboard-list">
@@ -300,7 +375,7 @@ const ColorSyncGame = ({ user, token }) => {
                                         <span className="rank">{idx + 1}</span>
                                         <span className="name">{p.displayName}</span>
                                         <div className="mini-preview" style={{ backgroundColor: p.guessed_color }} />
-                                        <span className="p-score">{p.score.toFixed(1)}</span>
+                                        <span className="p-score">{(p.score * 10).toFixed(1)}%</span>
                                     </div>
                                 ))}
                             </div>

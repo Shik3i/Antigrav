@@ -2,8 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Play, Pause, RotateCcw, Repeat } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
+import { selectNextPokemon } from '../utils/pokemonUtils';
+import { useAuth } from '../context/AuthContext';
 
 const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTimeOffset = 0 }) => {
+    const { setUser } = useAuth();
     const [localRemainingMs, setLocalRemainingMs] = useState(0);
     const [showConfetti, setShowConfetti] = useState(false);
     const animationRef = useRef(null);
@@ -90,6 +93,38 @@ const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTim
         socket.on(EVENTS.TIMER_COMPLETED, handleCompleted);
         return () => socket.off(EVENTS.TIMER_COMPLETED, handleCompleted);
     }, [socket, roomState]);
+
+    // Pokemon Timer Sync Logic
+    useEffect(() => {
+        const handleCompleted = () => {
+            const pokemonTheme = user?.preferences?.pokemonTheme;
+            if (pokemonTheme?.active && pokemonTheme?.timerSync) {
+                fetch('/api/pokemon')
+                    .then(res => res.json())
+                    .then(list => {
+                        const nextP = selectNextPokemon(list, pokemonTheme);
+                        if (nextP) {
+                            setUser(prev => ({
+                                ...prev,
+                                preferences: {
+                                    ...prev.preferences,
+                                    pokemonTheme: { 
+                                        ...prev.preferences.pokemonTheme, 
+                                        id: nextP.id, 
+                                        name: nextP.name, 
+                                        types: nextP.types,
+                                        threshold: nextP.threshold,
+                                        backgroundColor: nextP.backgroundColor
+                                    }
+                                }
+                            }));
+                        }
+                    });
+            }
+        };
+        socket.on(EVENTS.TIMER_COMPLETED, handleCompleted);
+        return () => socket.off(EVENTS.TIMER_COMPLETED, handleCompleted);
+    }, [socket, user?.preferences?.pokemonTheme]);
 
     const playRingtone = () => {
         const soundChoice = user?.preferences?.alarmSound || ALARM_SOUNDS.CLASSIC_BEEP;
