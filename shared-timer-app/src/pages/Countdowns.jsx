@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Timer, Plus, Trash2, Globe, Eye, Lock, X, Maximize, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Countdowns = ({ user }) => {
+    const navigate = useNavigate();
     const { token, isGuest } = useAuth();
     const [countdowns, setCountdowns] = useState([]);
     const [guestCountdowns, setGuestCountdowns] = useState([]);
@@ -141,7 +143,7 @@ const Countdowns = ({ user }) => {
 
     const handleFullscreen = (c) => {
         const url = `/c?title=${encodeURIComponent(c.eventName)}&target=${new Date(c.targetDate).getTime()}`;
-        window.location.href = url;
+        navigate(url);
     };
 
     const canDelete = (c) => {
