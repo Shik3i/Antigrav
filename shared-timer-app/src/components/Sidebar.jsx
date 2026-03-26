@@ -151,6 +151,8 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
         'scratch-cards': <Grid3X3 size={18} color="#fbbf24" />,
         'rift-defense': <Shield size={18} color="#10b981" />,
+        'lol-idle': <Trophy size={18} color="#6366f1" />,
+        'colorsync': <Palette size={18} color="var(--accent-primary)" />,
         'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
         'settings': <Settings size={18} />,
         'roadmap': <Lightbulb size={18} color="#fbbf24" />,

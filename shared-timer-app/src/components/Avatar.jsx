@@ -58,7 +58,7 @@ const Avatar = React.memo(({ user, size = 32, style = {}, src = null }) => {
     if (teamImage) {
         return (
             <div style={{ ...baseStyle, background: 'rgba(255,255,255,0.1)' }}>
-                <img src={teamImage} alt={fanTeam || 'Fan Team'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={teamImage} alt={fanTeam || 'Fan Team'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
             </div>
         );
     }

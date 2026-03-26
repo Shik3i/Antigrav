@@ -27,8 +27,15 @@ const dbLayer = require('./database');
 const originalConsoleError = console.error;
 console.error = function(...args) {
     if (dbLayer && dbLayer.logError) {
-        // Extract string message
-        const msg = args.map(a => (typeof a === 'object' && a instanceof Error) ? a.message : (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ');
+        // Extract string message (Safe JSON.stringify for circular objects)
+        const msg = args.map(a => {
+            if (typeof a === 'object' && a instanceof Error) return a.message;
+            if (typeof a === 'object' && a !== null) {
+                try { return JSON.stringify(a); }
+                catch (e) { return '[Unserializable Object]'; }
+            }
+            return a;
+        }).join(' ');
         // Find Error object for stack trace
         const errObj = args.find(a => typeof a === 'object' && a instanceof Error);
         const stack = errObj ? errObj.stack : undefined;
@@ -136,6 +143,7 @@ app.get('*catchall', (req, res) => {
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
+    dbLayer.logSystemEvent('info', 'System', `Server listening on port ${PORT}`);
     apiController.initializeEsportsDb();
     startCron();
 });

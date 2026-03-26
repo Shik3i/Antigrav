@@ -16,8 +16,11 @@ const db = new sqlite3.Database(dbFilePath, (err) => {
     console.error('Could not connect to database', err);
   } else {
     console.log('Connected to SQLite database');
+    // Mirroring to DB table only after we know it's initialized (handled later in serialize)
     // Enable WAL mode for better concurrent read/write performance
     db.run('PRAGMA journal_mode=WAL;');
+    db.run('PRAGMA synchronous=NORMAL;');
+    db.run('PRAGMA temp_store=MEMORY;');
     // Enforce foreign key constraints (SQLite ignores them by default)
     db.run('PRAGMA foreign_keys=ON;');
   }
@@ -203,6 +206,15 @@ db.serialize(() => {
     stack TEXT,
     context TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // SystemLogs: dedicated table for info/warn logs with 24h retention
+  db.run(`CREATE TABLE IF NOT EXISTS SystemLogs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    level TEXT,
+    context TEXT,
+    message TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
   // ─── Performance Indexes ───────────────────────────────────────
@@ -397,9 +409,11 @@ db.serialize(() => {
     userId TEXT NOT NULL,
     time_ms INTEGER NOT NULL,
     note TEXT DEFAULT '',
+    scramble TEXT DEFAULT '',
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
   )`);
+  db.run("ALTER TABLE SpeedcubeTimes ADD COLUMN scramble TEXT DEFAULT ''", () => { });
   db.run('CREATE INDEX IF NOT EXISTS idx_speedcube_userId ON SpeedcubeTimes(userId)');
   
   // Scratchcards: stores purchased but not yet claimed cards
@@ -452,6 +466,48 @@ db.serialize(() => {
     FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
   )`);
 
+  // --- LoL Idle Game (Road to Worlds) ---
+  db.run(`CREATE TABLE IF NOT EXISTS Idle_Profiles (
+    userId TEXT PRIMARY KEY,
+    level INTEGER DEFAULT 1,
+    hype INTEGER DEFAULT 0,
+    dollars INTEGER DEFAULT 1000000,
+    last_sync_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    upgrades_json TEXT DEFAULT '{}',
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+
+  db.run("ALTER TABLE Idle_Profiles ADD COLUMN dollars INTEGER DEFAULT 1000000", () => { });
+
+  db.run(`CREATE TABLE IF NOT EXISTS Idle_Inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    team_code TEXT NOT NULL,
+    tier INTEGER DEFAULT 1,
+    role TEXT DEFAULT 'Top',
+    level INTEGER DEFAULT 1,
+    experience INTEGER DEFAULT 0,
+    rarity TEXT DEFAULT 'Common',
+    base_stats INTEGER DEFAULT 10,
+    is_equipped BOOLEAN DEFAULT 0,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+  db.run("ALTER TABLE Idle_Inventory ADD COLUMN role TEXT DEFAULT 'Top'", () => { });
+  db.run("ALTER TABLE Idle_Inventory ADD COLUMN level INTEGER DEFAULT 1", () => { });
+  db.run("ALTER TABLE Idle_Inventory ADD COLUMN experience INTEGER DEFAULT 0", () => { });
+  db.run("ALTER TABLE Idle_Inventory ADD COLUMN rarity TEXT DEFAULT 'Common'", () => { });
+  db.run("ALTER TABLE Idle_Inventory ADD COLUMN base_stats INTEGER DEFAULT 10", () => { });
+
+  db.run(`CREATE TABLE IF NOT EXISTS Idle_Roster (
+    userId TEXT NOT NULL,
+    slot_id INTEGER NOT NULL,
+    inventory_id INTEGER,
+    current_mode TEXT DEFAULT 'Trainieren',
+    PRIMARY KEY (userId, slot_id),
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE,
+    FOREIGN KEY(inventory_id) REFERENCES Idle_Inventory(id) ON DELETE SET NULL
+  )`);
+
   // --- NavbarSettings ---
   db.run(`CREATE TABLE IF NOT EXISTS NavbarSettings (
     key TEXT PRIMARY KEY,
@@ -461,6 +517,47 @@ db.serialize(() => {
     isVisible BOOLEAN DEFAULT 1,
     sortOrder INTEGER DEFAULT 0
   )`, () => {
+    // Phase 20 Migration: Color Sync Tables
+    db.run(`CREATE TABLE IF NOT EXISTS ColorSync_Scores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT NOT NULL,
+      score REAL NOT NULL,
+      target_color TEXT NOT NULL,
+      guessed_color TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS ColorSync_Daily (
+      date TEXT PRIMARY KEY,
+      target_color TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS ColorSync_Lobbies (
+      id TEXT PRIMARY KEY,
+      creatorId TEXT NOT NULL,
+      target_color TEXT NOT NULL,
+      status TEXT DEFAULT 'waiting',
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(creatorId) REFERENCES Users(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS ColorSync_LobbyParticipants (
+      lobby_id TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      score REAL,
+      guessed_color TEXT,
+      submitted_at DATETIME,
+      PRIMARY KEY(lobby_id, userId),
+      FOREIGN KEY(lobby_id) REFERENCES ColorSync_Lobbies(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+    )`);
+
+    db.run('CREATE INDEX IF NOT EXISTS idx_colorsync_scores_userId ON ColorSync_Scores(userId)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_colorsync_lobby_participants_lobbyId ON ColorSync_LobbyParticipants(lobby_id)');
+
     // Seed default menu items
     const defaults = [
       ['dashboard', 'Sync Timers', '/', 'Timers', 1, 1],
@@ -493,15 +590,39 @@ db.serialize(() => {
     
     // Fix: Feature Roadmap path (was /roadmap, should be /features)
     db.run("UPDATE NavbarSettings SET path = '/features' WHERE key = 'roadmap'");
+
+    // LoL Idle Game Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('lol-idle', 'Road to Worlds', '/games/lol-idle', 'Games', 1, 1.5)`);
+    
+    // Shift other games to make room for 1.5 (or just use REAL if SQLite allows, but it's INTEGER)
+    // Actually, SQLite INTEGER can store REAL if needed, but let's be clean.
+    // I'll update the sortOrder of existing ones.
+    db.run("UPDATE NavbarSettings SET sortOrder = 3 WHERE key = 'scratch-cards' AND category = 'Games'");
+    db.run("UPDATE NavbarSettings SET sortOrder = 4 WHERE key = 'rift-defense' AND category = 'Games'");
+    db.run("UPDATE NavbarSettings SET sortOrder = 5 WHERE key = 'game-leaderboards' AND category = 'Games'");
+    db.run("UPDATE NavbarSettings SET sortOrder = 2 WHERE key = 'lol-idle' AND category = 'Games'");
+
+    // Color Sync Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('colorsync', 'Color Sync', '/color-sync', 'Games', 1, 6)`);
+    db.run("UPDATE NavbarSettings SET sortOrder = 6 WHERE key = 'colorsync' AND category = 'Games'");
+  });
+  
+  // Signal database is ready and mirror initial logs
+  db.run("SELECT 1", () => {
+    console.log('Database initialized and ready for system logging');
+    logSystemEvent('info', 'System', 'Database initialized and ready for system logging');
+    logSystemEvent('info', 'System', 'Connected to SQLite database');
   });
 });
 
 // Speedcube Helpers
-const addSpeedcubeTime = (userId, time_ms, note = '') => {
+const addSpeedcubeTime = (userId, time_ms, note = '', scramble = '') => {
   return new Promise((resolve, reject) => {
-    db.run('INSERT INTO SpeedcubeTimes (userId, time_ms, note) VALUES (?, ?, ?)', [userId, time_ms, note], function (err) {
+    db.run('INSERT INTO SpeedcubeTimes (userId, time_ms, note, scramble) VALUES (?, ?, ?, ?)', [userId, time_ms, note, scramble], function (err) {
       if (err) reject(err);
-      else resolve({ id: this.lastID, userId, time_ms, note, createdAt: new Date().toISOString() });
+      else resolve({ id: this.lastID, userId, time_ms, note, scramble, createdAt: new Date().toISOString() });
     });
   });
 };
@@ -2330,7 +2451,309 @@ const getUserDailyPackCount = (userId, packId) => {
   });
 };
 
+/**
+ * Log a system event (Info, Warn) to the SystemLogs table.
+ * Includes a 24h retention policy (self-cleans on every new log).
+ */
+const logSystemEvent = async (level, context, message) => {
+  try {
+    db.run(
+      'INSERT INTO SystemLogs (level, context, message) VALUES (?, ?, ?)',
+      [level, context, message],
+      (err) => {
+        if (err) console.error('[DB] SystemLog insertion failed:', err.message);
+      }
+    );
+
+    // Async cleanup: Delete logs older than 24 hours (Stochastic cleanup with 5% probability to reduce I/O)
+    if (Math.random() < 0.05) {
+      setImmediate(() => {
+        db.run("DELETE FROM SystemLogs WHERE createdAt < datetime('now', '-1 day')", (err) => {
+          if (err) console.error('[DB] SystemLog cleanup failed:', err.message);
+        });
+      });
+    }
+  } catch (e) {
+    console.error('[DB] Error in logSystemEvent:', e.message);
+  }
+};
+
+/**
+ * Fetch the latest 500 system logs.
+ */
+const getSystemLogs = () => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM SystemLogs ORDER BY createdAt DESC LIMIT 500', [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
 module.exports = {
+  // --- LoL Idle Game (Road to Worlds) Helpers ---
+  getIdleProfile: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM Idle_Profiles WHERE userId = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else {
+          // TEST BUDGET: Always ensure at least 1,000,000 for testing (hardcoded as requested)
+          if (row && (row.dollars === null || row.dollars < 1000000)) {
+            row.dollars = 1000000;
+          }
+          resolve(row);
+        }
+      });
+    });
+  },
+
+  createIdleProfile: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.run('INSERT OR IGNORE INTO Idle_Profiles (userId) VALUES (?)', [userId], function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  updateIdleProfile: (userId, data) => {
+    return new Promise((resolve, reject) => {
+      // Dynamic SET query based on provided object fields
+      const keys = Object.keys(data);
+      if (keys.length === 0) return resolve(0);
+      const fields = keys.map(k => `${k} = ?`).join(', ');
+      const values = [...Object.values(data), userId];
+      
+      db.run(
+        `UPDATE Idle_Profiles SET ${fields} WHERE userId = ?`,
+        values,
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  },
+
+  updateInventoryUnit: (id, data) => {
+    return new Promise((resolve, reject) => {
+      const keys = Object.keys(data);
+      const values = Object.values(data);
+      const setClause = keys.map(k => `${k} = ?`).join(', ');
+      db.run(`UPDATE Idle_Inventory SET ${setClause} WHERE id = ?`, [...values, id], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  },
+
+  getIdleInventory: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM Idle_Inventory WHERE userId = ?', [userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  addInventoryUnit: (userId, teamCode, rarity = 'Common', baseStats = 10, role = 'Top') => {
+    return new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO Idle_Inventory (userId, team_code, rarity, base_stats, role, level) VALUES (?, ?, ?, ?, ?, ?)',
+        [userId, teamCode, rarity, baseStats, role, 1],
+        function (err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID, userId, team_code: teamCode, tier: 1, rarity, base_stats: baseStats, role, level: 1 });
+        }
+      );
+    });
+  },
+
+  deleteInventoryUnit: (unitId) => {
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM Idle_Inventory WHERE id = ?', [unitId], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  },
+
+  mergeInventoryUnits: (userId, teamCode, tier, role) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        // Find 3 units to delete of SAME team, tier AND role
+        db.all(
+          'SELECT id FROM Idle_Inventory WHERE userId = ? AND team_code = ? AND tier = ? AND role = ? AND is_equipped = 0 LIMIT 3',
+          [userId, teamCode, tier, role],
+          (err, rows) => {
+            if (err || rows.length < 3) {
+              db.run('ROLLBACK');
+              return reject(err || new Error('Not enough units of this role to merge'));
+            }
+            const ids = rows.map(r => r.id);
+            db.run(`DELETE FROM Idle_Inventory WHERE id IN (${ids.join(',')})`, (err) => {
+              if (err) {
+                db.run('ROLLBACK');
+                return reject(err);
+              }
+              // Insert the upgraded unit with the SAME role
+              db.run(
+                'INSERT INTO Idle_Inventory (userId, team_code, tier, role) VALUES (?, ?, ?, ?)',
+                [userId, teamCode, tier + 1, role],
+                function (err) {
+                  if (err) {
+                    db.run('ROLLBACK');
+                    return reject(err);
+                  }
+                  db.run('COMMIT');
+                  resolve({ id: this.lastID, tier: tier + 1, role });
+                }
+              );
+            });
+          }
+        );
+      });
+    });
+  },
+
+  mergeAllInventoryUnits: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.all(
+          'SELECT id, team_code, tier, role FROM Idle_Inventory WHERE userId = ? AND is_equipped = 0',
+          [userId],
+          async (err, rows) => {
+            if (err) return reject(err);
+            
+            // Group candidates by teamCode-tier-role
+            const groups = {};
+            rows.forEach(r => {
+              const key = `${r.team_code}-${r.tier}-${r.role}`;
+              if (!groups[key]) groups[key] = [];
+              groups[key].push(r.id);
+            });
+
+            const toDelete = [];
+            const toInsert = [];
+
+            // Simple iterative pass (can be repeated if user clicks again, 
+            // but we can do one full pass of all possible set-of-3 merges)
+            Object.keys(groups).forEach(key => {
+              const ids = groups[key];
+              const [team_code, tierStr, role] = key.split('-');
+              const tier = parseInt(tierStr);
+              
+              const setsOfThree = Math.floor(ids.length / 3);
+              if (setsOfThree > 0) {
+                for (let i = 0; i < setsOfThree; i++) {
+                  toDelete.push(...ids.slice(i * 3, (i + 3) * 3));
+                  toInsert.push({ team_code, tier: tier + 1, role });
+                }
+              }
+            });
+
+            if (toDelete.length === 0) return resolve({ changes: 0 });
+
+            db.run('BEGIN TRANSACTION');
+            try {
+              // Delete in chunks if too many, but usually it's fine
+              db.run(`DELETE FROM Idle_Inventory WHERE id IN (${toDelete.join(',')})`);
+              
+              const insertStmt = db.prepare('INSERT INTO Idle_Inventory (userId, team_code, tier, role) VALUES (?, ?, ?, ?)');
+              toInsert.forEach(item => insertStmt.run(userId, item.team_code, item.tier, item.role));
+              insertStmt.finalize();
+              
+              db.run('COMMIT', (err) => {
+                if (err) reject(err);
+                else resolve({ changes: toInsert.length });
+              });
+            } catch (e) {
+              db.run('ROLLBACK');
+              reject(e);
+            }
+          }
+        );
+      });
+    });
+  },
+
+  getIdleRoster: (userId) => {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT r.slot_id, i.id as inventory_id, i.team_code, i.tier, i.experience, i.rarity, i.base_stats, i.role, i.level
+        FROM Idle_Roster r
+        LEFT JOIN Idle_Inventory i ON r.inventory_id = i.id
+        WHERE r.userId = ?
+        ORDER BY r.slot_id ASC
+      `;
+      db.all(query, [userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  assignInventoryToRoster: (userId, slotId, inventoryId) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        // If inventoryId is null, we are unequipping
+        if (inventoryId === null) {
+          db.get('SELECT inventory_id FROM Idle_Roster WHERE userId = ? AND slot_id = ?', [userId, slotId], (err, row) => {
+            if (row && row.inventory_id) {
+              db.run('UPDATE Idle_Inventory SET is_equipped = 0 WHERE id = ?', [row.inventory_id]);
+            }
+            db.run('UPDATE Idle_Roster SET inventory_id = NULL WHERE userId = ? AND slot_id = ?', [userId, slotId], (err) => {
+              if (err) db.run('ROLLBACK'), reject(err);
+              else db.run('COMMIT'), resolve();
+            });
+          });
+        } else {
+          // Equipping
+          // 1. Mark unit as equipped
+          db.run('UPDATE Idle_Inventory SET is_equipped = 1 WHERE id = ?', [inventoryId]);
+          // 2. Clear old unit in this slot if exists
+          db.get('SELECT inventory_id FROM Idle_Roster WHERE userId = ? AND slot_id = ?', [userId, slotId], (err, row) => {
+            if (row && row.inventory_id) {
+              db.run('UPDATE Idle_Inventory SET is_equipped = 0 WHERE id = ?', [row.inventory_id]);
+            }
+            // 3. Update Roster
+            db.run(
+              'INSERT INTO Idle_Roster (userId, slot_id, inventory_id) VALUES (?, ?, ?) ON CONFLICT(userId, slot_id) DO UPDATE SET inventory_id = excluded.inventory_id',
+              [userId, slotId, inventoryId],
+              (err) => {
+                if (err) db.run('ROLLBACK'), reject(err);
+                else db.run('COMMIT'), resolve();
+              }
+            );
+          });
+        }
+      });
+    });
+  },
+
+  updateInventoryXP: (id, amount) => {
+    return new Promise((resolve, reject) => {
+      db.run('UPDATE Idle_Inventory SET experience = experience + ? WHERE id = ?', [amount, id], function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  updateRosterMode: (userId, slotId, mode) => {
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE Idle_Roster SET current_mode = ? WHERE userId = ? AND slot_id = ?',
+        [mode, userId, slotId],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  },
   db,
   getGlobalScratchcardStats,
   getLatestScratchcardWinners,
@@ -2627,5 +3050,9 @@ module.exports = {
         });
       });
     });
-  }
+  },
+
+  logSystemEvent, // [NEW]
+  getSystemLogs,  // [NEW]
+  dbLayer: { db } // For direct access if needed
 };

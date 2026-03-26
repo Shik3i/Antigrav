@@ -130,6 +130,7 @@ exports.fetchEsportsData = async (forceRefresh = false) => {
         esportsScheduleCache.data = schedule;
         esportsScheduleCache.timestamp = now;
         console.log(`[API] Synced ${schedule.length} upcoming esports matches (Cache valid for 6h).`);
+        dbLayer.logSystemEvent('info', 'API', `Synced ${schedule.length} upcoming esports matches (Cache valid for 6h).`);
         return schedule;
     } catch (err) {
         if (esportsScheduleCache.data) {
@@ -165,6 +166,7 @@ exports.fetchAllEsportsTeams = async () => {
         if (teamsList.length > 0) {
             await dbLayer.upsertEsportsTeams(teamsList);
             console.log(`[API] Successfully synced ${teamsList.length} esports teams to local DB.`);
+            dbLayer.logSystemEvent('info', 'API', `Successfully synced ${teamsList.length} esports teams to local DB.`);
         }
         return teamsList;
     } catch (err) {
@@ -180,17 +182,21 @@ exports.initializeEsportsDb = async () => {
 
         if (needsUpdate) {
             console.log('[API] Local Esports Teams DB is empty or older than 24 hours. Fetching automatically in the background...');
+            dbLayer.logSystemEvent('info', 'API', 'Local Esports Teams DB is empty or older than 24 hours. Fetching automatically in the background...');
             exports.fetchAllEsportsTeams().catch(e => console.error('[API] Auto-sync teams failed:', e.message));
         } else {
             console.log('[API] Local Esports Teams DB is up-to-date. Skipping auto-sync.');
+            dbLayer.logSystemEvent('info', 'API', 'Local Esports Teams DB is up-to-date. Skipping auto-sync.');
         }
 
         // Proactively fetch and cache the schedule on startup, and set interval to auto-update every 6 hours
         console.log('[API] Warming up Esports Schedule cache...');
+        dbLayer.logSystemEvent('info', 'API', 'Warming up Esports Schedule cache...');
         exports.fetchEsportsData(true).catch(e => console.error('[API] Auto-sync schedule failed:', e.message));
         
         setInterval(() => {
             console.log('[API] Auto-updating Esports Schedule cache (every 6 hours)...');
+            dbLayer.logSystemEvent('info', 'API', 'Auto-updating Esports Schedule cache (every 6 hours)...');
             exports.fetchEsportsData(true).catch(e => console.error('[API] Background schedule sync failed:', e.message));
         }, 6 * 60 * 60 * 1000);
 
@@ -381,6 +387,7 @@ exports.fetchPolymarketOddsData = async (forceRefreshMatch = null) => {
             lastBetResolutionTrigger = now;
             const { resolveBets } = require('../cron/betResolver');
             console.log('[API] Polymarket price 1.0 detected. Auto-triggering bet resolver...');
+            dbLayer.logSystemEvent('info', 'API', 'Polymarket price 1.0 detected. Auto-triggering bet resolver...');
             resolveBets().catch(e => {
                 console.error('[API] Auto-trigger bet resolver error:', e.message);
                 dbLayer.logError('Auto-trigger bet resolver error', e.stack);
@@ -900,6 +907,16 @@ exports.getErrorLogs = async (req, res) => {
         res.json(logs);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch error logs' });
+    }
+};
+
+exports.getSystemLogs = async (req, res) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const logs = await dbLayer.getSystemLogs();
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch system logs' });
     }
 };
 

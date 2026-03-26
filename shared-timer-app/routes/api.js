@@ -4,6 +4,8 @@ const apiController = require('../controllers/apiController');
 const authController = require('../controllers/authController');
 const friendsController = require('../controllers/friendsController');
 const riftDefenseController = require('../controllers/riftDefenseController');
+const idleGameController = require('../controllers/idleGameController');
+const colorSyncController = require('../controllers/colorSyncController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -110,6 +112,7 @@ router.delete('/features/:id', authController.authenticateToken, apiController.d
 
 // ─── Error Logging ──────────────────────────────────────────
 router.get('/errors', authController.authenticateToken, apiController.getErrorLogs);
+router.get('/admin/system-logs', authController.authenticateToken, apiController.getSystemLogs); // [NEW]
 router.delete('/errors', authController.authenticateToken, apiController.clearErrorLogs);
 router.delete('/errors/:id', authController.authenticateToken, apiController.deleteErrorLog);
 
@@ -157,5 +160,23 @@ router.post('/rift-defense/combine-all', authController.authenticateToken, riftD
 router.post('/rift-defense/scrap', authController.authenticateToken, riftDefenseController.scrapTower);
 router.post('/rift-defense/save-stats', authController.authenticateToken, riftDefenseController.saveStats);
 router.get('/rift-defense/leaderboards', riftDefenseController.getLeaderboards);
+
+// ─── LoL Idle Game (Road to Worlds) ──────────────────────────
+router.get('/idle/status', authController.authenticateToken, idleGameController.getGameStatus);
+router.post('/idle/gacha', authController.authenticateToken, idleGameController.performGachaPull);
+router.post('/idle/merge', authController.authenticateToken, idleGameController.mergeUnits);
+router.post('/idle/merge-all', authController.authenticateToken, idleGameController.mergeAllUnits);
+router.post('/idle/equip', authController.authenticateToken, idleGameController.equipUnit);
+router.post('/idle/sell', authController.authenticateToken, idleGameController.sellUnit);
+router.post('/idle/roster/mode', authController.authenticateToken, idleGameController.updateRosterMode);
+router.post('/idle/tournament/complete', authController.authenticateToken, idleGameController.validateTournament);
+
+// ─── Color Sync (Color Guessing Game) ─────────────────────────
+router.get('/colorsync/daily', colorSyncController.getDailyColor);
+router.get('/colorsync/random', colorSyncController.getRandomColor);
+router.post('/colorsync/submit', authController.authenticateToken, colorSyncController.submitScore);
+router.post('/colorsync/lobby', authController.authenticateToken, colorSyncController.createLobby);
+router.get('/colorsync/lobby/:uuid', colorSyncController.getLobbyData);
+router.post('/colorsync/lobby/:uuid/submit', authController.authenticateToken, colorSyncController.submitLobbyScore);
 
 module.exports = router;

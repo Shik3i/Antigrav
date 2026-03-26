@@ -1,0 +1,1016 @@
+.idle-game-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding-bottom: 4rem;
+    color: var(--text-main);
+}
+
+.idle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+}
+
+.manager-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.manager-icon {
+    color: var(--accent-primary);
+}
+
+.currency-info {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0,0,0,0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.9rem;
+}
+
+.idle-content {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 2rem;
+}
+
+.idle-main-area {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.roster-grid.lineup {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.roster-slot {
+    padding: 1.25rem;
+    border-radius: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 200px;
+    border: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+    background: rgba(255,255,255,0.02);
+}
+
+.slot-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.player-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.player-avatar {
+    position: relative;
+    width: 60px; height: 60px;
+}
+
+.player-avatar img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 8px;
+}
+
+.stars-overlay {
+    position: absolute;
+    top: -5px; right: -5px;
+    display: flex; gap: 1px; color: #fbbf24;
+}
+
+.slot-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.roster-grid.staff {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.staff-slot {
+    min-width: 280px;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+.staff-title {
+    margin-top: 1rem;
+    opacity: 0.8;
+}
+
+.player-name-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Immersion Animations */
+.rec-dot-pulse {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #ef4444;
+    animation: pulse-red 1.5s infinite;
+    z-index: 5;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.training-pulse {
+    color: #fbbf24;
+    animation: bounce-small 2s infinite ease-in-out;
+}
+
+@keyframes bounce-small {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+/* Mode Toggle Redesign */
+.mode-toggle-container {
+    display: flex;
+    background: rgba(0,0,0,0.4);
+    border-radius: 20px;
+    padding: 2px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.mode-switch-btn {
+    padding: 4px 12px;
+    border-radius: 18px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.7rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mode-switch-btn.active {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.mode-switch-btn:hover:not(.active) {
+    color: white;
+    background: rgba(255,255,255,0.05);
+}
+
+.empty-slot-msg {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.3;
+    font-size: 0.8rem;
+    font-style: italic;
+    border: 2px dashed rgba(255,255,255,0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.empty-slot-msg:hover {
+    opacity: 0.6;
+    background: rgba(255,255,255,0.02);
+}
+
+.unequip-btn {
+    background: transparent; border: none; color: #ef4444; cursor: pointer; opacity: 0.6; transition: 0.2s;
+}
+
+.unequip-btn:hover { opacity: 1; transform: scale(1.1); }
+
+.roster-slot.malus {
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    box-shadow: inset 0 0 15px rgba(239, 68, 68, 0.1);
+}
+
+.roster-slot.malus::after {
+    content: '! Position Malus';
+    position: absolute;
+    bottom: 5px;
+    right: 10px;
+    font-size: 0.6rem;
+    color: #ef4444;
+    font-weight: bold;
+}
+
+.level-badge {
+    position: absolute;
+    bottom: -5px;
+    left: -5px;
+    background: #1f2937;
+    color: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.power-stat {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: var(--accent-primary);
+    margin-top: 0.25rem;
+}
+
+.mode-toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.mode-explanation {
+    font-size: 0.6rem;
+    opacity: 0.5;
+    font-style: italic;
+    white-space: nowrap;
+}
+
+/* Inventory Section */
+.inventory-section {
+    padding: 1.5rem;
+    border-radius: 1.5rem;
+    background: rgba(255,255,255,0.02);
+    margin-top: 2rem;
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1rem;
+}
+
+.inventory-card {
+    background: rgba(0,0,0,0.4);
+    padding: 1rem;
+    border-radius: 1rem;
+    text-align: center;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: 0.3s;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.inventory-card:hover { border-color: var(--accent-primary); transform: translateY(-3px); }
+
+.inv-actions { margin-top: 0.75rem; }
+.inv-actions button { width: 100%; padding: 0.5rem; font-size: 0.8rem; }
+.equip-btn { background: var(--accent-primary); border: none; color: white; border-radius: 0.5rem; cursor: pointer; }
+
+/* Inventory Card Enhancements */
+.inv-avatar {
+    position: relative;
+    width: 60px; height: 60px; margin: 0 auto 0.5rem;
+}
+
+.inv-level {
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    background: #1a1a1a;
+    color: #9ca3af;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.inv-info {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.inv-role-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    opacity: 0.7;
+}
+
+.inv-avatar img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 6px;
+}
+
+.inv-count {
+    position: absolute; bottom: -5px; right: -5px;
+    background: #374151; color: white; padding: 2px 5px; border-radius: 4px; font-size: 0.65rem; font-weight: bold;
+}
+
+.inv-stars {
+    display: flex; justify-content: center; gap: 1px; margin-bottom: 0.5rem; color: #fbbf24;
+}
+
+.merge-btn-active {
+    width: 100%; padding: 4px; background: #10b981; color: white; border-radius: 4px; font-size: 0.7rem; cursor: pointer; border: none; font-weight: bold; margin-bottom: 4px;
+}
+
+.equip-btn-action:hover { background: #3b82f6; }
+
+.slot-selector {
+    background: rgba(0,0,0,0.6);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--accent-primary);
+    margin-top: 0.5rem;
+    animation: fadeIn 0.2s ease;
+}
+
+.selector-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    color: #9ca3af;
+    margin-bottom: 0.4rem;
+    font-weight: bold;
+}
+
+.slot-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+}
+
+.slot-target-btn {
+    padding: 4px 6px;
+    font-size: 0.6rem;
+    background: #374151;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.slot-target-btn:hover { background: var(--accent-primary); border-color: white; }
+.slot-target-btn.occupied {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+.slot-target-btn.occupied:hover { background: #ef4444; }
+
+.cancel-equip {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.cancel-equip:hover { color: white; }
+
+/* Sidebar & Arena */
+.idle-sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.gacha-section { padding: 1.5rem; text-align: center; }
+
+.buy-btn { width: 100%; padding: 1rem; border-radius: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+
+.arena-section { padding: 1.5rem; }
+
+.hp-container { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; margin: 1rem 0; }
+
+.hp-bar-outer { flex: 1; background: rgba(0,0,0,0.4); }
+
+.hp-bar { height: 100%; transition: 0.3s; }
+.hp-bar.player { background: #10b981; }
+.hp-bar.enemy { background: #ef4444; }
+
+.match-result {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; border-radius: 1rem; z-index: 10;
+}
+
+.match-result.victory { color: #10b981; }
+.match-result.defeat { color: #ef4444; }
+
+/* Gacha Reveal Modal */
+.gacha-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.gacha-modal-content {
+    width: 400px;
+    padding: 2rem;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    animation: scaleUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.scratch-container {
+    border: 4px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    background: #1a1a1a;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+}
+
+.reveal-details {
+    margin-top: 1.5rem;
+    transition: 0.5s ease;
+}
+
+.reveal-details.hidden {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
+
+.reveal-details.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.rarity-text {
+    font-size: 1.5rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+    letter-spacing: 2px;
+}
+
+.rarity-text.legendary { color: #fbbf24; text-shadow: 0 0 15px rgba(251, 191, 36, 0.5); }
+.rarity-text.epic { color: #a855f7; text-shadow: 0 0 15px rgba(168, 85, 247, 0.5); }
+.rarity-text.rare { color: #3b82f6; text-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+.rarity-text.common { color: #9ca3af; }
+
+.reveal-stats {
+    margin: 1rem 0 1.5rem;
+    font-size: 1.1rem;
+    color: var(--accent-primary);
+    font-weight: bold;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* New Economy & Rarity Styles */
+/* Sidebar Currency Widget */
+.currency-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.side-currency-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+}
+
+.side-currency-item .currency-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.side-currency-item.dollars { color: #10b981; }
+.side-currency-item.hype { color: #6366f1; }
+
+.dollar-symbol, .dollar-btn-icon {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #10b981;
+}
+
+.dollar-btn-icon {
+    font-size: 1.1rem;
+    margin-right: 4px;
+}
+
+.currency-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.3;
+    margin-left: auto;
+    font-weight: bold;
+}
+
+.sidebar-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-main);
+}
+
+.sidebar-section-header h3 {
+    font-size: 1rem;
+    margin: 0;
+    font-weight: 600;
+}
+
+.sidebar-desc {
+    font-size: 0.75rem;
+    opacity: 0.5;
+    margin-bottom: 1.25rem;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.buy-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.buy-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+/* Dual Recruit Grouping */
+.dual-recruit-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.recruit-group {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.side-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px !important;
+    font-size: 0.8rem !important;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.bulk-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+}
+
+.bulk-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.kc-btn {
+    background: rgba(251, 191, 36, 0.05) !important;
+    color: #fbbf24 !important;
+    border: 1px solid rgba(251, 191, 36, 0.1) !important;
+}
+
+.kc-btn:hover {
+    background: #fbbf24 !important;
+    color: #000 !important;
+}
+
+/* Bulk Reveal Modal */
+.gacha-modal-content.bulk-layout {
+    width: 1000px;
+    max-width: 95vw;
+}
+
+.bulk-reveal-container h2 {
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.bulk-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.bulk-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    position: relative;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: bulkFadeIn 0.4s forwards;
+    transition: 0.3s;
+}
+
+.bulk-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-5px);
+}
+
+@keyframes bulkFadeIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.bulk-item img {
+    width: 90px;
+    height: 90px;
+    object-fit: contain;
+}
+
+.bulk-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.bulk-rarity-dot {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 10px currentColor;
+}
+
+.rarity-common .bulk-rarity-dot { background: #6b7280; color: #6b7280; }
+.rarity-rare .bulk-rarity-dot { background: #3b82f6; color: #3b82f6; }
+.rarity-epic .bulk-rarity-dot { background: #a855f7; color: #a855f7; }
+.rarity-legendary .bulk-rarity-dot { background: #fbbf24; color: #fbbf24; }
+
+.collect-all-btn {
+    margin-top: 1rem;
+    padding: 0.8rem 4rem !important;
+}
+
+.reveal-role-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.4rem 1rem;
+    border-radius: 2rem;
+    font-weight: 600;
+}
+.rarity-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+
+.rarity-common .rarity-badge { background: #6b7280; color: white; }
+.rarity-rare .rarity-badge { background: #3b82f6; color: white; }
+.rarity-epic .rarity-badge { background: #a855f7; color: white; }
+.rarity-legendary .rarity-badge { background: #fbbf24; color: #000; }
+
+.inv-avatar {
+    border: 2px solid transparent;
+    transition: 0.3s;
+}
+
+.rarity-common.inv-avatar { border-color: rgba(107, 114, 128, 0.2); }
+.rarity-rare.inv-avatar { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 10px rgba(59, 130, 246, 0.1); }
+.rarity-epic.inv-avatar { border-color: rgba(168, 85, 247, 0.4); box-shadow: 0 0 15px rgba(168, 85, 247, 0.15); }
+.rarity-legendary.inv-avatar { border-color: rgba(251, 191, 36, 0.5); box-shadow: 0 0 20px rgba(251, 191, 36, 0.2); }
+
+.unit-action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sell-btn-action {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: 0.2s;
+    font-weight: bold;
+}
+
+.sell-btn-action:hover {
+    background: #ef4444;
+    color: white;
+}
+
+/* Context Menu Styles */
+.context-menu {
+    position: fixed;
+    background: #1a1b1e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    padding: 6px 0;
+    z-index: 2000;
+    min-width: 180px;
+    animation: fadeInScale 0.1s ease-out;
+}
+
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.context-header {
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 4px;
+}
+
+.context-header strong {
+    font-size: 0.85rem;
+    color: white;
+}
+
+.context-header span {
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+
+.context-stats {
+    padding: 6px 16px;
+    font-size: 0.8rem;
+    color: var(--accent-primary);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.context-item {
+    width: 100%;
+    padding: 8px 16px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: #d1d5db;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: 0.2s;
+}
+
+.context-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+}
+
+.context-item.danger {
+    color: #ef4444;
+}
+
+.context-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.context-menu hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    margin: 4px 0;
+}
+
+.inv-power {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    margin-top: 2px;
+}
+
+.inv-role-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Inventory Controls */
+.section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.inventory-controls {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.filter-group {
+    display: flex;
+    gap: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 6px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.filter-pill {
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.filter-pill:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.filter-pill.active {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.sort-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.sort-label {
+    font-size: 0.85rem;
+    color: #9ca3af;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sort-select {
+    background: #1a1b1e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+    transition: 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 40px;
+}
+
+.sort-select:hover {
+    border-color: var(--accent-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.inventory-scroll {
+    max-height: 700px;
+    overflow-y: auto;
+    padding-right: 1rem;
+    margin-right: -0.5rem;
+}
+
+.inventory-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.inventory-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.inventory-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.inventory-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 1200px) {
+    .section-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+    }
+    .inventory-controls {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+}
+.merge-all-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    margin-left: 15px;
+}
+
+.merge-all-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(217, 119, 6, 0.4);
+    filter: brightness(1.1);
+}
+
+.merge-all-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}

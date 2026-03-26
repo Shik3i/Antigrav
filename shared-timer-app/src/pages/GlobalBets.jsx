@@ -186,7 +186,7 @@ const GlobalBets = () => {
                     <div className="esports-match-teams">
                         <div className="esports-team">
                             <div style={{ width: '40px', height: '40px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                {t1Logo ? <img src={t1Logo} alt={t1Name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={20} color="var(--text-muted)" />}
+                                {t1Logo ? <img src={t1Logo} alt={t1Name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} loading="lazy" /> : <Trophy size={20} color="var(--text-muted)" />}
                             </div>
                             <div className="esports-team-name" style={{ fontSize: '1.1rem' }}>{t1Name}</div>
                         </div>
@@ -196,7 +196,7 @@ const GlobalBets = () => {
                         <div className="esports-team esports-team-right">
                             <div className="esports-team-name" style={{ fontSize: '1.1rem' }}>{t2Name}</div>
                             <div style={{ width: '40px', height: '40px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                {t2Logo ? <img src={t2Logo} alt={t2Name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={20} color="var(--text-muted)" />}
+                                {t2Logo ? <img src={t2Logo} alt={t2Name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} loading="lazy" /> : <Trophy size={20} color="var(--text-muted)" />}
                             </div>
                         </div>
                     </div>

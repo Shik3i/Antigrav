@@ -12,14 +12,14 @@ const getTimes = async (req, res) => {
 };
 
 const addTime = async (req, res) => {
-    const { time_ms, note } = req.body;
+    const { time_ms, note, scramble } = req.body;
     if (time_ms === undefined || typeof time_ms !== 'number') {
         return res.status(400).json({ error: 'time_ms is required and must be a number' });
     }
 
     try {
         const userId = req.user.userId;
-        const result = await dbLayer.addSpeedcubeTime(userId, time_ms, note || '');
+        const result = await dbLayer.addSpeedcubeTime(userId, time_ms, note || '', scramble || '');
         res.status(201).json(result);
     } catch (error) {
         console.error('Error adding speedcube time:', error);
