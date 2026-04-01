@@ -271,7 +271,9 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                     odds: bettingState.odds,
                     polymarketUrl: bettingState.url,
                     eventDate: bettingState.eventDate,
-                    league: bettingState.league
+                    league: bettingState.league,
+                    team1Logo: bettingState.team1Logo,
+                    team2Logo: bettingState.team2Logo
                 })
             });
             const data = await res.json();
@@ -486,6 +488,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                   eventDate: match.startTime,
                                                   stakeInput: '1.00',
                                                   league: match.league,
+                                                  team1Logo: match.team1.image,
+                                                  team2Logo: match.team2.image,
                                                   polymarketTeam1: t1Outcome.name,
                                                   polymarketTeam2: t2Outcome.name,
                                                   polymarketTeam: t1Outcome.name
@@ -632,6 +636,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                                  eventDate: match.startTime,
                                                                  stakeInput: '1.00', // Default to 1.00 KC
                                                                  league: match.league,
+                                                                 team1Logo: match.team1.image,
+                                                                 team2Logo: match.team2.image,
                                                                  polymarketTeam1: t1Outcome.name,
                                                                  polymarketTeam2: t2Outcome.name,
                                                                  polymarketTeam: t1Outcome.name

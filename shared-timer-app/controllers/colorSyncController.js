@@ -39,7 +39,7 @@ exports.calculateScore = (target, guessed) => {
     
     // Max distance in RGB space is sqrt(255^2 + 255^2 + 255^2) ≈ 441.67
     const maxDistance = Math.sqrt(3 * Math.pow(255, 2));
-    const score = Math.max(0, 10 * (1 - distance / maxDistance));
+    const score = Math.max(0, 10 * Math.pow(1 - distance / maxDistance, 2.5));
     return parseFloat(score.toFixed(1));
 };
 
@@ -66,31 +66,41 @@ exports.submitScore = (req, res) => {
     // Handle Daily Lock
     if (mode === 'DAILY') {
         const checkQuery = `SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`;
-        db.db.get(checkQuery, [userId, today], (err, existing) => {
+        db.db.get(checkQuery, [userId, today], async (err, existing) => {
             if (err) return res.status(500).json({ error: 'Database error' });
             if (existing) return res.status(403).json({ error: 'You have already played today\'s challenge.' });
 
-            // Save to Daily Results
-            const dailyQuery = `INSERT INTO ColorSync_DailyResults (userId, score, guessed_color, date) VALUES (?, ?, ?, ?)`;
-            db.db.run(dailyQuery, [userId, score, guessed_color, today], (err) => {
-                if (err) console.error('Error saving daily result:', err);
-            });
-
-            // Fall through to general score saving
-            saveGeneralScore();
+            try {
+                // Save to Daily Results
+                const dailyQuery = `INSERT INTO ColorSync_DailyResults (userId, score, guessed_color, date) VALUES (?, ?, ?, ?)`;
+                await new Promise((resolve, reject) => {
+                    db.db.run(dailyQuery, [userId, score, guessed_color, today], (err) => {
+                         if (err) reject(err); else resolve();
+                    });
+                });
+                
+                const dbLayer = require('../database');
+                await dbLayer.addKoalaCoins(userId, 1000, 'Color Sync Daily Completion');
+                
+                // Fall through to general score saving, passing earnedCoins
+                saveGeneralScore(10); // 1000 cents = 10 KC
+            } catch (error) {
+                console.error('Error saving daily result or rewarding:', error);
+                saveGeneralScore();
+            }
         });
     } else {
         saveGeneralScore();
     }
 
-    function saveGeneralScore() {
+    function saveGeneralScore(earnedCoins = 0) {
         const query = `INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, ?)`;
         db.db.run(query, [userId, score, target_color, guessed_color, mode], function(err) {
             if (err) {
                 console.error('Error saving ColorSync score:', err);
                 return res.status(500).json({ error: 'Failed to save score' });
             }
-            res.json({ success: true, id: this.lastID });
+            res.json({ success: true, id: this.lastID, earnedCoins });
         });
     }
 };
@@ -118,7 +128,7 @@ exports.getDailyStats = (req, res) => {
     `;
 
     const leaderboardQuery = `
-        SELECT r.score, u.displayName
+        SELECT r.score, r.guessed_color, u.displayName
         FROM ColorSync_DailyResults r
         JOIN Users u ON r.userId = u.id
         WHERE r.date = ?

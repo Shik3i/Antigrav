@@ -9,7 +9,7 @@ Dieses Dokument ist eine strikte Arbeitsanweisung für den Agenten bei jedem Fea
 - Speichere die Datei.
 
 ### 2. Changelog-Dokumentation
-- Öffne die Datei, die für den Changelog zuständig ist (z.B. `Changelog.jsx` oder die entsprechende JSON/Daten-Datei).
+- Öffne die Datei, die für den Changelog zuständig ist (\src\data\changelog.json).
 - Erstelle einen neuen Eintrag ganz oben.
 - Fasse die Änderungen des aktuellen Tasks kurz und präzise zusammen.
 - Nutze das aktuelle Datum.

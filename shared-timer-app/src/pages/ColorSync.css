@@ -54,6 +54,14 @@
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
 }
 
+/* Results container for solid background on result screen */
+.results-container, .result-card {
+    background: #1a1a1a !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid var(--border-color);
+}
+
 .cs-mode-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -256,6 +264,7 @@ input[type=range]::-webkit-slider-thumb {
     width: 90%;
     padding: 3rem;
     text-align: center;
+    /* Inherits solid background from .results-container, .result-card block above */
 }
 
 .final-score {
@@ -399,7 +408,8 @@ input[type=range]::-webkit-slider-thumb {
 .daily-global-stats {
     margin: 2rem 0;
     padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: #222 !important; /* Solid background for stats area */
+    border-radius: 12px;
 }
 
 .stats-row {
@@ -459,6 +469,39 @@ input[type=range]::-webkit-slider-thumb {
 
 .animate-bounce-subtle {
     animation: bounceSubtle 2s infinite ease-in-out;
+}
+
+/* Expanded Color Compare in Leaderboard */
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.clickable-row:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.expanded-color-compare {
+    display: flex;
+    width: 100%;
+    height: 80px;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.expand-block {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.6);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.05rem;
 }
 
 /* Animations */

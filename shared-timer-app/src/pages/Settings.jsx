@@ -932,7 +932,7 @@ const Settings = ({ user, setUser, socket }) => {
                                         try {
                                             // Securely fetch admin token even if already superadmin
                                             const token = localStorage.getItem('timerToken');
-                                            sessionStorage.setItem('admin_token', 'Bearer ' + token);
+                                            sessionStorage.setItem('admin_token', token);
                                         } catch (e) {}
                                     }
                                     navigate('/admin');
@@ -957,7 +957,7 @@ const Settings = ({ user, setUser, socket }) => {
                                     const pwd = document.getElementById('admin-password-input').value;
                                     try {
                                         const res = await axios.post('/api/admin/unlock', { password: pwd });
-                                        sessionStorage.setItem('admin_token', 'Bearer ' + res.data.token);
+                                        sessionStorage.setItem('admin_token', res.data.token);
                                         setHasGlobalAdmin(true);
                                     } catch (err) {
                                         alert(err.response?.data?.error || 'Incorrect password');
@@ -991,7 +991,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.10.0
+                    Version 2.11.0
                 </div>
             </div>
         </div>

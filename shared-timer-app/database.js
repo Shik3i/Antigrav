@@ -191,6 +191,9 @@ db.serialize(() => {
     polymarketUrl TEXT,
     eventDate DATETIME NOT NULL,
     status TEXT DEFAULT 'open',
+    league TEXT,
+    team1Logo TEXT,
+    team2Logo TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(userId) REFERENCES Users(id)
   )`);
@@ -198,6 +201,8 @@ db.serialize(() => {
   // Migration: Add polymarketTeam to Bets
   db.run("ALTER TABLE Bets ADD COLUMN polymarketTeam TEXT", () => { });
   db.run("ALTER TABLE Bets ADD COLUMN league TEXT", () => { });
+  db.run("ALTER TABLE Bets ADD COLUMN team1Logo TEXT", () => { });
+  db.run("ALTER TABLE Bets ADD COLUMN team2Logo TEXT", () => { });
 
   // ErrorLogs: persistent storage for server-side errors
   db.run(`CREATE TABLE IF NOT EXISTS ErrorLogs (
@@ -372,13 +377,6 @@ db.serialize(() => {
     FOREIGN KEY(pack_id) REFERENCES scratchcard_packs(id) ON DELETE CASCADE
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS Changelog (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    version TEXT NOT NULL,
-    date TEXT NOT NULL,
-    changes TEXT NOT NULL,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
 
   db.run("INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('game_koalaflap_payout_enabled', 'true')");
 
@@ -1566,11 +1564,11 @@ const clearErrorLogs = () => {
 };
 
 // ─── Bets ──────────────────────────────────────────────
-const createBet = (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league) => {
+const createBet = (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league, team1Logo, team2Logo) => {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO Bets (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league],
+      'INSERT INTO Bets (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league, team1Logo, team2Logo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league, team1Logo, team2Logo],
       function (err) {
         if (err) reject(err);
         else resolve({ id: this.lastID });
@@ -2177,41 +2175,6 @@ function completeDailyMission(userId, missionId, rewardCents) {
   });
 }
 
-function getChangelog() {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM Changelog ORDER BY createdAt DESC', (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
-}
-
-function addChangelogEntry(version, date, changes) {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT INTO Changelog (version, date, changes) VALUES (?, ?, ?)', [version, date, changes], function (err) {
-      if (err) reject(err);
-      else resolve(this.lastID);
-    });
-  });
-}
-
-function updateChangelogEntry(id, version, date, changes) {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE Changelog SET version = ?, date = ?, changes = ? WHERE id = ?', [version, date, changes, id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-}
-
-function deleteChangelogEntry(id) {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM Changelog WHERE id = ?', [id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-}
 
 // ─── Achievements & Daily Bonus ────────────────────────────────
 const getUserAchievements = (userId) => {
@@ -2895,10 +2858,6 @@ module.exports = {
   deleteGameScore,
   checkDailyMission,
   completeDailyMission,
-  getChangelog,
-  addChangelogEntry,
-  updateChangelogEntry,
-  deleteChangelogEntry,
   addSpeedcubeTime,
   getSpeedcubeTimes,
   updateSpeedcubeNote,
