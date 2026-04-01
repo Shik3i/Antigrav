@@ -19,6 +19,8 @@ const ColorSyncGame = ({ user, token }) => {
     const [lobbyData, setLobbyData] = useState(null);
     const [dailyStatus, setDailyStatus] = useState({ played: false, result: null });
     const [globalStats, setGlobalStats] = useState(null);
+    const [earnedCoins, setEarnedCoins] = useState(0);
+    const [expandedRow, setExpandedRow] = useState(null);
 
     const fetchDailyStatus = useCallback(async () => {
         if (!token) return;
@@ -167,6 +169,8 @@ const ColorSyncGame = ({ user, token }) => {
                     },
                     body: JSON.stringify(payload)
                 });
+                const data = await res.json();
+                if (data.earnedCoins) setEarnedCoins(data.earnedCoins);
                 if (gameMode === 'DAILY') fetchDailyStatus();
             }
         } catch (err) {
@@ -305,6 +309,13 @@ const ColorSyncGame = ({ user, token }) => {
                         <Trophy className="trophy-icon" />
                         <h2>Results</h2>
                         <div className="final-score">{(score * 10).toFixed(1)}<span>%</span></div>
+                        
+                        {earnedCoins > 0 && (
+                            <div className="coin-reward animate-bounce-subtle" style={{ backgroundColor: '#10b981', color: '#fff', padding: '0.4rem 1rem', borderRadius: '20px', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                                +{earnedCoins} KC für dein Daily!
+                            </div>
+                        )}
+                        
                         {gameMode === 'DAILY' && globalStats && (
                             <div className="comparison-badge animate-bounce-subtle">
                                 Better than {(Math.random() * 100).toFixed(0)}% of players!
@@ -348,10 +359,29 @@ const ColorSyncGame = ({ user, token }) => {
                             <div className="daily-leaderboard">
                                 <h4>Today's Top Performers</h4>
                                 {globalStats.topPerformers.map((p, i) => (
-                                    <div key={i} className="mini-lb-item">
-                                        <span>#{i+1} {p.displayName}</span>
-                                        <strong>{(p.score * 10).toFixed(1)}%</strong>
-                                    </div>
+                                    <React.Fragment key={i}>
+                                        <div 
+                                            className="mini-lb-item clickable-row"
+                                            onClick={() => setExpandedRow(expandedRow === `daily-${i}` ? null : `daily-${i}`)}
+                                        >
+                                            <span style={{ flex: 1 }}>#{i+1} {p.displayName}</span>
+                                            <div style={{ display: 'flex', gap: '4px', marginRight: '10px' }}>
+                                                <div className="mini-preview" style={{ backgroundColor: targetColorRgb, width: '20px', height: '20px' }} title="Target Color" />
+                                                <div className="mini-preview" style={{ backgroundColor: p.guessed_color, width: '20px', height: '20px' }} title="Guessed Color" />
+                                            </div>
+                                            <strong>{(p.score * 10).toFixed(1)}%</strong>
+                                        </div>
+                                        {expandedRow === `daily-${i}` && (
+                                            <div className="expanded-color-compare animate-fade-in">
+                                                <div className="expand-block target-block" style={{ backgroundColor: targetColorRgb }}>
+                                                    <span>Target</span>
+                                                </div>
+                                                <div className="expand-block guessed-block" style={{ backgroundColor: p.guessed_color }}>
+                                                    <span>Guessed</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </div>
                         </div>
@@ -371,12 +401,30 @@ const ColorSyncGame = ({ user, token }) => {
                             <h3>Lobby Leaderboard</h3>
                             <div className="leaderboard-list">
                                 {lobbyData.participants.sort((a, b) => b.score - a.score).map((p, idx) => (
-                                    <div key={p.userId} className="leaderboard-item">
-                                        <span className="rank">{idx + 1}</span>
-                                        <span className="name">{p.displayName}</span>
-                                        <div className="mini-preview" style={{ backgroundColor: p.guessed_color }} />
-                                        <span className="p-score">{(p.score * 10).toFixed(1)}%</span>
-                                    </div>
+                                    <React.Fragment key={p.userId}>
+                                        <div 
+                                            className="leaderboard-item clickable-row"
+                                            onClick={() => setExpandedRow(expandedRow === `lobby-${p.userId}` ? null : `lobby-${p.userId}`)}
+                                        >
+                                            <span className="rank">{idx + 1}</span>
+                                            <span className="name">{p.displayName}</span>
+                                            <div style={{ display: 'flex', gap: '4px', marginRight: '5px' }}>
+                                                <div className="mini-preview" style={{ backgroundColor: targetColorRgb, width: '24px', height: '24px' }} title="Target Color" />
+                                                <div className="mini-preview" style={{ backgroundColor: p.guessed_color, width: '24px', height: '24px' }} title="Guessed Color" />
+                                            </div>
+                                            <span className="p-score">{(p.score * 10).toFixed(1)}%</span>
+                                        </div>
+                                        {expandedRow === `lobby-${p.userId}` && (
+                                            <div className="expanded-color-compare animate-fade-in">
+                                                <div className="expand-block target-block" style={{ backgroundColor: targetColorRgb }}>
+                                                    <span>Target</span>
+                                                </div>
+                                                <div className="expand-block guessed-block" style={{ backgroundColor: p.guessed_color }}>
+                                                    <span>Guessed</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </div>
                         </div>

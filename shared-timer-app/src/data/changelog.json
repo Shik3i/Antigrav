@@ -1,5 +1,11 @@
 [
   {
+    "id": 16,
+    "version": "2.11.0",
+    "date": "2026-04-01",
+    "changes": "- **Color Sync Minigame**: Einführung des neuen Farb-Guessing-Spiels mit 3 Schwierigkeitsstufen.\n- **Daily Challenge**: Einzigartige tägliche Herausforderung mit globalem Leaderboard und 10 Koala Coin (KC) Belohnung.\n- **Lobby-System**: Private Räume für den Echtzeit-Wettbewerb mit Freunden.\n- **UI Refinement**: Side-by-Side Farbanzeige mit \"Touching Blocks\" UX und soliden Hintergründen für maximalen Kontrast.\n- **Interactive Leaderboard**: Klickbare Zeilen zum detaillierten Vergleich von Target- und Guess-Farben."
+  },
+  {
     "id": 15,
     "version": "2.10.0",
     "date": "2026-03-26",

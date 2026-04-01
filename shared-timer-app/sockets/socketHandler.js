@@ -129,7 +129,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.TRIGGER_FETCH_ALL_TEAMS, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized admin access');
                 return;
             }
@@ -161,7 +161,7 @@ module.exports = function (io) {
 
         // Admin Endpoints
         socket.on(EVENTS.GET_ADMIN_MAPPINGS, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized admin access');
                 return;
             }
@@ -174,7 +174,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.ADD_ADMIN_MAPPING, async ({ token, originalCode, polymarketCode }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -189,7 +189,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.DELETE_ADMIN_MAPPING, async ({ token, id }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -205,7 +205,7 @@ module.exports = function (io) {
 
         // --- Scratchcard Pools Admin ---
         socket.on(EVENTS.GET_ADMIN_SCRATCHCARD_POOLS, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -218,7 +218,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.ADD_ADMIN_SCRATCHCARD_POOL_TEAM, async ({ token, cardType, teamCode }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -233,7 +233,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.DELETE_ADMIN_SCRATCHCARD_POOL_TEAM, async ({ token, cardType, teamCode }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -249,7 +249,7 @@ module.exports = function (io) {
 
         // --- Scratchcard Economy Config ---
         socket.on(EVENTS.GET_ADMIN_SCRATCHCARD_ECONOMY, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -262,7 +262,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.UPDATE_ADMIN_SCRATCHCARD_ECONOMY, async ({ token, cardType, price, winChance, rewardAmount }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') {
+            if (!(await verifyAdmin(token))) {
                 socket.emit(EVENTS.ERROR, 'Unauthorized');
                 return;
             }
@@ -278,7 +278,7 @@ module.exports = function (io) {
 
         // --- Cache Admin ---
         socket.on(EVENTS.GET_ADMIN_CACHE, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 const status = apiController.getAdminCacheStatus();
                 socket.emit(EVENTS.ADMIN_CACHE_DATA, status);
@@ -286,7 +286,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.FLUSH_ADMIN_CACHE, async ({ token, target }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 const status = apiController.flushAdminCache(target);
                 await dbLayer.logAdminAction(socket.user.userId, socket.user.username, 'FLUSH_CACHE', { target });
@@ -296,7 +296,7 @@ module.exports = function (io) {
 
         // --- Activity Admin ---
         socket.on(EVENTS.GET_ADMIN_ACTIVITY, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 const activity = await dbLayer.getAllTimerCompletions();
                 socket.emit(EVENTS.ADMIN_ACTIVITY_DATA, activity);
@@ -304,7 +304,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.DELETE_ADMIN_ACTIVITY, async ({ token, id }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 await dbLayer.deleteTimerCompletion(id);
                 const activity = await dbLayer.getAllTimerCompletions();
@@ -314,7 +314,7 @@ module.exports = function (io) {
 
         // --- Room Admin ---
         socket.on(EVENTS.GET_ADMIN_ROOMS, async ({ token }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 // Instead of fetching from DB, we pull the live instances from memory
                 const rooms = Array.from(roomManager.rooms.values()).map(r => ({
@@ -334,7 +334,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.DELETE_ADMIN_ROOM, async ({ token, id }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 // If it's active in memory, clean it up and boot users
                 if (roomManager.rooms.has(id)) {
@@ -358,7 +358,7 @@ module.exports = function (io) {
         });
 
         socket.on(EVENTS.EDIT_ADMIN_ROOM, async ({ token, id, newName, defaultRole }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             try {
                 if (roomManager.rooms.has(id)) {
                     roomManager.updateRoomInfo(id, newName, defaultRole);
@@ -383,8 +383,8 @@ module.exports = function (io) {
             }
         });
 
-        socket.on(EVENTS.ADMIN_BROADCAST_MESSAGE, ({ token, message }) => {
-            if (token !== 'Bearer Entangled-Napping7-Custodian') { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
+        socket.on(EVENTS.ADMIN_BROADCAST_MESSAGE, async ({ token, message }) => {
+            if (!(await verifyAdmin(token))) { socket.emit(EVENTS.ERROR, 'Unauthorized'); return; }
             if (message && message.trim().length > 0) {
                 io.emit(EVENTS.GLOBAL_ANNOUNCEMENT, { message: message.trim(), timestamp: Date.now() });
             }
@@ -687,11 +687,22 @@ module.exports = function (io) {
             });
         });
 
-        const verifyAdmin = (token) => {
+        const verifyAdmin = async (token) => {
             if (token === 'Bearer Entangled-Napping7-Custodian') return true;
             try {
                 const actualToken = token && token.startsWith('Bearer ') ? token.slice(7) : token;
-                return jwt.verify(actualToken, JWT_SECRET)?.is_superadmin;
+                const decoded = jwt.verify(actualToken, JWT_SECRET);
+
+                // If token payload explicitly has it (e.g., master password tokens)
+                if (decoded?.is_superadmin) return true;
+
+                // Fallback: Check the database for normal user tokens
+                const uid = decoded?.userId || decoded?.id;
+                if (uid) {
+                    const dbUser = await dbLayer.getUser(uid);
+                    return dbUser && (dbUser.is_superadmin === 1 || dbUser.is_superadmin === true);
+                }
+                return false;
             } catch {
                 return false;
             }
@@ -699,7 +710,7 @@ module.exports = function (io) {
 
         // KoalaCoins Admin Handlers
         socket.on('ADMIN_GET_KOALA_BASELINE', async ({ token }) => {
-            if (verifyAdmin(token)) {
+            if (await verifyAdmin(token)) {
                 try {
                     const baseline = await dbLayer.getKoalaBaseline();
                     socket.emit('KOALA_BASELINE_DATA', { baseline });
@@ -710,7 +721,7 @@ module.exports = function (io) {
         });
 
         socket.on('ADMIN_UPDATE_KOALA_BASELINE', async ({ token, baseline }) => {
-            if (verifyAdmin(token)) {
+            if (await verifyAdmin(token)) {
                 try {
                     await dbLayer.updateKoalaBaseline(baseline);
                     await dbLayer.logAdminAction(socket.user.userId, socket.user.username, 'UPDATE_KOALA_BASELINE', { baseline });
@@ -722,7 +733,7 @@ module.exports = function (io) {
         });
 
         socket.on('ADMIN_GET_KOALA_TRANSACTIONS', async ({ token, userId }) => {
-            if (verifyAdmin(token)) {
+            if (await verifyAdmin(token)) {
                 try {
                     const transactions = await dbLayer.getKoalaTransactions(userId, 5);
                     socket.emit('KOALA_TRANSACTIONS_DATA', { userId, transactions });
@@ -733,7 +744,7 @@ module.exports = function (io) {
         });
 
         socket.on('ADMIN_ADJUST_KOALA_COINS', async ({ token, userId, amountCents, reason }) => {
-            if (verifyAdmin(token)) {
+            if (await verifyAdmin(token)) {
                 try {
                     const newBalanceCents = await dbLayer.addKoalaCoins(userId, amountCents, reason);
                     const targetUser = await dbLayer.getUser(userId);

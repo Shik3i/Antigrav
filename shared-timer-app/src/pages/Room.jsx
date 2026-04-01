@@ -189,7 +189,7 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
                         </h1>
 
                         {/* Top-right button group: Portal to App.jsx header */}
-                        {createPortal(
+                        {document.getElementById('desktop-room-actions') && createPortal(
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <button
                                     className="btn-ghost desktop-only animate-fade-in"

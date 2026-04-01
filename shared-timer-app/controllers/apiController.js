@@ -22,6 +22,21 @@ const NEWS_TTL = 15 * 60 * 1000; // 15 Minuten
 // Pokémon Cache for performance (DRY/Performance Optimization)
 let pokemonMemoryCache = null;
 
+// Changelog Cache
+let changelogCache = null;
+
+// Pokémon Config Cache
+let pokemonConfigsCache = null;
+
+// Navbar Settings Cache
+let navbarSettingsCache = null;
+
+// Esports Teams Cache
+let esportsTeamsCache = null;
+
+// Scratchcard Packs Cache (Metadata + Teams)
+let scratchcardPacksCache = null;
+
 exports.getHighscores = async (req, res, next) => {
     try {
         const scores = await dbLayer.getHighscores(20);
@@ -185,6 +200,7 @@ exports.fetchAllEsportsTeams = async () => {
             console.log(`[API] Successfully synced ${teamsList.length} esports teams to local DB.`);
             dbLayer.logSystemEvent('info', 'API', `Successfully synced ${teamsList.length} esports teams to local DB.`);
         }
+        esportsTeamsCache = null; // Invalidate cache
         return teamsList;
     } catch (err) {
         console.error('Failed to save esports teams to local DB:', err.message);
@@ -229,8 +245,10 @@ exports.getAllEsportsTeamsFromDB = async () => {
 
 exports.getEsportsTeams = async (req, res, next) => {
     try {
-        const teams = await dbLayer.getAllEsportsTeams();
-        res.json(teams);
+        if (esportsTeamsCache) return res.json(esportsTeamsCache);
+
+        esportsTeamsCache = await dbLayer.getAllEsportsTeams();
+        res.json(esportsTeamsCache);
     } catch (err) {
         console.error('Failed to fetch esports teams list:', err);
         res.status(500).json({ error: 'Failed' });
@@ -974,7 +992,7 @@ exports.clearErrorLogs = async (req, res) => {
 // ─── Bets ───────────────────────────────────────────────────
 exports.placeBet = async (req, res, next) => {
     try {
-        const { matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate } = req.body;
+        const { matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, team1Logo, team2Logo } = req.body;
         const userId = req.user?.id || req.user?.userId;
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
@@ -1003,7 +1021,7 @@ exports.placeBet = async (req, res, next) => {
 
         // Create bet
         const { league } = req.body;
-        const bet = await dbLayer.createBet(userId, sanitize(matchName), sanitize(chosenTeam), sanitize(polymarketTeam || chosenTeam), parsedStake, odds, polymarketUrl, eventDate, league);
+        const bet = await dbLayer.createBet(userId, sanitize(matchName), sanitize(chosenTeam), sanitize(polymarketTeam || chosenTeam), parsedStake, odds, polymarketUrl, eventDate, league, team1Logo, team2Logo);
 
         res.status(201).json({ success: true, betId: bet.id });
     } catch (err) {
@@ -1365,13 +1383,17 @@ exports.deleteAdminGameScore = async (req, res) => {
 
 exports.getChangelog = async (req, res, next) => {
     try {
+        if (changelogCache) return res.json(changelogCache);
+
         const changelogPath = path.resolve(process.cwd(), 'src/data/changelog.json');
         if (fs.existsSync(changelogPath)) {
-            const data = fs.readFileSync(changelogPath, 'utf8');
-            res.json(JSON.parse(data));
+            const fileData = fs.readFileSync(changelogPath, 'utf8');
+            changelogCache = JSON.parse(fileData);
         } else {
-            res.json([]);
+            changelogCache = [];
         }
+
+        res.json(changelogCache);
     } catch (err) {
         next(err);
     }
@@ -1466,16 +1488,17 @@ exports.getScratchcardPacks = async (req, res) => {
         const packs = await dbLayer.getScratchcardPacks();
         const enrichedPacks = await Promise.all(packs.map(async (p) => {
             const teams = await dbLayer.getScratchcardPackTeams(p.id);
-            let maxWinPerLine = 0;
+            let max_win = 0;
             if (p.is_weighted) {
-                // Rank-1 multiplier is always 10.0
-                maxWinPerLine = p.price * 10;
+                // Calculation: Rank-1 config yields 20x. Sum of 8 lines yields 160. Total multiplier is 160 * 8 = 1280.
+                max_win = p.price * 1280;
             } else {
-                maxWinPerLine = p.reward_amount || (p.price * 5);
+                const maxWinPerLine = p.reward_amount || (p.price * 5);
+                max_win = maxWinPerLine * 64; // Under new math: (reward/price) sum * 8 lines = 64 * reward
             }
             return {
                 ...p,
-                max_win: maxWinPerLine * 8, // 8-line jackpot
+                max_win: max_win,
                 teams: teams
             };
         }));
@@ -1489,21 +1512,40 @@ exports.getScratchcardPacks = async (req, res) => {
 exports.getScratchcardConfig = async (req, res) => {
     try {
         const userId = req.user?.userId || req.user?.id;
-        const packs = await dbLayer.getScratchcardPacks();
-        const activePacks = packs.filter(p => p.is_active);
-        
-        // Enhance packs with team counts and user-specific daily counts
-        const enhancedPacks = await Promise.all(activePacks.map(async (pack) => {
-            const teams = await dbLayer.getScratchcardPackTeams(pack.id);
+
+        // Hybrid Caching: Cache metadata and teams, but keep user daily count live
+        if (!scratchcardPacksCache) {
+            const packs = await dbLayer.getScratchcardPacks();
+            const activePacks = packs.filter(p => p.is_active);
+            
+            scratchcardPacksCache = await Promise.all(activePacks.map(async (pack) => {
+                const teams = await dbLayer.getScratchcardPackTeams(pack.id);
+                
+                let max_win = 0;
+                if (pack.is_weighted) {
+                    max_win = pack.price * 1280;
+                } else {
+                    const maxWinPerLine = pack.reward_amount || (pack.price * 5);
+                    max_win = maxWinPerLine * 64;
+                }
+
+                return {
+                    ...pack,
+                    max_win: max_win,
+                    teams_count: teams.length,
+                    teams: teams.map(t => ({ team_code: t.team_code, position: t.position }))
+                };
+            }));
+        }
+
+        // Add user-specific daily counts live
+        const enhancedPacks = await Promise.all(scratchcardPacksCache.map(async (pack) => {
             let userDailyCount = 0;
             if (userId && pack.max_daily_limit > 0) {
                 userDailyCount = await dbLayer.getUserDailyPackCount(userId, pack.id);
             }
-            
             return {
                 ...pack,
-                teams_count: teams.length,
-                teams: teams.map(t => ({ team_code: t.team_code, position: t.position })),
                 userDailyCount
             };
         }));
@@ -1667,6 +1709,7 @@ exports.buyScratchcard = async (req, res, next) => {
         
         const winningLines = findAllWinningLines(grid);
         let winAmount = 0;
+        let totalMultiplier = 0.0;
 
         for (const win of winningLines) {
             if (pack.is_weighted) {
@@ -1685,10 +1728,16 @@ exports.buyScratchcard = async (req, res, next) => {
                     multiplier = 20.0;
                 }
                 
-                winAmount += Math.floor(pack.price * multiplier);
+                totalMultiplier += multiplier;
             } else {
-                winAmount += (pack.reward_amount || (pack.price * 5));
+                const reward = (pack.reward_amount || (pack.price * 5));
+                totalMultiplier += (reward / pack.price);
             }
+        }
+
+        if (winningLines.length > 0) {
+            totalMultiplier = totalMultiplier * winningLines.length;
+            winAmount = Math.floor(pack.price * totalMultiplier);
         }
 
         const result = await dbLayer.purchaseScratchcardTransaction(userId, packId, pack.name, pack.price, grid, winAmount);
@@ -1714,6 +1763,7 @@ exports.adminCreateScratchPack = async (req, res) => {
         if (teams && Array.isArray(teams)) {
             await dbLayer.setScratchcardPackTeams(newPack.id, teams);
         }
+        scratchcardPacksCache = null; // Invalidate cache
         res.json({ success: true, pack: newPack });
     } catch (err) {
         console.error('adminCreateScratchPack error:', err);
@@ -1729,6 +1779,7 @@ exports.adminUpdateScratchPack = async (req, res) => {
         if (teams && Array.isArray(teams)) {
             await dbLayer.setScratchcardPackTeams(id, teams);
         }
+        scratchcardPacksCache = null; // Invalidate cache
         res.json({ success: true });
     } catch (err) {
         console.error('adminUpdateScratchPack error:', err);
@@ -1740,6 +1791,7 @@ exports.adminDeleteScratchPack = async (req, res) => {
     try {
         const { id } = req.params;
         await dbLayer.deleteScratchcardPack(id);
+        scratchcardPacksCache = null; // Invalidate cache
         res.json({ success: true });
     } catch (err) {
         console.error('adminDeleteScratchPack error:', err);
@@ -1785,8 +1837,10 @@ exports.claimScratchcard = async (req, res, next) => {
 // Navbar Settings
 exports.getPublicNavbarSettings = async (req, res, next) => {
     try {
-        const settings = await dbLayer.getNavbarSettings(false);
-        res.json(settings);
+        if (navbarSettingsCache) return res.json(navbarSettingsCache);
+
+        navbarSettingsCache = await dbLayer.getNavbarSettings(false);
+        res.json(navbarSettingsCache);
     } catch (err) {
         next(err);
     }
@@ -1808,6 +1862,7 @@ exports.updateNavbarSettings = async (req, res, next) => {
             return res.status(400).json({ error: 'Settings must be an array' });
         }
         await dbLayer.updateNavbarSettings(settings);
+        navbarSettingsCache = null; // Invalidate cache
         res.json({ success: true });
     } catch (err) {
         next(err);
@@ -1835,13 +1890,13 @@ exports.getPokemonData = async (req, res, next) => {
     try {
         if (pokemonMemoryCache) return res.json(pokemonMemoryCache);
         
-        const filePath = path.join(__dirname, '..', 'data', 'pokemon.txt');
+        const filePath = path.join(__dirname, '..', 'assets_static', 'pokemon.txt');
         if (!fs.existsSync(filePath)) return res.json([]);
         
         const data = fs.readFileSync(filePath, 'utf8');
         const lines = data.split('\n').filter(line => line.trim());
         
-        const colorsPath = path.join(__dirname, '..', 'data', 'pokemon_colors.json');
+        const colorsPath = path.join(__dirname, '..', 'assets_static', 'pokemon_colors.json');
         let backgroundColors = {};
         if (fs.existsSync(colorsPath)) {
             backgroundColors = JSON.parse(fs.readFileSync(colorsPath, 'utf8'));
@@ -1868,8 +1923,10 @@ exports.getPokemonConfigs = async (req, res, next) => {
         if (!req.user || !req.user.is_superadmin) {
             return res.status(403).json({ error: 'Forbidden' });
         }
-        const configs = await dbLayer.getPokemonConfigs();
-        res.json(configs);
+        if (pokemonConfigsCache) return res.json(pokemonConfigsCache);
+
+        pokemonConfigsCache = await dbLayer.getPokemonConfigs();
+        res.json(pokemonConfigsCache);
     } catch (err) {
         next(err);
     }
@@ -1877,8 +1934,10 @@ exports.getPokemonConfigs = async (req, res, next) => {
 
 exports.getPublicPokemonConfigs = async (req, res, next) => {
     try {
-        const configs = await dbLayer.getPokemonConfigs();
-        res.json(configs);
+        if (pokemonConfigsCache) return res.json(pokemonConfigsCache);
+
+        pokemonConfigsCache = await dbLayer.getPokemonConfigs();
+        res.json(pokemonConfigsCache);
     } catch (err) {
         next(err);
     }
@@ -1891,6 +1950,7 @@ exports.updatePokemonConfigs = async (req, res, next) => {
         }
         const { settings, colors } = req.body;
         await dbLayer.updatePokemonConfigs(settings, colors);
+        pokemonConfigsCache = null; // Invalidate cache
         res.json({ success: true });
     } catch (err) {
         next(err);

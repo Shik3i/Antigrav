@@ -683,7 +683,7 @@ const ScratchcardShop = () => {
                                     <div style={{ ...styles.prizeBadge, background: isSpecial ? 'rgba(236, 72, 153, 0.15)' : 'rgba(59, 130, 246, 0.1)', color: isSpecial ? '#f472b6' : '#60a5fa' }}>{pack.region_label || pack.scope || 'CLASSIC'}</div>
                                     <h3 style={styles.cardTitle}>{pack.name.replace(' Scratch', '')}</h3>
                                     <div style={styles.winDisplay}>
-                                        Win up to <span style={{ color: isSpecial ? '#ec4899' : '#10b981', fontWeight: 800 }}>{(pack.reward_amount / 100).toLocaleString()} KC</span>
+                                        Win up to <span style={{ color: isSpecial ? '#ec4899' : '#10b981', fontWeight: 800 }}>{(pack.max_win / 100).toLocaleString()} KC</span>
                                     </div>
                                 </div>
 
@@ -1011,7 +1011,7 @@ const ScratchcardShop = () => {
                                 <div style={{ fontSize: '1.5rem' }}>🎉</div>
                                 <div style={{ fontSize: '0.75rem', lineHeight: '1.4', color: '#94a3b8' }}>
                                     <strong style={{ color: 'white', display: 'block', marginBottom: '2px' }}>MEHRFACHGEWINNE MÖGLICH!</strong>
-                                    Die 3 Gewinnrichtungen können sich kreuzen. Liegen mehrere Gewinnlinien gleichzeitig vor, werden die Multiplikatoren addiert. (z.B. Ein "Blackout" mit 9 gleichen Symbolen entspricht 8 Gewinnlinien gleichzeitig).
+                                    Die 3 Gewinnrichtungen können sich kreuzen. Liegen mehrere Gewinnlinien gleichzeitig vor, werden deren Gewinne addiert und anschließend mit der Gesamtanzahl der getroffenen Linien multipliziert. (z.B. Ein "Blackout" mit 9 gleichen Symbolen entspricht 8 Gewinnlinien gleichzeitig).
                                 </div>
                             </div>
 

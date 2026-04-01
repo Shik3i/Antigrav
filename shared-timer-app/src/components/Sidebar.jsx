@@ -205,9 +205,6 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                                 key={item.key} 
                                                 to={item.path} 
                                                 onClick={() => {
-                                                    if (item.key === 'admin') {
-                                                        sessionStorage.setItem('admin_token', 'Bearer Entangled-Napping7-Custodian');
-                                                    }
                                                     onClose();
                                                 }} 
                                                 className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 

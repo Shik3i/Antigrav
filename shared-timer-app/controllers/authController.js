@@ -292,7 +292,14 @@ const getBannedUsersList = async (req, res) => {
 // Middleware to protect routes that require user to be logged in
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+
+    // Robust token extraction: handle potentially redundant "Bearer " prefixes
+    // e.g., "Bearer ABC" -> "ABC", "Bearer Bearer ABC" -> "ABC"
+    let token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (token.startsWith('Bearer ')) {
+        token = token.replace(/^Bearer\s+/i, '').trim();
+    }
 
     if (!token) return res.status(401).json({ error: 'Authentication required' });
 
@@ -306,42 +313,46 @@ const authenticateToken = (req, res, next) => {
     jwt.verify(token, JWT_SECRET, async (err, decoded) => {
         if (err) {
             console.warn('[AUTH] JWT verification failed:', err.message, 'for token starts with:', token.substring(0, 10));
-            return res.status(403).json({ error: 'Token is invalid or expired' });
+            return res.status(401).json({ error: 'Invalid token' });
         }
-        
-        // console.log('[AUTH] Token verified for userId:', decoded.userId || decoded.id);
 
         try {
             const user = await dbLayer.getUser(decoded.userId || decoded.id);
             if (user) {
                 req.user = {
-                    ...decoded,
-                    id: user.id,
-                    userId: user.id,
+                    id: user.id || decoded.userId || decoded.id,
+                    userId: user.id || decoded.userId || decoded.id,
                     username: user.username,
                     displayName: user.displayName,
-                    is_superadmin: user.is_superadmin === 1 || user.is_superadmin === true
+                    is_superadmin: user.is_superadmin === 1 || user.is_superadmin === true || decoded.is_superadmin === true
                 };
             } else {
-                console.warn('[AUTH] User not found in DB for token:', decoded.userId || decoded.id);
-                req.user = { ...decoded, id: decoded.userId || decoded.id, userId: decoded.userId || decoded.id };
+                // If user not in DB, but JWT is valid and has is_superadmin, trust it for admin session
+                console.warn('[AUTH] User not found in DB, using token payload:', decoded.userId || decoded.id);
+                req.user = {
+                    ...decoded,
+                    id: decoded.userId || decoded.id || 'admin_session',
+                    userId: decoded.userId || decoded.id || 'admin_session',
+                    is_superadmin: decoded.is_superadmin === true
+                };
             }
-        } catch (dbErr) {
-            console.error('[AUTH] DB error in middleware:', dbErr);
-            req.user = { ...decoded, id: decoded.userId || decoded.id, userId: decoded.userId || decoded.id };
+            next();
+        } catch (err) {
+            next(err);
         }
-        next();
     });
 };
 
 // Middleware to extract user if token exists, but not fail if it doesn't
 const optionalAuthenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    if (!authHeader) return next();
 
-    if (!token) {
-        return next();
+    let token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (token.startsWith('Bearer ')) {
+        token = token.replace('Bearer ', '').trim();
     }
+    if (!token) return next();
 
     jwt.verify(token, JWT_SECRET, async (err, decoded) => {
         if (!err) {
