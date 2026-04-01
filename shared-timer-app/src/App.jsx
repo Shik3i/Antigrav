@@ -31,6 +31,7 @@ const RiftDefense = React.lazy(() => import('./pages/RiftDefense'));
 const LoLIdleGame = React.lazy(() => import('./pages/LoLIdleGame'));
 const ColorSyncGame = React.lazy(() => import('./pages/ColorSyncGame'));
 const SharedCountdown = React.lazy(() => import('./pages/SharedCountdown'));
+const LevelingTracker = React.lazy(() => import('./pages/LevelingTracker'));
 
 import NewsTicker from './components/NewsTicker';
 import Friends from './pages/Friends';
@@ -500,6 +501,7 @@ function InnerApp() {
                 <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
                 <Route path="/games/leaderboard" element={<GameLeaderboards />} />
                 <Route path="/speedcube" element={<SpeedcubeTimer />} />
+                <Route path="/leveling" element={<LevelingTracker />} />
                 <Route path="/scratchcards" element={<Scratchcards />} />
                 <Route path="/games/rift-defense" element={<RiftDefense />} />
                 <Route path="/games/lol-idle" element={<LoLIdleGame user={user} token={token} />} />

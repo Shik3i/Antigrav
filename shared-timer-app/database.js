@@ -620,6 +620,10 @@ db.serialize(() => {
             VALUES ('colorsync', 'Color Sync', '/color-sync', 'Games', 1, 6)`);
     db.run("UPDATE NavbarSettings SET sortOrder = 6 WHERE key = 'colorsync' AND category = 'Games'");
 
+    // Leveling Tracker Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('leveling-tracker', 'Leveling Tracker', '/leveling', 'Timers', 1, 5)`);
+
     // ─── Pokemon System Tables ───────────────────────────────────
     db.run(`CREATE TABLE IF NOT EXISTS PokemonSettings (
       key TEXT PRIMARY KEY,

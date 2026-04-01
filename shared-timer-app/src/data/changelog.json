@@ -1,5 +1,11 @@
 [
   {
+    "id": 17,
+    "version": "2.12.0",
+    "date": "2026-04-01",
+    "changes": "- **MMO Leveling Tracker**: Neues Tool zur XP-Überwachung und Vorhersage (Flyff-Stil).\n- **XP/h & Predictions**: Live-Berechnung von XP-Raten (h/m/d) und geschätzte Level-Up Zeiten via Last-Tick oder Session-Schnitt.\n- **FWC 2026 Countdown**: Integrierter Event-Countdown für die Flyff World Championship oberhalb des Trackers.\n- **Performance & QoL**: 100-Einträge Historie-Limit, Enter-Taste Support und Session-Reset-Button für schnelles Löschen des Verlaufs."
+  },
+  {
     "id": 16,
     "version": "2.11.0",
     "date": "2026-04-01",
