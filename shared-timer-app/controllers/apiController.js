@@ -1956,3 +1956,53 @@ exports.updatePokemonConfigs = async (req, res, next) => {
         next(err);
     }
 };
+
+// ─── Daily Status Aggregation ────────────────────────────────
+exports.getDailyStatus = async (req, res, next) => {
+    try {
+        const userId = req.user.userId;
+        const today = new Date().toISOString().split('T')[0];
+
+        const result = { achievements: false, colorsync: false };
+
+        // Check Achievements daily login bonus
+        const achievementsController = require('./achievementsController');
+        try {
+            const achievementStatus = await new Promise((resolve, reject) => {
+                // Simulate the status fetch inline
+                dbLayer.db.get(
+                    `SELECT id FROM AchievementClaims WHERE claimedBy = ? AND claimedAt >= date('now', 'start of day') AND milestoneId = 'daily'`,
+                    [userId],
+                    (err, row) => {
+                        if (err) resolve({ available: false });
+                        else resolve({ available: !row });
+                    }
+                );
+            });
+            result.achievements = achievementStatus.available;
+        } catch (e) {
+            // If achievements table doesn't exist yet, skip
+        }
+
+        // Check ColorSync daily challenge
+        try {
+            const colorSyncPlayed = await new Promise((resolve, reject) => {
+                dbLayer.db.get(
+                    `SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`,
+                    [userId, today],
+                    (err, row) => {
+                        if (err) resolve(true); // assume played on error
+                        else resolve(!!row);
+                    }
+                );
+            });
+            result.colorsync = !colorSyncPlayed; // true = NOT yet played = badge visible
+        } catch (e) {
+            // skip on error
+        }
+
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+};

@@ -1,5 +1,11 @@
 [
   {
+    "id": 18,
+    "version": "2.13.0",
+    "date": "2026-04-02",
+    "changes": "- **MMO Tracker: Gold Integration**: Einführung eines separaten Gold-Tracking-Modus mit eigener Historie und präzisen Ertrags-Prognosen (Gold pro h/m/d).\n- **Persistent Milestones**: Automatische Speicherung von Level-Fortschritten in der Datenbank; inklusive Logik zur Erfassung von übersprungenen Meilensteinen.\n- **Dynamic Navigation Badges**: Kleine rote Benachrichtigungs-Badges in der Sidebar weisen nun visuell auf offene tägliche Belohnungen (Achievements & ColorSync) hin.\n- **QoL-Shortcuts 2.0**: Erweiterte Steuerung via ArrowUp/ArrowDown in allen XP-Feldern sowie ein dedizierter '+1' Button für eine schnellere Level-Anpassung."
+  },
+  {
     "id": 17,
     "version": "2.12.0",
     "date": "2026-04-01",

@@ -126,6 +126,8 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const [navSettings, setNavSettings] = useState([]);
     const [loadingNav, setLoadingNav] = useState(true);
 
+    const [dailyStatus, setDailyStatus] = useState({ achievements: false, colorsync: false });
+
     useEffect(() => {
         const fetchNav = async () => {
             try {
@@ -138,8 +140,27 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 setLoadingNav(false);
             }
         };
+
+        const fetchDailyStatus = async () => {
+            if (isGuest || !activeToken) return;
+            try {
+                const res = await fetch('/api/daily-status', {
+                    headers: { 'Authorization': `Bearer ${activeToken}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setDailyStatus(data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch daily status:', err);
+            }
+        };
+
         fetchNav();
-    }, []);
+        fetchDailyStatus();
+        const interval = setInterval(fetchDailyStatus, 120000); // 2 min check
+        return () => clearInterval(interval);
+    }, [isGuest, activeToken]);
 
     const iconMap = {
         'dashboard': <LayoutDashboard size={18} />,
@@ -208,10 +229,23 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                                     onClose();
                                                 }} 
                                                 className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 
-                                                style={{ justifyContent: 'flex-start' }}
+                                                style={{ justifyContent: 'flex-start', position: 'relative' }}
                                             >
                                                 {iconMap[item.key] || <ListTodo size={18} />}
                                                 {item.label}
+                                                {dailyStatus[item.key] && (
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        right: '8px',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        background: '#ef4444',
+                                                        borderRadius: '50%',
+                                                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)'
+                                                    }}></span>
+                                                )}
                                             </NavLink>
                                         );
                                     })}
