@@ -1,5 +1,11 @@
 [
   {
+    "id": 19,
+    "version": "2.14.0",
+    "date": "2026-04-02",
+    "changes": "- **Navigation Badges Fix**: Korrektur der SQL-Abfragen für die tägliche Belohnungserkennung (Achievements & Boni).\n- **Category Notifications**: Rote Badges erscheinen nun auch an den Gruppen-Einstiegspunkten (Games/Esports), wenn dort Aktionen verfügbar sind (auch bei geschlossener Sidebar).\n- **QoL Visited-Tracking**: Badges verschwinden für den Rest des Tages, sobald man die entsprechende Seite einmal besucht hat (bis 0:00 Uhr UTC Reset)."
+  },
+  {
     "id": 18,
     "version": "2.13.0",
     "date": "2026-04-02",
