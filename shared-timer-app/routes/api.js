@@ -188,4 +188,12 @@ router.get('/pokemon/configs', apiController.getPublicPokemonConfigs);
 router.get('/admin/pokemon-configs', authController.authenticateToken, apiController.getPokemonConfigs);
 router.post('/admin/pokemon-configs/update', authController.authenticateToken, apiController.updatePokemonConfigs);
 
+// ─── Leveling Tracker (Milestones) ────────────────────────────
+const levelingController = require('../controllers/levelingController');
+router.post('/leveling/milestone', authController.authenticateToken, levelingController.saveMilestone);
+router.get('/leveling/milestones', authController.authenticateToken, levelingController.getMilestones);
+
+// ─── Daily Status Aggregation ─────────────────────────────────
+router.get('/daily-status', authController.authenticateToken, apiController.getDailyStatus);
+
 module.exports = router;

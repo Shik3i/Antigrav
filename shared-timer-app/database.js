@@ -624,6 +624,16 @@ db.serialize(() => {
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
             VALUES ('leveling-tracker', 'Leveling Tracker', '/leveling', 'Timers', 1, 5)`);
 
+    // ─── Leveling Milestones Table ───────────────────────────────
+    db.run(`CREATE TABLE IF NOT EXISTS LevelingMilestones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT NOT NULL,
+      level INTEGER NOT NULL,
+      reachedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(userId, level),
+      FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+    )`);
+
     // ─── Pokemon System Tables ───────────────────────────────────
     db.run(`CREATE TABLE IF NOT EXISTS PokemonSettings (
       key TEXT PRIMARY KEY,
