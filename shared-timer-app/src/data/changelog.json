@@ -1,5 +1,11 @@
 [
   {
+    "id": 20,
+    "version": "2.14.1",
+    "date": "2026-04-02",
+    "changes": "- **Local Badge Tracking**: Umstellung der Sidebar-Badges auf browser-loses Tracking via localStorage zur Performance-Optimierung.\n- **Daily Reset**: Zuverlässiger Reset aller täglichen Badges (Achievements, Games, etc.) um exakt 0:00 Uhr UTC.\n- **CSS Guard**: Globaler Fix für den Recharts 'cssRules' TypeError in Chrome/Edge, der zu Browser-Abstürzen führen konnte."
+  },
+  {
     "id": 19,
     "version": "2.14.0",
     "date": "2026-04-02",
