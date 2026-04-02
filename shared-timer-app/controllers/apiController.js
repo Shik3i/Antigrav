@@ -1965,40 +1965,36 @@ exports.getDailyStatus = async (req, res, next) => {
 
         const result = { achievements: false, colorsync: false };
 
-        // Check Achievements daily login bonus
-        const achievementsController = require('./achievementsController');
+        // 1. Check Achievements daily login bonus
         try {
-            const achievementStatus = await new Promise((resolve, reject) => {
-                // Simulate the status fetch inline
+            const hasClaimedToday = await new Promise((resolve) => {
                 dbLayer.db.get(
-                    `SELECT id FROM AchievementClaims WHERE claimedBy = ? AND claimedAt >= date('now', 'start of day') AND milestoneId = 'daily'`,
+                    `SELECT id FROM Users WHERE id = ? AND last_daily_claim >= date('now', 'start of day')`,
                     [userId],
                     (err, row) => {
-                        if (err) resolve({ available: false });
-                        else resolve({ available: !row });
+                        resolve(!!row);
                     }
                 );
             });
-            result.achievements = achievementStatus.available;
+            result.achievements = !hasClaimedToday; // true = AVAILABLE = badge visible
         } catch (e) {
-            // If achievements table doesn't exist yet, skip
+            console.error('[DailyStatus] Achievement check error:', e);
         }
 
-        // Check ColorSync daily challenge
+        // 2. Check ColorSync daily challenge
         try {
-            const colorSyncPlayed = await new Promise((resolve, reject) => {
+            const hasPlayedToday = await new Promise((resolve) => {
                 dbLayer.db.get(
                     `SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`,
                     [userId, today],
                     (err, row) => {
-                        if (err) resolve(true); // assume played on error
-                        else resolve(!!row);
+                        resolve(!!row);
                     }
                 );
             });
-            result.colorsync = !colorSyncPlayed; // true = NOT yet played = badge visible
+            result.colorsync = !hasPlayedToday; // true = NOT yet played = badge visible
         } catch (e) {
-            // skip on error
+            // Table might not exist or other error
         }
 
         res.json(result);

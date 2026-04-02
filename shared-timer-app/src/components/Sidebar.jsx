@@ -127,6 +127,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const [loadingNav, setLoadingNav] = useState(true);
 
     const [dailyStatus, setDailyStatus] = useState({ achievements: false, colorsync: false });
+    const [seenStatus, setSeenStatus] = useState({});
 
     useEffect(() => {
         const fetchNav = async () => {
@@ -156,11 +157,23 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
             }
         };
 
+        const dateKey = new Date().toISOString().split('T')[0];
+        const savedSeen = localStorage.getItem(`daily_seen_${dateKey}`);
+        if (savedSeen) setSeenStatus(JSON.parse(savedSeen));
+        else setSeenStatus({});
+
         fetchNav();
         fetchDailyStatus();
         const interval = setInterval(fetchDailyStatus, 120000); // 2 min check
         return () => clearInterval(interval);
     }, [isGuest, activeToken]);
+
+    const markAsSeen = (key) => {
+        const dateKey = new Date().toISOString().split('T')[0];
+        const newSeen = { ...seenStatus, [key]: true };
+        setSeenStatus(newSeen);
+        localStorage.setItem(`daily_seen_${dateKey}`, JSON.stringify(newSeen));
+    };
 
     const iconMap = {
         'dashboard': <LayoutDashboard size={18} />,
@@ -205,14 +218,37 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     const sectionKey = cat.toLowerCase();
                     if (items.length === 0) return null;
 
+                    const hasBadge = items.some(item => dailyStatus[item.key] && !seenStatus[item.key]);
+
                     return (
                         <div key={cat} className="nav-section" style={{ marginTop: cat === 'Timers' ? '0' : '12px' }}>
                             <button 
                                 className="btn-ghost section-header" 
                                 onClick={() => setOpenGroup(p => p === sectionKey ? null : sectionKey)}
-                                style={{ width: '100%', justifyContent: 'space-between', opacity: 0.7, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '4px' }}
+                                style={{ 
+                                    width: '100%', 
+                                    justifyContent: 'space-between', 
+                                    opacity: 0.7, 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 700, 
+                                    letterSpacing: '0.05em', 
+                                    textTransform: 'uppercase', 
+                                    marginBottom: '4px',
+                                    position: 'relative'
+                                }}
                             >
-                                <span>{cat}</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {cat}
+                                    {hasBadge && (
+                                        <span style={{
+                                            width: '6px',
+                                            height: '6px',
+                                            background: '#ef4444',
+                                            borderRadius: '50%',
+                                            boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
+                                        }}></span>
+                                    )}
+                                </span>
                                 {openGroup === sectionKey ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             </button>
                             {openGroup === sectionKey && (
@@ -221,11 +257,15 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                         // Safety check: only superadmins can see the Admin Panel link
                                         if (item.key === 'admin' && !user?.is_superadmin) return null;
                                         
+                                        const isDailyItem = (item.key === 'achievements' || item.key === 'colorsync');
+                                        const showBadge = dailyStatus[item.key] && !seenStatus[item.key];
+
                                         return (
                                             <NavLink 
                                                 key={item.key} 
                                                 to={item.path} 
                                                 onClick={() => {
+                                                    if (isDailyItem) markAsSeen(item.key);
                                                     onClose();
                                                 }} 
                                                 className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 
@@ -233,7 +273,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                             >
                                                 {iconMap[item.key] || <ListTodo size={18} />}
                                                 {item.label}
-                                                {dailyStatus[item.key] && (
+                                                {showBadge && (
                                                     <span style={{
                                                         position: 'absolute',
                                                         right: '8px',
@@ -254,8 +294,6 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         </div>
                     );
                 })}
-
-
             </nav>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '4px', marginTop: '16px' }}>
