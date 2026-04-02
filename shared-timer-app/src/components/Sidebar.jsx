@@ -126,10 +126,18 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const [navSettings, setNavSettings] = useState([]);
     const [loadingNav, setLoadingNav] = useState(true);
 
-    const [dailyStatus, setDailyStatus] = useState({ achievements: false, colorsync: false });
-    const [seenStatus, setSeenStatus] = useState({});
-
+    // --- Tägliche Badges (Pure LocalStorage Logik) ---
+    const [lastVisits, setLastVisits] = useState({});
+    
     useEffect(() => {
+        const visits = {};
+        const dailyKeys = ['achievements', 'colorsync', 'scratch-cards', 'lol-idle', 'rift-defense'];
+        dailyKeys.forEach(key => {
+            const val = localStorage.getItem(`last_visit_${key}`);
+            if (val) visits[key] = parseInt(val);
+        });
+        setLastVisits(visits);
+        
         const fetchNav = async () => {
             try {
                 const res = await fetch('/api/navbar-settings');
@@ -141,38 +149,24 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 setLoadingNav(false);
             }
         };
-
-        const fetchDailyStatus = async () => {
-            if (isGuest || !activeToken) return;
-            try {
-                const res = await fetch('/api/daily-status', {
-                    headers: { 'Authorization': `Bearer ${activeToken}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setDailyStatus(data);
-                }
-            } catch (err) {
-                console.error('Failed to fetch daily status:', err);
-            }
-        };
-
-        const dateKey = new Date().toISOString().split('T')[0];
-        const savedSeen = localStorage.getItem(`daily_seen_${dateKey}`);
-        if (savedSeen) setSeenStatus(JSON.parse(savedSeen));
-        else setSeenStatus({});
-
         fetchNav();
-        fetchDailyStatus();
-        const interval = setInterval(fetchDailyStatus, 120000); // 2 min check
-        return () => clearInterval(interval);
-    }, [isGuest, activeToken]);
+    }, []);
 
-    const markAsSeen = (key) => {
-        const dateKey = new Date().toISOString().split('T')[0];
-        const newSeen = { ...seenStatus, [key]: true };
-        setSeenStatus(newSeen);
-        localStorage.setItem(`daily_seen_${dateKey}`, JSON.stringify(newSeen));
+    const markAsVisited = (key) => {
+        const now = Date.now();
+        localStorage.setItem(`last_visit_${key}`, now.toString());
+        setLastVisits(prev => ({ ...prev, [key]: now }));
+    };
+
+    const isBadgeVisible = (key) => {
+        const dailyKeys = ['achievements', 'colorsync', 'scratch-cards', 'lol-idle', 'rift-defense'];
+        if (!dailyKeys.includes(key)) return false;
+        
+        const startOfToday = new Date();
+        startOfToday.setUTCHours(0, 0, 0, 0);
+        const lastVisit = lastVisits[key];
+        
+        return !lastVisit || lastVisit < startOfToday.getTime();
     };
 
     const iconMap = {
@@ -218,7 +212,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     const sectionKey = cat.toLowerCase();
                     if (items.length === 0) return null;
 
-                    const hasBadge = items.some(item => dailyStatus[item.key] && !seenStatus[item.key]);
+                    const hasBadge = items.some(item => isBadgeVisible(item.key));
 
                     return (
                         <div key={cat} className="nav-section" style={{ marginTop: cat === 'Timers' ? '0' : '12px' }}>
@@ -257,15 +251,14 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                         // Safety check: only superadmins can see the Admin Panel link
                                         if (item.key === 'admin' && !user?.is_superadmin) return null;
                                         
-                                        const isDailyItem = (item.key === 'achievements' || item.key === 'colorsync');
-                                        const showBadge = dailyStatus[item.key] && !seenStatus[item.key];
+                                        const showBadge = isBadgeVisible(item.key);
 
                                         return (
                                             <NavLink 
                                                 key={item.key} 
                                                 to={item.path} 
                                                 onClick={() => {
-                                                    if (isDailyItem) markAsSeen(item.key);
+                                                    markAsVisited(item.key);
                                                     onClose();
                                                 }} 
                                                 className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 

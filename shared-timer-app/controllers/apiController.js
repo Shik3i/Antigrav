@@ -1963,7 +1963,13 @@ exports.getDailyStatus = async (req, res, next) => {
         const userId = req.user.userId;
         const today = new Date().toISOString().split('T')[0];
 
-        const result = { achievements: false, colorsync: false };
+        // Keys MUST match the item.key in Sidebar.jsx / NavbarSettings
+        const result = { 
+            achievements: false, 
+            colorsync: false,
+            'scratch-cards': false,
+            'lol-idle': false
+        };
 
         // 1. Check Achievements daily login bonus
         try {
@@ -1976,7 +1982,7 @@ exports.getDailyStatus = async (req, res, next) => {
                     }
                 );
             });
-            result.achievements = !hasClaimedToday; // true = AVAILABLE = badge visible
+            result.achievements = !hasClaimedToday;
         } catch (e) {
             console.error('[DailyStatus] Achievement check error:', e);
         }
@@ -1987,15 +1993,35 @@ exports.getDailyStatus = async (req, res, next) => {
                 dbLayer.db.get(
                     `SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`,
                     [userId, today],
-                    (err, row) => {
-                        resolve(!!row);
-                    }
+                    (err, row) => resolve(!!row)
                 );
             });
-            result.colorsync = !hasPlayedToday; // true = NOT yet played = badge visible
-        } catch (e) {
-            // Table might not exist or other error
-        }
+            result.colorsync = !hasPlayedToday;
+        } catch (e) { }
+
+        // 3. Check Scratchcards (Free Pack)
+        try {
+            const hasFreePackToday = await new Promise((resolve) => {
+                dbLayer.db.get(
+                    `SELECT id FROM Scratchcards WHERE userId = ? AND is_free = 1 AND date(claimed_at) = date('now')`,
+                    [userId],
+                    (err, row) => resolve(!!row)
+                );
+            });
+            result['scratch-cards'] = !hasFreePackToday;
+        } catch (e) { }
+
+        // 4. Check LoL Idle (Daily Reward)
+        try {
+            const hasIdleRewardToday = await new Promise((resolve) => {
+                dbLayer.db.get(
+                    `SELECT userId FROM Idle_Profiles WHERE userId = ? AND last_daily_reward >= date('now', 'start of day')`,
+                    [userId],
+                    (err, row) => resolve(!!row)
+                );
+            });
+            result['lol-idle'] = !hasIdleRewardToday;
+        } catch (e) { }
 
         res.json(result);
     } catch (err) {
