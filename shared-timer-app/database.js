@@ -267,6 +267,19 @@ db.serialize(() => {
     FOREIGN KEY(requestId) REFERENCES FeatureRequests(id) ON DELETE CASCADE
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS UserGameStats (
+    userId TEXT NOT NULL,
+    gameId TEXT NOT NULL,
+    highscore INTEGER DEFAULT 0,
+    totalScore INTEGER DEFAULT 0,
+    totalLines INTEGER DEFAULT 0,
+    playCount INTEGER DEFAULT 0,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (userId, gameId),
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+
+  // GameScores: stores historical performance entries
   db.run(`CREATE TABLE IF NOT EXISTS GameScores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     userId TEXT NOT NULL,
@@ -2023,6 +2036,76 @@ const recordGameScore = (userId, gameId, score, coinsEarned) => {
   });
 };
 
+const updateUserGameStats = (userId, gameId, newScore, newLines = 0) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      INSERT INTO UserGameStats (userId, gameId, highscore, totalScore, totalLines, playCount, updatedAt)
+      VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+      ON CONFLICT(userId, gameId) DO UPDATE SET
+        highscore = MAX(highscore, excluded.highscore),
+        totalScore = totalScore + excluded.totalScore,
+        totalLines = totalLines + excluded.totalLines,
+        playCount = playCount + 1,
+        updatedAt = CURRENT_TIMESTAMP
+    `;
+    db.run(query, [userId, gameId, newScore, newScore, newLines], function (err) {
+      if (err) {
+        logError(`updateUserGameStats failed: ${err.message}`, err.stack, JSON.stringify({ userId, gameId, newScore, newLines }));
+        reject(err);
+      } else resolve({ success: true });
+    });
+  });
+};
+
+// --- Migration: Initial Populate UserGameStats from GameScores (Tetris Only) ---
+const migrateTetrisStats = () => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      console.log("[Migration] Consolidating Tetris Stats into UserGameStats...");
+      
+      // 1. Clear existing Tetris entries in UserGameStats to avoid duplicates during migration
+      db.run("DELETE FROM UserGameStats WHERE gameId = 'tetris'");
+
+      // 2. Aggregate from GameScores
+      // Note: highscore comes from 'tetris' gameId, lines come from 'tetris_lines' gameId
+      const aggQuery = `
+        INSERT INTO UserGameStats (userId, gameId, highscore, totalLines, playCount)
+        SELECT 
+          userId, 
+          'tetris' as gameId, 
+          MAX(CASE WHEN gameId = 'tetris' THEN score ELSE 0 END) as highscore,
+          SUM(CASE WHEN gameId = 'tetris_lines' THEN score ELSE 0 END) as totalLines,
+          COUNT(CASE WHEN gameId = 'tetris' THEN 1 END) as playCount
+        FROM GameScores
+        WHERE gameId IN ('tetris', 'tetris_lines')
+        GROUP BY userId
+      `;
+
+      db.run(aggQuery, (err) => {
+        if (err) {
+          console.error("[Migration] Tetris stats migration failed:", err);
+          return reject(err);
+        }
+        
+        // 3. Cleanup: Delete the old 'tetris_lines' records since they are now redundantly summed
+        // We keep 'tetris' highscore entries for session history if desired, 
+        // but the user wants to reduce bloat. Let's delete tetris_lines at least.
+        db.run("DELETE FROM GameScores WHERE gameId = 'tetris_lines'", (delErr) => {
+          if (delErr) console.error("[Migration] Failed to cleanup tetris_lines:", delErr);
+          else console.log("[Migration] Tetris stats consolidation complete. Cleaned up old records.");
+          resolve();
+        });
+      });
+    });
+  });
+};
+
+// Trigger migration once at startup (after a slight delay to ensure tables are ready)
+setTimeout(() => {
+  migrateTetrisStats().catch(e => console.error("Auto-migration failed:", e));
+}, 2000);
+
+
 // --- NEW: Game Upgrades Helpers ---
 const getGameUpgradesConfig = (category = 'koala_flap') => {
   return new Promise((resolve, reject) => {
@@ -2125,6 +2208,38 @@ const purchaseUpgrade = (userId, upgradeId) => {
 
 const getGameLeaderboards = (gameId) => {
   return new Promise((resolve, reject) => {
+    // For Tetris, use the new optimized UserGameStats table
+    if (gameId === 'tetris') {
+      const highscoreQuery = `
+        SELECT u.displayName, u.username, u.preferences, u.id as userId, gs.highscore
+        FROM UserGameStats gs
+        JOIN Users u ON gs.userId = u.id
+        WHERE gs.gameId = 'tetris'
+        ORDER BY highscore DESC
+        LIMIT 10
+      `;
+
+      const cumulativeQuery = `
+        SELECT u.displayName, u.username, u.preferences, u.id as userId, gs.totalLines as totalScore, gs.totalScore as totalEarned
+        FROM UserGameStats gs
+        JOIN Users u ON gs.userId = u.id
+        WHERE gs.gameId = 'tetris'
+        ORDER BY totalScore DESC, totalLines DESC
+        LIMIT 10
+      `;
+
+      Promise.all([
+        new Promise((res, rej) => db.all(highscoreQuery, [], (err, rows) => err ? rej(err) : res(rows))),
+        new Promise((res, rej) => db.all(cumulativeQuery, [], (err, rows) => err ? rej(err) : res(rows)))
+      ])
+        .then(([highscores, cumulative]) => {
+          resolve({ highscores, cumulative });
+        })
+        .catch(reject);
+      return;
+    }
+
+    // Default legacy logic for other games (aggregated SUM)
     const highscoreQuery = `
       SELECT u.displayName, u.username, u.preferences, u.id as userId, MAX(gs.score) as highscore
       FROM GameScores gs
@@ -2155,6 +2270,7 @@ const getGameLeaderboards = (gameId) => {
       .catch(reject);
   });
 };
+
 
 function getAdminGameScores(gameId) {
   return new Promise((resolve, reject) => {
@@ -3142,6 +3258,7 @@ module.exports = {
     });
   },
 
+  updateUserGameStats,
   logSystemEvent, // [NEW]
   getSystemLogs,  // [NEW]
   clearSystemLogs, // [NEW]

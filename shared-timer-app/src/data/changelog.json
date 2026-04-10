@@ -1,5 +1,11 @@
 [
   {
+    "id": 22,
+    "version": "2.16.0",
+    "date": "2026-04-10",
+    "changes": "- **Tetris Engine Optimization**: Refactor der Statistik-Speicherung von zeilenbasierter Aggregation auf ein effizientes KV-System (UserGameStats).\\n- **Performance Refactor**: Implementierung von atomaren UPSERT-Updates für Highscore und Lifetime-Lines zur Reduzierung von Datenbank-Bloat.\\n- **Data Migration**: Automatisierte Überführung bestehender Tetris-Lines aus GameScores in das neue optimierte SQL-Schema."
+  },
+  {
     "id": 21,
     "version": "2.15.0",
     "date": "2026-04-10",
