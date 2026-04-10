@@ -1281,12 +1281,9 @@ exports.submitTetrisScore = async (req, res, next) => {
         const safeScore = parseInt(score) || 0;
         const safeLines = parseInt(lines) || 0;
 
-        if (safeScore > 0) {
-            // First record the highscore
-            await dbLayer.recordGameScore(userId, 'tetris', safeScore, 0); // 0 coins
-            // Then record the lines as a separate "game" for lifetime stats. 
-            // We use 'score' column to store lines in db.
-            await dbLayer.recordGameScore(userId, 'tetris_lines', safeLines, 0);
+        if (safeScore > 0 || safeLines > 0) {
+            // New optimized atomic storage: one row per user/game
+            await dbLayer.updateUserGameStats(userId, 'tetris', safeScore, safeLines);
         }
 
         res.json({ success: true, coinsEarned: 0 }); // No coins for Tetris
