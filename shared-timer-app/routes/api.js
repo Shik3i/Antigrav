@@ -173,6 +173,9 @@ router.post('/idle/sell', authController.authenticateToken, idleGameController.s
 router.post('/idle/roster/mode', authController.authenticateToken, idleGameController.updateRosterMode);
 router.post('/idle/tournament/complete', authController.authenticateToken, idleGameController.validateTournament);
 
+// ─── Tetris ──────────────────────────────────────────────
+router.post('/games/tetris/submit', authController.authenticateToken, apiController.submitTetrisScore);
+
 // ─── Color Sync (Color Guessing Game) ─────────────────────────
 router.get('/colorsync/daily', colorSyncController.getDailyColor);
 router.get('/colorsync/random', colorSyncController.getRandomColor);
@@ -192,6 +195,18 @@ router.post('/admin/pokemon-configs/update', authController.authenticateToken, a
 const levelingController = require('../controllers/levelingController');
 router.post('/leveling/milestone', authController.authenticateToken, levelingController.saveMilestone);
 router.get('/leveling/milestones', authController.authenticateToken, levelingController.getMilestones);
+
+// ─── MMO Market Prices ────────────────────────────────────────
+const marketController = require('../controllers/marketController');
+router.get('/market', authController.optionalAuthenticateToken, marketController.getAllActive);
+router.post('/market', authController.authenticateToken, marketController.addItem);
+router.put('/market/:id', authController.authenticateToken, marketController.updateItem);
+router.delete('/market/:id', authController.authenticateToken, marketController.softDeleteItem);
+
+// Market Prices Superadmin
+router.get('/admin/market/deleted', authController.authenticateToken, marketController.getAllDeleted);
+router.patch('/admin/market/:id/restore', authController.authenticateToken, marketController.restoreItem);
+router.delete('/admin/market/:id/hard', authController.authenticateToken, marketController.hardDeleteItem);
 
 // ─── Daily Status Aggregation ─────────────────────────────────
 router.get('/daily-status', authController.authenticateToken, apiController.getDailyStatus);

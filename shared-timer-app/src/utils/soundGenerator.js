@@ -31,52 +31,64 @@ export const ALARM_SOUNDS = {
     COIN_JINGLE: 'Coin Jingle'
 };
 
-export const playAlarmSound = (soundType) => {
+export const playAlarmSound = (soundType, volume = 0.5) => {
     if (!soundType || soundType === ALARM_SOUNDS.NONE) return;
 
     const ctx = getAudioContext();
     const t = ctx.currentTime;
 
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = volume;
+    masterGain.connect(ctx.destination);
+
+    const virtualCtx = new Proxy(ctx, {
+        get(target, prop) {
+            if (prop === 'destination') return masterGain;
+            const val = target[prop];
+            return typeof val === 'function' ? val.bind(target) : val;
+        }
+    });
+
     switch (soundType) {
         case ALARM_SOUNDS.SOFT_BELL:
-            playSoftBell(ctx, t);
+            playSoftBell(virtualCtx, t);
             break;
         case ALARM_SOUNDS.DIGITAL_ALARM:
-            playDigitalAlarm(ctx, t);
+            playDigitalAlarm(virtualCtx, t);
             break;
         case ALARM_SOUNDS.GONG:
-            playGong(ctx, t);
+            playGong(virtualCtx, t);
             break;
         case ALARM_SOUNDS.BIRD:
-            playBird(ctx, t);
+            playBird(virtualCtx, t);
             break;
         case ALARM_SOUNDS.CHIME:
-            playChime(ctx, t);
+            playChime(virtualCtx, t);
             break;
         case ALARM_SOUNDS.BUZZER:
-            playBuzzer(ctx, t);
+            playBuzzer(virtualCtx, t);
             break;
         case ALARM_SOUNDS.WATCH_BEEP:
-            playWatchBeep(ctx, t);
+            playWatchBeep(virtualCtx, t);
             break;
         case ALARM_SOUNDS.SONAR:
-            playSonar(ctx, t);
+            playSonar(virtualCtx, t);
             break;
         case ALARM_SOUNDS.TWINKLE:
-            playTwinkle(ctx, t);
+            playTwinkle(virtualCtx, t);
             break;
         case ALARM_SOUNDS.ARCADE:
-            playArcade(ctx, t);
+            playArcade(virtualCtx, t);
             break;
         case ALARM_SOUNDS.ECHO_DROP:
-            playEchoDrop(ctx, t);
+            playEchoDrop(virtualCtx, t);
             break;
         case ALARM_SOUNDS.SIREN:
-            playSiren(ctx, t);
+            playSiren(virtualCtx, t);
             break;
         case ALARM_SOUNDS.CLASSIC_BEEP:
         default:
-            playClassicBeep(ctx, t);
+            playClassicBeep(virtualCtx, t);
             break;
     }
 };

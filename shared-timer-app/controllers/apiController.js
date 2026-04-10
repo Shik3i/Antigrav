@@ -1271,6 +1271,32 @@ exports.submitKoalaFlapScore = async (req, res, next) => {
     }
 };
 
+exports.submitTetrisScore = async (req, res, next) => {
+    try {
+        const { score, lines } = req.body;
+        const userId = req.user?.id || req.user?.userId;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        
+        const safeScore = parseInt(score) || 0;
+        const safeLines = parseInt(lines) || 0;
+
+        if (safeScore > 0) {
+            // First record the highscore
+            await dbLayer.recordGameScore(userId, 'tetris', safeScore, 0); // 0 coins
+            // Then record the lines as a separate "game" for lifetime stats. 
+            // We use 'score' column to store lines in db.
+            await dbLayer.recordGameScore(userId, 'tetris_lines', safeLines, 0);
+        }
+
+        res.json({ success: true, coinsEarned: 0 }); // No coins for Tetris
+    } catch (err) {
+        console.error('[Games] Error submitting Tetris score:', err);
+        if (dbLayer.logError) await dbLayer.logError(`Tetris Score Submission Failed: ${err.message}`, err.stack, req.user?.id);
+        res.status(500).json({ error: 'Failed to submit score' });
+    }
+};
+
 exports.getGameLeaderboards = async (req, res, next) => {
     try {
         const gameId = req.query.gameId || 'koala_flap';

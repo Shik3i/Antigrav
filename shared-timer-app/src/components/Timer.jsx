@@ -128,7 +128,8 @@ const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTim
 
     const playRingtone = () => {
         const soundChoice = user?.preferences?.alarmSound || ALARM_SOUNDS.CLASSIC_BEEP;
-        playAlarmSound(soundChoice);
+        const volume = user?.preferences?.alarmVolume !== undefined ? user.preferences.alarmVolume : 0.5;
+        playAlarmSound(soundChoice, volume);
     };
 
     if (!roomState) return null;
@@ -146,13 +147,15 @@ const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTim
     
     let currentPhase = 'focus';
     let phaseText = roomState?.state?.isRunning ? 'Focusing' : (localRemainingMs === 0 ? 'Done' : 'Paused');
+    const workName = roomState?.config?.pomodoro?.workName || 'Focusing';
+    const breakName = roomState?.config?.pomodoro?.breakName || 'Entspannen';
     if (isPomodoro) {
         if (localRemainingMs > totalDuration - pauseTime) {
             currentPhase = 'pause';
-            phaseText = roomState?.state?.isRunning ? 'Entspannen' : 'Paused (Entspannen)';
+            phaseText = roomState?.state?.isRunning ? breakName : `Paused (${breakName})`;
         } else {
             currentPhase = 'focus';
-            phaseText = roomState?.state?.isRunning ? 'Focusing' : (localRemainingMs === 0 ? 'Done' : 'Paused');
+            phaseText = roomState?.state?.isRunning ? workName : (localRemainingMs === 0 ? 'Done' : `Paused (${workName})`);
         }
     }
 
@@ -221,7 +224,7 @@ const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTim
                         border: '1px solid currentColor',
                         transition: 'all 0.3s ease'
                     }}>
-                        Phase: {currentPhase === 'pause' ? 'Entspannen' : 'Focusing'}
+                        Phase: {currentPhase === 'pause' ? breakName : workName}
                     </div>
                 )}
                 {visualMode === 'circle' && (

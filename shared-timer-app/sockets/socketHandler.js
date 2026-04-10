@@ -589,7 +589,7 @@ module.exports = function (io) {
             }
         });
 
-        socket.on(EVENTS.SET_POMODORO, ({ roomId, enabled, pauseMinutes }) => {
+        socket.on(EVENTS.SET_POMODORO, ({ roomId, enabled, pauseMinutes, workName, breakName }) => {
             const user = roomManager.getUserBySocket(socket.id);
             if (user && user.role === 'write') {
                 const room = roomManager.getRoom(roomId);
@@ -600,7 +600,7 @@ module.exports = function (io) {
                             return;
                         }
                     }
-                    roomManager.togglePomodoro(roomId, enabled, pauseMinutes);
+                    roomManager.togglePomodoro(roomId, enabled, pauseMinutes, workName, breakName);
                     io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
                     const ev = roomManager.addEvent(roomId, 'action', `${user.displayName} ${enabled ? 'enabled' : 'disabled'} Pomodoro mode`, socket.id);
                     if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);

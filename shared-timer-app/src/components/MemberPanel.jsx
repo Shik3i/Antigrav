@@ -48,6 +48,8 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
     const currentMinutes = roomState.config.durationMs / 60000;
     const [durationInput, setDurationInput] = useState(currentMinutes);
     const [pauseInput, setPauseInput] = useState(roomState?.config?.pomodoro?.pauseMinutes || 5);
+    const [workNameInput, setWorkNameInput] = useState(roomState?.config?.pomodoro?.workName || 'Work');
+    const [breakNameInput, setBreakNameInput] = useState(roomState?.config?.pomodoro?.breakName || 'Break');
     const [activeTab, setActiveTab] = useState('controls');
 
     // Friends state lifted here
@@ -224,7 +226,7 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                                         alert("Validierung: Die Pausenzeit muss kleiner als die Gesamtzeit sein.");
                                         return;
                                     }
-                                    socket.emit(EVENTS.SET_POMODORO, { roomId, enabled, pauseMinutes: pMins });
+                                    socket.emit(EVENTS.SET_POMODORO, { roomId, enabled, pauseMinutes: pMins, workName: workNameInput, breakName: breakNameInput });
                                 }}
                             >
                                 <Clock size={16} />
@@ -248,7 +250,7 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                                                     alert("Validierung: Die Pausenzeit muss kleiner als die Gesamtzeit sein.");
                                                     setPauseInput(roomState.config.pomodoro?.pauseMinutes || 5);
                                                 } else {
-                                                    socket.emit(EVENTS.SET_POMODORO, { roomId, enabled: true, pauseMinutes: pMins });
+                                                    socket.emit(EVENTS.SET_POMODORO, { roomId, enabled: true, pauseMinutes: pMins, workName: workNameInput, breakName: breakNameInput });
                                                 }
                                             }
                                         }}
@@ -261,6 +263,45 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                                         style={{ width: '70px', padding: '6px 10px', fontSize: '0.85rem', textAlign: 'center' }}
                                     />
                                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>min</span>
+                                </div>
+                            )}
+
+                            {roomState.state.isPomodoro && (
+                                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '8px', marginTop: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flex: 1 }}>Work Name:</span>
+                                        <input
+                                            type="text"
+                                            value={workNameInput}
+                                            onChange={(e) => setWorkNameInput(e.target.value)}
+                                            onBlur={() => {
+                                                const pMins = parseFloat(pauseInput) || 5;
+                                                socket.emit(EVENTS.SET_POMODORO, { roomId, enabled: true, pauseMinutes: pMins, workName: workNameInput, breakName: breakNameInput });
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') e.target.blur();
+                                            }}
+                                            className="input-primary"
+                                            style={{ width: '120px', padding: '6px 10px', fontSize: '0.85rem' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flex: 1 }}>Break Name:</span>
+                                        <input
+                                            type="text"
+                                            value={breakNameInput}
+                                            onChange={(e) => setBreakNameInput(e.target.value)}
+                                            onBlur={() => {
+                                                const pMins = parseFloat(pauseInput) || 5;
+                                                socket.emit(EVENTS.SET_POMODORO, { roomId, enabled: true, pauseMinutes: pMins, workName: workNameInput, breakName: breakNameInput });
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') e.target.blur();
+                                            }}
+                                            className="input-primary"
+                                            style={{ width: '120px', padding: '6px 10px', fontSize: '0.85rem' }}
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </div>
