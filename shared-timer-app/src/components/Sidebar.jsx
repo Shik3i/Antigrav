@@ -188,6 +188,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         'roadmap': <Lightbulb size={18} color="#fbbf24" />,
         'changelog': <History size={18} color="#94a3b8" />,
         'admin': <Shield size={18} color="var(--accent-primary)" />,
+        'tetris': <Gamepad2 size={18} color="#ec4899" />,
     };
 
     const categories = ['Timers', 'Esports', 'Games', 'System'];

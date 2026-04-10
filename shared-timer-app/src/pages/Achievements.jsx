@@ -20,6 +20,7 @@ const Achievements = () => {
     const [claiming, setClaiming] = useState(false);
     const [error, setError] = useState(null);
     const [showCompleted, setShowCompleted] = useState(false);
+    const [hoveredCard, setHoveredCard] = useState(null);
 
     const fetchStatus = async () => {
         try {
@@ -196,50 +197,78 @@ const Achievements = () => {
                             {meta.label}
                         </h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                            {chainMilestones.map((m) => (
-                                <div key={m.id} className="glass-panel hover-card" style={{
-                                    position: 'relative', overflow: 'hidden',
-                                    border: m.isCompleted ? `1px solid ${meta.color}80` : undefined
-                                }}>
-                                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                                        <div style={{
-                                            width: '48px', height: '48px', borderRadius: '12px',
-                                            background: `${meta.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            color: meta.color
-                                        }}>
-                                            {getIcon(m.icon)}
-                                        </div>
-                                        <div>
-                                            <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.1rem' }}>{m.title}</h3>
-                                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{m.description}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Progress Bar */}
-                                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', height: '8px', overflow: 'hidden', marginBottom: '0.5rem' }}>
-                                        <div style={{
-                                            height: '100%',
-                                            background: m.isCompleted ? '#10b981' : meta.color,
-                                            width: `${Math.min(100, (m.currentProgress / m.requiredCount) * 100)}%`,
-                                            transition: 'width 0.5s ease-out'
-                                        }} />
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                                        <span>Fortschritt: {m.currentProgress} / {m.requiredCount}</span>
-                                        <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>+{formatCoins(m.rewardCoins)} KC</span>
-                                    </div>
-
-                                    <button
-                                        className={m.isCompleted ? 'btn-primary' : 'btn-ghost'}
-                                        style={{ width: '100%', padding: '0.75rem', opacity: m.isCompleted ? 1 : 0.5 }}
-                                        disabled={!m.isCompleted || claiming}
-                                        onClick={() => handleClaim(m.id)}
+                            {chainMilestones.map((m) => {
+                                const isHovered = hoveredCard === m.id;
+                                return (
+                                    <div 
+                                        key={m.id} 
+                                        className="glass-panel hover-card" 
+                                        onMouseEnter={() => setHoveredCard(m.id)}
+                                        onMouseLeave={() => setHoveredCard(null)}
+                                        style={{
+                                            position: 'relative', 
+                                            overflow: 'hidden',
+                                            padding: '24px',
+                                            borderRadius: '24px',
+                                            background: isHovered ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+                                            border: m.isCompleted ? `1px solid ${meta.color}` : isHovered ? `1px solid ${meta.color}60` : '1px solid rgba(255,255,255,0.08)',
+                                            transform: isHovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
+                                            boxShadow: isHovered ? `0 12px 24px -10px ${meta.color}50` : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                        }}
                                     >
-                                        {m.isCompleted ? 'Meilenstein Abholen' : <><Lock size={16} /> Noch nicht erreicht</>}
-                                    </button>
-                                </div>
-                            ))}
+                                        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                                            <div style={{
+                                                width: '56px', height: '56px', borderRadius: '16px',
+                                                background: `${meta.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                color: meta.color, flexShrink: 0,
+                                                boxShadow: isHovered ? `inset 0 0 10px ${meta.color}30` : 'none',
+                                                transition: 'all 0.3s ease'
+                                            }}>
+                                                {getIcon(m.icon)}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 700, color: isHovered ? meta.color : 'var(--text-main)', transition: 'color 0.3s ease' }}>{m.title}</h3>
+                                                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{m.description}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Progress Bar */}
+                                        <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', height: '10px', overflow: 'hidden', marginBottom: '12px', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)' }}>
+                                            <div style={{
+                                                height: '100%',
+                                                background: m.isCompleted ? '#10b981' : `linear-gradient(90deg, ${meta.color}90, ${meta.color})`,
+                                                width: `${Math.min(100, (m.currentProgress / m.requiredCount) * 100)}%`,
+                                                borderRadius: '12px',
+                                                boxShadow: `0 0 10px ${m.isCompleted ? '#10b981' : meta.color}80`,
+                                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                                            }} />
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '24px', fontWeight: 500 }}>
+                                            <span style={{ color: m.isCompleted ? '#10b981' : 'var(--text-muted)' }}>{m.currentProgress} <span style={{ opacity: 0.5 }}>/</span> {m.requiredCount}</span>
+                                            <span style={{ color: '#f59e0b', fontWeight: 800, background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '8px' }}>+{formatCoins(m.rewardCoins)} KC</span>
+                                        </div>
+
+                                        <button
+                                            className={m.isCompleted ? 'btn-primary' : 'btn-ghost'}
+                                            style={{ 
+                                                width: '100%', 
+                                                padding: '12px', 
+                                                opacity: m.isCompleted ? 1 : 0.6,
+                                                borderRadius: '12px',
+                                                fontWeight: 700,
+                                                transition: 'all 0.2s ease',
+                                                background: !m.isCompleted && isHovered ? 'rgba(255,255,255,0.08)' : undefined
+                                            }}
+                                            disabled={!m.isCompleted || claiming}
+                                            onClick={() => handleClaim(m.id)}
+                                        >
+                                            {m.isCompleted ? 'Meilenstein Abholen' : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Lock size={16} /> Noch nicht erreicht</span>}
+                                        </button>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 );

@@ -624,6 +624,11 @@ db.serialize(() => {
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
             VALUES ('leveling-tracker', 'Leveling Tracker', '/leveling', 'Timers', 1, 5)`);
 
+    // Tetris Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('tetris', 'Tetris', '/tetris', 'Games', 1, 7)`);
+
+
     // ─── Leveling Milestones Table ───────────────────────────────
     db.run(`CREATE TABLE IF NOT EXISTS LevelingMilestones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -658,6 +663,23 @@ db.serialize(() => {
       });
     });
   });
+
+  // ─── MMO Market Prices Table ──────────────────────────────────
+  db.run(`CREATE TABLE IF NOT EXISTS MMO_MarketPrices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    itemName TEXT NOT NULL,
+    price BIGINT NOT NULL,
+    updatedBy TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    isDeleted INTEGER DEFAULT 0
+  )`);
+  
+  db.run("ALTER TABLE MMO_MarketPrices ADD COLUMN createdAt DATETIME DEFAULT CURRENT_TIMESTAMP", (err) => {
+    // Ignore duplicate column error if already run
+  });
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_market_deleted_name ON MMO_MarketPrices(isDeleted, itemName);`);
   
 
   // Signal database is ready and mirror initial logs
@@ -2114,12 +2136,12 @@ const getGameLeaderboards = (gameId) => {
     `;
 
     const cumulativeQuery = `
-      SELECT u.displayName, u.username, u.preferences, u.id as userId, SUM(gs.coinsEarned) as totalEarned
+      SELECT u.displayName, u.username, u.preferences, u.id as userId, SUM(gs.coinsEarned) as totalEarned, SUM(gs.score) as totalScore
       FROM GameScores gs
       JOIN Users u ON gs.userId = u.id
       WHERE gs.gameId = ?
       GROUP BY gs.userId
-      ORDER BY totalEarned DESC
+      ORDER BY totalEarned DESC, totalScore DESC
       LIMIT 10
     `;
 

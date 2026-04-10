@@ -5,7 +5,7 @@ import Avatar from '../components/Avatar';
 import UserContextMenu from '../components/UserContextMenu';
 
 const GameLeaderboards = () => {
-    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] } });
+    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [koalaSortField, setKoalaSortField] = useState('highscore');
@@ -18,14 +18,18 @@ const GameLeaderboards = () => {
     const [riftMinionsSortDir, setRiftMinionsSortDir] = useState('desc');
     const [riftBossesSortField, setRiftBossesSortField] = useState('value');
     const [riftBossesSortDir, setRiftBossesSortDir] = useState('desc');
+    const [tetrisSortField, setTetrisSortField] = useState('highscore');
+    const [tetrisSortDir, setTetrisSortDir] = useState('desc');
 
     useEffect(() => {
         const fetchLeaderboards = async () => {
             try {
-                const [lbRes, scratchRes, riftRes] = await Promise.all([
+                const [lbRes, scratchRes, riftRes, tetrisScoreRes, tetrisLinesRes] = await Promise.all([
                     axios.get('/api/games/leaderboard?gameId=koala_flap'),
                     axios.get('/api/scratchcards/stats'),
-                    axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } }))
+                    axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } })),
+                    axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [] } })),
+                    axios.get('/api/games/leaderboard?gameId=tetris_lines').catch(() => ({ data: { cumulative: [] } }))
                 ]);
 
                 const scratchList = (scratchRes.data.leaderboard || []).map(row => ({
@@ -49,7 +53,26 @@ const GameLeaderboards = () => {
                     }
                 });
 
-                setLeaderboards({ koala: Object.values(highscoreMap), scratch: scratchList, rift: riftRes.data.leaderboards || { highestWave: [], totalMinions: [], totalBosses: [] } });
+                // Merge Tetris highscores + lines into one list
+                const tetrisMap = {};
+                (tetrisScoreRes.data.highscores || []).forEach(row => {
+                    tetrisMap[row.userId || row.displayName] = { ...row };
+                });
+                (tetrisLinesRes.data.cumulative || []).forEach(row => {
+                    const key = row.userId || row.displayName;
+                    if (tetrisMap[key]) {
+                        tetrisMap[key].totalLines = row.totalScore || 0;
+                    } else {
+                        tetrisMap[key] = { ...row, highscore: 0, totalLines: row.totalScore || 0 };
+                    }
+                });
+
+                setLeaderboards({ 
+                    koala: Object.values(highscoreMap), 
+                    scratch: scratchList, 
+                    rift: riftRes.data.leaderboards || { highestWave: [], totalMinions: [], totalBosses: [] },
+                    tetris: Object.values(tetrisMap)
+                });
                 setLoading(false);
             } catch (err) {
                 console.error('Failed to fetch leaderboards:', err);
@@ -167,6 +190,7 @@ const GameLeaderboards = () => {
     const sortedRiftWave = sortData(leaderboards.rift.highestWave, riftWaveSortField, riftWaveSortDir);
     const sortedRiftMinions = sortData(leaderboards.rift.totalMinions, riftMinionsSortField, riftMinionsSortDir);
     const sortedRiftBosses = sortData(leaderboards.rift.totalBosses, riftBossesSortField, riftBossesSortDir);
+    const sortedTetris = sortData(leaderboards.tetris, tetrisSortField, tetrisSortDir);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '48px', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
@@ -283,6 +307,33 @@ const GameLeaderboards = () => {
                             columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
                         })}
                     </div>
+                </div>
+            </section>
+
+            {/* Tetris */}
+            <section>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Trophy size={18} color="#fff" />
+                    </div>
+                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TETRIS</h2>
+                </div>
+                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <TrendingUp size={18} color="#ec4899" />
+                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    </div>
+                    {renderTable({
+                        data: sortedTetris,
+                        accentColor: '#ec4899',
+                        sortField: tetrisSortField,
+                        sortDir: tetrisSortDir,
+                        onSort: (f) => handleSort(tetrisSortField, setTetrisSortField, tetrisSortDir, setTetrisSortDir, f),
+                        columns: [
+                            { field: 'highscore', label: 'Highscore', width: '100px', format: v => v.toLocaleString() },
+                            { field: 'totalLines', label: 'Total Lines (Lifetime)', width: '150px', format: v => v.toLocaleString() }
+                        ]
+                    })}
                 </div>
             </section>
 

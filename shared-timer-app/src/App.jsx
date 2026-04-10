@@ -32,6 +32,7 @@ const LoLIdleGame = React.lazy(() => import('./pages/LoLIdleGame'));
 const ColorSyncGame = React.lazy(() => import('./pages/ColorSyncGame'));
 const SharedCountdown = React.lazy(() => import('./pages/SharedCountdown'));
 const LevelingTracker = React.lazy(() => import('./pages/LevelingTracker'));
+const Tetris = React.lazy(() => import('./pages/Tetris'));
 
 import NewsTicker from './components/NewsTicker';
 import Friends from './pages/Friends';
@@ -508,6 +509,7 @@ function InnerApp() {
                 <Route path="/color-sync" element={<ColorSyncGame user={user} token={token} />} />
                 <Route path="/color-sync/lobby/:uuid" element={<ColorSyncGame user={user} token={token} />} />
                 <Route path="/profile/:username" element={<UserProfile />} />
+                <Route path="/tetris" element={<Tetris />} />
                 <Route path="/c" element={<SharedCountdown />} />
                 <Route path="*" element={<div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-main)' }}><h2>404 - Seite nicht gefunden</h2><p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Die gesuchte Seite existiert nicht.</p><a href="/" style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-card)', borderRadius: '8px', color: 'var(--text-main)', textDecoration: 'none', border: '1px solid var(--border-color)' }}>Zurück zur Startseite</a></div>} />
               </Routes>

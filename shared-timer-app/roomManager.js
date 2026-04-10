@@ -285,18 +285,40 @@ class RoomManager {
         };
     }
 
-    togglePomodoro(roomId, enabled, pauseMinutes) {
+    togglePomodoro(roomId, enabled, pauseMinutes, workName, breakName) {
         const room = this.getRoom(roomId);
         if (room) {
             room.state.isPomodoro = enabled;
             if (enabled) {
-                if (!room.config.pomodoro || pauseMinutes) {
-                    room.config.pomodoro = { pauseMinutes: parseFloat(pauseMinutes) || 5 };
+                if (!room.config.pomodoro) room.config.pomodoro = {};
+                if (pauseMinutes !== undefined && pauseMinutes !== null) {
+                    room.config.pomodoro.pauseMinutes = parseFloat(pauseMinutes) || 5;
                 }
+                if (workName !== undefined) room.config.pomodoro.workName = workName;
+                if (breakName !== undefined) room.config.pomodoro.breakName = breakName;
             }
             return true;
         }
         return false;
+    }
+
+    advancePomodoro(roomId) {
+        const room = this.getRoom(roomId);
+        if (!room || !room.state.isPomodoro) return null;
+
+        // Toggle phase
+        room.state.pomodoroPhase = room.state.pomodoroPhase === 'work' ? 'break' : 'work';
+        
+        if (room.state.pomodoroPhase === 'work') {
+            room.state.pomodoroCycles++;
+            room.state.remainingMs = room.config.durationMs; // Use default work duration
+        } else {
+            const pauseMinutes = room.config.pomodoro?.pauseMinutes || 5;
+            room.state.remainingMs = pauseMinutes * 60 * 1000;
+        }
+
+        this.startTimer(roomId);
+        return room.state.pomodoroPhase;
     }
 
     toggleAutoRestart(roomId, enabled) {

@@ -1,5 +1,11 @@
 [
   {
+    "id": 21,
+    "version": "2.15.0",
+    "date": "2026-04-10",
+    "changes": "- **Tetris Minigame**: Vollwertiges Tetris-Erlebnis mit Endless- und Sprint-Modus (40 Lines) hinzugefügt.\\n- **Tetris Stats & Leaderboards**: Aufzeichnung von Highscores und Lifetime-Lines; Anzeige beider Metriken in den globalen Game Leaderboards.\\n- **Tetris UI/UX Refinement**: Neues klares Layout mit Ghost-Piece Mechanik, Next/Hold-Views, Partikeleffekten und integriertem \"Best Score\" im Header.\\n- **Bugfixes**: Behebung von Layout-Verschiebungen und Overlaps im Tetris Game-Over-Screen."
+  },
+  {
     "id": 20,
     "version": "2.14.1",
     "date": "2026-04-02",

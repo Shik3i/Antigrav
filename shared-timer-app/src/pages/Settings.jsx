@@ -788,7 +788,7 @@ const Settings = ({ user, setUser, socket }) => {
                                     Choose the sound that plays when the timer hits zero.
                                 </p>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                                     <select
                                         className="input-primary"
                                         style={{ flex: 1, cursor: 'pointer', maxWidth: '300px' }}
@@ -799,13 +799,28 @@ const Settings = ({ user, setUser, socket }) => {
                                             <option key={sound} value={sound}>{sound}</option>
                                         ))}
                                     </select>
+                                    
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Volume2 size={16} color="var(--text-muted)" />
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="1"
+                                            step="0.05"
+                                            value={user.preferences?.alarmVolume !== undefined ? user.preferences.alarmVolume : 0.5}
+                                            onChange={(e) => updatePref('alarmVolume', parseFloat(e.target.value))}
+                                            style={{ width: '100px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
+                                            title="Volume"
+                                        />
+                                    </div>
 
                                     <button
                                         type="button"
                                         className="btn-ghost"
                                         style={{ padding: '10px 16px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)', display: 'flex', gap: '8px', alignItems: 'center' }}
                                         onClick={() => {
-                                            playAlarmSound(user.preferences?.alarmSound || ALARM_SOUNDS.CLASSIC_BEEP);
+                                            const vol = user.preferences?.alarmVolume !== undefined ? user.preferences.alarmVolume : 0.5;
+                                            playAlarmSound(user.preferences?.alarmSound || ALARM_SOUNDS.CLASSIC_BEEP, vol);
                                             if (Notification.permission === 'default') {
                                                 Notification.requestPermission().then(perm => {
                                                     if (perm === 'granted') {
@@ -991,7 +1006,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.14.1
+                    Version 2.15.0
                 </div>
             </div>
         </div>
