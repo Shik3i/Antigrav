@@ -4,6 +4,15 @@ import { Trophy, Coins, TrendingUp, ShieldCheck, ArrowUp, ArrowDown, Map } from 
 import Avatar from '../components/Avatar';
 import UserContextMenu from '../components/UserContextMenu';
 
+const formatSprintTime = (ms) => {
+    if (!ms || ms === 0) return '--:--.--';
+    const totalSec = Math.floor(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    const frac = Math.floor((ms % 1000) / 10);
+    return `${min}:${sec.toString().padStart(2, '0')}.${frac.toString().padStart(2, '0')}`;
+};
+
 const GameLeaderboards = () => {
     const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [] });
     const [loading, setLoading] = useState(true);
@@ -24,12 +33,11 @@ const GameLeaderboards = () => {
     useEffect(() => {
         const fetchLeaderboards = async () => {
             try {
-                const [lbRes, scratchRes, riftRes, tetrisScoreRes, tetrisLinesRes] = await Promise.all([
+                const [lbRes, scratchRes, riftRes, tetrisRes] = await Promise.all([
                     axios.get('/api/games/leaderboard?gameId=koala_flap'),
                     axios.get('/api/scratchcards/stats'),
                     axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } })),
-                    axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [] } })),
-                    axios.get('/api/games/leaderboard?gameId=tetris_lines').catch(() => ({ data: { cumulative: [] } }))
+                    axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [], cumulative: [] } }))
                 ]);
 
                 const scratchList = (scratchRes.data.leaderboard || []).map(row => ({
@@ -39,7 +47,7 @@ const GameLeaderboards = () => {
                     totalBought: row.totalBought || 0
                 }));
 
-                // Merge KoalaFlap highscores + cumulative into one list
+                // Merge KoalaFlap highscores + cumulative
                 const highscoreMap = {};
                 (lbRes.data.highscores || []).forEach(row => {
                     highscoreMap[row.userId || row.displayName] = { ...row };
@@ -53,17 +61,21 @@ const GameLeaderboards = () => {
                     }
                 });
 
-                // Merge Tetris highscores + lines into one list
+                // Merge Tetris highscores + lines (both now from the same response)
                 const tetrisMap = {};
-                (tetrisScoreRes.data.highscores || []).forEach(row => {
+                (tetrisRes.data.highscores || []).forEach(row => {
                     tetrisMap[row.userId || row.displayName] = { ...row };
                 });
-                (tetrisLinesRes.data.cumulative || []).forEach(row => {
+                (tetrisRes.data.cumulative || []).forEach(row => {
                     const key = row.userId || row.displayName;
                     if (tetrisMap[key]) {
-                        tetrisMap[key].totalLines = row.totalScore || 0;
+                        tetrisMap[key].totalLines = row.totalLines || 0;
+                        // Always pick the non-zero sprintHighscore if it exists
+                        if (row.sprintHighscore > 0 && (!tetrisMap[key].sprintHighscore || row.sprintHighscore < tetrisMap[key].sprintHighscore)) {
+                            tetrisMap[key].sprintHighscore = row.sprintHighscore;
+                        }
                     } else {
-                        tetrisMap[key] = { ...row, highscore: 0, totalLines: row.totalScore || 0 };
+                        tetrisMap[key] = { ...row, highscore: 0, totalLines: row.totalLines || 0 };
                     }
                 });
 
@@ -331,6 +343,8 @@ const GameLeaderboards = () => {
                         onSort: (f) => handleSort(tetrisSortField, setTetrisSortField, tetrisSortDir, setTetrisSortDir, f),
                         columns: [
                             { field: 'highscore', label: 'Highscore', width: '100px', format: v => v.toLocaleString() },
+                            { field: 'sprintHighscore', label: 'Sprint (40L)', width: '120px', format: v => formatSprintTime(v) },
+                            { field: 'maxLevel', label: 'Max Level', width: '90px' },
                             { field: 'totalLines', label: 'Total Lines (Lifetime)', width: '150px', format: v => v.toLocaleString() }
                         ]
                     })}

@@ -176,6 +176,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         'statistics': <BarChart3 size={18} />,
         'esports': <Trophy size={18} color="#3b82f6" />,
         'esports-bets': <Target size={18} color="#f59e0b" />,
+        'polymarket-general': <TrendingUp size={18} color="#3b82f6" />,
         'financial-dashboard': <TrendingUp size={18} color="#10b981" />,
         'achievements': <Trophy size={18} color="#facc15" />,
         'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
@@ -189,6 +190,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         'changelog': <History size={18} color="#94a3b8" />,
         'admin': <Shield size={18} color="var(--accent-primary)" />,
         'tetris': <Gamepad2 size={18} color="#ec4899" />,
+        'wordle': <Maximize2 size={18} color="#10b981" />,
     };
 
     const categories = ['Timers', 'Esports', 'Games', 'System'];

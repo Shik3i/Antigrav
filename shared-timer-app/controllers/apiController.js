@@ -330,7 +330,11 @@ exports.fetchPolymarketOddsData = async (forceRefreshMatch = null) => {
     };
 
     if (forceRefreshMatch) {
-        slugsToTry.push(...generateSlugsForMatch(forceRefreshMatch.team1, forceRefreshMatch.team2, forceRefreshMatch.startTime));
+        if (forceRefreshMatch.slug) {
+            slugsToTry.push(forceRefreshMatch.slug);
+        } else {
+            slugsToTry.push(...generateSlugsForMatch(forceRefreshMatch.team1, forceRefreshMatch.team2, forceRefreshMatch.startTime));
+        }
     } else {
         schedule.forEach(match => {
             if (!match.team1 || !match.team2 || match.team1.code === 'TBD' || match.team2.code === 'TBD') return;
@@ -359,51 +363,90 @@ exports.fetchPolymarketOddsData = async (forceRefreshMatch = null) => {
     let triggerResolution = false;
     const fetchedOdds = allLolEvents.map(event => {
         const markets = event.markets || [];
+        if (markets.length === 0) return null;
 
-        // Find the match-winner market: prioritize "Match Winner" or "moneyline" type
-        let winnerMarket = markets.find(m => m.sportsMarketType === 'moneyline' || m.groupItemTitle === 'Match Winner');
+        // 1. Check if we have multiple binary markets (Yes/No style) that should be aggregated
+        // (Typical for "Winner of Tournament" or "Election Winner" events)
+        const isMultiMarket = markets.length > 2 && markets.every(m => {
+            try {
+                const outcomes = JSON.parse(m.outcomes || '[]');
+                return outcomes.includes('Yes') || outcomes.includes('No');
+            } catch { return false; }
+        });
 
-        // Fallback if not specifically tagged: 
-        // has exactly 2 non-Yes/No outcomes and is NOT a sub-market like First Blood or Map Handicap
-        if (!winnerMarket) {
-            winnerMarket = markets.find(m => {
-                try {
-                    const names = JSON.parse(m.outcomes || '[]');
-                    const isTwoTeam = names.length === 2
-                        && !names.includes('Yes') && !names.includes('No')
-                        && !names.includes('Over') && !names.includes('Under');
+        let outcomeData = [];
+        let url = `https://polymarket.com/event/${event.slug}`;
 
-                    const question = (m.question || '').toLowerCase();
-                    const isSubMarket = question.includes('first blood') || question.includes('game') || question.includes('handicap') || question.includes('map');
+        if (isMultiMarket) {
+            // AGGREGATE MODE: Take "Yes" price from every market
+            outcomeData = markets.map(m => {
+                const outcomes = JSON.parse(m.outcomes || '[]');
+                const prices = JSON.parse(m.outcomePrices || '[]');
+                const yesIndex = outcomes.indexOf('Yes');
+                
+                // Use groupItemTitle (e.g. "Scottie Scheffler") or question if missing
+                let name = m.groupItemTitle || m.question;
+                if (name && name.startsWith('Will ') && name.endsWith(' win?')) {
+                    name = name.substring(5, name.length - 5);
+                }
 
-                    return isTwoTeam && !isSubMarket;
-                } catch { return false; }
-            });
-        }
+                return {
+                    name: name || 'Unknown',
+                    price: parseFloat(prices[yesIndex] || 0),
+                    pct: Math.round(parseFloat(prices[yesIndex] || 0) * 100)
+                };
+            }).sort((a, b) => b.price - a.price); // Sort by highest probability
+        } else {
+            // SINGLE MARKET MODE: Find the best winner market
+            let winnerMarket = markets.find(m => m.sportsMarketType === 'moneyline' || m.groupItemTitle === 'Match Winner');
 
-        if (!winnerMarket) return null;
-
-        try {
-            const outcomeNames = JSON.parse(winnerMarket.outcomes);
-            const outcomePrices = JSON.parse(winnerMarket.outcomePrices || '[]');
-
-            // Trigger resolution if any outcome has hit 100% (price 1.0)
-            if (outcomePrices.some(p => parseFloat(p) === 1)) {
-                triggerResolution = true;
+            // Fallback for custom binary markets
+            if (!winnerMarket) {
+                winnerMarket = markets.find(m => {
+                    try {
+                        const names = JSON.parse(m.outcomes || '[]');
+                        const isTwoTeam = names.length === 2
+                            && !names.includes('Yes') && !names.includes('No')
+                            && !names.includes('Over') && !names.includes('Under');
+                        const question = (m.question || '').toLowerCase();
+                        const isSubMarket = question.includes('first blood') || question.includes('game') || question.includes('handicap') || question.includes('map');
+                        return isTwoTeam && !isSubMarket;
+                    } catch { return false; }
+                });
             }
 
-            return {
-                id: event.id,
-                slug: event.slug,
-                title: event.title,
-                outcomes: outcomeNames.map((name, i) => ({
+            // Absolute fallback
+            if (!winnerMarket) winnerMarket = markets[0];
+
+            try {
+                const names = JSON.parse(winnerMarket.outcomes || '[]');
+                const prices = JSON.parse(winnerMarket.outcomePrices || '[]');
+                outcomeData = names.map((name, i) => ({
                     name,
-                    price: parseFloat(outcomePrices[i] || 0),
-                    pct: Math.round(parseFloat(outcomePrices[i] || 0) * 100)
-                })),
-                url: `https://polymarket.com/event/${event.slug}`
-            };
-        } catch { return null; }
+                    price: parseFloat(prices[i] || 0),
+                    pct: Math.round(parseFloat(prices[i] || 0) * 100)
+                }));
+                // Some events are direct /market/ links
+                if (winnerMarket.slug && !event.slug) {
+                    url = `https://polymarket.com/market/${winnerMarket.slug}`;
+                }
+            } catch { return null; }
+        }
+
+        if (outcomeData.length === 0) return null;
+
+        // Trigger resolution logic if any price is exactly 1.0 (100%)
+        if (outcomeData.some(o => o.price === 1)) {
+            triggerResolution = true;
+        }
+
+        return {
+            id: event.id,
+            slug: event.slug,
+            title: event.title,
+            outcomes: outcomeData,
+            url
+        };
     }).filter(Boolean);
 
     if (forceRefreshMatch) {
@@ -691,10 +734,19 @@ exports.deleteAdminMapping = async (id) => {
 };
 
 exports.getAdminCacheStatus = () => {
+    const polyData = polymarketCache.data || [];
+    const esportsItems = polyData.filter(item => item.slug && item.slug.startsWith('lol-')).length;
+    const generalItems = polyData.length - esportsItems;
+
     return {
-        polymarket: {
-            isCached: !!polymarketCache.data,
-            items: polymarketCache.data ? polymarketCache.data.length : 0,
+        polymarketEsports: {
+            isCached: esportsItems > 0,
+            items: esportsItems,
+            ageSeconds: polymarketCache.timestamp ? Math.round((Date.now() - polymarketCache.timestamp) / 1000) : null
+        },
+        polymarketGeneral: {
+            isCached: generalItems > 0,
+            items: generalItems,
             ageSeconds: polymarketCache.timestamp ? Math.round((Date.now() - polymarketCache.timestamp) / 1000) : null
         },
         oddsApi: {
@@ -1017,7 +1069,7 @@ exports.placeBet = async (req, res, next) => {
         }
 
         // Deduct coins
-        await dbLayer.addKoalaCoins(userId, -parsedStake, `Bet placed on ${chosenTeam}`);
+        await dbLayer.addKoalaCoins(userId, -parsedStake, `Polymarket (Esports): ${matchName} (Team: ${chosenTeam})`);
 
         // Create bet
         const { league } = req.body;
@@ -1273,17 +1325,23 @@ exports.submitKoalaFlapScore = async (req, res, next) => {
 
 exports.submitTetrisScore = async (req, res, next) => {
     try {
-        const { score, lines } = req.body;
-        const userId = req.user?.id || req.user?.userId;
+        const { score, lines, level, sprintTime } = req.body;
+        let finalUserId = req.user?.id || req.user?.userId;
+        if (!finalUserId) return res.status(401).json({ error: 'Unauthorized' });
 
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        // Robustness: If the ID looks like a short name/username, try to resolve it to a UUID
+        if (finalUserId.length < 20) {
+            const user = await dbLayer.getUserByUsername(finalUserId);
+            if (user) finalUserId = user.id;
+        }
         
         const safeScore = parseInt(score) || 0;
         const safeLines = parseInt(lines) || 0;
+        const safeLevel = parseInt(level) || 1;
+        const safeSprintTime = parseInt(sprintTime) || 0;
 
-        if (safeScore > 0 || safeLines > 0) {
-            // New optimized atomic storage: one row per user/game
-            await dbLayer.updateUserGameStats(userId, 'tetris', safeScore, safeLines);
+        if (safeScore > 0 || safeLines > 0 || safeLevel > 0 || safeSprintTime > 0) {
+            await dbLayer.updateUserGameStats(finalUserId, 'tetris', safeScore, safeLines, safeLevel, safeSprintTime);
         }
 
         res.json({ success: true, coinsEarned: 0 }); // No coins for Tetris

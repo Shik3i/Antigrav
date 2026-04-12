@@ -6,6 +6,8 @@ const friendsController = require('../controllers/friendsController');
 const riftDefenseController = require('../controllers/riftDefenseController');
 const idleGameController = require('../controllers/idleGameController');
 const colorSyncController = require('../controllers/colorSyncController');
+const polymarketController = require('../controllers/polymarketController');
+const wordleController = require('../controllers/wordleController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -173,8 +175,20 @@ router.post('/idle/sell', authController.authenticateToken, idleGameController.s
 router.post('/idle/roster/mode', authController.authenticateToken, idleGameController.updateRosterMode);
 router.post('/idle/tournament/complete', authController.authenticateToken, idleGameController.validateTournament);
 
-// ─── Tetris ──────────────────────────────────────────────
 router.post('/games/tetris/submit', authController.authenticateToken, apiController.submitTetrisScore);
+
+// ─── Polymarket General ───────────────────────────────────
+router.post('/polymarket/general', authController.authenticateToken, polymarketController.addGeneralBet);
+router.get('/polymarket/general', polymarketController.getAllGeneralBets);
+router.post('/polymarket/general/bet', authController.authenticateToken, polymarketController.placeGeneralBet);
+router.post('/polymarket/general/resolve', authController.authenticateToken, polymarketController.resolveGeneralBet);
+router.delete('/polymarket/general/:id', authController.authenticateToken, polymarketController.deleteGeneralBet);
+
+// ─── Wordle ──────────────────────────────────────────────
+router.get('/wordle/daily', authController.optionalAuthenticateToken, wordleController.getDailyGame);
+router.post('/wordle/daily', authController.authenticateToken, wordleController.submitDailyResult);
+router.get('/wordle/random', wordleController.getRandomWord);
+router.get('/wordle/dictionary', wordleController.getDictionary);
 
 // ─── Color Sync (Color Guessing Game) ─────────────────────────
 router.get('/colorsync/daily', colorSyncController.getDailyColor);

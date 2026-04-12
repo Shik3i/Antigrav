@@ -271,13 +271,28 @@ db.serialize(() => {
     userId TEXT NOT NULL,
     gameId TEXT NOT NULL,
     highscore INTEGER DEFAULT 0,
+    sprintHighscore INTEGER DEFAULT 0,
     totalScore INTEGER DEFAULT 0,
     totalLines INTEGER DEFAULT 0,
+    maxLevel INTEGER DEFAULT 1,
     playCount INTEGER DEFAULT 0,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (userId, gameId),
     FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
   )`);
+
+  // Phase 19 Migration: Add maxLevel to UserGameStats
+  db.run("ALTER TABLE UserGameStats ADD COLUMN maxLevel INTEGER DEFAULT 1", (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error("Migration error adding maxLevel to UserGameStats:", err);
+    }
+  });
+
+  db.run("ALTER TABLE UserGameStats ADD COLUMN sprintHighscore INTEGER DEFAULT 0", (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error("Migration error adding sprintHighscore to UserGameStats:", err);
+    }
+  });
 
   // GameScores: stores historical performance entries
   db.run(`CREATE TABLE IF NOT EXISTS GameScores (
@@ -288,6 +303,55 @@ db.serialize(() => {
     coinsEarned INTEGER NOT NULL,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(userId) REFERENCES Users(id)
+  )`);
+
+  // PolymarketGeneralBets: for user-submitted custom bets
+  db.run(`CREATE TABLE IF NOT EXISTS PolymarketGeneralBets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    title TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    url TEXT NOT NULL UNIQUE,
+    outcomes TEXT NOT NULL, -- JSON
+    status TEXT DEFAULT 'open',
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+  db.run("ALTER TABLE PolymarketGeneralBets ADD COLUMN winnerIndex INTEGER", () => { });
+
+  // PolymarketUserBets: for user bets on custom Polymarket events
+  db.run(`CREATE TABLE IF NOT EXISTS PolymarketUserBets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    polymarketBetId INTEGER NOT NULL,
+    outcomeIndex INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE,
+    FOREIGN KEY(polymarketBetId) REFERENCES PolymarketGeneralBets(id) ON DELETE CASCADE
+  )`);
+
+  // Migration: Add shares and priceAtBet to PolymarketUserBets
+  db.run("ALTER TABLE PolymarketUserBets ADD COLUMN shares REAL DEFAULT 0.0", () => { });
+  db.run("ALTER TABLE PolymarketUserBets ADD COLUMN priceAtBet REAL DEFAULT 0.0", () => { });
+
+  // --- Wordle Minigame ---
+  db.run(`CREATE TABLE IF NOT EXISTS Wordle_DailyWords (
+    date TEXT PRIMARY KEY,
+    word TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS Wordle_DailyResults (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    date TEXT NOT NULL,
+    guesses TEXT NOT NULL, -- JSON array of guesses
+    won BOOLEAN NOT NULL,
+    earnedCoins INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(userId, date),
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
   )`);
 
   // Phase 19 Migration: Remove sessionLog column from GameScores
@@ -641,6 +705,14 @@ db.serialize(() => {
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
             VALUES ('tetris', 'Tetris', '/tetris', 'Games', 1, 7)`);
 
+    // Polymarket General Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('polymarket-general', 'Polymarket General', '/polymarket-general', 'Esports', 1, 5)`);
+
+    // Wordle Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
+            VALUES ('wordle', 'Wordle', '/wordle', 'Games', 1, 8)`);
+
 
     // ─── Leveling Milestones Table ───────────────────────────────
     db.run(`CREATE TABLE IF NOT EXISTS LevelingMilestones (
@@ -768,6 +840,8 @@ const getUser = (id) => {
   });
 };
 
+const getUserById = getUser;
+
 const registerUser = (id, displayName, username, passwordHash) => {
   return new Promise((resolve, reject) => {
     getKoalaBaseline().then(settings => {
@@ -804,10 +878,10 @@ const getAllRegisteredUsers = () => {
         u.createdAt, 
         u.lastActive,
         CAST(u.koala_balance AS INTEGER) AS koala_balance,
-        CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_banned
+        CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_banned,
+        CASE WHEN u.password_hash IS NULL THEN 1 ELSE 0 END as is_guest
       FROM Users u
       LEFT JOIN BannedUsers b ON u.id = b.id
-      WHERE u.username IS NOT NULL 
       ORDER BY u.createdAt DESC
     `;
     db.all(query, [], (err, rows) => {
@@ -847,6 +921,15 @@ const updateUserPassword = (id, newPasswordHash) => {
 const updateUserRole = (id, isSuperadmin) => {
   return new Promise((resolve, reject) => {
     db.run('UPDATE Users SET is_superadmin = ? WHERE id = ?', [isSuperadmin ? 1 : 0, id], function (err) {
+      if (err) reject(err);
+      else resolve(this.changes);
+    });
+  });
+};
+
+const updateUserBalance = (id, newBalance) => {
+  return new Promise((resolve, reject) => {
+    db.run('UPDATE Users SET koala_balance = ? WHERE id = ?', [newBalance, id], function (err) {
       if (err) reject(err);
       else resolve(this.changes);
     });
@@ -1329,16 +1412,48 @@ const deleteRoomAdmin = (id) => {
 const deleteUserAdmin = (id) => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
-      // 1. Delete friends relationships involving this user
-      db.run('DELETE FROM Friends WHERE userId = ? OR friendId = ?', [id, id], function (err) {
-        if (err) console.error("Error deleting friend links for user", id, err);
+      // 1. Manually clean up tables without schema-level ON DELETE CASCADE
+      db.run('DELETE FROM Friends WHERE userId = ? OR friendId = ?', [id, id], (err) => {
+        if (err) console.error("Error deleting Friends:", err);
       });
-      // 2. Delete timer events for this user
-      db.run('DELETE FROM TimerEvents WHERE userId = ?', [id], function (err) {
-        if (err) console.error("Error deleting timer events for user", id, err);
+      db.run('DELETE FROM TimerEvents WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting TimerEvents:", err);
       });
-      // 3. User deletion no longer needs to clean up the Rooms DB table
-      // 4. Finally delete the user
+      db.run('DELETE FROM KoalaTransactions WHERE user_id = ?', [id], (err) => {
+        if (err) console.error("Error deleting KoalaTransactions:", err);
+      });
+      db.run('DELETE FROM BannedUsers WHERE id = ?', [id], (err) => {
+        if (err) console.error("Error deleting BannedUsers:", err);
+      });
+      db.run('DELETE FROM UserAchievements WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting UserAchievements:", err);
+      });
+      db.run('DELETE FROM Bets WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting Bets:", err);
+      });
+      db.run('DELETE FROM GameScores WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting GameScores:", err);
+      });
+      db.run('DELETE FROM UserUpgrades WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting UserUpgrades:", err);
+      });
+      db.run('DELETE FROM UserMissions WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting UserMissions:", err);
+      });
+      db.run('DELETE FROM Scratchcards WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting Scratchcards:", err);
+      });
+      db.run('DELETE FROM Countdowns WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting Countdowns:", err);
+      });
+      db.run('DELETE FROM FeatureRequests WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting FeatureRequests:", err);
+      });
+      db.run('DELETE FROM FeatureVotes WHERE userId = ?', [id], (err) => {
+        if (err) console.error("Error deleting FeatureVotes:", err);
+      });
+
+      // 2. Finally delete the user-record (schema-level CASCADE will handle others)
       db.run('DELETE FROM Users WHERE id = ?', [id], function (err) {
         if (err) reject(err);
         else resolve(this.changes);
@@ -1350,7 +1465,7 @@ const deleteUserAdmin = (id) => {
 // ─── Banning System ────────────────────────────────────────────────
 const banUser = (userId, username, reason) => {
   return new Promise((resolve, reject) => {
-    db.run('INSERT INTO BannedUsers (userId, username, reason) VALUES (?, ?, ?)', [userId, username, reason || null], function (err) {
+    db.run('INSERT INTO BannedUsers (id, username, reason) VALUES (?, ?, ?)', [userId, username, reason || null], function (err) {
       if (err) reject(err);
       else resolve(this.changes);
     });
@@ -1359,7 +1474,7 @@ const banUser = (userId, username, reason) => {
 
 const unbanUser = (userId) => {
   return new Promise((resolve, reject) => {
-    db.run('DELETE FROM BannedUsers WHERE userId = ?', [userId], function (err) {
+    db.run('DELETE FROM BannedUsers WHERE id = ?', [userId], function (err) {
       if (err) reject(err);
       else resolve(this.changes);
     });
@@ -2036,74 +2151,224 @@ const recordGameScore = (userId, gameId, score, coinsEarned) => {
   });
 };
 
-const updateUserGameStats = (userId, gameId, newScore, newLines = 0) => {
+const addPolymarketGeneralBet = (userId, title, slug, url, outcomes) => {
   return new Promise((resolve, reject) => {
-    const query = `
-      INSERT INTO UserGameStats (userId, gameId, highscore, totalScore, totalLines, playCount, updatedAt)
-      VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-      ON CONFLICT(userId, gameId) DO UPDATE SET
-        highscore = MAX(highscore, excluded.highscore),
-        totalScore = totalScore + excluded.totalScore,
-        totalLines = totalLines + excluded.totalLines,
-        playCount = playCount + 1,
-        updatedAt = CURRENT_TIMESTAMP
-    `;
-    db.run(query, [userId, gameId, newScore, newScore, newLines], function (err) {
-      if (err) {
-        logError(`updateUserGameStats failed: ${err.message}`, err.stack, JSON.stringify({ userId, gameId, newScore, newLines }));
-        reject(err);
-      } else resolve({ success: true });
-    });
+    db.run(
+      'INSERT INTO PolymarketGeneralBets (userId, title, slug, url, outcomes) VALUES (?, ?, ?, ?, ?)',
+      [userId, title, slug, url, JSON.stringify(outcomes)],
+      function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
   });
 };
 
-// --- Migration: Initial Populate UserGameStats from GameScores (Tetris Only) ---
-const migrateTetrisStats = () => {
+const placePolymarketUserBet = (userId, polymarketBetId, outcomeIndex, amount, shares = 0, priceAtBet = 0) => {
   return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      console.log("[Migration] Consolidating Tetris Stats into UserGameStats...");
-      
-      // 1. Clear existing Tetris entries in UserGameStats to avoid duplicates during migration
-      db.run("DELETE FROM UserGameStats WHERE gameId = 'tetris'");
+    db.run(
+      'INSERT INTO PolymarketUserBets (userId, polymarketBetId, outcomeIndex, amount, shares, priceAtBet) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, polymarketBetId, outcomeIndex, amount, shares, priceAtBet],
+      function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
+  });
+};
 
-      // 2. Aggregate from GameScores
-      // Note: highscore comes from 'tetris' gameId, lines come from 'tetris_lines' gameId
-      const aggQuery = `
-        INSERT INTO UserGameStats (userId, gameId, highscore, totalLines, playCount)
-        SELECT 
-          userId, 
-          'tetris' as gameId, 
-          MAX(CASE WHEN gameId = 'tetris' THEN score ELSE 0 END) as highscore,
-          SUM(CASE WHEN gameId = 'tetris_lines' THEN score ELSE 0 END) as totalLines,
-          COUNT(CASE WHEN gameId = 'tetris' THEN 1 END) as playCount
-        FROM GameScores
-        WHERE gameId IN ('tetris', 'tetris_lines')
-        GROUP BY userId
-      `;
+const deletePolymarketGeneralBet = (betId) => {
+  return new Promise((resolve, reject) => {
+    // 1. Fetch info for refunds BEFORE starting transaction
+    db.get('SELECT title FROM PolymarketGeneralBets WHERE id = ?', [betId], (err, row) => {
+      if (err) return reject(err);
+      if (!row) return resolve(0); // Already gone
+      const title = row.title;
 
-      db.run(aggQuery, (err) => {
-        if (err) {
-          console.error("[Migration] Tetris stats migration failed:", err);
-          return reject(err);
-        }
-        
-        // 3. Cleanup: Delete the old 'tetris_lines' records since they are now redundantly summed
-        // We keep 'tetris' highscore entries for session history if desired, 
-        // but the user wants to reduce bloat. Let's delete tetris_lines at least.
-        db.run("DELETE FROM GameScores WHERE gameId = 'tetris_lines'", (delErr) => {
-          if (delErr) console.error("[Migration] Failed to cleanup tetris_lines:", delErr);
-          else console.log("[Migration] Tetris stats consolidation complete. Cleaned up old records.");
-          resolve();
+      db.all('SELECT userId, amount, shares FROM PolymarketUserBets WHERE polymarketBetId = ?', [betId], (err, userBets) => {
+        if (err) return reject(err);
+
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION');
+
+          let errorOccurred = false;
+
+          // Refund each user
+          userBets.forEach(ub => {
+            const refundCents = (ub.amount || 0) * 100;
+            const logReason = `Refund: ${title} (Wette gelöscht) - ${ub.amount} KC (${ub.shares} Shares)`;
+            
+            db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [refundCents, ub.userId], (err) => {
+              if (err) errorOccurred = true;
+            });
+            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [ub.userId, refundCents, logReason], (err) => {
+              if (err) errorOccurred = true;
+            });
+          });
+
+          // Delete all records
+          db.run('DELETE FROM PolymarketUserBets WHERE polymarketBetId = ?', [betId], (err) => {
+            if (err) errorOccurred = true;
+          });
+          db.run('DELETE FROM PolymarketGeneralBets WHERE id = ?', [betId], (err) => {
+            if (err) errorOccurred = true;
+          });
+
+          db.run('COMMIT', function(err) {
+            if (err || errorOccurred) {
+              db.run('ROLLBACK');
+              reject(err || new Error('Transaction failed during refund'));
+            } else {
+              resolve(userBets.length);
+            }
+          });
         });
       });
     });
   });
 };
 
-// Trigger migration once at startup (after a slight delay to ensure tables are ready)
-setTimeout(() => {
-  migrateTetrisStats().catch(e => console.error("Auto-migration failed:", e));
-}, 2000);
+const updatePolymarketGeneralBetStatus = (betId, status, winnerIndex) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'UPDATE PolymarketGeneralBets SET status = ?, winnerIndex = ? WHERE id = ?',
+      [status, winnerIndex, betId],
+      function(err) {
+        if (err) reject(err);
+        else resolve({ changes: this.changes });
+      }
+    );
+  });
+};
+
+const getPolymarketGeneralBetById = (betId) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM PolymarketGeneralBets WHERE id = ?', [betId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+};
+
+const getPolymarketUserBets = (polymarketBetId) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT b.*, u.username, u.displayName, u.preferences
+      FROM PolymarketUserBets b
+      JOIN Users u ON b.userId = u.id
+      WHERE b.polymarketBetId = ?
+      ORDER BY b.createdAt DESC
+    `;
+    db.all(query, [polymarketBetId], (err, rows) => {
+      if (err) reject(err);
+      else {
+        const enriched = (rows || []).map(r => ({
+          ...r,
+          preferences: r.preferences ? JSON.parse(r.preferences) : {}
+        }));
+        resolve(enriched);
+      }
+    });
+  });
+};
+
+const getAllPolymarketGeneralBets = () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT p.*, u.username, u.displayName, u.preferences
+      FROM PolymarketGeneralBets p 
+      JOIN Users u ON p.userId = u.id 
+      ORDER BY createdAt DESC
+    `;
+    db.all(query, [], async (err, rows) => {
+      if (err) return reject(err);
+      
+      try {
+        const enrichedRows = await Promise.all(rows.map(async (r) => {
+          const placedBets = await getPolymarketUserBets(r.id);
+          return { 
+            ...r, 
+            outcomes: JSON.parse(r.outcomes),
+            preferences: r.preferences ? JSON.parse(r.preferences) : {},
+            placedBets 
+          };
+        }));
+        resolve(enrichedRows);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+};
+
+const getDailyWord = (date) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT word FROM Wordle_DailyWords WHERE date = ?', [date], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.word : null);
+    });
+  });
+};
+
+const saveDailyWord = (date, word) => {
+  return new Promise((resolve, reject) => {
+    db.run('INSERT OR REPLACE INTO Wordle_DailyWords (date, word) VALUES (?, ?)', [date, word], (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+};
+
+const saveWordleResult = (userId, date, guesses, won, earnedCoins) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) VALUES (?, ?, ?, ?, ?)',
+      [userId, date, JSON.stringify(guesses), won ? 1 : 0, earnedCoins],
+      function(err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID });
+      }
+    );
+  });
+};
+
+const getWordleStatus = (userId, date) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM Wordle_DailyResults WHERE userId = ? AND date = ?', [userId, date], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? { ...row, guesses: JSON.parse(row.guesses), won: !!row.won } : null);
+    });
+  });
+};
+
+const updateUserGameStats = (userId, gameId, newScore, newLines = 0, newLevel = 1, sprintTime = 0) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      INSERT INTO UserGameStats (userId, gameId, highscore, sprintHighscore, totalScore, totalLines, maxLevel, playCount, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+      ON CONFLICT(userId, gameId) DO UPDATE SET
+        highscore = MAX(highscore, excluded.highscore),
+        sprintHighscore = CASE 
+          WHEN excluded.sprintHighscore > 0 AND (sprintHighscore = 0 OR excluded.sprintHighscore < sprintHighscore) 
+          THEN excluded.sprintHighscore 
+          ELSE sprintHighscore 
+        END,
+        totalScore = totalScore + excluded.totalScore,
+        totalLines = totalLines + excluded.totalLines,
+        maxLevel = MAX(maxLevel, excluded.maxLevel),
+        playCount = playCount + 1,
+        updatedAt = CURRENT_TIMESTAMP
+    `;
+    db.run(query, [userId, gameId, newScore, sprintTime, newScore, newLines, newLevel], function (err) {
+      if (err) {
+        logError(`updateUserGameStats failed: ${err.message}`, err.stack, JSON.stringify({ userId, gameId, newScore, newLines, newLevel, sprintTime }));
+        reject(err);
+      } else resolve({ success: true });
+    });
+  });
+};
+
+// (No migrations or restores - only core table initialization)
 
 
 // --- NEW: Game Upgrades Helpers ---
@@ -2209,9 +2474,9 @@ const purchaseUpgrade = (userId, upgradeId) => {
 const getGameLeaderboards = (gameId) => {
   return new Promise((resolve, reject) => {
     // For Tetris, use the new optimized UserGameStats table
-    if (gameId === 'tetris') {
+    if (gameId === 'tetris' || gameId === 'tetris_lines') {
       const highscoreQuery = `
-        SELECT u.displayName, u.username, u.preferences, u.id as userId, gs.highscore
+        SELECT u.displayName, u.username, u.preferences, u.id as userId, gs.highscore, gs.sprintHighscore, gs.maxLevel
         FROM UserGameStats gs
         JOIN Users u ON gs.userId = u.id
         WHERE gs.gameId = 'tetris'
@@ -2220,11 +2485,15 @@ const getGameLeaderboards = (gameId) => {
       `;
 
       const cumulativeQuery = `
-        SELECT u.displayName, u.username, u.preferences, u.id as userId, gs.totalLines as totalScore, gs.totalScore as totalEarned
+        SELECT u.displayName, u.username, u.preferences, u.id as userId, 
+               gs.totalLines as totalLines, 
+               gs.totalScore as totalScore,
+               gs.sprintHighscore as sprintHighscore,
+               gs.maxLevel as maxLevel
         FROM UserGameStats gs
         JOIN Users u ON gs.userId = u.id
         WHERE gs.gameId = 'tetris'
-        ORDER BY totalScore DESC, totalLines DESC
+        ORDER BY gs.totalLines DESC, gs.highscore DESC
         LIMIT 10
       `;
 
@@ -2928,6 +3197,7 @@ module.exports = {
   addUser,
   updateUserName,
   getUser,
+  getUserById,
   addRoom,
   getRoom,
   recordTimerCompletion,
@@ -3258,7 +3528,19 @@ module.exports = {
     });
   },
 
+  addPolymarketGeneralBet,
+  placePolymarketUserBet,
+  getAllPolymarketGeneralBets,
+  getPolymarketGeneralBetById,
+  getPolymarketUserBets,
+  updatePolymarketGeneralBetStatus,
+  deletePolymarketGeneralBet,
+  getDailyWord,
+  saveDailyWord,
+  saveWordleResult,
+  getWordleStatus,
   updateUserGameStats,
+  updateUserBalance,
   logSystemEvent, // [NEW]
   getSystemLogs,  // [NEW]
   clearSystemLogs, // [NEW]
