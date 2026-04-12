@@ -905,8 +905,11 @@ module.exports = function (io) {
 
                 // Record completion in DB for every unique user present
                 Array.from(uniqueUsers.values()).forEach(user => {
-                    dbLayer.addUser(user.userId || user.id, user.displayName || user.username).then(() => {
-                        dbLayer.recordTimerCompletion(user.userId || user.id, room.id, room.config.name, durationMinutes).catch(console.error);
+                    const id = user.userId || user.id;
+                    if (!id) return; // Prevent corrupt entries with no ID
+
+                    dbLayer.addUser(id, user.displayName || user.username).then(() => {
+                        dbLayer.recordTimerCompletion(id, room.id, room.config.name, durationMinutes).catch(console.error);
 
                         // Award KoalaCoins if there is a real duration
                         if (coinsToAward > 0) {

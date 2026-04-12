@@ -25,6 +25,11 @@ const Admin = ({ socket }) => {
     const [activeTab, setActiveTab] = useState('mappings');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [collapsedSections, setCollapsedSections] = useState({
+        'Superadmins': false,
+        'Regular Users': false,
+        '👻 Ghost / Guest Accounts': true
+    });
 
     // Data state
     const [mappings, setMappings] = useState([]);
@@ -714,7 +719,8 @@ const Admin = ({ socket }) => {
     };
 
     const superadminUsers = sortUsers(usersList.filter(u => u.is_superadmin));
-    const regularUsers = sortUsers(usersList.filter(u => !u.is_superadmin));
+    const regularUsers = sortUsers(usersList.filter(u => !u.is_superadmin && !u.is_guest));
+    const guestUsers = sortUsers(usersList.filter(u => u.is_guest));
 
     // Activity actions
     const handleDeleteActivity = (id) => {
@@ -847,7 +853,7 @@ const Admin = ({ socket }) => {
     };
 
     const handleDeleteUserAccount = async (userId, username) => {
-        if (!window.confirm(`CRITICAL WARNING: Are you sure you want to completely delete "${username}" and all their associated data (Friends, Timer Events, Rooms)? This action is irreversible.`)) {
+        if (!window.confirm(`CRITICAL WARNING: Are you sure you want to completely delete "${username || userId}" and all their associated data (Friends, Timer Events, Rooms)? This action is irreversible.`)) {
             return;
         }
 
@@ -864,7 +870,7 @@ const Admin = ({ socket }) => {
             });
 
             if (res.ok) {
-                alert(`User ${username} deleted successfully.`);
+                alert(`User ${username || userId} deleted successfully.`);
                 setUsersList(prev => prev.filter(u => u.id !== userId));
             } else {
                 const data = await res.json();
@@ -1220,22 +1226,22 @@ const Admin = ({ socket }) => {
                 <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
                     <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 style={{ margin: 0 }}>Polymarket API</h3>
-                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.polymarket.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.polymarket.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
-                                {cacheStatus.polymarket.isCached ? 'CACHED' : 'EMPTY'}
+                            <h3 style={{ margin: 0 }}>Polymarket API (Esports)</h3>
+                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.polymarketEsports.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.polymarketEsports.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
+                                {cacheStatus.polymarketEsports.isCached ? 'CACHED' : 'EMPTY'}
                             </span>
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Items fetched:</span>
-                                <strong>{cacheStatus.polymarket.items} odds</strong>
+                                <span style={{ color: 'var(--text-muted)' }}>Events cached:</span>
+                                <strong>{cacheStatus.polymarketEsports.items} events</strong>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Cache age:</span>
-                                <strong>{formatCacheAge(cacheStatus.polymarket.ageSeconds)}</strong>
+                                <strong>{formatCacheAge(cacheStatus.polymarketEsports.ageSeconds)}</strong>
                             </div>
                         </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('polymarket')} style={{ marginTop: 'auto', padding: '12px' }}>Clear Polymarket Cache</button>
+                        <button className="btn-secondary" onClick={() => handleFlushCache('polymarket')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Polymarket (Esports) Cache leeren</button>
                     </div>
 
                     <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1255,7 +1261,7 @@ const Admin = ({ socket }) => {
                                 <strong>{formatCacheAge(cacheStatus.oddsApi.ageSeconds)}</strong>
                             </div>
                         </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('oddsapi')} style={{ marginTop: 'auto', padding: '12px' }}>Clear The Odds API Cache</button>
+                        <button className="btn-secondary" onClick={() => handleFlushCache('oddsapi')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>The Odds API Cache leeren</button>
                     </div>
 
                     <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1275,7 +1281,7 @@ const Admin = ({ socket }) => {
                                 <strong>{esportsLastUpdated ? new Date(esportsLastUpdated).toLocaleString() : 'Never'}</strong>
                             </div>
                         </div>
-                        <button className="btn-secondary" onClick={() => { setLoading(true); socket.emit(EVENTS.TRIGGER_FETCH_ALL_TEAMS, { token: globalToken }); }} style={{ marginTop: 'auto', padding: '12px' }}>Fetch All Esports Teams</button>
+                        <button className="btn-secondary" onClick={() => { setLoading(true); socket.emit(EVENTS.TRIGGER_FETCH_ALL_TEAMS, { token: globalToken }); }} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Esports Teams DB aktualisieren</button>
                     </div>
 
                     <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1295,7 +1301,27 @@ const Admin = ({ socket }) => {
                                 <strong>{formatCacheAge(cacheStatus.loleSports.ageSeconds)}</strong>
                             </div>
                         </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('lolesports')} style={{ marginTop: 'auto', padding: '12px' }}>Flush Schedule Cache</button>
+                        <button className="btn-secondary" onClick={() => handleFlushCache('lolesports')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>LoLEsports Schedule Cache leeren</button>
+                    </div>
+
+                    <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <h3 style={{ margin: 0 }}>Polymarket API (General Resolution)</h3>
+                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.polymarketGeneral.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.polymarketGeneral.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
+                                {cacheStatus.polymarketGeneral.isCached ? 'CACHED' : 'EMPTY'}
+                            </span>
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Active General Bets:</span>
+                                <strong>{cacheStatus.polymarketGeneral.items} events</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Cache age:</span>
+                                <strong>{formatCacheAge(cacheStatus.polymarketGeneral.ageSeconds)}</strong>
+                            </div>
+                        </div>
+                        <button className="btn-secondary" onClick={() => handleFlushCache('polymarket')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Polymarket (General) Cache leeren</button>
                     </div>
 
                     <button className="btn-primary" onClick={() => handleFlushCache('all')} style={{ gridColumn: '1 / -1', background: 'rgba(239,68,68,0.2)', color: '#ef4444', borderColor: '#ef4444' }}>Purge All Server Caches</button>
@@ -1409,23 +1435,43 @@ const Admin = ({ socket }) => {
 
                     {[
                         { title: 'Superadmins', count: superadminUsers.length, list: superadminUsers, color: 'var(--accent-primary)' },
-                        { title: 'Regular Users', count: regularUsers.length, list: regularUsers, color: 'var(--text-muted)' }
+                        { title: 'Regular Users', count: regularUsers.length, list: regularUsers, color: 'var(--text-muted)' },
+                        { title: '👻 Ghost / Guest Accounts', count: guestUsers.length, list: guestUsers, color: '#f97316' }
                     ].map(section => (
                         <div key={section.title} style={{ marginBottom: '32px' }}>
-                            <h4 style={{ marginBottom: '16px', color: section.color, borderBottom: `1px solid ${section.color}40`, paddingBottom: '8px' }}>
-                                {section.title} ({section.count})
+                            <h4 
+                                style={{ 
+                                    marginBottom: '16px', 
+                                    color: section.color, 
+                                    borderBottom: `1px solid ${section.color}40`, 
+                                    paddingBottom: '8px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    cursor: 'pointer',
+                                    userSelect: 'none'
+                                }}
+                                onClick={() => setCollapsedSections(prev => ({ ...prev, [section.title]: !prev[section.title] }))}
+                            >
+                                <span>{section.title} ({section.count})</span>
+                                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                    {collapsedSections[section.title] ? 'Show [ + ]' : 'Hide [ − ]'}
+                                </span>
                             </h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {!collapsedSections[section.title] && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 {section.list.length === 0 ? (
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No users found in this category.</div>
                                 ) : section.list.map(u => (
                                     <div key={u.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: u.is_banned ? '1px solid #ef4444' : '1px solid var(--border-color)', opacity: u.is_banned ? 0.7 : 1 }}>
                                         <div style={{ flex: '1 1 250px' }}>
                                             <div style={{ fontWeight: 600, fontSize: '1.1rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ textDecoration: u.is_banned ? 'line-through' : 'none' }}>{u.username}</span>
+                                                <span style={{ textDecoration: u.is_banned ? 'line-through' : 'none' }}>{u.username || u.displayName || u.id}</span>
+                                                {u.is_guest ? <span style={{ fontSize: '0.65rem', background: '#f97316', color: 'white', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Guest</span> : null}
                                                 {u.is_banned ? <span style={{ fontSize: '0.65rem', background: '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Banned</span> : null}
                                             </div>
                                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Display Name: {u.displayName}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>ID: {u.id}</div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                                 <span>Joined: {new Date(u.createdAt).toLocaleDateString()}</span>
                                                 <span>Last Active: {u.lastActive ? new Date(u.lastActive).toLocaleString() : 'Never'}</span>
@@ -1564,7 +1610,8 @@ const Admin = ({ socket }) => {
                                         )}
                                     </div>
                                 ))}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     ))}
 

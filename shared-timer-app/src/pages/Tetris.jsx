@@ -131,10 +131,30 @@ const Tetris = () => {
     });
     const speedModeRef = useRef(false);
 
+    // Scaling Logic
+    const [gameScale, setGameScale] = useState(1);
+    const updateScale = useCallback(() => {
+        const availableH = window.innerHeight - 150; // Account for header and padding
+        const baseH = 700; // The intrinsic height of our game cluster
+        const newScale = Math.max(0.5, Math.min(2.5, availableH / baseH));
+        setGameScale(newScale);
+    }, []);
+
+    useEffect(() => {
+        updateScale();
+        window.addEventListener('resize', updateScale);
+        return () => window.removeEventListener('resize', updateScale);
+    }, [updateScale]);
+
     const [chillMode, setChillMode] = useState(() => {
         try { return localStorage.getItem('tetris_chill_mode') === 'true'; } catch { return false; }
     });
     const chillModeRef = useRef(false);
+
+    useEffect(() => {
+        chillModeRef.current = chillMode;
+        try { localStorage.setItem('tetris_chill_mode', chillMode.toString()); } catch {}
+    }, [chillMode]);
 
     useEffect(() => {
         speedModeRef.current = speedMode;
@@ -185,14 +205,20 @@ const Tetris = () => {
 
     // ─── Score Submission ─────────────────────────────────────
 
-    const submitScore = useCallback(async (finalScore, finalLines) => {
+    const submitScore = useCallback(async (finalScore, finalLines, finalLevel, sprintTime = 0) => {
         const token = localStorage.getItem('timerToken');
-        if (!token || finalScore === 0) return;
+        if (!token || (finalScore === 0 && sprintTime === 0)) return;
+        
         try {
             await fetch('/api/games/tetris/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ score: finalScore, lines: finalLines }),
+                body: JSON.stringify({ 
+                    score: finalScore, 
+                    lines: finalLines, 
+                    level: finalLevel,
+                    sprintTime: Math.floor(sprintTime)
+                }),
             });
         } catch (e) {
             console.error('Failed to submit Tetris score', e);
@@ -260,7 +286,8 @@ const Tetris = () => {
             g.phase = 'OVER';
             setGamePhase('OVER');
             if (g.score > g.highScore) { g.highScore = g.score; setDisplayHighScore(g.score); }
-            submitScore(g.score, g.lines);
+            // Send 0 lines here because they were already sent incrementally during play
+            submitScore(g.score, 0, g.level);
             return;
         }
         g.piece = { key, shape, x, y };
@@ -317,6 +344,11 @@ const Tetris = () => {
         setDisplayLines(g.lines);
         setDisplayLevel(g.level);
 
+        // Persistent saving: Save the lines cleared JUST NOW (incremental)
+        if (count > 0) {
+            submitScore(g.score, count, g.level);
+        }
+
         // Sprint mode: check win condition
         if (g.mode === 'sprint' && g.lines >= SPRINT_TARGET) {
             const elapsed = performance.now() - g.sprintStartTime;
@@ -324,7 +356,8 @@ const Tetris = () => {
             g.phase = 'OVER';
             setGamePhase('OVER');
             if (g.score > g.highScore) { g.highScore = g.score; setDisplayHighScore(g.score); }
-            submitScore(g.score, g.lines);
+            // Sprint mode submission with elapsed time
+            submitScore(g.score, 0, g.level, elapsed);
             return;
         }
 
@@ -770,10 +803,19 @@ const Tetris = () => {
 
     return (
         <div ref={containerRef}
-            style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%', outline: 'none' }}
+            style={{ 
+                width: '100%', 
+                margin: '0 auto', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '100%', 
+                outline: 'none',
+                position: 'relative',
+                overflow: 'hidden' // Kill any scrollbars from scaling
+            }}
             tabIndex="0"
         >
-            {/* Header */}
+            {/* Header stays static */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button className="btn-ghost" onClick={() => navigate(-1)} style={{ padding: '8px' }}>
                     <ArrowLeft size={20} />
@@ -788,7 +830,28 @@ const Tetris = () => {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'flex-start' }}>
+            {/* Content area that handles the scale */}
+            <div style={{ 
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                width: '100%',
+                overflow: 'hidden'
+            }}>
+                <div style={{ 
+                    display: 'flex', 
+                    gap: '12px', 
+                    justifyContent: 'center', 
+                    alignItems: 'flex-start',
+                    transform: `scale(${gameScale})`,
+                    transformOrigin: 'top center',
+                    transition: 'transform 0.2s ease-out',
+                    // This height fix is necessary for document flow
+                    height: `${700 * gameScale}px`,
+                    width: '100%',
+                    minWidth: 0
+                }}>
                 {/* ── LEFT COLUMN: Hold + Actions + Toggles ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100px', flexShrink: 0 }}>
                     {/* Hold */}
@@ -975,7 +1038,8 @@ const Tetris = () => {
                 </div>
             </div>
         </div>
-    );
+    </div>
+);
 };
 
 export default Tetris;
