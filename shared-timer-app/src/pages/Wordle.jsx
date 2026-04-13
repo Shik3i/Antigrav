@@ -105,7 +105,7 @@ const Wordle = ({ user, token }) => {
             return `wordle_daily_${selectedDate}_${userId}`;
         }
         return `wordle_endless_${userId}`;
-    }, [user]);
+    }, [user, selectedDate]);
 
     const saveToStorage = useCallback((currentGuesses, currentSolution) => {
         const key = getStorageKey(mode);
