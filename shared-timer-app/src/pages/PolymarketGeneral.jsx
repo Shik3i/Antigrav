@@ -18,6 +18,7 @@ const PolymarketGeneral = () => {
     const [currentUser, setCurrentUser] = useState(null);
     const [showUserBetsId, setShowUserBetsId] = useState(null);
     const [resovledAccordionOpen, setResolvedAccordionOpen] = useState(false);
+    const [polymarketSettings, setPolymarketSettings] = useState({ allowUsersToAdd: false });
 
     const fetchBets = async () => {
         try {
@@ -35,7 +36,17 @@ const PolymarketGeneral = () => {
     useEffect(() => {
         fetchBets();
         fetchCurrentUser();
+        fetchPolymarketSettings();
     }, []);
+
+    const fetchPolymarketSettings = async () => {
+        try {
+            const res = await axios.get('/api/polymarket/settings');
+            setPolymarketSettings(res.data);
+        } catch (err) {
+            console.error('Failed to fetch polymarket settings:', err);
+        }
+    };
 
     const fetchCurrentUser = async () => {
         const token = localStorage.getItem('timerToken');
@@ -180,11 +191,11 @@ const PolymarketGeneral = () => {
                         Direkt zu Polymarket.com
                     </a>
                 </div>
-                {currentUser && (
+                {currentUser && (currentUser.is_superadmin || polymarketSettings.allowUsersToAdd) && (
                     <button 
                         onClick={() => setShowAddForm(!showAddForm)}
                         className="btn-primary" 
-                        style={{ padding: '12px 24px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: 'var(--accent-glow)' }}
+                        style={{ padding: '12px 24px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: 'var(--accent-gradient)' }}
                     >
                         <Plus size={20} />
                         Wette hinzufügen

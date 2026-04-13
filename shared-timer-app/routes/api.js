@@ -178,14 +178,20 @@ router.post('/idle/tournament/complete', authController.authenticateToken, idleG
 router.post('/games/tetris/submit', authController.authenticateToken, apiController.submitTetrisScore);
 
 // ─── Polymarket General ───────────────────────────────────
+router.get('/polymarket/settings', polymarketController.getSettings);
 router.post('/polymarket/general', authController.authenticateToken, polymarketController.addGeneralBet);
 router.get('/polymarket/general', polymarketController.getAllGeneralBets);
 router.post('/polymarket/general/bet', authController.authenticateToken, polymarketController.placeGeneralBet);
 router.post('/polymarket/general/resolve', authController.authenticateToken, polymarketController.resolveGeneralBet);
 router.delete('/polymarket/general/:id', authController.authenticateToken, polymarketController.deleteGeneralBet);
 
+// Admin Polymarket Settings
+router.get('/admin/polymarket/settings', authController.authenticateToken, polymarketController.getAdminSettings);
+router.put('/admin/polymarket/settings', authController.authenticateToken, polymarketController.updateSettings);
+
 // ─── Wordle ──────────────────────────────────────────────
 router.get('/wordle/daily', authController.optionalAuthenticateToken, wordleController.getDailyGame);
+router.get('/wordle/daily/leaderboard', authController.authenticateToken, wordleController.getDailyLeaderboard);
 router.post('/wordle/daily', authController.authenticateToken, wordleController.submitDailyResult);
 router.get('/wordle/random', wordleController.getRandomWord);
 router.get('/wordle/dictionary', wordleController.getDictionary);

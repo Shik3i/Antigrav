@@ -53,6 +53,7 @@ const Admin = ({ socket }) => {
     const [logs, setLogs] = useState([]);
     const [systemLogs, setSystemLogs] = useState([]); // [NEW]
     const [pokemonConfigs, setPokemonConfigs] = useState({ settings: { contrast_threshold: '0.6' }, colors: {} });
+    const [polymarketSettings, setPolymarketSettings] = useState({ allowUsersToAdd: false });
 
     const handleFetchNavbarSettings = async () => {
     
@@ -100,6 +101,31 @@ const Admin = ({ socket }) => {
                 data: err.response?.data,
                 message: err.message
             });
+        }
+    };
+
+    const handleFetchPolymarketSettings = async () => {
+        try {
+            const res = await axios.get('/api/admin/polymarket/settings', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setPolymarketSettings(res.data);
+        } catch (err) {
+            console.error('[Admin API Debug] Request failed for Polymarket Settings:', err);
+        }
+    };
+
+    const handleTogglePolymarketAdd = async () => {
+        try {
+            const newValue = !polymarketSettings.allowUsersToAdd;
+            await axios.put('/api/admin/polymarket/settings', { allowUsersToAdd: newValue }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setPolymarketSettings({ allowUsersToAdd: newValue });
+            addLog('Success', `Polymarket permissions updated: Users can ${newValue ? 'now' : 'no longer'} add bets.`, 'success');
+        } catch (err) {
+            console.error('[Admin API Debug] Update failed for Polymarket Settings:', err);
+            addLog('Error', 'Failed to update Polymarket permissions.', 'error');
         }
     };
 
@@ -484,6 +510,9 @@ const Admin = ({ socket }) => {
         }
         if (activeTab === 'pokemon') {
             handleFetchPokemonConfigs();
+        }
+        if (activeTab === 'mappings') {
+            handleFetchPolymarketSettings();
         }
     }, [activeTab]);
 
@@ -1120,6 +1149,41 @@ const Admin = ({ socket }) => {
             {/* TAB: TEAM MAPPINGS */}
             {activeTab === 'mappings' && (
                 <div className="animate-fade-in">
+                    <div className="glass-card" style={{ padding: '32px', marginBottom: '32px', borderLeft: '4px solid var(--accent-primary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: '0 0 8px 0' }}>Polymarket Global Permissions</h3>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+                                    Steuere, wer neue Polymarket-Wetten über einen Link hinzufügen darf.
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '12px 20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: polymarketSettings.allowUsersToAdd ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
+                                    {polymarketSettings.allowUsersToAdd ? 'Alle registrierten User' : 'Nur Superadmins'}
+                                </span>
+                                <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={polymarketSettings.allowUsersToAdd}
+                                        onChange={handleTogglePolymarketAdd}
+                                        style={{ opacity: 0, width: 0, height: 0 }}
+                                    />
+                                    <span className="slider round" style={{
+                                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                        backgroundColor: polymarketSettings.allowUsersToAdd ? 'var(--accent-primary)' : '#444',
+                                        transition: '.4s', borderRadius: '34px'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute', content: '""', height: '18px', width: '18px', left: '4px', bottom: '4px',
+                                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
+                                            transform: polymarketSettings.allowUsersToAdd ? 'translateX(24px)' : 'translateX(0)'
+                                        }}></span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="glass-card" style={{ padding: '32px', marginBottom: '32px', position: 'relative', zIndex: 100 }}>
                         <h3 style={{ marginBottom: '16px' }}>Add Team Code Mapping</h3>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
