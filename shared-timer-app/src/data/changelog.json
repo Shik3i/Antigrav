@@ -1,5 +1,11 @@
 [
   {
+    "id": 25,
+    "version": "2.17.2",
+    "date": "2026-04-13",
+    "changes": "- **Wordle Archiv-Modus**: Spiele verpasste Dailies nach und sichere dir die 10 KC Belohnung auch nachträglich.\n- **Historische Bestenlisten**: Navigiere durch vergangene Tage und sieh dir die Ergebnisse der Community für jedes Datum an.\n- **Datum-Navigation**: Neue Steuerungsleiste im Wordle-Header zum einfachen Wechseln zwischen Heute und dem Archiv.\n- **Sicherheits-Check**: Schutz der API gegen den Abruf von zukünftigen Wörtern und Leaderboards."
+  },
+  {
     "id": 24,
     "version": "2.17.1",
     "date": "2026-04-13",
