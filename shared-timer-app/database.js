@@ -1596,6 +1596,29 @@ const updateKoalaBaseline = (settings) => {
   });
 };
 
+// --- POLYMARKET SETTINGS ---
+const getPolymarketSettings = () => {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT value FROM ServerSettings WHERE key = 'polymarket_allow_users_add'`, (err, row) => {
+      if (err) reject(err);
+      else {
+        // Default to false (0) if not set
+        resolve({ allowUsersToAdd: row ? row.value === '1' : false });
+      }
+    });
+  });
+};
+
+const updatePolymarketSettings = (allowUsersAdd) => {
+  return new Promise((resolve, reject) => {
+    const value = allowUsersAdd ? '1' : '0';
+    db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('polymarket_allow_users_add', ?)`, [value], function(err) {
+      if (err) reject(err);
+      else resolve(true);
+    });
+  });
+};
+
 const addKoalaCoins = (userId, amountCents, reason) => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
@@ -2337,6 +2360,22 @@ const getWordleStatus = (userId, date) => {
     db.get('SELECT * FROM Wordle_DailyResults WHERE userId = ? AND date = ?', [userId, date], (err, row) => {
       if (err) reject(err);
       else resolve(row ? { ...row, guesses: JSON.parse(row.guesses), won: !!row.won } : null);
+    });
+  });
+};
+
+const getWordleDailyLeaderboard = (date) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT r.*, u.username, u.displayName, u.preferences
+      FROM Wordle_DailyResults r
+      JOIN Users u ON r.userId = u.id
+      WHERE r.date = ?
+      ORDER BY r.won DESC, r.earnedCoins DESC, r.id ASC
+    `;
+    db.all(query, [date], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows.map(r => ({ ...r, guesses: JSON.parse(r.guesses), won: !!r.won })));
     });
   });
 };
@@ -3535,10 +3574,13 @@ module.exports = {
   getPolymarketUserBets,
   updatePolymarketGeneralBetStatus,
   deletePolymarketGeneralBet,
+  getPolymarketSettings,
+  updatePolymarketSettings,
   getDailyWord,
   saveDailyWord,
   saveWordleResult,
   getWordleStatus,
+  getWordleDailyLeaderboard,
   updateUserGameStats,
   updateUserBalance,
   logSystemEvent, // [NEW]

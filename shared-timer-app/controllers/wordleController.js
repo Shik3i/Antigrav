@@ -59,20 +59,70 @@ exports.submitDailyResult = async (req, res, next) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
         const existing = await dbLayer.getWordleStatus(userId, today);
-        if (existing) return res.status(400).json({ error: 'You already played the daily word today.' });
+        if (existing) return res.status(400).json({ error: 'Das tägliche Wordle wurde für heute bereits aufgezeichnet.' });
 
         let earnedCoins = 0;
         if (won) {
-            earnedCoins = 10;
-            const user = await dbLayer.getUserById(userId);
-            if (user) {
-                await dbLayer.updateUserBalance(userId, user.koala_balance + earnedCoins);
-                await dbLayer.logKoalaTransaction(userId, earnedCoins, 'Wordle Daily Reward', 'game_reward');
-            }
+            earnedCoins = 1000;
+            await dbLayer.addKoalaCoins(userId, earnedCoins, 'Wordle Daily Reward');
         }
 
         await dbLayer.saveWordleResult(userId, today, guesses, won, earnedCoins);
         res.json({ success: true, earnedCoins });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const evaluateGuessInternal = (guess, sol) => {
+    if (!sol || !guess) return Array(guess.length).fill('absent');
+    const result = Array(guess.length).fill('absent');
+    const solutionArray = sol.split('');
+    const guessArray = guess.split('');
+    const pool = {};
+    solutionArray.forEach(letter => pool[letter] = (pool[letter] || 0) + 1);
+
+    // Pass 1: Correct
+    guessArray.forEach((letter, i) => {
+        if (letter === solutionArray[i]) {
+            result[i] = 'correct';
+            pool[letter]--;
+        }
+    });
+
+    // Pass 2: Present
+    guessArray.forEach((letter, i) => {
+        if (result[i] !== 'correct' && pool[letter] > 0) {
+            result[i] = 'present';
+            pool[letter]--;
+        }
+    });
+    return result;
+};
+
+exports.getDailyLeaderboard = async (req, res, next) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const today = new Date().toISOString().split('T')[0];
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const dailyWord = await dbLayer.getDailyWord(today);
+        const status = await dbLayer.getWordleStatus(userId, today);
+        const isFinished = !!status;
+
+        let leaderboard = await dbLayer.getWordleDailyLeaderboard(today);
+
+        // If not finished, mask the actual words (guesses)
+        if (!isFinished && dailyWord) {
+            leaderboard = leaderboard.map(entry => ({
+                ...entry,
+                guesses: null, // Hide actual strings
+                evaluations: entry.guesses.map(g => evaluateGuessInternal(g, dailyWord.toUpperCase()))
+            }));
+        }
+
+        res.json(leaderboard);
     } catch (err) {
         next(err);
     }

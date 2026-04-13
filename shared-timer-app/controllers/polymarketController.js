@@ -9,6 +9,15 @@ exports.addGeneralBet = async (req, res, next) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
         if (!title || !url) return res.status(400).json({ error: 'Title and URL are required' });
 
+        // Permission check
+        const settings = await dbLayer.getPolymarketSettings();
+        const user = await dbLayer.getUserById(userId);
+        const isSuperAdmin = user?.is_superadmin || false;
+
+        if (!isSuperAdmin && !settings.allowUsersToAdd) {
+            return res.status(403).json({ error: 'Das Hinzufügen von Wetten ist aktuell nur für Superadmins erlaubt.' });
+        }
+
         // Extract slug from URL
         let slug = '';
         if (url.includes('/event/')) {
@@ -238,6 +247,42 @@ exports.resolveGeneralBet = async (req, res, next) => {
             totalPaid: totalCentsPaid / 100
         });
 
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getSettings = async (req, res, next) => {
+    try {
+        const settings = await dbLayer.getPolymarketSettings();
+        res.json(settings);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getAdminSettings = async (req, res, next) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const user = await dbLayer.getUserById(userId);
+        if (!user || !user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+
+        const settings = await dbLayer.getPolymarketSettings();
+        res.json(settings);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateSettings = async (req, res, next) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        const user = await dbLayer.getUserById(userId);
+        if (!user || !user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+
+        const { allowUsersToAdd } = req.body;
+        await dbLayer.updatePolymarketSettings(allowUsersToAdd);
+        res.json({ success: true });
     } catch (err) {
         next(err);
     }

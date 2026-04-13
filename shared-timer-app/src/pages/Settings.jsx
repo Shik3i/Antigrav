@@ -1000,13 +1000,208 @@ const Settings = ({ user, setUser, socket }) => {
                         display: 'flex', alignItems: 'center', gap: '8px',
                         color: 'var(--accent-primary)', textDecoration: 'none',
                         fontSize: '0.9rem', padding: '8px 12px', borderRadius: '8px', transition: 'all 0.2s ease', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--border-focus)'
+                                            max="1"
+                                            step="0.05"
+                                            value={user.preferences?.alarmVolume !== undefined ? user.preferences.alarmVolume : 0.5}
+                                            onChange={(e) => updatePref('alarmVolume', parseFloat(e.target.value))}
+                                            style={{ width: '100px', cursor: 'pointer', accentColor: 'var(--accent-primary)' }}
+                                            title="Volume"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="btn-ghost"
+                                        style={{ padding: '10px 16px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)', display: 'flex', gap: '8px', alignItems: 'center' }}
+                                        onClick={() => {
+                                            const vol = user.preferences?.alarmVolume !== undefined ? user.preferences.alarmVolume : 0.5;
+                                            playAlarmSound(user.preferences?.alarmSound || ALARM_SOUNDS.CLASSIC_BEEP, vol);
+                                            if (Notification.permission === 'default') {
+                                                Notification.requestPermission().then(perm => {
+                                                    if (perm === 'granted') {
+                                                        new Notification('Testing 1, 2, 3!', { body: 'Notifications are working.' });
+                                                    }
+                                                });
+                                            } else if (Notification.permission === 'granted') {
+                                                new Notification('Testing 1, 2, 3!', { body: 'Notifications are working.' });
+                                            }
+                                        }}
+                                    >
+                                        <BellRing size={16} /> Test Alarm
+                                    </button>
+                                </div>
+
+                                <div style={{ marginTop: '20px' }}>
+                                    <p style={{ color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>
+                                        <strong>Pre-Timer Ping:</strong> Get a ping sound X seconds before the timer ends. Set to 0 to disable.
+                                    </p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <input
+                                            type="number"
+                                            className="input-primary"
+                                            style={{ maxWidth: '120px' }}
+                                            min="0"
+                                            step="10"
+                                            value={user.preferences?.preTimerPingSeconds || 0}
+                                            onChange={(e) => updatePref('preTimerPingSeconds', parseInt(e.target.value) || 0)}
+                                        />
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>seconds before end</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Other Features */}
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '32px' }}>
+                                <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Terminal size={18} /> System & Other Features
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={user.preferences?.showNewsTicker ?? (window.innerWidth > 768)}
+                                            onChange={(e) => updatePref('showNewsTicker', e.target.checked)}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show Live News Ticker (Tagesschau)</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={user.preferences?.showReactions ?? false}
+                                            onChange={(e) => updatePref('showReactions', e.target.checked)}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show Emote / Reaction Bar</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={user.preferences?.showClock ?? true}
+                                            onChange={(e) => updatePref('showClock', e.target.checked)}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show Local Clock</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={user.preferences?.showKoalaCoins ?? true}
+                                            onChange={(e) => updatePref('showKoalaCoins', e.target.checked)}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show KoalaCoins Global Widget</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={showStreamWidget}
+                                            onChange={(e) => toggleStreamWidget(e.target.checked)}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show Floating Twitch Widget</span>
+                                    </label>
+
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={user.preferences?.showWeather ?? false}
+                                            onChange={(e) => updatePref('showWeather', e.target.checked)}
+                                            style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>Show Local Weather Widget</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingsSection>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
+                        <button type="submit" className="btn-primary">
+                            Save Profile
+                        </button>
+                        {saved && <span style={{ color: '#10b981', fontSize: '0.85rem' }}>Successfully saved!</span>}
+                    </div>
+                </form>
+
+                <SettingsSection title="Server Admin Panel" icon={<Shield size={20} />}>
+                    {canManageUsers ? (
+                        <div>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '0.9rem' }}>
+                                You have full access to Server Settings and User Management.
+                            </p>
+                            <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={async () => {
+                                    if (isSuperAdmin) {
+                                        try {
+                                            // Securely fetch admin token even if already superadmin
+                                            const token = localStorage.getItem('timerToken');
+                                            sessionStorage.setItem('admin_token', token);
+                                        } catch (e) {}
+                                    }
+                                    navigate('/admin');
+                                }}
+                            >
+                                Open Server Admin Panel
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <input
+                                type="password"
+                                placeholder="Enter Admin Code"
+                                className="input-primary"
+                                style={{ maxWidth: '200px' }}
+                                id="admin-password-input"
+                            />
+                            <button
+                                type="button"
+                                className="btn-ghost"
+                                onClick={async () => {
+                                    const pwd = document.getElementById('admin-password-input').value;
+                                    try {
+                                        const res = await axios.post('/api/admin/unlock', { password: pwd });
+                                        sessionStorage.setItem('admin_token', res.data.token);
+                                        setHasGlobalAdmin(true);
+                                    } catch (err) {
+                                        alert(err.response?.data?.error || 'Incorrect password');
+                                    }
+                                }}
+                            >
+                                Unlock Admin
+                            </button>
+                        </div>
+                    )}
+                </SettingsSection>
+            </div>
+
+            <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <Link to="/api-docs" style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        color: 'var(--text-muted)', textDecoration: 'none',
+                        fontSize: '0.9rem', padding: '8px', borderRadius: '8px', transition: 'all 0.2s ease', border: '1px solid transparent'
+                    }}>
+                        <Terminal size={16} />
+                        <span>View API Docs</span>
+                    </Link>
+                    <Link to="/extension-info" style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        color: 'var(--accent-primary)', textDecoration: 'none',
+                        fontSize: '0.9rem', padding: '8px 12px', borderRadius: '8px', transition: 'all 0.2s ease', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--border-focus)'
                     }}>
                         <Download size={16} />
                         <span>Get Browser Extension</span>
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.17.0
+                    Version 2.17.1
                 </div>
             </div>
         </div>
