@@ -1,5 +1,11 @@
 [
   {
+    "id": 26,
+    "version": "2.17.3",
+    "date": "2026-04-13",
+    "changes": "- **Wordle Archive Bugfix**: Fix der Reaktivität beim Datumswechsel durch Korrektur der React-Hook-Abhängigkeiten.\n- **Navigations-Limit**: Implementierung eines MIN_DATE (12.04.2026), um ungültige Historien-Abfragen zu verhindern.\n- **UI Polish**: Der 'Zurück'-Button wird nun korrekt deaktiviert, wenn das Startdatum der Historie erreicht ist.\n- **State Sync**: Leaderboard und Wordle-Grid aktualisieren sich nun zuverlässig und synchron beim Blättern im Archiv."
+  },
+  {
     "id": 25,
     "version": "2.17.2",
     "date": "2026-04-13",
