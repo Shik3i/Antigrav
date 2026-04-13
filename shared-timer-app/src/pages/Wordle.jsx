@@ -23,6 +23,22 @@ const Wordle = ({ user, token }) => {
     const [activeModeData, setActiveModeData] = useState(null);
     const [dailyLeaderboard, setDailyLeaderboard] = useState([]);
     const [expandedUserId, setExpandedUserId] = useState(null);
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+    const isToday = (dateString) => {
+        return dateString === new Date().toISOString().split('T')[0];
+    };
+
+    const handleDateChange = (days) => {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + days);
+        const newDateStr = d.toISOString().split('T')[0];
+        
+        // Prevent future dates
+        if (newDateStr > new Date().toISOString().split('T')[0]) return;
+        
+        setSelectedDate(newDateStr);
+    };
 
     const evaluateGuess = useCallback((guess, sol) => {
         if (!sol || !guess) return Array(WORD_LENGTH).fill('absent');
@@ -83,8 +99,7 @@ const Wordle = ({ user, token }) => {
     const getStorageKey = useCallback((currentMode) => {
         const userId = user?.id || user?.userId || 'guest';
         if (currentMode === 'daily') {
-            const today = new Date().toISOString().split('T')[0];
-            return `wordle_daily_${today}_${userId}`;
+            return `wordle_daily_${selectedDate}_${userId}`;
         }
         return `wordle_endless_${userId}`;
     }, [user]);
@@ -118,7 +133,7 @@ const Wordle = ({ user, token }) => {
             const savedData = saved ? JSON.parse(saved) : null;
 
             if (gameMode === 'daily') {
-                const res = await axios.get('/api/wordle/daily', {
+                const res = await axios.get(`/api/wordle/daily?date=${selectedDate}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : {}
                 });
                 
@@ -157,7 +172,7 @@ const Wordle = ({ user, token }) => {
 
     useEffect(() => {
         initGame(mode);
-    }, [mode, initGame]);
+    }, [mode, selectedDate, initGame]);
 
     useEffect(() => {
         const fetchDict = async () => {
@@ -247,7 +262,7 @@ const Wordle = ({ user, token }) => {
     const fetchLeaderboard = useCallback(async () => {
         if (!token || mode !== 'daily') return;
         try {
-            const res = await axios.get('/api/wordle/daily/leaderboard', {
+            const res = await axios.get(`/api/wordle/daily/leaderboard?date=${selectedDate}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setDailyLeaderboard(res.data || []);
@@ -266,7 +281,7 @@ const Wordle = ({ user, token }) => {
         if (!token || submitting) return;
         setSubmitting(true);
         try {
-            await axios.post('/api/wordle/daily', {
+            await axios.post(`/api/wordle/daily?date=${selectedDate}`, {
                 guesses,
                 won
             }, {
@@ -529,6 +544,48 @@ const Wordle = ({ user, token }) => {
                         Endless
                     </button>
                 </div>
+
+                {mode === 'daily' && (
+                    <div style={{ 
+                        marginTop: '20px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '20px',
+                        background: 'rgba(255,255,255,0.05)',
+                        padding: '8px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                        <button 
+                            onClick={() => handleDateChange(-1)} 
+                            className="btn-ghost" 
+                            style={{ padding: '4px', borderRadius: '50%' }}
+                        >
+                            <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} />
+                        </button>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                {isToday(selectedDate) ? 'Heute' : new Date(selectedDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            </span>
+                            {!isToday(selectedDate) && (
+                                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--accent-primary)', fontWeight: 800 }}>
+                                    Archiv
+                                </span>
+                            )}
+                        </div>
+
+                        <button 
+                            onClick={() => handleDateChange(1)} 
+                            className="btn-ghost" 
+                            style={{ padding: '4px', borderRadius: '50%', opacity: isToday(selectedDate) ? 0.3 : 1 }}
+                            disabled={isToday(selectedDate)}
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div style={{ height: '24px', textAlign: 'center', color: 'var(--accent-primary)', fontWeight: 600 }}>

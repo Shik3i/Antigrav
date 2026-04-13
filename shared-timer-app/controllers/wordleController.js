@@ -30,20 +30,35 @@ try {
     cachedWords = ['ALARM', 'APFEL', 'BIRNE', 'STERN', 'GLÜCK'];
 }
 
+const getTargetDate = (req) => {
+    const today = new Date().toISOString().split('T')[0];
+    const dateQuery = req.query.date;
+
+    if (!dateQuery) return today;
+
+    // Simple regex validation for YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateQuery)) return today;
+
+    // Safety: No future dates allowed
+    if (dateQuery > today) return today;
+
+    return dateQuery;
+};
+
 exports.getDailyGame = async (req, res, next) => {
     try {
         const userId = req.user?.id || req.user?.userId;
-        const today = new Date().toISOString().split('T')[0];
+        const targetDate = getTargetDate(req);
 
-        let word = await dbLayer.getDailyWord(today);
+        let word = await dbLayer.getDailyWord(targetDate);
         if (!word) {
             // Predictable random word based on date
-            const dateNum = parseInt(today.replace(/-/g, ''));
+            const dateNum = parseInt(targetDate.replace(/-/g, ''));
             word = cachedWords[dateNum % cachedWords.length];
-            await dbLayer.saveDailyWord(today, word);
+            await dbLayer.saveDailyWord(targetDate, word);
         }
 
-        const status = userId ? await dbLayer.getWordleStatus(userId, today) : null;
+        const status = userId ? await dbLayer.getWordleStatus(userId, targetDate) : null;
         res.json({ word, played: !!status, status });
     } catch (err) {
         next(err);
@@ -54,20 +69,20 @@ exports.submitDailyResult = async (req, res, next) => {
     try {
         const { guesses, won } = req.body;
         const userId = req.user?.id || req.user?.userId;
-        const today = new Date().toISOString().split('T')[0];
+        const targetDate = getTargetDate(req);
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const existing = await dbLayer.getWordleStatus(userId, today);
-        if (existing) return res.status(400).json({ error: 'Das tägliche Wordle wurde für heute bereits aufgezeichnet.' });
+        const existing = await dbLayer.getWordleStatus(userId, targetDate);
+        if (existing) return res.status(400).json({ error: 'Das tägliche Wordle wurde für dieses Datum bereits aufgezeichnet.' });
 
         let earnedCoins = 0;
         if (won) {
             earnedCoins = 1000;
-            await dbLayer.addKoalaCoins(userId, earnedCoins, 'Wordle Daily Reward');
+            await dbLayer.addKoalaCoins(userId, earnedCoins, `Wordle Daily Reward (${targetDate})`);
         }
 
-        await dbLayer.saveWordleResult(userId, today, guesses, won, earnedCoins);
+        await dbLayer.saveWordleResult(userId, targetDate, guesses, won, earnedCoins);
         res.json({ success: true, earnedCoins });
     } catch (err) {
         next(err);
@@ -103,15 +118,15 @@ const evaluateGuessInternal = (guess, sol) => {
 exports.getDailyLeaderboard = async (req, res, next) => {
     try {
         const userId = req.user?.id || req.user?.userId;
-        const today = new Date().toISOString().split('T')[0];
+        const targetDate = getTargetDate(req);
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const dailyWord = await dbLayer.getDailyWord(today);
-        const status = await dbLayer.getWordleStatus(userId, today);
+        const dailyWord = await dbLayer.getDailyWord(targetDate);
+        const status = await dbLayer.getWordleStatus(userId, targetDate);
         const isFinished = !!status;
 
-        let leaderboard = await dbLayer.getWordleDailyLeaderboard(today);
+        let leaderboard = await dbLayer.getWordleDailyLeaderboard(targetDate);
 
         // If not finished, mask the actual words (guesses)
         if (!isFinished && dailyWord) {
