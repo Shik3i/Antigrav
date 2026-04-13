@@ -1,5 +1,11 @@
 [
   {
+    "id": 28,
+    "version": "2.17.5",
+    "date": "2026-04-13",
+    "changes": "- **UI/UX Polishing**: Reduzierung der vertikalen Abstände (Gap & Padding) für ein kompakteres Design.\n- **Layout-Optimierung**: Straffung des Headers und des Spielbereichs, um Scrolling auf Standardbildschirmen zu minimieren.\n- **Visual Hierarchy**: Bessere Platznutzung zwischen Titel, Modus-Auswahl und Spielfeld."
+  },
+  {
     "id": 27,
     "version": "2.17.4",
     "date": "2026-04-13",
