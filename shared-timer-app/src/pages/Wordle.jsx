@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar';
 
 const WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
+const MIN_DATE = '2026-04-12';
 
 const Wordle = ({ user, token }) => {
     const [mode, setMode] = useState('daily'); // 'daily' or 'endless'
@@ -36,6 +37,8 @@ const Wordle = ({ user, token }) => {
         
         // Prevent future dates
         if (newDateStr > new Date().toISOString().split('T')[0]) return;
+        // Prevent pre-release dates
+        if (newDateStr < MIN_DATE) return;
         
         setSelectedDate(newDateStr);
     };
@@ -269,15 +272,15 @@ const Wordle = ({ user, token }) => {
         } catch (err) {
             console.error('Failed to fetch leaderboard:', err);
         }
-    }, [token, mode]);
+    }, [token, mode, selectedDate]);
 
     useEffect(() => {
         if (token && mode === 'daily') {
             fetchLeaderboard();
         }
-    }, [token, mode, dailyPlayed, fetchLeaderboard]);
+    }, [token, mode, selectedDate, dailyPlayed, fetchLeaderboard]);
 
-    const submitDaily = async (won) => {
+    const submitDaily = useCallback(async (won) => {
         if (!token || submitting) return;
         setSubmitting(true);
         try {
@@ -297,7 +300,7 @@ const Wordle = ({ user, token }) => {
         } finally {
             setSubmitting(false);
         }
-    };
+    }, [token, submitting, guesses, selectedDate, clearStorage]);
 
 
     const renderGrid = () => {
@@ -560,7 +563,8 @@ const Wordle = ({ user, token }) => {
                         <button 
                             onClick={() => handleDateChange(-1)} 
                             className="btn-ghost" 
-                            style={{ padding: '4px', borderRadius: '50%' }}
+                            style={{ padding: '4px', borderRadius: '50%', opacity: selectedDate <= MIN_DATE ? 0.3 : 1 }}
+                            disabled={selectedDate <= MIN_DATE}
                         >
                             <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} />
                         </button>
