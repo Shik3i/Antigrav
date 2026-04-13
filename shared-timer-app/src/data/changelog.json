@@ -1,5 +1,11 @@
 [
   {
+    "id": 27,
+    "version": "2.17.4",
+    "date": "2026-04-13",
+    "changes": "- **LocalStorage Sync Fix**: Korrektur der Memoization-Abhängigkeiten in Wordle.jsx, um Spielstände im Archiv korrekt nach Datum getrennt zu speichern.\n- **Data Integrity**: Sicherstellung, dass das Nachspielen alter Tage nicht den Speicherstand des aktuellen Tages überschreibt."
+  },
+  {
     "id": 26,
     "version": "2.17.3",
     "date": "2026-04-13",
