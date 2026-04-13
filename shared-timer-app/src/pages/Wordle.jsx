@@ -526,7 +526,7 @@ const Wordle = ({ user, token }) => {
     };
 
     return (
-        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', padding: '20px' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: '2.5rem', marginBottom: '8px', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     KoalaWordle
@@ -550,13 +550,13 @@ const Wordle = ({ user, token }) => {
 
                 {mode === 'daily' && (
                     <div style={{ 
-                        marginTop: '20px', 
+                        marginTop: '12px', 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center', 
                         gap: '20px',
                         background: 'rgba(255,255,255,0.05)',
-                        padding: '8px 16px',
+                        padding: '4px 12px',
                         borderRadius: '12px',
                         border: '1px solid rgba(255,255,255,0.1)'
                     }}>
@@ -596,7 +596,7 @@ const Wordle = ({ user, token }) => {
                 {message}
             </div>
 
-            <div className="glass-panel" style={{ padding: '32px', borderRadius: '24px', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: '32px', alignItems: 'center' }}>
+            <div className="glass-panel" style={{ padding: '20px', borderRadius: '24px', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
                 {loading ? (
                     <div className="animate-spin" style={{ opacity: 0.5 }}><RefreshCw size={48} /></div>
                 ) : (
