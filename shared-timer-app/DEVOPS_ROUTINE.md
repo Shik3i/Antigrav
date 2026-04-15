@@ -6,6 +6,7 @@ Dieses Dokument ist eine strikte Arbeitsanweisung für den Agenten bei jedem Fea
 - Öffne `Settings.jsx`.
 - Suche die Versionsnummer (z.B. "Version 2.9.0").
 - Erhöhe die Minor-Version um +1 (z.B. von 2.9.0 auf 2.10.0).
+- Außer es sind nur Bugfixes, dann erhöhe die 3. zahl um +1 (z.B. von 2.9.0 auf 2.9.1)
 - Speichere die Datei.
 
 ### 2. Changelog-Dokumentation

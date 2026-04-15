@@ -111,38 +111,21 @@ function InnerApp() {
   const selectedLeagues = user.preferences?.esportsLeagues || DEFAULT_LEAGUES;
   useEsportsNotifications(selectedLeagues, globalSocket);
 
+  // SOCKET INITIALIZATION: Strictly stable lifecycle
   useEffect(() => {
-    // Check for extension installation
-    const handleWindowMessage = (event) => {
-      // Accept PONG from bridge.js
-      if (event.data?.action === 'EXTENSION_PONG') {
-        console.log('[App] Received EXTENSION_PONG from bridge.js!');
-        setUser(prev => {
-          if (prev.preferences?.hasExtension) return prev;
-          console.log('[App] Setting hasExtension to true and propagating to server...');
-          return { ...prev, preferences: { ...prev.preferences, hasExtension: true } };
-        });
-      }
-
-      // Generic Data Pipe (Extension -> Window -> Socket)
-      if (event.data?.type === 'EXTENSION_OUTBOUND') {
-        window.dispatchEvent(new CustomEvent('EXTENSION_OUTBOUND_EVENT', {
-          detail: event.data.payload
-        }));
-      }
-    };
-    window.addEventListener('message', handleWindowMessage);
-
     // Ping extension shortly after load
     setTimeout(() => window.postMessage({ action: 'EXTENSION_PING' }, '*'), 500);
 
+    console.log('[App] Initializing socket with token:', token ? 'exists' : 'null');
     const newSocket = io('/', {
       transports: ['websocket'],
       autoConnect: true,
       auth: { token }
     });
+    
     setGlobalSocket(newSocket);
 
+    // Common global listeners
     newSocket.on(EVENTS.CONNECT, () => {
       console.log('[App] globalSocket connected! ID:', newSocket.id);
       setIsConnected(true);
@@ -157,43 +140,63 @@ function InnerApp() {
       }
     });
 
-    // Live coin balance update (no more F5 needed!)
+    // Live coin balance update using functional update
     newSocket.on(EVENTS.COIN_BALANCE_UPDATE, ({ balance }) => {
       setUser(prev => ({ ...prev, koala_balance: balance }));
     });
-    // Latency tracking loop
-    newSocket.on(EVENTS.PONG, ({ clientTime, serverTime }) => {
-      const now = Date.now();
-      const ping = Math.round((now - clientTime) / 2);
-      // Offset: if serverTime is 1000, and ping is 50, true time when we get it is 1050.
-      // So offset = (serverTime + ping) - localDateNow
-      const offset = (serverTime + ping) - now;
-      setServerTimeOffset(offset);
-
-      // Report back to server so others see our ping
-      newSocket.emit(EVENTS.REPORT_METRICS, { ping, offset });
-    });
-
-    const pingInterval = setInterval(() => {
-      if (newSocket.connected) {
-        newSocket.emit(EVENTS.PING, { clientTime: Date.now() });
-      }
-    }, 5000);
 
     newSocket.on(EVENTS.DISCONNECT, (reason) => {
-      console.error('[App] SOCKET DISCONNECTED. Reason:', reason);
+      console.warn('[App] SOCKET DISCONNECTED. Reason:', reason);
       setIsConnected(false);
     });
 
-    console.log('[App] InnerApp MOUNTED');
+    const handleWindowMessage = (event) => {
+      if (event.data?.action === 'EXTENSION_PONG') {
+        setUser(prev => {
+          if (prev.preferences?.hasExtension) return prev;
+          return { ...prev, preferences: { ...prev.preferences, hasExtension: true } };
+        });
+      }
+      if (event.data?.type === 'EXTENSION_OUTBOUND') {
+        window.dispatchEvent(new CustomEvent('EXTENSION_OUTBOUND_EVENT', {
+          detail: event.data.payload
+        }));
+      }
+    };
+    window.addEventListener('message', handleWindowMessage);
 
     return () => {
-      console.trace('[App] InnerApp UNMOUNTING! This is destroying the socket!');
+      console.log('[App] InnerApp Lifecycle Cleanup: Disconnecting Socket');
       window.removeEventListener('message', handleWindowMessage);
-      clearInterval(pingInterval);
-      newSocket.disconnect();
+      newSocket.disconnect(); 
     };
-  }, []);
+  }, [token]);
+
+  // LATENCY & METRICS: Separate lifecycle
+  useEffect(() => {
+    if (!globalSocket) return;
+
+    const handlePong = ({ clientTime, serverTime }) => {
+      const now = Date.now();
+      const ping = Math.round((now - clientTime) / 2);
+      const offset = (serverTime + ping) - now;
+      setServerTimeOffset(offset);
+      globalSocket.emit(EVENTS.REPORT_METRICS, { ping, offset });
+    };
+
+    globalSocket.on(EVENTS.PONG, handlePong);
+
+    const pingInterval = setInterval(() => {
+      if (globalSocket.connected) {
+        globalSocket.emit(EVENTS.PING, { clientTime: Date.now() });
+      }
+    }, 5000);
+
+    return () => {
+      globalSocket.off(EVENTS.PONG, handlePong);
+      clearInterval(pingInterval);
+    };
+  }, [globalSocket]);
 
   useEffect(() => {
     fetch('/api/pokemon/configs')
@@ -240,12 +243,12 @@ function InnerApp() {
     }
   }, [user, globalSocket, activeRoomId]);
 
+  // ROOM JOIN & SYNC: Decoupled logic
   useEffect(() => {
     if (!activeRoomId || !user?.id || !globalSocket) return;
 
-    // Ensure socket is connected before emitting
     const join = () => {
-      console.log('[App] Joining room:', activeRoomId, 'with user:', user.displayName, 'token:', activeToken);
+      console.log('[App] Joining room:', activeRoomId, 'with user:', user.displayName);
       setRoomError(null);
       globalSocket.emit(EVENTS.JOIN_ROOM, {
         roomId: activeRoomId,
@@ -256,74 +259,60 @@ function InnerApp() {
       });
     };
 
-    const handleConnect = () => {
-      join();
-    };
-
-    if (globalSocket.connected) {
-      join();
-    } else {
-      globalSocket.on(EVENTS.CONNECT, handleConnect);
-    }
+    const handleConnect = () => join();
+    if (globalSocket.connected) join();
+    else globalSocket.on(EVENTS.CONNECT, handleConnect);
 
     const handleSync = (state) => {
       setRoomState(state);
-
-      // Auto-fetch tokens if we are a writer
-      const myUser = state.users.find(u => u.userId === user.id || u.id === user.id || u.socketId === globalSocket?.id);
-      if (myUser && myUser.role === 'write' && globalSocket) {
+      // Functional approach: compare and emit only if necessary
+      const myUser = state.users.find(u => u.userId === user.id || u.socketId === globalSocket.id);
+      if (myUser?.role === 'write' && globalSocket.connected) {
         globalSocket.emit(EVENTS.GET_INVITE_TOKENS, { roomId: state.id });
       }
     };
+
     const handleError = (msg) => {
-      if (msg === 'Room not found or has expired. Please check the URL or create a new room.') {
-        // If the user is NOT actively trying to view a room page, clear the active room state silently
-        if (!location.pathname.startsWith('/room/')) {
-          console.log('[App] Auto-rejoin failed: Room no longer exists. Clearing state.');
-          setActiveRoomId(null);
-          setActiveToken(null);
-          return;
-        }
+      if (msg.includes('Room not found') && !location.pathname.startsWith('/room/')) {
+        setActiveRoomId(null);
+        setActiveToken(null);
+        return;
       }
-      console.error('[App] Received room error:', msg);
       setRoomError(msg);
     };
+
     const handleTokens = (data) => setRoomTokens(data);
+
+    const handleInvite = (data) => {
+      if (window.confirm(`${data.inviterName} has invited you to "${data.roomName}". Join?`)) {
+        navigate(`/room/${data.roomId}`);
+      }
+    };
+
+    const handleExtensionMessage = (data) => {
+      window.postMessage({ type: 'EXTENSION_INBOUND', payload: data.payload, senderName: data.userDisplayName }, '*');
+    };
+
+    const handleOutboundSync = (e) => {
+      globalSocket.emit(EVENTS.EXTENSION_MESSAGE, { roomId: activeRoomId, payload: e.detail });
+    };
 
     globalSocket.on(EVENTS.SYNC_STATE, handleSync);
     globalSocket.on(EVENTS.ERROR, handleError);
-    globalSocket.on(EVENTS.ROOM_INVITE, (data) => {
-      if (window.confirm(`${data.inviterName} has invited you to join the room "${data.roomName}". Join now?`)) {
-        navigate(`/room/${data.roomId}`);
-      }
-    });
-
+    globalSocket.on(EVENTS.ROOM_INVITE, handleInvite);
     globalSocket.on(EVENTS.INVITE_TOKENS, handleTokens);
-
-    const handleOutboundSync = (e) => {
-      const payload = e.detail;
-      globalSocket.emit(EVENTS.EXTENSION_MESSAGE, { roomId: activeRoomId, payload });
-    };
+    globalSocket.on(EVENTS.EXTENSION_MESSAGE, handleExtensionMessage);
     window.addEventListener('EXTENSION_OUTBOUND_EVENT', handleOutboundSync);
 
-    const handleExtensionMessage = (data) => {
-      window.postMessage({
-        type: 'EXTENSION_INBOUND',
-        payload: data.payload,
-        senderName: data.userDisplayName || null
-      }, '*');
-    };
-    globalSocket.on(EVENTS.EXTENSION_MESSAGE, handleExtensionMessage);
-
     return () => {
-      console.log('[App] Leaving room cleanup for:', activeRoomId);
+      console.log('[App] Room Cleanup:', activeRoomId);
       globalSocket.off(EVENTS.CONNECT, handleConnect);
       globalSocket.off(EVENTS.SYNC_STATE, handleSync);
       globalSocket.off(EVENTS.ERROR, handleError);
+      globalSocket.off(EVENTS.ROOM_INVITE, handleInvite);
       globalSocket.off(EVENTS.INVITE_TOKENS, handleTokens);
       globalSocket.off(EVENTS.EXTENSION_MESSAGE, handleExtensionMessage);
       window.removeEventListener('EXTENSION_OUTBOUND_EVENT', handleOutboundSync);
-      globalSocket.off(EVENTS.ROOM_INVITE);
     };
   }, [activeRoomId, activeToken, user?.id, globalSocket]);
 

@@ -1,5 +1,11 @@
 [
   {
+    "id": 29,
+    "version": "2.18.0",
+    "date": "2026-04-15",
+    "changes": "- **Social Minigames**: Einführung von interaktiven Coinflip- und Deathroll-Spielen direkt in den Timer-Räumen.\n- **Premium Animationen**: Synchronisierte 3D-CSS-Animationen für den Münzwurf und interaktive Würfel-Effekte.\n- **Turn-Logic**: Implementierung einer zugbasierten Spielsteuerung für Deathroll zur Förderung der Fairness.\n- **Socket-Stabilisierung**: Vollständiges Refactoring des Socket-Lebenszyklus und Fehlerbehebung bei Event-Übertragungen.\n- **UI/UX Polishing**: Vereinheitlichung der Minigame-Timings auf 5 Sekunden für ein flüssigeres Spielerlebnis."
+  },
+  {
     "id": 28,
     "version": "2.17.5",
     "date": "2026-04-13",
