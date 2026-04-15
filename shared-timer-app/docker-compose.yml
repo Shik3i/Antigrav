@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  shared-timer:
+    build: .
+    container_name: shared-timer-app
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      # Persist the SQLite database outside the container
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DB_PATH=/app/data/timer.db
+      - THE_ODDS_API_KEY=29bafe6cd2bcbb56439a0cc7dd4a9380
+      - TWITCH_CLIENT_ID=
+      - TWITCH_CLIENT_SECRET=

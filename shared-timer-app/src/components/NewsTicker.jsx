@@ -1,0 +1,80 @@
+import React, { useEffect, useState } from 'react';
+import { Rss } from 'lucide-react';
+import { usePageVisibility } from '../hooks/usePageVisibility';
+
+const NewsTicker = ({ socket }) => {
+    const [news, setNews] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const isVisible = usePageVisibility();
+
+    const formatUpdatedAt = (value) => {
+        if (!value) return null;
+        return new Intl.DateTimeFormat('de-DE', {
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(value);
+    };
+
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNews = (data) => {
+            if (Array.isArray(data)) {
+                setNews(data);
+                setLastUpdated(new Date());
+            }
+            setLoading(false);
+        };
+
+        socket.on('api_news_data', handleNews);
+
+        const fetchNews = () => {
+            if (socket.connected) socket.emit('get_api_news');
+        };
+
+        fetchNews();
+        socket.on('connect', fetchNews);
+
+        // Refresh every 10 minutes
+        const interval = setInterval(fetchNews, isVisible ? 10 * 60 * 1000 : 30 * 60 * 1000);
+        return () => {
+            socket.off('api_news_data', handleNews);
+            socket.off('connect', fetchNews);
+            clearInterval(interval);
+        };
+    }, [isVisible, socket]);
+
+    if (loading || news.length === 0) return null;
+
+    return (
+        <div className="news-ticker-wrapper">
+            <div className="news-ticker-label">
+                <Rss size={14} /> Tagesschau
+            </div>
+            {lastUpdated && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: '12px', whiteSpace: 'nowrap' }}>
+                    Stand {formatUpdatedAt(lastUpdated)}
+                </div>
+            )}
+            <div className="news-ticker-content">
+                <div className="news-ticker-track">
+                    {/* Double the array for seamless infinite scrolling */}
+                    {[...news, ...news].map((item, i) => (
+                        <a
+                            key={i}
+                            href={item.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="news-item"
+                        >
+                            {item.title}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default NewsTicker;
