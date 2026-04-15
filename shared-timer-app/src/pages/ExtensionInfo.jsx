@@ -20,7 +20,7 @@ const ExtensionInfo = () => {
                     1. Download Extension
                 </h2>
                 <p style={{ marginBottom: '12px', color: 'var(--text-main)', lineHeight: '1.5' }}>
-                    Download the latest version (<strong>v2.2</strong>) of the KoalaSync extension as a ZIP file.
+                    Download the latest version (<strong>v2.5</strong>) of the KoalaSync extension as a ZIP file.
                 </p>
                 <p style={{ marginBottom: '24px', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
                     Don't worry about missing updates — the extension will notify you automatically when someone in your room has a newer version!

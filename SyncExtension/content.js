@@ -1,26 +1,87 @@
 // content.js - Injected into video tabs
 // Handles play/pause commands, diagnostics, and force sync
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // Ignore messages meant for bridge.js (bidirectional sync and ACK)
-    if (message.source === 'extension_popup' || message.source === 'extension_background') {
-        return false;
-    }
-    // Ignore generic pipe wrappers — only handle raw payloads
-    if (message.type === 'EXTENSION_INBOUND' || message.type === 'EXTENSION_OUTBOUND') {
-        return false;
-    }
+(function() {
+    // Prevent double injection
+    if (window.koalaSyncInjected) return;
+    window.koalaSyncInjected = true;
 
-    if (message.action === 'ping') {
-        sendResponse({ status: 'ok' });
-        return true;
-    }
+    // --- Global state for coordination ---
+    let isProcessingCommand = false;
 
     // --- Helper: find the best video element on the page ---
     function findVideo() {
         const videos = document.querySelectorAll('video');
         if (videos.length > 0) return videos[0];
         return document.querySelector('video');
+    }
+
+    // --- Helper: safely play/pause taking YouTube, Twitch and other SPA players into account ---
+    function tryMediaAction(action) {
+        isProcessingCommand = true;
+        try {
+            const host = window.location.hostname.toLowerCase();
+            const isYouTube = host.includes('youtube.com');
+            const isTwitch = host.includes('twitch.tv');
+
+            // --- YOUTUBE SPECIAL HANDLING ---
+            if (isYouTube) {
+                const ytButton = document.querySelector('.ytp-play-button');
+                if (ytButton) {
+                    const title = ytButton.getAttribute('title') || ytButton.getAttribute('data-title-no-tooltip') || ytButton.getAttribute('aria-label') || '';
+                    const isCurrentlyPlaying = title.toLowerCase().includes('pause');
+
+                    if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
+                        ytButton.click();
+                        setTimeout(() => { isProcessingCommand = false; }, 500);
+                        return;
+                    } else {
+                        isProcessingCommand = false;
+                        return;
+                    }
+                }
+            }
+
+            // --- TWITCH SPECIAL HANDLING ---
+            if (isTwitch) {
+                const twitchButton = document.querySelector('[data-a-target="player-play-pause-button"]');
+                if (twitchButton) {
+                    // Check state via aria-label or internal icon
+                    const label = twitchButton.getAttribute('aria-label')?.toLowerCase() || '';
+                    const isCurrentlyPlaying = label.includes('pause') || label.includes('wiedergabe stoppen');
+
+                    if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
+                        twitchButton.click();
+                        setTimeout(() => { isProcessingCommand = false; }, 500);
+                        return;
+                    } else {
+                        isProcessingCommand = false;
+                        return;
+                    }
+                }
+            }
+
+            // --- DEFAULT HTML5 VIDEO FALLBACK ---
+            const videos = document.querySelectorAll('video');
+            videos.forEach(v => {
+                if (action === 'play') {
+                    if (v.paused) {
+                        v.play().catch(e => {
+                            if (e.name === 'NotAllowedError') {
+                                console.warn('SyncExtension: Autoplay blocked. Please click the page once to enable sync.');
+                            } else {
+                                console.debug('SyncExtension: Native play failed:', e.message);
+                            }
+                        });
+                    }
+                } else if (action === 'pause') {
+                    if (!v.paused) v.pause();
+                }
+            });
+        } catch (e) {
+            console.error('SyncExtension: Error in media action:', e);
+        }
+        setTimeout(() => { isProcessingCommand = false; }, 500);
     }
 
     // --- Helper: poll video state with timeout ---
@@ -70,141 +131,186 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
     }
 
-    const videos = document.querySelectorAll('video');
-
-    // --- Diagnostics ---
-    if (message.action === 'get_debug_info') {
-        const result = {
-            detectionStatus: 'Not Found',
-            videoState: 'N/A',
-            currentTime: 'N/A',
-            readyState: 'N/A',
-            sourceUrl: window.location.href
-        };
-
-        try {
-            const targetVideo = findVideo();
-            if (targetVideo) {
-                result.detectionStatus = 'Found';
-                result.videoState = targetVideo.paused ? 'Paused' : 'Playing';
-                result.currentTime = targetVideo.currentTime.toFixed(1) + 's';
-                result.readyState = targetVideo.readyState;
-                result.sourceUrl = targetVideo.src || targetVideo.currentSrc || window.location.href;
-            } else {
-                result.detectionStatus = 'No <video> element found';
-            }
-        } catch (e) {
-            result.detectionStatus = `Error: ${e.message}`;
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Ignore messages meant for bridge.js (bidirectional sync and ACK)
+        if (message.source === 'extension_popup' || message.source === 'extension_background') {
+            return false;
+        }
+        // Ignore generic pipe wrappers — only handle raw payloads
+        if (message.type === 'EXTENSION_INBOUND' || message.type === 'EXTENSION_OUTBOUND') {
+            return false;
         }
 
-        sendResponse(result);
-        return true;
-    }
+        if (message.action === 'ping') {
+            sendResponse({ status: 'ok' });
+            return true;
+        }
 
-    if (videos.length === 0) {
-        sendResponse({ status: 'no_video' });
-        return true;
-    }
+        // --- Diagnostics ---
+        if (message.action === 'get_debug_info') {
+            const result = {
+                detectionStatus: 'Not Found',
+                videoState: 'N/A',
+                currentTime: 'N/A',
+                readyState: 'N/A',
+                sourceUrl: window.location.href
+            };
 
-    // --- Helper: safely play/pause taking YouTube and other SPA players into account ---
-    const tryMediaAction = (action) => {
-        try {
-            const isYouTube = window.location.hostname.includes('youtube.com');
-
-            if (isYouTube) {
-                const ytButton = document.querySelector('.ytp-play-button');
-                if (ytButton) {
-                    const title = ytButton.getAttribute('title') || ytButton.getAttribute('data-title-no-tooltip') || ytButton.getAttribute('aria-label') || '';
-                    const isCurrentlyPlaying = title.toLowerCase().includes('pause');
-
-                    if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
-                        ytButton.click();
-                        return;
-                    } else {
-                        return; // Already in desired state
-                    }
+            try {
+                const targetVideo = findVideo();
+                if (targetVideo) {
+                    result.detectionStatus = 'Found';
+                    result.videoState = targetVideo.paused ? 'Paused' : 'Playing';
+                    result.currentTime = targetVideo.currentTime.toFixed(1) + 's';
+                    result.readyState = targetVideo.readyState;
+                    result.sourceUrl = targetVideo.src || targetVideo.currentSrc || window.location.href;
+                } else {
+                    result.detectionStatus = 'No <video> element found';
                 }
-
-                const ytVideo = document.querySelector('video.video-stream.html5-main-video');
-                if (ytVideo) {
-                    if (action === 'play' && ytVideo.paused) {
-                        ytVideo.play().catch(e => console.warn('YT native play fails:', e));
-                    } else if (action === 'pause' && !ytVideo.paused) {
-                        ytVideo.pause();
-                    }
-                    return;
-                }
+            } catch (e) {
+                result.detectionStatus = `Error: ${e.message}`;
             }
 
-            // Default HTML5 Video approach
-            videos.forEach(v => {
-                if (action === 'play') {
-                    if (v.paused) v.play().catch(e => console.error('Play failed:', e));
-                } else if (action === 'pause') {
-                    if (!v.paused) v.pause();
-                }
-            });
-        } catch (e) {
-            console.error('Error in media action:', e);
+            sendResponse(result);
+            return true;
         }
-    };
 
-    // --- PLAY with verified ACK ---
-    if (message.action === 'play') {
-        tryMediaAction('play');
-        pollVideoState(false).then(success => {
-            sendResponse({ status: success ? 'playing' : 'failed' });
-        });
-        return true; // async
-    }
-
-    // --- PAUSE with verified ACK ---
-    if (message.action === 'pause') {
-        tryMediaAction('pause');
-        pollVideoState(true).then(success => {
-            sendResponse({ status: success ? 'paused' : 'failed' });
-        });
-        return true; // async
-    }
-
-    // --- FORCE SYNC: Phase 1 - Pause + Seek ---
-    if (message.action === 'force_sync_pause_seek') {
-        const targetTime = message.targetTime;
-        const video = findVideo();
-
-        if (!video) {
+        const videos = document.querySelectorAll('video');
+        if (videos.length === 0) {
             sendResponse({ status: 'no_video' });
             return true;
         }
 
-        // Pause first
-        tryMediaAction('pause');
+        // --- PLAY with verified ACK ---
+        if (message.action === 'play') {
+            tryMediaAction('play');
+            pollVideoState(false).then(success => {
+                sendResponse({ status: success ? 'playing' : 'failed' });
+            });
+            return true; // async
+        }
 
-        // Wait until paused, then seek
-        pollVideoState(true, 1500).then(() => {
-            video.currentTime = targetTime;
+        // --- PAUSE with verified ACK ---
+        if (message.action === 'pause') {
+            tryMediaAction('pause');
+            pollVideoState(true).then(success => {
+                sendResponse({ status: success ? 'paused' : 'failed' });
+            });
+            return true; // async
+        }
 
-            // Wait until seeked and buffered
-            pollSeekReady(targetTime).then(ready => {
-                sendResponse({
-                    status: ready ? 'seek_ready' : 'seek_timeout',
-                    currentTime: video.currentTime,
-                    readyState: video.readyState
+        // --- FORCE SYNC: Phase 1 - Pause + Seek ---
+        if (message.action === 'force_sync_pause_seek') {
+            const targetTime = message.targetTime;
+            const video = findVideo();
+
+            if (!video) {
+                sendResponse({ status: 'no_video' });
+                return true;
+            }
+
+            // Pause first
+            tryMediaAction('pause');
+
+            // Wait until paused, then seek
+            pollVideoState(true, 1500).then(() => {
+                video.currentTime = targetTime;
+
+                // Wait until seeked and buffered
+                pollSeekReady(targetTime).then(ready => {
+                    sendResponse({
+                        status: ready ? 'seek_ready' : 'seek_timeout',
+                        currentTime: video.currentTime,
+                        readyState: video.readyState
+                    });
                 });
             });
-        });
 
-        return true; // async
+            return true; // async
+        }
+
+        // --- FORCE SYNC: Phase 2 - Play ---
+        if (message.action === 'force_sync_play') {
+            tryMediaAction('play');
+            pollVideoState(false).then(success => {
+                sendResponse({ status: success ? 'playing' : 'failed' });
+            });
+            return true; // async
+        }
+
+        return true;
+    });
+
+    // HEARTBEAT: Ping background.js every 15 seconds to keep it alive
+    // Only run if we have a video or were active to minimize noise on non-media tabs
+    const heartbeatInterval = setInterval(() => {
+        try {
+            // 1. Extra robust check: id is gone = context dead
+            if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id) {
+                clearInterval(heartbeatInterval);
+                return;
+            }
+
+            const video = findVideo();
+            if (video || window.koalaSyncInjected) {
+                // 2. Double protection with try/catch because sendMessage throws synchronously on invalid context
+                chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content' }).catch(() => {
+                    clearInterval(heartbeatInterval);
+                });
+            }
+        } catch (e) {
+            // Context is definitely gone
+            clearInterval(heartbeatInterval);
+        }
+    }, 15000);
+
+    // --- TWO-WAY SYNC: Listen for native video events ---
+    function reportVideoEvent(action) {
+        if (isProcessingCommand) return;
+        
+        const video = findVideo();
+        const payload = {
+            action: action,
+            timestamp: new Date().toISOString(),
+            currentTime: video ? video.currentTime : null,
+            sourceUrl: window.location.href
+        };
+
+        chrome.runtime.sendMessage({
+            type: 'EXTENSION_OUTBOUND',
+            source: 'video_native_event',
+            payload: payload
+        }).catch(() => {});
     }
 
-    // --- FORCE SYNC: Phase 2 - Play ---
-    if (message.action === 'force_sync_play') {
-        tryMediaAction('play');
-        pollVideoState(false).then(success => {
-            sendResponse({ status: success ? 'playing' : 'failed' });
-        });
-        return true; // async
+    function attachVideoListeners(video) {
+        if (!video || video.dataset.syncAttached === 'true') return;
+        
+        video.addEventListener('play', () => reportVideoEvent('play'));
+        video.addEventListener('pause', () => reportVideoEvent('pause'));
+        video.dataset.syncAttached = 'true';
     }
 
-    return true;
-});
+    // Check for videos immediately and periodically
+    let observer;
+    const initSync = () => {
+        const video = findVideo();
+        if (video) {
+            attachVideoListeners(video);
+            if (observer) observer.disconnect();
+        }
+    };
+
+    observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.addedNodes.length) {
+                initSync();
+            }
+        }
+    });
+
+    initSync();
+    setInterval(initSync, 5000); // Rare fallback check
+    observer.observe(document.body, { childList: true, subtree: true });
+
+})();
