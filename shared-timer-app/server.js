@@ -60,6 +60,7 @@ const setupSocketHandlers = require('./sockets/socketHandler');
 const { startCron } = require('./cron/betResolver');
 
 const app = express();
+app.disable('x-powered-by');
 app.use(cors());
 app.use(compression());
 app.use(express.json({ limit: '200kb' }));
