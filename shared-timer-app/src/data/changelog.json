@@ -1,5 +1,11 @@
 [
   {
+    "id": 32,
+    "version": "2.21.0",
+    "date": "2026-04-15",
+    "changes": "- **Admin Panel**: Persistente Speicherung der Navigations-Reihenfolge und editierbare Labels/Kategorien hinzugefügt.\n- **Dynamic Sidebar**: Die täglichen \"Daily Visit\" Badges werden nun dynamisch über das Admin-Panel gesteuert.\n- **Twitch Integration**: Integration von \"Prime League\" im globalen Widget und isolierter Live-Status für \"Spielestyler\" im Leveling Tracker."
+  },
+  {
     "id": 31,
     "version": "2.20.0",
     "date": "2026-04-15",

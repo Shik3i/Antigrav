@@ -497,7 +497,7 @@ async function getTwitchAccessToken() {
 }
 
 async function getTwitchStatus(options = {}) {
-    const channels = ['handofblood', 'eintrachtspandau', 'tolkin', 'lec', 'lck', 'riotgames'];
+    const channels = ['handofblood', 'eintrachtspandau', 'tolkin', 'lec', 'lck', 'riotgames', 'primeleague', 'spielestyler'];
 
     return resolveCached(caches.twitchStatus, async () => {
         const token = await getTwitchAccessToken().catch(() => null);
@@ -525,7 +525,7 @@ async function getTwitchStatus(options = {}) {
             const stream = liveStreams.find((entry) => entry.user_login.toLowerCase() === login.toLowerCase());
             return {
                 user_login: login,
-                is_live: Boolean(stream) && stream.game_name === 'League of Legends',
+                is_live: Boolean(stream) && (login === 'spielestyler' || stream.game_name === 'League of Legends'),
                 game_name: stream ? stream.game_name : null,
                 viewer_count: stream ? stream.viewer_count : 0,
                 thumbnail_url: stream ? stream.thumbnail_url : null

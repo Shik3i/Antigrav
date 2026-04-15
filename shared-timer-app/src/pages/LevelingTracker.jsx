@@ -65,12 +65,33 @@ const formatRelativeTime = (dateStr) => {
 
 const FwcCountdown = () => {
   const [now, setNow] = useState(Date.now());
+  const [spStylerLive, setSpStylerLive] = useState(null);
   // Target: 23. April 2026, 10:00 Uhr
   const target = new Date('2026-04-23T10:00:00').getTime();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch('/api/twitch/status');
+        if (res.ok) {
+          const data = await res.json();
+          const match = data.find(c => c.user_login.toLowerCase() === 'spielestyler');
+          if (match && match.is_live) {
+            setSpStylerLive(match);
+          } else {
+            setSpStylerLive(null);
+          }
+        }
+      } catch (e) {}
+    };
+    fetchStatus();
+    const iv = setInterval(fetchStatus, 60000);
+    return () => clearInterval(iv);
   }, []);
 
   const diff = target - now;
@@ -83,30 +104,54 @@ const FwcCountdown = () => {
   const seconds = Math.floor((absDiff % (1000 * 60)) / 1000);
 
   return (
-    <div className="glass-card animate-fade-in" style={{ 
-      padding: '12px 24px', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      gap: '16px',
-      background: 'rgba(245, 158, 11, 0.05)',
-      border: '1px solid rgba(245, 158, 11, 0.2)',
-      borderRadius: '16px'
-    }}>
-      <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '8px', borderRadius: '50%', display: 'flex' }}>
-        <Trophy size={20} color="#f59e0b" />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-          {isFuture ? 'Countdown zum Flyff FWC 2026:' : 'Zeit seit dem Flyff FWC 2026 Start:'}
-        </span>
-        <div style={{ display: 'flex', gap: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b' }}>
-          <span>{days}d</span>
-          <span>{hours}h</span>
-          <span>{minutes}m</span>
-          <span style={{ minWidth: '45px' }}>{seconds}s</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="glass-card animate-fade-in" style={{ 
+        padding: '12px 24px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        gap: '16px',
+        background: 'rgba(245, 158, 11, 0.05)',
+        border: '1px solid rgba(245, 158, 11, 0.2)',
+        borderRadius: '16px'
+      }}>
+        <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '8px', borderRadius: '50%', display: 'flex' }}>
+          <Trophy size={20} color="#f59e0b" />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+            {isFuture ? 'Countdown zum Flyff FWC 2026:' : 'Zeit seit dem Flyff FWC 2026 Start:'}
+          </span>
+          <div style={{ display: 'flex', gap: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b' }}>
+            <span>{days}d</span>
+            <span>{hours}h</span>
+            <span>{minutes}m</span>
+            <span style={{ minWidth: '45px' }}>{seconds}s</span>
+          </div>
         </div>
       </div>
+      
+      {spStylerLive && (
+        <a 
+          href={`https://twitch.tv/spielestyler`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="glass-card stream-trigger animate-glow"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 24px',
+            textDecoration: 'none', color: 'inherit', borderRadius: '16px',
+            background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)'
+          }}
+        >
+          <div style={{ position: 'relative', display: 'flex' }}>
+              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 10px #ef4444' }} />
+          </div>
+          <span style={{ fontWeight: 600 }}>Spielestyler ist LIVE mit Flyff!</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.85rem', opacity: 0.8 }}>
+              {spStylerLive.viewer_count} Zuschauer
+          </span>
+        </a>
+      )}
     </div>
   );
 };

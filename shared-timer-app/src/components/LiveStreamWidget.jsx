@@ -27,7 +27,8 @@ const LiveStreamWidget = () => {
         { id: 'tolkin', name: 'Tolkin' },
         { id: 'lec', name: 'LEC' },
         { id: 'lck', name: 'LCK' },
-        { id: 'riotgames', name: 'Riot Games' }
+        { id: 'riotgames', name: 'Riot Games' },
+        { id: 'primeleague', name: 'Prime League' }
     ];
 
     const fetchStatus = async () => {
@@ -137,7 +138,10 @@ const LiveStreamWidget = () => {
     };
 
     const getStatusFor = (id) => channelStatus.find(s => s.user_login.toLowerCase() === id.toLowerCase());
-    const liveCount = channelStatus.filter(s => s.is_live).length;
+    const liveCount = channels.filter(ch => {
+        const s = getStatusFor(ch.id);
+        return s && s.is_live;
+    }).length;
 
     if (!showWidget) return null;
 
