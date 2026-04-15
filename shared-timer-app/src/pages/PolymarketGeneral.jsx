@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, Link as LinkIcon, ExternalLink, TrendingUp, Search, Calendar, Hash, Info, AlertTriangle, Users, ChevronDown, ChevronUp, Trash2, CheckCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
+import { useToast } from '../context/ToastContext';
 
 const PolymarketGeneral = () => {
+    const { showToast } = useToast();
     const [bets, setBets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -93,13 +95,13 @@ const PolymarketGeneral = () => {
         
         const betAmount = parseInt(amount);
         if (isNaN(betAmount) || betAmount <= 0) {
-            alert('Bitte einen gültigen Wetteinsatz eingeben.');
+            showToast('Bitte einen gültigen Wetteinsatz eingeben.', 'warning');
             return;
         }
 
         const token = localStorage.getItem('timerToken');
         if (!token) {
-            alert('Bitte einloggen, um zu wetten.');
+            showToast('Bitte einloggen, um zu wetten.', 'warning');
             return;
         }
 
@@ -117,7 +119,7 @@ const PolymarketGeneral = () => {
             setBettingStatus(prev => ({ ...prev, [betId]: 'success' }));
             setCurrentBet({ outcomeIndex: 0, amount: '' });
             
-            alert(`Wette erfolgreich platziert! ${betAmount} KC wurden abgezogen.`);
+            showToast(`Wette erfolgreich platziert! ${betAmount} KC wurden abgezogen.`, 'success');
             
             setTimeout(() => {
                 setBettingStatus(prev => ({ ...prev, [betId]: 'idle' }));
@@ -126,7 +128,7 @@ const PolymarketGeneral = () => {
         } catch (err) {
             console.error('Betting failed:', err);
             setBettingStatus(prev => ({ ...prev, [betId]: 'error' }));
-            alert(err.response?.data?.error || 'Wette konnte nicht platziert werden.');
+            showToast(err.response?.data?.error || 'Wette konnte nicht platziert werden.', 'error');
         }
     };
 
@@ -140,7 +142,7 @@ const PolymarketGeneral = () => {
             });
             fetchBets();
         } catch (err) {
-            alert('Löschen fehlgeschlagen: ' + (err.response?.data?.error || err.message));
+            showToast('Löschen fehlgeschlagen: ' + (err.response?.data?.error || err.message), 'error');
         }
     };
 
@@ -151,13 +153,13 @@ const PolymarketGeneral = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.data.success) {
-                alert(res.data.message);
+                showToast(res.data.message, 'success');
                 fetchBets();
             } else {
-                alert(res.data.message || 'Check abgeschlossen: Markt noch offen.');
+                showToast(res.data.message || 'Check abgeschlossen: Markt noch offen.', 'info');
             }
         } catch (err) {
-            alert('Resolution fehlgeschlagen: ' + (err.response?.data?.error || err.message));
+            showToast('Resolution fehlgeschlagen: ' + (err.response?.data?.error || err.message), 'error');
         }
     };
 

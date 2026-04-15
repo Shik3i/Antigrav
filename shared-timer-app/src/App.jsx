@@ -52,6 +52,8 @@ import { getStoredValue, setStoredValue } from './utils/clientStorage';
 import { scheduleDeferred } from './utils/deferred';
 import { usePageVisibility } from './hooks/usePageVisibility';
 import { FloatingWidgetSkeleton, RouteSkeleton, WidgetPillSkeleton } from './components/LoadingSkeletons';
+import { ToastProvider } from './context/ToastContext';
+import ToastContainer from './components/ToastContainer';
 
 // Global styles for the app container
 const appStyle = {
@@ -458,6 +460,7 @@ function InnerApp() {
 
   return (
       <>
+      <ToastContainer />
       <GlobalAudioController socket={globalSocket} roomState={roomState} />
       
       {/* Pokemon Background Layer */}
@@ -684,7 +687,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <InnerApp />
+        <ToastProvider>
+          <InnerApp />
+        </ToastProvider>
       </AuthProvider>
     </Router>
   );

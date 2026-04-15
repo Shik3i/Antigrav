@@ -10,8 +10,10 @@ import EVENTS from '../socketEvents';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import ClockWidget from '../components/ClockWidget';
 import WeatherWidget from '../components/WeatherWidget';
+import { useToast } from '../context/ToastContext';
 
 const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode, serverTimeOffset, setIsRightPanelOpen, onLeaveRoom }) => {
+    const { showToast } = useToast();
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
@@ -169,7 +171,7 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
         const url = new URL(window.location.href);
         url.searchParams.set('token', tokenToUse);
         navigator.clipboard.writeText(url.toString());
-        alert(`Invite link with ${role.toUpperCase()} rights copied to clipboard!`);
+        showToast(`Einladungs-Link für ${role.toUpperCase()} kopiert!`, 'success');
     };
 
     if (roomError) {

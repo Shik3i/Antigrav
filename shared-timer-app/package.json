@@ -1,6 +1,6 @@
 {
   "name": "shared-timer-app",
-  "version": "2.21.1",
+  "version": "2.22.0",
   "description": "Shared real-time timer with multi-room support and SQLite",
   "main": "index.js",
   "scripts": {

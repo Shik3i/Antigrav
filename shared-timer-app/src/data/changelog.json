@@ -1,5 +1,11 @@
 [
   {
+    "id": 35,
+    "version": "2.22.0",
+    "date": "2026-04-16",
+    "changes": "- **Global Toast System**: Ersetzung von blockierenden Browser-Alerts durch ein modernes, globales Benachrichtigungssystem mit Glasmorphismus-Design.\n- **UI Design Optimization**: Optimierung des MMO Leveling Tracker Headers durch ein kompakteres, horizontales Layout (FWC & Stream Info in einer Zeile).\n- **Smooth Transitions**: Implementierung von CSS-basierten Fade- und Slide-Effekten für flüssige Tab-Wechsel.\n- **UX Stability**: Entfernung des automatischen Schließens von Esports-Wett-Overlays zur Verbesserung des Workflows bei Mehrfachwetten.\n- **Aria-Labeling**: Verbesserung der Barrierefreiheit durch Hinzufügen von `aria-label` zu Stream-Buttons."
+  },
+  {
     "id": 34,
     "version": "2.21.2",
     "date": "2026-04-15",

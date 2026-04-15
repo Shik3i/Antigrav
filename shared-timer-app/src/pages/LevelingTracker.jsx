@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Download
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 /**
  * Format milliseconds to a readable duration string (e.g. 2h 15m or HH:MM:SS)
@@ -104,29 +105,26 @@ const FwcCountdown = () => {
   const seconds = Math.floor((absDiff % (1000 * 60)) / 1000);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'stretch' }}>
       <div className="glass-card animate-fade-in" style={{ 
-        padding: '12px 24px', 
+        padding: '8px 16px', 
         display: 'flex', 
         alignItems: 'center', 
-        justifyContent: 'center', 
-        gap: '16px',
+        gap: '12px',
         background: 'rgba(245, 158, 11, 0.05)',
-        border: '1px solid rgba(245, 158, 11, 0.2)',
-        borderRadius: '16px'
+        border: '1px solid rgba(245, 158, 11, 0.15)',
+        borderRadius: '12px'
       }}>
-        <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '8px', borderRadius: '50%', display: 'flex' }}>
-          <Trophy size={20} color="#f59e0b" />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-            {isFuture ? 'Countdown zum Flyff FWC 2026:' : 'Zeit seit dem Flyff FWC 2026 Start:'}
+        <Trophy size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+          <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            {isFuture ? 'FWC Countdown:' : 'Seit FWC Start:'}
           </span>
-          <div style={{ display: 'flex', gap: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b' }}>
+          <div style={{ display: 'flex', gap: '6px', fontFamily: "'JetBrains Mono', monospace", fontSize: '1rem', fontWeight: 800, color: '#f59e0b' }}>
             <span>{days}d</span>
             <span>{hours}h</span>
             <span>{minutes}m</span>
-            <span style={{ minWidth: '45px' }}>{seconds}s</span>
+            <span style={{ minWidth: '35px' }}>{seconds}s</span>
           </div>
         </div>
       </div>
@@ -138,17 +136,15 @@ const FwcCountdown = () => {
           rel="noopener noreferrer"
           className="glass-card stream-trigger animate-glow"
           style={{
-            display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 24px',
-            textDecoration: 'none', color: 'inherit', borderRadius: '16px',
-            background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)'
+            display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px',
+            textDecoration: 'none', color: 'inherit', borderRadius: '12px',
+            background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)'
           }}
         >
-          <div style={{ position: 'relative', display: 'flex' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 10px #ef4444' }} />
-          </div>
-          <span style={{ fontWeight: 600 }}>Spielestyler ist LIVE mit Flyff!</span>
-          <span style={{ marginLeft: 'auto', fontSize: '0.85rem', opacity: 0.8 }}>
-              {spStylerLive.viewer_count} Zuschauer
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 8px #ef4444' }} />
+          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Spielestyler LIVE</span>
+          <span style={{ fontSize: '0.75rem', opacity: 0.7, padding: '2px 6px', background: 'rgba(0,0,0,0.2)', borderRadius: '4px' }}>
+              {spStylerLive.viewer_count}
           </span>
         </a>
       )}
@@ -157,6 +153,7 @@ const FwcCountdown = () => {
 };
 
 const LevelingTracker = ({ user, token }) => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('mmo_active_tab') || 'xp');
   const [now, setNow] = useState(Date.now());
   const [calcMode, setCalcMode] = useState('10'); // 'tick', '10', '6h'
@@ -286,12 +283,12 @@ const LevelingTracker = ({ user, token }) => {
   }, [activeTab, token, user]);
 
   const handleAddMarketItem = () => {
-    if (!token) return alert('Bitte zuerst einloggen.');
+    if (!token) return showToast('Bitte zuerst einloggen.', 'warning');
     setModalState({ type: 'addMarketItem', itemNameStr: '', priceStr: '' });
   };
 
   const handleUpdateMarketItem = (item) => {
-    if (!token) return alert('Bitte zuerst einloggen.');
+    if (!token) return showToast('Bitte zuerst einloggen.', 'warning');
     setModalState({ type: 'updateMarketItem', itemId: item.id, itemNameStr: item.itemName, priceStr: item.price.toString() });
   };
 
@@ -322,7 +319,7 @@ const LevelingTracker = ({ user, token }) => {
       // Remove thousand separators before parsing
       const price = parseInt(priceStrRaw.replace(/\./g, ''));
 
-      if (!itemName || !price || price <= 0) return alert('Ungültiger Name oder Preis');
+      if (!itemName || !price || price <= 0) return showToast('Ungültiger Name oder Preis', 'error');
 
       const endpoint = modalState.type === 'addMarketItem' ? '/api/market' : `/api/market/${modalState.itemId}`;
       const method = modalState.type === 'addMarketItem' ? 'POST' : 'PUT';
@@ -532,37 +529,39 @@ const LevelingTracker = ({ user, token }) => {
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
-          <TrendingUp size={40} color="var(--accent-primary)" />
-          <h1 style={{ fontSize: '2.5rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '8px' }}>
+          <TrendingUp size={28} color="var(--accent-primary)" />
+          <h1 style={{ fontSize: '1.75rem', margin: 0, fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             MMO Leveling Tracker
           </h1>
         </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '32px' }}>Tracke deinen Fortschritt und berechne deine Level-Up Zeiten.</p>
-        <a 
-          href="https://drive.google.com/drive/folders/1azJ08r8eZcf0dO2uxX4s8pIbANifPHaJ?usp=sharing" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            gap: '6px', 
-            fontSize: '0.82rem', 
-            color: 'var(--text-muted)', 
-            textDecoration: 'none',
-            marginTop: '-24px',
-            marginBottom: '32px',
-            opacity: 0.7,
-            transition: 'opacity 0.2s',
-            fontWeight: 500
-          }}
-          onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-          onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}
-        >
-          <Download size={14} /> Download: Flyff Browser Addon (by Antigravity)
-        </a>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '16px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0 }}>Fortschritt & Level-Up Zeiten tracken.</p>
+          <div style={{ width: '1px', height: '14px', background: 'var(--border-color)', display: 'inline-block' }}></div>
+          <a 
+            href="https://drive.google.com/drive/folders/1azJ08r8eZcf0dO2uxX4s8pIbANifPHaJ?usp=sharing" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              fontSize: '0.82rem', 
+              color: 'var(--accent-primary)', 
+              textDecoration: 'none',
+              opacity: 0.8,
+              transition: 'opacity 0.2s',
+              fontWeight: 600
+            }}
+            onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
+          >
+            <Download size={13} /> Browser Addon
+          </a>
+        </div>
+        
         <FwcCountdown />
       </div>
 
@@ -626,7 +625,8 @@ const LevelingTracker = ({ user, token }) => {
         </button>
       </div>
 
-      <div className="leveling-grid" style={{ display: 'grid', gridTemplateColumns: (activeTab === 'xp' || activeTab === 'gold') ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+      <div key={activeTab} className="tab-content-transition">
+        <div className="leveling-grid" style={{ display: 'grid', gridTemplateColumns: (activeTab === 'xp' || activeTab === 'gold') ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           <div className="glass-card" style={{ padding: '24px' }}>
@@ -937,6 +937,8 @@ const LevelingTracker = ({ user, token }) => {
           </form>
         </div>
       )}
+
+      </div>
 
       <style>{`
         @media (max-width: 900px) { .leveling-grid { grid-template-columns: 1fr !important; } }

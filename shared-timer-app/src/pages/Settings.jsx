@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 import axios from 'axios';
 import { Terminal, Volume2, BellRing, Palette, Trophy, Download, Star, Heart, Search, X, ChevronDown, ChevronUp, Dna, Sparkles, RefreshCw, Clock, Shield, User, Lock, Settings as SettingsIcon } from 'lucide-react';
 import { getNextPokemon } from '../utils/pokemonUtils';
@@ -69,6 +70,7 @@ const SettingsSection = ({ title, icon, defaultOpen = false, children }) => {
 };
 
 const Settings = ({ user, setUser, socket }) => {
+    const { showToast } = useToast();
     const [name, setName] = useState(user.displayName);
     const [saved, setSaved] = useState(false);
     const [hasGlobalAdmin, setHasGlobalAdmin] = useState(false);
@@ -194,7 +196,7 @@ const Settings = ({ user, setUser, socket }) => {
             if (fanTeam === teamCode) newFanTeam = null;
         } else {
             if (current.length >= 10) {
-                alert("You can only have up to 10 favorite teams.");
+                showToast("Du kannst maximal 10 Favoriten-Teams auswählen.", "warning");
                 return;
             }
             current.push(teamCode);
@@ -968,7 +970,7 @@ const Settings = ({ user, setUser, socket }) => {
                                         sessionStorage.setItem('admin_token', res.data.token);
                                         setHasGlobalAdmin(true);
                                     } catch (err) {
-                                        alert(err.response?.data?.error || 'Incorrect password');
+                                        showToast(err.response?.data?.error || 'Falsches Passwort', 'error');
                                     }
                                 }}
                             >
@@ -999,7 +1001,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.21.2
+                    Version 2.22.0
                 </div>
             </div>
         </div>

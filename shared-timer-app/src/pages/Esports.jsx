@@ -3,6 +3,7 @@ import { Trophy, CalendarClock, Globe, TrendingUp, ExternalLink, Timer, Star } f
 import { LEAGUE_COLORS } from '../hooks/useEsportsNotifications';
 import { useAuth } from '../context/AuthContext';
 import { usePageVisibility } from '../hooks/usePageVisibility';
+import { useToast } from '../context/ToastContext';
 
 const INTERNATIONAL_EVENTS = [
     { name: 'First Stand 2026', start: new Date('2026-03-16T10:00:00Z'), end: new Date('2026-03-22T23:59:59Z'), location: 'São Paulo, Brazil' },
@@ -12,6 +13,7 @@ const INTERNATIONAL_EVENTS = [
 
 const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) => {
     const { token, user, setUser } = useAuth();
+    const { showToast } = useToast();
     const [matches, setMatches] = useState([]);
     const [odds, setOdds] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,7 +25,6 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
 
     const [bettingState, setBettingState] = useState(null);
     const [isPlacingBet, setIsPlacingBet] = useState(false);
-    const [betMessage, setBetMessage] = useState(null);
 
     const favoriteTeams = user?.preferences?.favoriteTeams || [];
     const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
@@ -296,7 +297,6 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
         if (stakeCents <= 0) return;
 
         setIsPlacingBet(true);
-        setBetMessage(null);
         try {
             const res = await fetch('/api/esports/bets', {
                 method: 'POST',
@@ -319,17 +319,13 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to place bet');
-            setBetMessage({ type: 'success', text: 'Wette erfolgreich platziert!' });
+            showToast('Wette erfolgreich platziert!', 'success');
             
             if (user && setUser) {
                 setUser({ ...user, koala_balance: (user.koala_balance || 0) - stakeCents });
             }
-            setTimeout(() => {
-                setBettingState(null);
-                setBetMessage(null);
-            }, 3000);
         } catch (err) {
-            setBetMessage({ type: 'error', text: err.message });
+            showToast(err.message, 'error');
         } finally {
             setIsPlacingBet(false);
         }
@@ -797,14 +793,10 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                                 </div>
                                                             </div>
 
-                                                            {betMessage && (
-                                                                <div style={{ marginTop: '12px', padding: '8px', borderRadius: '6px', fontSize: '0.85rem', background: betMessage.type === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)', color: betMessage.type === 'error' ? '#ef4444' : '#10b981' }}>
-                                                                    {betMessage.text}
-                                                                </div>
-                                                            )}
+
 
                                                             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                                                <button className="btn-ghost" onClick={() => { setBettingState(null); setBetMessage(null); }}>Abbrechen</button>
+                                                                <button className="btn-ghost" onClick={() => { setBettingState(null); }}>Abbrechen</button>
                                                                 <button className="btn-primary" onClick={handlePlaceBet} disabled={
                                                                     isPlacingBet || 
                                                                     !bettingState.stakeInput ||
