@@ -25,9 +25,8 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [4/4] Copying files to Unraid (\\unraidbox\appdata\CollabTimer)...
+echo [4/4] Copying Dockerfile to Unraid (\\unraidbox\appdata\CollabTimer)...
 copy /Y deploy\shared-timer-app.tar \\unraidbox\appdata\CollabTimer\shared-timer-app.tar
-copy /Y deploy\docker-compose.yml \\unraidbox\appdata\CollabTimer\docker-compose.yml
 if %errorlevel% neq 0 (
     echo Error copying files to Unraid. Please check the network path \\unraidbox\appdata\CollabTimer.
     exit /b %errorlevel%
