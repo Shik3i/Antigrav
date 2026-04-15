@@ -1,5 +1,11 @@
 [
   {
+    "id": 34,
+    "version": "2.21.2",
+    "date": "2026-04-15",
+    "changes": "- **Esports Odds Matching**: Grundlegende Reparatur der Matching-Logik zwischen LoL-Schedule und Polymarket.\n- **Backend Slug-Expansion**: Automatische Abfrage von Permutationen aus Team-Codes UND vollen Team-Namen, um auch regionale Ligen (Prime League) besser zu erfassen.\n- **Frontend Robustness**: Implementierung einer zwei-stufigen Verifizierung via Outcome-Namen (Fuzzy Match), falls die Slugs nicht exakt übereinstimmen.\n- **Performance Fix**: Entfernung redundanter Console-Logs im Render-Cycle zur Reduzierung der Browserlast."
+  },
+  {
     "id": 33,
     "version": "2.21.1",
     "date": "2026-04-15",

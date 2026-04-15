@@ -191,16 +191,43 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
 
         for (const odd of odds) {
             const slug = (odd.slug || '').toLowerCase();
-            const hasT1 = slug.includes(t1Poly);
-            const hasT2 = slug.includes(t2Poly);
-            if (!hasT1 || !hasT2) continue;
+            const title = (odd.title || '').toLowerCase();
+            
+            const p1 = `${t1Poly}-${t2Poly}`;
+            const p2 = `${t2Poly}-${t1Poly}`;
+
+            const matchesPermutations = slug.includes(p1) || slug.includes(p2) || title.includes(p1) || title.includes(p2);
+            const hasT1 = slug.includes(t1Poly) || slug.includes(match.team1.name?.toLowerCase().replace(/\s+/g, '-'));
+            const hasT2 = slug.includes(t2Poly) || slug.includes(match.team2.name?.toLowerCase().replace(/\s+/g, '-'));
+            
+            // Fuzzy match outcomes to team names/codes to definitively link them
+            let matchedOutcomes = false;
+            if (odd.outcomes && odd.outcomes.length >= 2) {
+                const normalize = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const o0 = normalize(odd.outcomes[0].name);
+                const o1 = normalize(odd.outcomes[1].name);
+                
+                const t1Ids = [match.team1.code, match.team1.name, t1Poly].map(normalize).filter(Boolean);
+                const t2Ids = [match.team2.code, match.team2.name, t2Poly].map(normalize).filter(Boolean);
+                
+                const o0MatchesT1 = t1Ids.some(id => o0.includes(id) || id.includes(o0));
+                const o0MatchesT2 = t2Ids.some(id => o0.includes(id) || id.includes(o0));
+                const o1MatchesT1 = t1Ids.some(id => o1.includes(id) || id.includes(o1));
+                const o1MatchesT2 = t2Ids.some(id => o1.includes(id) || id.includes(o1));
+                
+                if ((o0MatchesT1 && o1MatchesT2) || (o0MatchesT2 && o1MatchesT1)) matchedOutcomes = true;
+            }
+
+            if (!matchesPermutations && !(hasT1 && hasT2) && !matchedOutcomes) {
+                continue;
+            }
 
             // Extract date from slug (format: lol-team1-team2-YYYY-MM-DD)
             const dateMatch = slug.match(/(\d{4}-\d{2}-\d{2})/);
             if (dateMatch) {
                 const slugDate = new Date(dateMatch[1] + 'T00:00:00Z');
                 const diffDays = Math.abs(matchDate - slugDate) / (1000 * 60 * 60 * 24);
-                if (diffDays > 1.5) continue; // Skip slugs from different days
+                if (diffDays > 1.5) continue;
             }
             return odd;
         }
@@ -499,6 +526,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                      forceRefreshMatch: {
                                                          team1: match.team1.code,
                                                          team2: match.team2.code,
+                                                         team1Name: match.team1.name,
+                                                         team2Name: match.team2.name,
                                                          startTime: match.startTime
                                                      } 
                                                  });
@@ -646,6 +675,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                                     forceRefreshMatch: {
                                                                         team1: match.team1.code,
                                                                         team2: match.team2.code,
+                                                                        team1Name: match.team1.name,
+                                                                        team2Name: match.team2.name,
                                                                         startTime: match.startTime
                                                                     } 
                                                                 });
