@@ -112,6 +112,13 @@ const EVENTS = {
     GET_ADMIN_SCRATCHCARD_ECONOMY: 'get_admin_scratchcard_economy',
     ADMIN_SCRATCHCARD_ECONOMY_DATA: 'admin_scratchcard_economy_data',
     UPDATE_ADMIN_SCRATCHCARD_ECONOMY: 'update_admin_scratchcard_economy',
+    
+    // Minigames
+    ROOM_COINFLIP: 'room_coinflip',
+    ROOM_COINFLIP_RESULT: 'room_coinflip_result',
+    START_DEATHROLL: 'start_deathroll',
+    ROLL_DEATHROLL: 'roll_deathroll',
+    DEATHROLL_UPDATE: 'deathroll_update',
 };
 
 export default EVENTS;

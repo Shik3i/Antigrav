@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Play, Pause, RotateCcw, Repeat } from 'lucide-react';
+import { Play, Pause, RotateCcw, Repeat, StopCircle } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import { getNextPokemon } from '../utils/pokemonUtils';
@@ -378,6 +378,22 @@ const Timer = ({ roomState, socket, roomId, userRole, user, isZenMode, serverTim
                     ) : (
                         <button className="btn-primary" onClick={() => handleAction('PAUSE')} style={{ borderRadius: '50px', padding: '16px 32px', background: 'rgba(255,255,255,0.1)', boxShadow: 'none' }}>
                             <Pause fill="currentColor" /> Pause
+                        </button>
+                    )}
+
+                    {roomState.state.isRunning && (
+                        <button 
+                            className="btn-ghost" 
+                            onClick={() => {
+                                const abgelaufeneMinuten = Math.floor((roomState.config.durationMs - localRemainingMs) / 60000);
+                                if (window.confirm(`Timer wirklich beenden? Belohnungen werden anteilig für ${abgelaufeneMinuten} abgelaufene Minuten ausgeschüttet.`)) {
+                                    handleAction('END_EARLY');
+                                }
+                            }} 
+                            style={{ borderRadius: '50px', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} 
+                            title="Timer sofort beenden"
+                        >
+                            <StopCircle size={24} />
                         </button>
                     )}
 

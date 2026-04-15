@@ -800,6 +800,34 @@ body.zen-mode .news-ticker-wrapper {
   backdrop-filter: blur(12px);
 }
 
+/* ─── Minigames Animations ─── */
+@keyframes coinFlipSpin {
+  0% {
+    transform: rotateY(0) translateY(0) scale(1);
+  }
+  50% {
+    transform: rotateY(1800deg) translateY(-100px) scale(1.5);
+  }
+  100% {
+    transform: rotateY(3600deg) translateY(0) scale(1.2);
+  }
+}
+
+@keyframes coin-flip {
+  0% { transform: scale(0.5) rotateY(0); opacity: 0; }
+  15% { transform: scale(1.2) rotateY(720deg); opacity: 1; }
+  85% { transform: scale(1) rotateY(1440deg); opacity: 1; }
+  100% { transform: scale(0.9) rotateY(1800deg); opacity: 0; }
+}
+
+.coin-flip-animation {
+  animation: coin-flip 5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.dice-shake {
+  animation: diceShake 0.4s ease-in-out infinite;
+}
+
 /* ─── Pokémon Light Mode (Force Light Theme) ─── */
 [data-pokemon-mode="true"].pokemon-light-mode {
   --text-main: #1a202c !important;

@@ -56,7 +56,7 @@ module.exports = function (io) {
     });
 
     io.on('connection', (socket) => {
-        // console.log(`User connected: ${socket.id}`);
+        console.log('>>> [SOCKET] User verbunden:', socket.id);
 
         if (socket.user) {
             const userId = socket.user.userId;
@@ -569,6 +569,71 @@ module.exports = function (io) {
                     changed = roomManager.setDuration(roomId, payload); // payload is minutes
                     actionText = `set duration to ${payload}m`;
                     break;
+                case 'END_EARLY': {
+                    const room = roomManager.getRoom(roomId);
+                    if (room && room.state.isRunning) {
+                        roomManager._updateRemaining(room);
+                        const elapsedMs = room.config.durationMs - room.state.remainingMs;
+                        const originalDuration = room.config.durationMs;
+                        
+                        // Temporarily override to calculate strict rewards or fulfill request
+                        room.config.durationMs = elapsedMs;
+                        room.state.remainingMs = 0;
+                        room.state.isRunning = false;
+
+                        io.to(roomId).emit(EVENTS.TIMER_COMPLETED, { roomId, timestamp: Date.now() });
+                        changed = true;
+
+                        dbLayer.getKoalaBaseline().then(settings => {
+                            const durationMinutes = elapsedMs / (60 * 1000);
+                            const coinsToAward = Math.floor((durationMinutes / 60) * settings.koala_points_per_hour);
+
+                            const uniqueUsers = new Map();
+                            room.users.forEach(u => {
+                                const id = u.userId || u.id;
+                                if (id && !uniqueUsers.has(id)) uniqueUsers.set(id, u);
+                            });
+
+                            room.state.stats = room.state.stats || { totalCompletions: 0, userCompletions: {} };
+                            room.state.stats.totalCompletions++;
+
+                            Array.from(uniqueUsers.values()).forEach(u => {
+                                const id = u.userId || u.id;
+                                if (!id) return;
+                                room.state.stats.userCompletions[id] = (room.state.stats.userCompletions[id] || 0) + 1;
+                                dbLayer.addUser(id, u.displayName || u.username).then(() => {
+                                    dbLayer.recordTimerCompletion(id, room.id, room.config.name, durationMinutes).catch(console.error);
+                                    if (coinsToAward > 0) {
+                                        dbLayer.addKoalaCoins(id, coinsToAward, `Completed ${Math.round(durationMinutes)}m timer (ended early)`).then(newBalance => {
+                                            broadcastCoinUpdate(io, id, newBalance);
+                                            const userSockets = Array.from(room.users.values()).filter(us => (us.userId || us.id) === id);
+                                            userSockets.forEach(uSocket => {
+                                                if (uSocket.socketId) io.to(uSocket.socketId).emit('KOALA_COINS_EARNED', { amount: coinsToAward, newBalance });
+                                            });
+                                        }).catch(console.error);
+                                    }
+                                }).catch(console.error);
+                            });
+
+                            // Handle Auto-Restart correctly
+                            if (room.state.autoRestart && !room.state.isPomodoro) {
+                                setTimeout(() => {
+                                    if (roomManager.rooms.has(room.id) && room.state.autoRestart) {
+                                        room.config.durationMs = originalDuration;
+                                        roomManager.resetTimer(room.id);
+                                        roomManager.startTimer(room.id);
+                                        io.to(room.id).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(room.id));
+                                    }
+                                }, 3000);
+                            } else {
+                                room.config.durationMs = originalDuration;
+                            }
+                        }).catch(console.error);
+
+                        actionText = 'ended the timer early';
+                    }
+                    break;
+                }
             }
 
             if (changed) {
@@ -661,6 +726,62 @@ module.exports = function (io) {
 
         socket.on(EVENTS.SEND_REACTION, ({ roomId, emoji }) => {
             io.to(roomId).emit(EVENTS.REACTION, { emoji, userId: socket.id, timestamp: Date.now() });
+        });
+
+        // Minigames
+        socket.on(EVENTS.ROOM_COINFLIP, ({ roomId }) => {
+            try {
+                if (!roomId) return;
+                const user = roomManager.getUserBySocket(socket.id);
+                if (!user) return;
+                
+                const safeName = user.displayName || user.username || 'Ein Nutzer';
+                const result = Math.random() < 0.5 ? 'KOPF' : 'ZAHL';
+                
+                console.log(`>>> [MINIGAME] Coinflip in ${roomId}: ${safeName} -> ${result}`);
+                io.to(roomId).emit(EVENTS.ROOM_COINFLIP_RESULT, {
+                    userId: user.userId || socket.id,
+                    userName: safeName,
+                    result,
+                    timestamp: Date.now()
+                });
+            } catch (error) {
+                console.error('Minigame Error (Coinflip):', error);
+            }
+        });
+
+        socket.on(EVENTS.START_DEATHROLL, ({ roomId }) => {
+            try {
+                if (!roomId) return;
+                const user = roomManager.getUserBySocket(socket.id);
+                if (!user) return;
+                
+                const safeName = user.displayName || user.username || 'Ein Nutzer';
+                const drState = roomManager.startDeathroll(roomId, safeName);
+                if (drState) {
+                    io.to(roomId).emit(EVENTS.DEATHROLL_UPDATE, drState);
+                    io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
+                }
+            } catch (error) {
+                console.error('Minigame Error (Start Deathroll):', error);
+            }
+        });
+
+        socket.on(EVENTS.ROLL_DEATHROLL, ({ roomId }) => {
+            try {
+                if (!roomId) return;
+                const user = roomManager.getUserBySocket(socket.id);
+                if (!user) return;
+                
+                const safeName = user.displayName || user.username || 'Ein Nutzer';
+                const drState = roomManager.rollDeathroll(roomId, safeName);
+                if (drState) {
+                    io.to(roomId).emit(EVENTS.DEATHROLL_UPDATE, drState);
+                    io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
+                }
+            } catch (error) {
+                console.error('Minigame Error (Roll Deathroll):', error);
+            }
         });
 
         // GENERIC EXTENSION PAYLOAD PIPE
@@ -873,7 +994,7 @@ module.exports = function (io) {
                 }
             }
 
-            // console.log(`User disconnected: ${socket.id}, Reason: ${reason}`);
+            console.log('<<< [SOCKET] User getrennt:', socket.id, 'Grund:', reason);
         });
     });
 

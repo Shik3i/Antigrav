@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Link, X, Clock, Timer, History, Settings as SettingsIcon, Tv, Play, Pause, Plug, UserPlus, UserCheck, ChevronDown } from 'lucide-react';
+import { Users, Link, X, Clock, Timer, History, Settings as SettingsIcon, Tv, Play, Pause, Plug, UserPlus, UserCheck, ChevronDown, Gamepad2, Swords, Coins } from 'lucide-react';
 import EVENTS from '../socketEvents';
 import Avatar from './Avatar';
 import UserContextMenu from './UserContextMenu';
@@ -55,6 +55,7 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
     // Friends state lifted here
     const [friends, setFriends] = useState([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [selectedPvPMemberId, setSelectedPvPMemberId] = useState(null);
 
     useEffect(() => {
         const tk = localStorage.getItem('timerToken');
@@ -146,6 +147,48 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                     </div>
                 ))}
             </div>
+
+            {/* Minigames & PvP Accordion */}
+            <details style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                <summary style={{ 
+                    cursor: 'pointer', color: 'var(--text-main)', fontSize: '1rem', 
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0',
+                    outline: 'none', listStyle: 'none'
+                }}>
+                    <Gamepad2 size={18} color="#f59e0b" />
+                    <span style={{ fontWeight: 600 }}>Minigames & PvP</span>
+                    <ChevronDown size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                </summary>
+                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                    <button 
+                        type="button"
+                        className="btn-primary" 
+                        style={{ fontSize: '0.85rem', padding: '10px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)' }} 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const cleanRoomId = String(roomId);
+                            socket.emit(EVENTS.ROOM_COINFLIP, { roomId: cleanRoomId });
+                        }}
+                    >
+                        <Coins size={16} /> Münze werfen
+                    </button>
+                    <button 
+                        type="button"
+                        className="btn-primary" 
+                        style={{ fontSize: '0.85rem', padding: '10px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const cleanRoomId = String(roomId);
+                            socket.emit(EVENTS.START_DEATHROLL, { roomId: cleanRoomId });
+                        }}
+                        disabled={roomState.state.activeDeathroll != null}
+                    >
+                        <Swords size={16} /> Deathroll starten
+                    </button>
+                </div>
+            </details>
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: 'var(--radius-md)' }}>

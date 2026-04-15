@@ -36,11 +36,12 @@ class RoomManager {
                     todos: [], // { id, text, completed, author }
                     canvasLines: [], // array of lines drawn
                     eventHistory: [], // array of { type, message, timestamp, userId }
-                    // Statistics
                     stats: {
                         totalCompletions: 0,
                         userCompletions: {} // userId -> Number
-                    }
+                    },
+                    // Minigames
+                    activeDeathroll: null
                 },
                 users: new Map(), // socketId -> { userId, displayName, role }
                 timeoutId: null // Reference to clear room if empty after 5 mins
@@ -103,6 +104,58 @@ class RoomManager {
         const room = this.getRoom(roomId);
         if (room) {
             room.state.canvasLines = [];
+            return true;
+        }
+        return false;
+    }
+
+    // Minigames 
+    startDeathroll(roomId, userName) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            const roll = Math.floor(Math.random() * 1000) + 1;
+            room.state.activeDeathroll = {
+                currentMax: roll,
+                lastRoller: userName,
+                history: [{ roller: userName, max: 1000, roll }],
+                isComplete: roll === 1
+            };
+            if (roll === 1) {
+                setTimeout(() => {
+                    const r = this.getRoom(roomId);
+                    if (r && r.state.activeDeathroll?.isComplete) r.state.activeDeathroll = null;
+                }, 5000);
+            }
+            return room.state.activeDeathroll;
+        }
+        return null;
+    }
+
+    rollDeathroll(roomId, userName) {
+        const room = this.getRoom(roomId);
+        if (room && room.state.activeDeathroll && !room.state.activeDeathroll.isComplete) {
+            const currentMax = room.state.activeDeathroll.currentMax;
+            const roll = Math.floor(Math.random() * currentMax) + 1;
+            room.state.activeDeathroll.currentMax = roll;
+            room.state.activeDeathroll.lastRoller = userName;
+            room.state.activeDeathroll.history.push({ roller: userName, max: currentMax, roll });
+            room.state.activeDeathroll.isComplete = roll === 1;
+
+            if (roll === 1) {
+                setTimeout(() => {
+                    const r = this.getRoom(roomId);
+                    if (r && r.state.activeDeathroll?.isComplete) r.state.activeDeathroll = null;
+                }, 5000);
+            }
+            return room.state.activeDeathroll;
+        }
+        return null;
+    }
+
+    clearDeathroll(roomId) {
+        const room = this.getRoom(roomId);
+        if (room) {
+            room.state.activeDeathroll = null;
             return true;
         }
         return false;
