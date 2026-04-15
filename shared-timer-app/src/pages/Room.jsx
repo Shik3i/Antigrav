@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Maximize2, ChevronDown, Settings, Coins, Swords, Dices } from 'lucide-react';
 import Timer from '../components/Timer';
 import ReactionBar from '../components/ReactionBar';
@@ -11,11 +11,10 @@ import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import ClockWidget from '../components/ClockWidget';
 import WeatherWidget from '../components/WeatherWidget';
 
-const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode, serverTimeOffset, setIsRightPanelOpen }) => {
+const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode, serverTimeOffset, setIsRightPanelOpen, onLeaveRoom }) => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
-    const navigate = useNavigate();
     const [isMembersCollapsed, setIsMembersCollapsed] = useState(true);
     const [activeReactions, setActiveReactions] = useState([]);
     const [toasts, setToasts] = useState([]);
@@ -405,6 +404,7 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
                         serverTimeOffset={serverTimeOffset}
                         showCounter={showCounter}
                         toggleCounter={toggleCounter}
+                        onLeaveRoom={onLeaveRoom}
                     />
                 )
             }

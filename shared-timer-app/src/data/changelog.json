@@ -1,5 +1,11 @@
 [
   {
+    "id": 33,
+    "version": "2.21.1",
+    "date": "2026-04-15",
+    "changes": "- **Room Lifecycle Fix**: Das aktive Raum-Abo bleibt nun global bestehen, auch wenn du von der Raumseite auf andere Unterseiten navigierst.\n- **Explicit Leave Cleanup**: Der Raum wird nur noch beim echten \"Leave Room\" oder beim Browser-Disconnect verlassen, inklusive sauberem State-Reset.\n- **Global Title Timer**: Der Tab-Titel wird nun zentral und sekundengenau weiter aktualisiert, auch außerhalb der Raumseite und in Hintergrund-Tabs."
+  },
+  {
     "id": 32,
     "version": "2.21.0",
     "date": "2026-04-15",

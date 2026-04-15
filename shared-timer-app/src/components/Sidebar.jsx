@@ -107,15 +107,6 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    useEffect(() => {
-        if (!roomState) {
-            document.title = 'KoalaSync';
-            return;
-        }
-        const timeStr = formatTime(localRemainingMs);
-        document.title = `${timeStr} - ${roomState.name || 'KoalaSync'}`;
-    }, [localRemainingMs, roomState]);
-
     const handleAction = (e, action) => {
         e.stopPropagation();
         if (roomState) {

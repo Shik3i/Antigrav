@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import EVENTS from './socketEvents';
@@ -73,6 +73,27 @@ const POKEMON_TYPES_MAP = {
   steel: '#B8B8D0', fairy: '#EE99AC'
 };
 
+const DEFAULT_TITLE = 'KoalaSync';
+const EMPTY_ROOM_TOKENS = { readToken: null, writeToken: null };
+
+function getExactRemainingMs(roomState, serverTimeOffset = 0) {
+  if (!roomState?.state) return 0;
+  if (!roomState.state.isRunning || !roomState.state.lastTickTime) {
+    return roomState.state.remainingMs || 0;
+  }
+
+  const trueServerTime = Date.now() + serverTimeOffset;
+  const elapsedSinceTick = trueServerTime - roomState.state.lastTickTime;
+  return Math.max(0, (roomState.state.remainingMs || 0) - elapsedSinceTick);
+}
+
+function formatTimerTitle(ms) {
+  const totalSeconds = Math.ceil(Math.max(0, ms) / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
 function InnerApp() {
   const { user, setUser, token } = useAuth();
   const [pokemonConfigs, setPokemonConfigs] = useState(null);
@@ -85,7 +106,7 @@ function InnerApp() {
   const [activeToken, setActiveToken] = useState(() => getStoredValue('activeToken', null));
   const [roomState, setRoomState] = useState(null);
   const [roomError, setRoomError] = useState(null);
-  const [roomTokens, setRoomTokens] = useState({ readToken: null, writeToken: null });
+  const [roomTokens, setRoomTokens] = useState(EMPTY_ROOM_TOKENS);
   const [deferredFeaturesReady, setDeferredFeaturesReady] = useState(false);
 
   // Sync room ID and token to localStorage
@@ -112,6 +133,23 @@ function InnerApp() {
   const [globalAnnouncement, setGlobalAnnouncement] = useState('');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [pendingInvite, setPendingInvite] = useState(null);
+
+  const leaveActiveRoom = useCallback(({ navigateTo = '/' } = {}) => {
+    if (globalSocket?.connected && activeRoomId) {
+      globalSocket.emit(EVENTS.LEAVE_ROOM);
+    }
+    setActiveRoomId(null);
+    setActiveToken(null);
+    setRoomState(null);
+    setRoomError(null);
+    setRoomTokens(EMPTY_ROOM_TOKENS);
+    setPendingInvite(null);
+    setIsRightPanelOpen(false);
+    setIsZenMode(false);
+    if (navigateTo) {
+      navigate(navigateTo);
+    }
+  }, [activeRoomId, globalSocket, navigate]);
 
   // Esports live match notifications
   const selectedLeagues = user.preferences?.esportsLeagues || DEFAULT_LEAGUES;
@@ -251,14 +289,53 @@ function InnerApp() {
     }
 
     // Notify server of preference change (like hasExtension) if in room
-    if (globalSocket?.connected && activeRoomId && isRoomRoute) {
+    if (globalSocket?.connected && activeRoomId) {
       globalSocket.emit('UPDATE_PREFERENCES', { roomId: activeRoomId, preferences: user.preferences });
     }
-  }, [user, globalSocket, activeRoomId, isRoomRoute]);
+  }, [user, globalSocket, activeRoomId]);
 
-  // ROOM JOIN & SYNC: Decoupled logic
+  // Keep tab title in sync independently from the room page lifecycle.
   useEffect(() => {
-    if (!activeRoomId || !user?.id || !globalSocket || !isRoomRoute) return;
+    if (!roomState) {
+      document.title = DEFAULT_TITLE;
+      return undefined;
+    }
+
+    const roomName = roomState.config?.name || roomState.name || DEFAULT_TITLE;
+    const updateTitle = () => {
+      const nextTitle = `${formatTimerTitle(getExactRemainingMs(roomState, serverTimeOffset))} - ${roomName}`;
+      if (document.title !== nextTitle) {
+        document.title = nextTitle;
+      }
+    };
+
+    updateTitle();
+    const intervalId = setInterval(updateTitle, 1000);
+    return () => clearInterval(intervalId);
+  }, [
+    roomState?.id,
+    roomState?.config?.name,
+    roomState?.name,
+    roomState?.state?.isRunning,
+    roomState?.state?.remainingMs,
+    roomState?.state?.lastTickTime,
+    serverTimeOffset
+  ]);
+
+  // ROOM JOIN & SYNC: persistent beyond route changes
+  useEffect(() => {
+    if (!activeRoomId || !user?.id || !globalSocket) {
+      if (!activeRoomId) {
+        setRoomState(null);
+        setRoomError(null);
+        setRoomTokens(EMPTY_ROOM_TOKENS);
+      }
+      return undefined;
+    }
+
+    setRoomError(null);
+    setRoomTokens(EMPTY_ROOM_TOKENS);
+    setRoomState(prev => prev?.id === activeRoomId ? prev : null);
 
     const join = () => {
       setRoomError(null);
@@ -288,6 +365,8 @@ function InnerApp() {
       if (msg.includes('Room not found') && !location.pathname.startsWith('/room/')) {
         setActiveRoomId(null);
         setActiveToken(null);
+        setRoomState(null);
+        setRoomTokens(EMPTY_ROOM_TOKENS);
         return;
       }
       setRoomError(msg);
@@ -331,7 +410,6 @@ function InnerApp() {
     window.addEventListener('EXTENSION_OUTBOUND_EVENT', handleOutboundSync);
 
     return () => {
-      globalSocket.emit(EVENTS.LEAVE_ROOM);
       globalSocket.off(EVENTS.CONNECT, handleConnect);
       globalSocket.off(EVENTS.SYNC_STATE, handleSync);
       globalSocket.off(EVENTS.ERROR, handleError);
@@ -341,7 +419,7 @@ function InnerApp() {
       globalSocket.off(EVENTS.METRICS_UPDATE, handleMetricsUpdate);
       window.removeEventListener('EXTENSION_OUTBOUND_EVENT', handleOutboundSync);
     };
-  }, [activeRoomId, activeToken, user?.id, globalSocket, isRoomRoute]);
+  }, [activeRoomId, activeToken, user?.id, globalSocket, location.pathname]);
 
   // Pokémon Slideshow Logic
   useEffect(() => {
@@ -557,7 +635,7 @@ function InnerApp() {
                 <Route path="/" element={<Home user={user} globalSocket={globalSocket} />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/room/:id" element={<Room user={user} socket={globalSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} />} />
+                <Route path="/room/:id" element={<Room user={user} socket={globalSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} />} />
                 <Route path="/highscores" element={<Highscores />} />
                 <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={globalSocket} />} />
                 <Route path="/koala-dashboard" element={<KoalaDashboard />} />
