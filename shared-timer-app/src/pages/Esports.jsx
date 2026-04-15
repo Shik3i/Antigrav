@@ -448,7 +448,7 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
 
             {!loading && !error && filteredMatches.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {filteredMatches.map(match => {
+                    {filteredMatches.map((match, index) => {
                         const leagueColor = getLeagueColor(match.league);
                         const matchOdds = findOddsForMatch(match);
                         let t1Outcome = matchOdds ? matchOdds.outcomes[0] : null;
@@ -574,7 +574,7 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                 <div className="esports-match-teams">
                                     <div className="esports-team">
                                         <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                            {match.team1.image ? <img src={forceHttps(match.team1.image)} alt={match.team1.code} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
+                                            {match.team1.image ? <img src={forceHttps(match.team1.image)} alt={match.team1.code} width="48" height="48" loading={index < 2 ? "eager" : "lazy"} fetchpriority={index === 0 ? "high" : "auto"} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
                                         </div>
                                         <div style={{ minWidth: 0, overflow: 'hidden' }}>
                                             <div className="esports-team-name" title={match.team1.name}>{match.team1.name}</div>
@@ -598,7 +598,7 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                             )}
                                         </div>
                                         <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                            {match.team2.image ? <img src={forceHttps(match.team2.image)} alt={match.team2.code} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
+                                            {match.team2.image ? <img src={forceHttps(match.team2.image)} alt={match.team2.code} width="48" height="48" loading={index < 2 ? "eager" : "lazy"} fetchpriority={index === 0 ? "high" : "auto"} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
                                         </div>
                                     </div>
                                 </div>

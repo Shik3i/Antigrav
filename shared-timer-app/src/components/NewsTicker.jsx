@@ -5,16 +5,9 @@ import { usePageVisibility } from '../hooks/usePageVisibility';
 const NewsTicker = ({ socket }) => {
     const [news, setNews] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [lastUpdated, setLastUpdated] = useState(null);
     const isVisible = usePageVisibility();
 
-    const formatUpdatedAt = (value) => {
-        if (!value) return null;
-        return new Intl.DateTimeFormat('de-DE', {
-            hour: '2-digit',
-            minute: '2-digit'
-        }).format(value);
-    };
+
 
     useEffect(() => {
         if (!socket) return;
@@ -22,7 +15,6 @@ const NewsTicker = ({ socket }) => {
         const handleNews = (data) => {
             if (Array.isArray(data)) {
                 setNews(data);
-                setLastUpdated(new Date());
             }
             setLoading(false);
         };
@@ -52,11 +44,7 @@ const NewsTicker = ({ socket }) => {
             <div className="news-ticker-label">
                 <Rss size={14} /> Tagesschau
             </div>
-            {lastUpdated && (
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: '12px', whiteSpace: 'nowrap' }}>
-                    Stand {formatUpdatedAt(lastUpdated)}
-                </div>
-            )}
+
             <div className="news-ticker-content">
                 <div className="news-ticker-track">
                     {/* Double the array for seamless infinite scrolling */}

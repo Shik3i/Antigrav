@@ -1,5 +1,11 @@
 [
   {
+    "id": 31,
+    "version": "2.20.0",
+    "date": "2026-04-15",
+    "changes": "- **Performance Bundle**: Umstellung auf lokale Schriftarten (@fontsource/inter, @fontsource/outfit) zur Reduzierung von Render-Blocking-Ressourcen.\n- **Layout Stability (CLS)**: Umfassende Bild-Optimierung mit expliziten Dimensionen, Lazy-Loading und LCP-Priorisierung zur Behebung von Layout-Shifts.\n- **UI Refinement**: Entfernung des Zeitstempels im Tagesschau-Newsticker für ein saubereres Erscheinungsbild."
+  },
+  {
     "id": 30,
     "version": "2.19.0",
     "date": "2026-04-15",

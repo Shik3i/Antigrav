@@ -75,6 +75,8 @@ const GachaRevealModal = ({ results = [], onClose, allTeams }) => {
                                 <img 
                                     src={findTeamImage(results[0]?.team)} 
                                     alt={results[0]?.team} 
+                                    width="180"
+                                    height="180"
                                     loading="lazy"
                                     decoding="async"
                                     style={{ width: 180, height: 180, objectFit: 'contain', opacity: revealed ? 1 : 0.3, transition: '0.8s' }} 
@@ -103,7 +105,7 @@ const GachaRevealModal = ({ results = [], onClose, allTeams }) => {
                             {results.map((res, i) => (
                                 <div key={i} className={`bulk-item rarity-${res.rarity.toLowerCase()}`} style={{ animationDelay: `${i * 0.1}s` }}>
                                     <div className="bulk-rarity-dot"></div>
-                                    <img src={findTeamImage(res.team)} alt={res.team} loading="lazy" decoding="async" />
+                                    <img src={findTeamImage(res.team)} alt={res.team} width="48" height="48" loading="lazy" decoding="async" />
                                     <div className="bulk-info">
                                         <RoleIcon role={res.role} />
                                         <span>Pow: {res.stats}</span>
@@ -478,6 +480,8 @@ const LoLIdleGame = ({ user, token }) => {
                                                     <img 
                                                         src={findTeamImage(slot.team_code)} 
                                                         alt={slot.team_code} 
+                                                        width="60"
+                                                        height="60"
                                                         loading="lazy"
                                                         decoding="async"
                                                         style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '8px' }} 
@@ -527,6 +531,8 @@ const LoLIdleGame = ({ user, token }) => {
                                                     <img 
                                                         src={findTeamImage(slot.team_code)} 
                                                         alt={slot.team_code} 
+                                                        width="60"
+                                                        height="60"
                                                         loading="lazy"
                                                         decoding="async"
                                                         style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: '8px' }} 
@@ -600,6 +606,8 @@ const LoLIdleGame = ({ user, token }) => {
                                                 <img 
                                                     src={findTeamImage(group.team_code)} 
                                                     alt={group.team_code} 
+                                                    width="50"
+                                                    height="50"
                                                     loading="lazy"
                                                     decoding="async"
                                                     style={{ width: 50, height: 50, objectFit: 'contain', borderRadius: '6px' }} 

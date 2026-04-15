@@ -524,6 +524,9 @@ const Settings = ({ user, setUser, socket }) => {
                                             <img
                                                 src={`/assets/pokemon/${user.preferences.pokemonTheme.id}.jpg`}
                                                 alt="Current Pokemon"
+                                                width="60"
+                                                height="60"
+                                                loading="lazy"
                                                 style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}
                                             />
                                             <div style={{ flex: 1 }}>
@@ -681,7 +684,7 @@ const Settings = ({ user, setUser, socket }) => {
                                                         onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                                                     >
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            {team.image && <img src={team.image} alt={team.code} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
+                                                            {team.image && <img src={team.image} alt={team.code} width="24" height="24" loading="lazy" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
                                                             <span>{team.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>({team.code})</span></span>
                                                         </div>
                                                         <div style={{ padding: '2px 8px', fontSize: '0.8rem', borderRadius: '4px', background: favoriteTeams.includes(team.code) ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: favoriteTeams.includes(team.code) ? '#ef4444' : '#10b981' }}>
@@ -706,7 +709,7 @@ const Settings = ({ user, setUser, socket }) => {
                                                 borderRadius: '8px', border: isFan ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                                                 transition: 'all 0.2s ease', position: 'relative'
                                             }}>
-                                                {team.image && <img src={team.image} alt={team.code} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
+                                                {team.image && <img src={team.image} alt={team.code} width="24" height="24" loading="lazy" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
                                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                     <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{team.code}</span>
                                                     <button 
@@ -996,7 +999,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.19.0
+                    Version 2.20.0
                 </div>
             </div>
         </div>

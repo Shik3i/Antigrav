@@ -1228,7 +1228,7 @@ const Admin = ({ socket }) => {
                                                     onMouseLeave={(e) => e.target.style.background = 'transparent'}
                                                 >
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        {team.image && <img src={team.image} alt="" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
+                                                        {team.image && <img src={team.image} alt="" width="20" height="20" loading="lazy" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
                                                         <span style={{ color: 'white' }}>{team.name}</span>
                                                     </div>
                                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>{team.code}</span>
@@ -2251,7 +2251,7 @@ const Admin = ({ socket }) => {
                                                             onMouseLeave={(e) => e.target.style.background = 'transparent'}
                                                         >
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                {team.image && <img src={team.image} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />}
+                                                                {team.image && <img src={team.image} alt="" width="16" height="16" loading="lazy" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />}
                                                                 <span style={{ color: 'white', fontSize: '0.85rem' }}>{team.name}</span>
                                                             </div>
                                                             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 'bold' }}>{team.code}</span>
@@ -2270,7 +2270,7 @@ const Admin = ({ socket }) => {
                                                     background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)'
                                                 }}>
                                                     <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-primary)', minWidth: '24px' }}>#{idx + 1}</span>
-                                                    {team.image && <img src={team.image} alt="" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
+                                                    {team.image && <img src={team.image} alt="" width="20" height="20" loading="lazy" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
                                                     <div style={{ flex: 1 }}>
                                                         <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{team.name}</div>
                                                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{team.code}</div>
