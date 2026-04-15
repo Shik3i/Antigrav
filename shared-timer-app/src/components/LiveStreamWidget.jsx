@@ -151,6 +151,7 @@ const LiveStreamWidget = () => {
             <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="glass-card animate-fade-in stream-trigger"
+                aria-label="Stream umschalten"
                 style={{
                     position: 'fixed',
                     bottom: '80px',
@@ -297,10 +298,20 @@ const LiveStreamWidget = () => {
                             {!isMinimized && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{activeChannel}</span>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => setIsMinimized(!isMinimized)}>
+                            <button 
+                                className="btn-ghost" 
+                                style={{ padding: '4px' }} 
+                                onClick={() => setIsMinimized(!isMinimized)}
+                                aria-label={isMinimized ? "Fenster vergrößern" : "Fenster minimieren"}
+                            >
                                 {isMinimized ? <Maximize2 size={14} color="var(--text-muted)" /> : <Minimize2 size={14} color="var(--text-muted)" />}
                             </button>
-                            <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => setIsPlayerOpen(false)}>
+                            <button 
+                                className="btn-ghost" 
+                                style={{ padding: '4px' }} 
+                                onClick={() => setIsPlayerOpen(false)}
+                                aria-label="Stream schließen"
+                            >
                                 <X size={14} color="#ef4444" />
                             </button>
                         </div>
