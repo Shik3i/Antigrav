@@ -4,6 +4,103 @@
  * Listens for messages from popup.js and bridge.js
  */
 
+const TIMER_TAB_URLS = ["*://timer.shik3i.net/*", "http://localhost:3001/*", "*://*.timer.shik3i.net/*"];
+
+function getOrCreateExtensionInstanceId(callback) {
+    chrome.storage.local.get(['extensionInstanceId'], (storageData) => {
+        if (storageData.extensionInstanceId) {
+            callback(storageData.extensionInstanceId);
+            return;
+        }
+
+        const instanceId = crypto.randomUUID();
+        chrome.storage.local.set({ extensionInstanceId: instanceId }, () => callback(instanceId));
+    });
+}
+
+function broadcastToTimerTabs(message) {
+    chrome.tabs.query({ url: TIMER_TAB_URLS }, (tabs) => {
+        tabs.forEach(tab => {
+            chrome.tabs.sendMessage(tab.id, message).catch(() => { });
+        });
+    });
+}
+
+function announceLocalTabStatus() {
+    chrome.storage.local.get(['targetTabId'], (storageData) => {
+        const targetTabId = storageData.targetTabId;
+
+        getOrCreateExtensionInstanceId((instanceId) => {
+            const version = chrome.runtime.getManifest().version;
+
+            if (!targetTabId || targetTabId === 'none') {
+                broadcastToTimerTabs({
+                    type: 'EXTENSION_OUTBOUND',
+                    payload: {
+                        action: 'tab_status',
+                        tabTitle: null,
+                        isReady: false,
+                        version,
+                        instanceId
+                    }
+                });
+                return;
+            }
+
+            chrome.tabs.get(targetTabId, (tab) => {
+                if (chrome.runtime.lastError || !tab) {
+                    broadcastToTimerTabs({
+                        type: 'EXTENSION_OUTBOUND',
+                        payload: {
+                            action: 'tab_status',
+                            tabTitle: null,
+                            isReady: false,
+                            version,
+                            instanceId
+                        }
+                    });
+                    return;
+                }
+
+                const tabTitle = tab.title ? tab.title.substring(0, 30) : null;
+                broadcastToTimerTabs({
+                    type: 'EXTENSION_OUTBOUND',
+                    payload: {
+                        action: 'tab_status',
+                        tabTitle,
+                        isReady: !!tabTitle,
+                        version,
+                        instanceId
+                    }
+                });
+            });
+        });
+    });
+}
+
+function updateForceSyncState(timestamp, updater) {
+    if (!timestamp) return;
+
+    chrome.storage.local.get(['forceSyncState'], (storageData) => {
+        const nextState = updater(storageData.forceSyncState || {});
+        chrome.storage.local.set({ forceSyncState: nextState });
+    });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.alarms.create('extension-tab-status-heartbeat', { periodInMinutes: 1 });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    chrome.alarms.create('extension-tab-status-heartbeat', { periodInMinutes: 1 });
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'extension-tab-status-heartbeat') {
+        announceLocalTabStatus();
+    }
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // We only care about EXTENSION_INBOUND and EXTENSION_OUTBOUND now
     if (message.type === 'EXTENSION_INBOUND' || message.type === 'EXTENSION_OUTBOUND') {
@@ -26,12 +123,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         targetEntry.acks.push(ackName);
                         chrome.storage.local.set({ history: currentHistory });
                     }
-                } else if (currentHistory[0] && currentHistory[0].action === p.originalAction) {
-                    if (!currentHistory[0].acks) currentHistory[0].acks = [];
-                    if (ackName && !currentHistory[0].acks.includes(ackName)) {
-                        currentHistory[0].acks.push(ackName);
-                        chrome.storage.local.set({ history: currentHistory });
-                    }
                 }
             });
             return true;
@@ -39,35 +130,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // 2. Handle version announcements from other users
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'version_announce' && p.version) {
-            const myVersion = chrome.runtime.getManifest().version;
-            const compareVersions = (a, b) => {
-                const pa = a.split('.').map(Number);
-                const pb = b.split('.').map(Number);
-                for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-                    const na = pa[i] || 0, nb = pb[i] || 0;
-                    if (na < nb) return -1;
-                    if (na > nb) return 1;
+            getOrCreateExtensionInstanceId((instanceId) => {
+                if (p.instanceId && p.instanceId === instanceId) return;
+
+                const myVersion = chrome.runtime.getManifest().version;
+                const compareVersions = (a, b) => {
+                    const pa = a.split('.').map(Number);
+                    const pb = b.split('.').map(Number);
+                    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                        const na = pa[i] || 0, nb = pb[i] || 0;
+                        if (na < nb) return -1;
+                        if (na > nb) return 1;
+                    }
+                    return 0;
+                };
+                if (compareVersions(myVersion, p.version) < 0) {
+                    chrome.storage.local.set({ updateAvailable: p.version });
                 }
-                return 0;
-            };
-            if (compareVersions(myVersion, p.version) < 0) {
-                chrome.storage.local.set({ updateAvailable: p.version });
-            }
+            });
             return true;
         }
 
         // 2b. Handle tab_status announcements from other users
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'tab_status') {
-            const peerName = message.senderName || p.senderName || 'Unknown';
-            chrome.storage.local.get(['roomPeers'], (data) => {
-                const peers = data.roomPeers || {};
-                peers[peerName] = {
-                    tabTitle: p.tabTitle || null,
-                    isReady: p.isReady || false,
-                    version: p.version || null,
-                    lastSeen: Date.now()
-                };
-                chrome.storage.local.set({ roomPeers: peers });
+            getOrCreateExtensionInstanceId((instanceId) => {
+                if (p.instanceId && p.instanceId === instanceId) return;
+
+                const peerName = message.senderName || p.senderName || 'Unknown';
+                chrome.storage.local.get(['roomPeers'], (data) => {
+                    const peers = data.roomPeers || {};
+                    peers[peerName] = {
+                        tabTitle: p.tabTitle || null,
+                        isReady: p.isReady || false,
+                        version: p.version || null,
+                        instanceId: p.instanceId || null,
+                        lastSeen: Date.now()
+                    };
+                    chrome.storage.local.set({ roomPeers: peers });
+                });
+            });
+            return true;
+        }
+
+        // 2c. Track force-sync readiness from the room so the popup can wait on a real signal
+        if (message.type === 'EXTENSION_INBOUND' && p.action === 'force_sync_ready' && p.timestamp) {
+            getOrCreateExtensionInstanceId((instanceId) => {
+                if (p.instanceId && p.instanceId === instanceId) return;
+
+                const peerName = message.senderName || p.senderName || 'Unknown';
+                updateForceSyncState(p.timestamp, (currentState) => {
+                    const remoteReady = { ...(currentState.remoteReady || {}) };
+                    remoteReady[peerName] = {
+                        currentTime: p.currentTime ?? null,
+                        readyState: p.readyState ?? null,
+                        instanceId: p.instanceId || null,
+                        updatedAt: Date.now()
+                    };
+
+                    return {
+                        ...currentState,
+                        timestamp: p.timestamp,
+                        remoteReady
+                    };
+                });
             });
             return true;
         }
@@ -76,6 +201,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.storage.local.get(['targetTabId', 'history'], (storageData) => {
             const currentHistory = storageData.history || [];
             const actionTarget = p.action || 'unknown_payload';
+
+            if (actionTarget === 'force_sync_pause_seek' && p.timestamp) {
+                chrome.storage.local.set({
+                    forceSyncState: {
+                        timestamp: p.timestamp,
+                        stage: 'seeking',
+                        targetTime: p.targetTime ?? null,
+                        localReady: false,
+                        remoteReady: {},
+                        error: null,
+                        updatedAt: Date.now()
+                    }
+                });
+            }
 
             // Log core actions to history
             if (['play', 'pause', 'force_sync_pause_seek', 'force_sync_play'].includes(actionTarget)) {
@@ -98,38 +237,63 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         // Verified ACK: content.js confirmed the action succeeded
                         if (response.status === 'playing' || response.status === 'paused') {
                             // Forward ACK to all React Timer tabs via OUTBOUND pipe
-                            chrome.tabs.query({ url: ["*://timer.shik3i.net/*", "*://localhost/*", "*://*.timer.shik3i.net/*"] }, (tabs) => {
-                                tabs.forEach(tab => {
-                                    chrome.tabs.sendMessage(tab.id, {
-                                        type: 'EXTENSION_OUTBOUND',
-                                        payload: {
-                                            action: 'EXTENSION_SYNC_ACK',
-                                            originalAction: actionTarget,
-                                            timestamp: p.timestamp
-                                        }
-                                    }).catch(() => { });
-                                });
+                            broadcastToTimerTabs({
+                                type: 'EXTENSION_OUTBOUND',
+                                payload: {
+                                    action: 'EXTENSION_SYNC_ACK',
+                                    originalAction: actionTarget,
+                                    timestamp: p.timestamp
+                                }
                             });
                         }
 
                         // Force Sync: content.js confirmed seek is ready
                         if (response.status === 'seek_ready') {
-                            chrome.tabs.query({ url: ["*://timer.shik3i.net/*", "*://localhost/*", "*://*.timer.shik3i.net/*"] }, (tabs) => {
-                                tabs.forEach(tab => {
-                                    chrome.tabs.sendMessage(tab.id, {
-                                        type: 'EXTENSION_OUTBOUND',
-                                        payload: {
-                                            action: 'force_sync_ready',
-                                            currentTime: response.currentTime,
-                                            readyState: response.readyState,
-                                            timestamp: p.timestamp
-                                        }
-                                    }).catch(() => { });
+                            updateForceSyncState(p.timestamp, (currentState) => ({
+                                ...currentState,
+                                timestamp: p.timestamp,
+                                stage: 'ready',
+                                localReady: true,
+                                localCurrentTime: response.currentTime,
+                                localReadyState: response.readyState,
+                                error: null,
+                                updatedAt: Date.now()
+                            }));
+
+                            getOrCreateExtensionInstanceId((instanceId) => {
+                                broadcastToTimerTabs({
+                                    type: 'EXTENSION_OUTBOUND',
+                                    payload: {
+                                        action: 'force_sync_ready',
+                                        currentTime: response.currentTime,
+                                        readyState: response.readyState,
+                                        timestamp: p.timestamp,
+                                        instanceId
+                                    }
                                 });
                             });
                         }
+
+                        if (response.status === 'seek_timeout' || response.status === 'no_video') {
+                            updateForceSyncState(p.timestamp, (currentState) => ({
+                                ...currentState,
+                                timestamp: p.timestamp,
+                                stage: 'error',
+                                localReady: false,
+                                error: response.status,
+                                updatedAt: Date.now()
+                            }));
+                        }
                     }).catch(err => {
                         console.warn('Background: Failed to send message to target tab:', err.message);
+                        updateForceSyncState(p.timestamp, (currentState) => ({
+                            ...currentState,
+                            timestamp: p.timestamp,
+                            stage: 'error',
+                            localReady: false,
+                            error: err.message,
+                            updatedAt: Date.now()
+                        }));
                         if (retryCount === 0 && (err.message.includes('Receiving end does not exist') || err.message.includes('Could not establish connection'))) {
                             chrome.scripting.executeScript({
                                 target: { tabId: storageData.targetTabId },
@@ -143,11 +307,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             // 3. For Bidirectional Sync: Broadcast OUTBOUND payloads to Timer tabs
             if (message.type === 'EXTENSION_OUTBOUND') {
-                chrome.tabs.query({ url: ["*://timer.shik3i.net/*", "*://localhost/*", "*://*.timer.shik3i.net/*"] }, (tabs) => {
-                    tabs.forEach(tab => {
-                        chrome.tabs.sendMessage(tab.id, message).catch(() => { });
-                    });
-                });
+                broadcastToTimerTabs(message);
             }
         });
     }

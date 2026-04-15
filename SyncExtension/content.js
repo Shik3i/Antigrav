@@ -85,16 +85,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
             const targetVideo = findVideo();
             if (targetVideo) {
-                result.detectionStatus = '<span style="color: #4CAF50">Found</span>';
+                result.detectionStatus = 'Found';
                 result.videoState = targetVideo.paused ? 'Paused' : 'Playing';
                 result.currentTime = targetVideo.currentTime.toFixed(1) + 's';
                 result.readyState = targetVideo.readyState;
                 result.sourceUrl = targetVideo.src || targetVideo.currentSrc || window.location.href;
             } else {
-                result.detectionStatus = '<span style="color: #dc3545">No &lt;video&gt; element found</span>';
+                result.detectionStatus = 'No <video> element found';
             }
         } catch (e) {
-            result.detectionStatus = `<span style="color: #dc3545">Error: ${e.message}</span>`;
+            result.detectionStatus = `Error: ${e.message}`;
         }
 
         sendResponse(result);

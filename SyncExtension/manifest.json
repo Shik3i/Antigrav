@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "SyncExtension",
-  "version": "2.0",
+  "version": "2.1",
   "description": "Minimal Media-Sync for HTML5 videos.",
   "permissions": [
     "tabs",
     "storage",
     "scripting",
-    "clipboardWrite"
+    "clipboardWrite",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -34,7 +35,7 @@
     {
       "matches": [
         "https://timer.shik3i.net/*",
-        "http://localhost:3000/*"
+        "http://localhost:3001/*"
       ],
       "js": [
         "bridge.js"

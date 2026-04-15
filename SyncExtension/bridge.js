@@ -4,6 +4,11 @@
  * and the Chrome Extension's Background Worker.
  */
 
+const ALLOWED_ORIGINS = new Set([
+    'https://timer.shik3i.net',
+    'http://localhost:3001'
+]);
+
 // Helper: check if extension context is still valid
 function isContextValid() {
     try {
@@ -16,10 +21,15 @@ function isContextValid() {
 // Listen for messages from the React application (timer.shik3i.net)
 window.addEventListener('message', (event) => {
     if (!event.data) return;
+    if (event.source !== window) return;
+    if (!ALLOWED_ORIGINS.has(event.origin)) return;
 
     // React App asks if Extension is alive
     if (event.data.action === 'EXTENSION_PING') {
-        window.postMessage({ action: isContextValid() ? 'EXTENSION_PONG' : 'EXTENSION_GONE' }, '*');
+        window.postMessage(
+            { action: isContextValid() ? 'EXTENSION_PONG' : 'EXTENSION_GONE' },
+            window.location.origin
+        );
         return;
     }
 
@@ -37,7 +47,9 @@ window.addEventListener('message', (event) => {
 
 // Proactively announce presence to the React App as soon as bridge.js is loaded
 setTimeout(() => {
-    if (isContextValid()) window.postMessage({ action: 'EXTENSION_PONG' }, '*');
+    if (isContextValid()) {
+        window.postMessage({ action: 'EXTENSION_PONG' }, window.location.origin);
+    }
 }, 100);
 
 // Listen for reverse messages from the Extension generic pipe
@@ -49,6 +61,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         window.postMessage({
             type: 'EXTENSION_OUTBOUND',
             payload: message.payload
-        }, '*');
+        }, window.location.origin);
     }
 });

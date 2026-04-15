@@ -20,6 +20,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const syncStatusText = document.getElementById('syncStatusText');
 
     let detectedRoomId = null;
+    let hasTimerTab = false;
+    let extensionInstanceId = null;
+
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
     // Populate open tabs
     const tabs = await chrome.tabs.query({});
@@ -31,8 +40,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             targetTabSelect.appendChild(option);
         }
 
-        // Auto-detect timer room to confirm passive connection
-        if (tab.url && (tab.url.includes('timer.shik3i.net/room/') || tab.url.includes('localhost:3000/room/'))) {
+        if (tab.url && (tab.url.includes('timer.shik3i.net/') || tab.url.includes('localhost:3001/'))) {
+            hasTimerTab = true;
+        }
+
+        // Auto-detect timer room if one is open
+        if (tab.url && (tab.url.includes('timer.shik3i.net/room/') || tab.url.includes('localhost:3001/room/'))) {
             try {
                 const url = new URL(tab.url);
                 const match = url.pathname.match(/\/room\/([^\/]+)/);
@@ -48,21 +61,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const connDot = document.getElementById('connectionDot');
     const connText = document.getElementById('connectionText');
 
-    if (detectedRoomId) {
+    if (hasTimerTab) {
         connStatus.style.background = 'rgba(76, 175, 80, 0.1)';
         connStatus.style.borderColor = '#4CAF50';
         connDot.style.background = '#4CAF50';
         connDot.style.boxShadow = '0 0 8px #4CAF50';
         connText.style.color = '#4CAF50';
-        connText.textContent = `Connected to Room: ${detectedRoomId}`;
-
-        // Announce our version to the room so others can compare
-        const myVersion = chrome.runtime.getManifest().version;
-        chrome.runtime.sendMessage({
-            type: 'EXTENSION_OUTBOUND',
-            source: 'extension_popup',
-            payload: { action: 'version_announce', version: myVersion }
-        }).catch(() => { });
+        connText.textContent = detectedRoomId
+            ? `Timer tab detected (Room: ${detectedRoomId})`
+            : 'Timer tab detected';
+    } else {
+        connText.textContent = 'No timer tab detected';
     }
 
     // Check if background.js flagged a newer version from someone in the room
@@ -91,14 +100,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Load existing settings
-    chrome.storage.local.get(['targetTabId'], (data) => {
+    chrome.storage.local.get(['targetTabId', 'extensionInstanceId'], (data) => {
+        extensionInstanceId = data.extensionInstanceId || crypto.randomUUID();
+        if (!data.extensionInstanceId) {
+            chrome.storage.local.set({ extensionInstanceId });
+        }
         if (data.targetTabId !== undefined) {
             targetTabSelect.value = data.targetTabId === null ? 'none' : data.targetTabId;
         } else {
             targetTabSelect.value = 'none';
         }
         // Announce tab status AFTER restoring saved value (so the title is correct)
-        if (detectedRoomId) announceTabStatus();
+        if (hasTimerTab) {
+            announceTabStatus();
+            announceVersion();
+        }
     });
 
     // Auto-Save
@@ -122,10 +138,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Room Peer Status ---
     function announceTabStatus() {
+        if (!extensionInstanceId) return;
+
         const selVal = targetTabSelect.value;
-        if (!selVal || selVal === 'none') return;
         const selOption = targetTabSelect.options[targetTabSelect.selectedIndex];
-        const tabTitle = selOption ? selOption.textContent.replace(/^\d+ - /, '').trim() : null;
+        const tabTitle = (selVal && selVal !== 'none' && selOption)
+            ? selOption.textContent.replace(/^\d+ - /, '').trim()
+            : null;
         chrome.runtime.sendMessage({
             type: 'EXTENSION_OUTBOUND',
             source: 'extension_popup',
@@ -133,7 +152,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 action: 'tab_status',
                 tabTitle: tabTitle,
                 isReady: !!tabTitle,
-                version: chrome.runtime.getManifest().version
+                version: chrome.runtime.getManifest().version,
+                instanceId: extensionInstanceId
+            }
+        }).catch(() => {});
+    }
+
+    function announceVersion() {
+        if (!hasTimerTab || !extensionInstanceId) return;
+
+        chrome.runtime.sendMessage({
+            type: 'EXTENSION_OUTBOUND',
+            source: 'extension_popup',
+            payload: {
+                action: 'version_announce',
+                version: chrome.runtime.getManifest().version,
+                instanceId: extensionInstanceId
             }
         }).catch(() => {});
     }
@@ -145,7 +179,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const peers = data.roomPeers || {};
             // Evict peers not seen in last 10 minutes
             const now = Date.now();
-            const active = Object.entries(peers).filter(([, v]) => (now - v.lastSeen) < 10 * 60 * 1000);
+            const active = Object.entries(peers).filter(([, v]) => {
+                if ((now - v.lastSeen) >= 10 * 60 * 1000) return false;
+                if (v.instanceId && extensionInstanceId && v.instanceId === extensionInstanceId) return false;
+                return true;
+            });
 
             // Build "You" entry from current target tab selection
             const selVal = targetTabSelect.value;
@@ -166,10 +204,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const dot = isReady ? '🟢' : '🔴';
                 const ver = version ? `<span style="color:#6b7280;margin-left:auto;">v${version}</span>` : '';
                 const label = isSelf ? `<em style="color:#6b7280;">(You)</em>` : '';
+                const safeName = escapeHtml(name);
+                const safeTabTitle = escapeHtml(tabTitle);
                 const titleHtml = tabTitle
-                    ? `<span style="color:#a5b4fc;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tabTitle}">${tabTitle}</span>`
+                    ? `<span style="color:#a5b4fc;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safeTabTitle}">${safeTabTitle}</span>`
                     : `<span style="color:#6b7280;font-style:italic;">No tab</span>`;
-                row.innerHTML = `<span>${dot}</span><strong style="min-width:45px;">${name}</strong>${label}${titleHtml}${ver}`;
+                row.innerHTML = `<span>${dot}</span><strong style="min-width:45px;">${safeName}</strong>${label}${titleHtml}${ver}`;
                 list.appendChild(row);
             };
 
@@ -181,8 +221,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Render peers on open and whenever storage changes
     renderRoomPeers();
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.roomPeers) renderRoomPeers();
+        if (area === 'local' && (changes.roomPeers || changes.extensionInstanceId)) renderRoomPeers();
     });
+
+    const peerHeartbeat = setInterval(() => {
+        announceTabStatus();
+        renderRoomPeers();
+    }, 30000);
 
     // Media Controls Helper
     function sendMediaCommand(action) {
@@ -228,6 +273,61 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => { syncStatus.style.display = 'none'; }, delay);
     }
 
+    function waitForForceSyncReady(timestamp, timeoutMs = 9000) {
+        return new Promise((resolve) => {
+            let resolved = false;
+
+            const finish = (result) => {
+                if (resolved) return;
+                resolved = true;
+                chrome.storage.onChanged.removeListener(handleChange);
+                clearTimeout(timeoutId);
+                resolve(result);
+            };
+
+            const evaluateState = (state) => {
+                if (!state || state.timestamp !== timestamp) return false;
+                if (state.stage === 'error') {
+                    finish({
+                        ok: false,
+                        error: state.error || 'force_sync_failed',
+                        remoteReadyCount: Object.keys(state.remoteReady || {}).length
+                    });
+                    return true;
+                }
+                if (state.localReady) {
+                    finish({
+                        ok: true,
+                        remoteReadyCount: Object.keys(state.remoteReady || {}).length
+                    });
+                    return true;
+                }
+                return false;
+            };
+
+            const handleChange = (changes, area) => {
+                if (area !== 'local' || !changes.forceSyncState) return;
+                evaluateState(changes.forceSyncState.newValue);
+            };
+
+            const timeoutId = setTimeout(() => {
+                chrome.storage.local.get(['forceSyncState'], (data) => {
+                    const state = data.forceSyncState;
+                    finish({
+                        ok: false,
+                        error: state?.error || 'timeout',
+                        remoteReadyCount: Object.keys(state?.remoteReady || {}).length
+                    });
+                });
+            }, timeoutMs);
+
+            chrome.storage.onChanged.addListener(handleChange);
+            chrome.storage.local.get(['forceSyncState'], (data) => {
+                evaluateState(data.forceSyncState);
+            });
+        });
+    }
+
     forceSyncBtn.addEventListener('click', async () => {
         let targetTabIdStr = targetTabSelect.value;
         let targetTabId = targetTabIdStr === 'none' || targetTabIdStr === '' ? null : parseInt(targetTabIdStr, 10);
@@ -257,6 +357,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Phase 1: Send pause + seek to everyone (including self)
         updateSyncStatus(`⏳ Syncing to ${currentVideoTime.toFixed(1)}s...`, '#f59e0b');
 
+        await chrome.storage.local.set({
+            forceSyncState: {
+                timestamp,
+                stage: 'starting',
+                targetTime: currentVideoTime,
+                localReady: false,
+                remoteReady: {},
+                error: null,
+                updatedAt: Date.now()
+            }
+        });
+
         // Send to self (local extension)
         chrome.runtime.sendMessage({
             type: 'EXTENSION_INBOUND',
@@ -280,13 +392,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).catch(() => { });
 
         // Phase 2: Wait for seek to complete (give buffer time)
-        updateSyncStatus('⏳ Waiting for buffer...', '#f59e0b');
+        updateSyncStatus('⏳ Waiting for ready signal...', '#f59e0b');
+        const readyResult = await waitForForceSyncReady(timestamp);
 
-        // Wait a reasonable time for seek + buffer (content.js polls up to 8s)
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        if (!readyResult.ok) {
+            updateSyncStatus(`❌ Force Sync failed: ${readyResult.error}`, '#dc3545');
+            hideSyncStatus(5000);
+            return;
+        }
 
         // Phase 3: Send play to everyone
-        updateSyncStatus('▶ Starting playback...', '#6366f1');
+        if (readyResult.remoteReadyCount > 0) {
+            updateSyncStatus(`▶ Starting playback (${readyResult.remoteReadyCount} peer ready)...`, '#6366f1');
+        } else {
+            updateSyncStatus('▶ Starting playback...', '#6366f1');
+        }
 
         chrome.runtime.sendMessage({
             type: 'EXTENSION_INBOUND',
@@ -401,18 +521,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // Sender name
                 const sender = item.senderName || (item.source === 'extension_popup' ? 'You' : '');
+                const safeAction = escapeHtml(actionLabels[item.action] || item.action);
+                const safeSender = escapeHtml(sender);
 
                 // ACK list
                 let ackHtml = '';
                 if (item.acks && item.acks.length > 0) {
-                    ackHtml = `<div style="font-size: 9px; color: #6ee7b7; margin-top: 3px;">✓ ${item.acks.join(', ')}</div>`;
+                    ackHtml = `<div style="font-size: 9px; color: #6ee7b7; margin-top: 3px;">✓ ${escapeHtml(item.acks.join(', '))}</div>`;
                 }
 
                 div.innerHTML = `
                     <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <span class="history-action">${actionLabels[item.action] || item.action}</span>
-                            ${sender ? `<span style="font-size: 10px; color: #e2e8f0; font-weight: 500;">${sender}</span>` : ''}
+                            <span class="history-action">${safeAction}</span>
+                            ${sender ? `<span style="font-size: 10px; color: #e2e8f0; font-weight: 500;">${safeSender}</span>` : ''}
                             <span style="font-size: 8px; padding: 1px 5px; border-radius: 3px; background: ${sourceColor}22; color: ${sourceColor}; font-weight: 600;">${sourceLabel}</span>
                         </div>
                         ${ackHtml}
@@ -443,7 +565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const renderRow = (label, value) => `
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0;">
-                        <strong>${label}:</strong> <span style="color: #fff; text-align: right; max-width: 65%; word-break: break-all;">${value}</span>
+                        <strong>${escapeHtml(label)}:</strong> <span style="color: #fff; text-align: right; max-width: 65%; word-break: break-all;">${escapeHtml(value)}</span>
                     </div>
                 `;
 
@@ -456,7 +578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
             })
             .catch(err => {
-                devInfo.innerHTML = `<span style="color: #dc3545">Error connecting to tab:<br>${err.message}</span>`;
+                devInfo.innerHTML = `<span style="color: #dc3545">Error connecting to tab:<br>${escapeHtml(err.message)}</span>`;
             });
     }
 
@@ -469,4 +591,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load on initial popup open
     loadHistory();
+
+    window.addEventListener('unload', () => {
+        clearInterval(peerHeartbeat);
+    });
 });
