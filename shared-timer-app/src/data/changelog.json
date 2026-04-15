@@ -1,5 +1,11 @@
 [
   {
+    "id": 30,
+    "version": "2.19.0",
+    "date": "2026-04-15",
+    "changes": "- **System-Infrastruktur**: Vollständiges Refactoring der Server-Architektur für verbesserte Stabilität und reibungslose Synchronisation.\n- **Dependency Audit**: Anwendung von Sicherheits-Patches zur Schließung von Infrastruktur-Lücken."
+  },
+  {
     "id": 29,
     "version": "2.18.0",
     "date": "2026-04-15",
