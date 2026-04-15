@@ -56,7 +56,6 @@ module.exports = function (io) {
     });
 
     io.on('connection', (socket) => {
-        console.log('>>> [SOCKET] User verbunden:', socket.id);
 
         if (socket.user) {
             const userId = socket.user.userId;
@@ -738,7 +737,6 @@ module.exports = function (io) {
                 const safeName = user.displayName || user.username || 'Ein Nutzer';
                 const result = Math.random() < 0.5 ? 'KOPF' : 'ZAHL';
                 
-                console.log(`>>> [MINIGAME] Coinflip in ${roomId}: ${safeName} -> ${result}`);
                 io.to(roomId).emit(EVENTS.ROOM_COINFLIP_RESULT, {
                     userId: user.userId || socket.id,
                     userName: safeName,
@@ -978,7 +976,6 @@ module.exports = function (io) {
                     if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
                 }
 
-                // Update room list for all
                 broadcastActiveRooms(io);
             }
 
@@ -993,8 +990,6 @@ module.exports = function (io) {
                     }
                 }
             }
-
-            console.log('<<< [SOCKET] User getrennt:', socket.id, 'Grund:', reason);
         });
     });
 
