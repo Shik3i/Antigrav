@@ -3,12 +3,13 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import io from 'socket.io-client';
 import EVENTS from './socketEvents';
 import Sidebar from './components/Sidebar';
-import Home from './pages/Home';
-import Room from './pages/Room';
-import Settings from './pages/Settings';
-import Countdowns from './pages/Countdowns';
-import Login from './pages/Login';
-import Register from './pages/Register';
+// Page imports
+const Home = React.lazy(() => import('./pages/Home'));
+const Room = React.lazy(() => import('./pages/Room'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const Countdowns = React.lazy(() => import('./pages/Countdowns'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Register = React.lazy(() => import('./pages/Register'));
 
 // Lazy load pages that are less frequently used or have heavy dependencies
 const Highscores = React.lazy(() => import('./pages/Highscores'));
@@ -38,7 +39,7 @@ const Wordle = React.lazy(() => import('./pages/Wordle'));
 const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
 const LiveStreamWidget = React.lazy(() => import('./components/LiveStreamWidget'));
-import Friends from './pages/Friends';
+const Friends = React.lazy(() => import('./pages/Friends'));
 import ClockWidget from './components/ClockWidget';
 import KoalaCoinWidget from './components/KoalaCoinWidget';
 import useEsportsNotifications from './hooks/useEsportsNotifications';
@@ -51,7 +52,7 @@ import { fetchJson } from './utils/apiClient';
 import { getStoredValue, setStoredValue } from './utils/clientStorage';
 import { scheduleDeferred } from './utils/deferred';
 import { usePageVisibility } from './hooks/usePageVisibility';
-import { FloatingWidgetSkeleton, RouteSkeleton, WidgetPillSkeleton } from './components/LoadingSkeletons';
+import { FloatingWidgetSkeleton, RouteSkeleton, WidgetPillSkeleton, ViewLoader } from './components/LoadingSkeletons';
 import { ToastProvider } from './context/ToastContext';
 import ToastContainer from './components/ToastContainer';
 
@@ -633,7 +634,7 @@ function InnerApp() {
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           <main className="main-content" style={{ flex: 1, overflowY: 'auto', padding: isZenMode ? '0' : '2rem', position: 'relative' }}>
-            <React.Suspense fallback={<RouteSkeleton />}>
+            <React.Suspense fallback={<ViewLoader />}>
               <Routes>
                 <Route path="/" element={<Home user={user} globalSocket={globalSocket} />} />
                 <Route path="/login" element={<Login />} />

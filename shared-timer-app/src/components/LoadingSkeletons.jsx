@@ -1,4 +1,5 @@
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 
 export const WidgetPillSkeleton = ({ width = 120 }) => (
     <div
@@ -49,3 +50,50 @@ export const RouteSkeleton = ({ title = 'Lade Ansicht...' }) => (
         </div>
     </div>
 );
+
+export const ViewLoader = ({ title = 'Vorbereiten...' }) => (
+    <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        minHeight: '60vh', 
+        gap: '24px',
+        color: 'var(--text-main)',
+        animation: 'fadeIn 0.5s ease-out'
+    }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Loader2 
+                size={48} 
+                className="animate-spin" 
+                style={{ 
+                    animation: 'spin 1.5s linear infinite',
+                    color: 'var(--accent-primary)',
+                    filter: 'drop-shadow(0 0 8px var(--accent-primary))'
+                }} 
+            />
+            <div style={{
+                position: 'absolute',
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                border: '2px solid var(--accent-primary)',
+                borderTopColor: 'transparent',
+                animation: 'spin 3s linear infinite',
+                opacity: 0.3
+            }} />
+        </div>
+        <div style={{ 
+            fontSize: '1.2rem', 
+            fontWeight: 600, 
+            letterSpacing: '0.05em',
+            background: 'var(--accent-gradient)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            opacity: 0.8
+        }}>
+            {title}
+        </div>
+    </div>
+);
+

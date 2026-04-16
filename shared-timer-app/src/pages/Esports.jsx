@@ -338,15 +338,6 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                     <Trophy size={32} color="var(--accent-primary)" />
                     <h1 style={{ margin: 0, fontSize: '2.5rem' }}>LoL Esports</h1>
                 </div>
-                {user && (
-                    <button 
-                        className="btn-primary" 
-                        style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none' }}
-                        onClick={() => window.location.href = '/global-bets'}
-                    >
-                        <TrendingUp size={18} /> Community Bets
-                    </button>
-                )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>

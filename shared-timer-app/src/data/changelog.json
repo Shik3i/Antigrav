@@ -1,5 +1,11 @@
 [
   {
+    "id": 36,
+    "version": "2.23.0",
+    "date": "2026-04-16",
+    "changes": "- **Performance Optimization (Code Splitting)**: Umstellung der Hauptseiten auf dynamische Imports (`React.lazy`), um die initiale Ladezeit zu minimieren.\n- **ViewLoader Component**: Implementierung eines modernen, zentrierten Lade-Spinners für flüssigere Seitenübergänge.\n- **PWA Caching Strategy**: Einführung einer intelligenten Caching-Logik für externe LoL-Esports-Bilder (`static.lolesports.com`) mit einer 7-tägigen Ablauffrist.\n- **UI Cleanup**: Entfernung redundanter Navigations-Buttons auf der Esports-Seite zur Verbesserung der Übersichtlichkeit."
+  },
+  {
     "id": 35,
     "version": "2.22.0",
     "date": "2026-04-16",
