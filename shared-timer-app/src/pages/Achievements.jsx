@@ -25,21 +25,40 @@ const Achievements = () => {
     const isVisible = usePageVisibility();
 
     const fetchStatus = async () => {
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        
         try {
             const res = await fetch('/api/achievements/status', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
+            if (res.status === 401 || res.status === 403) {
+                setError('Sitzung abgelaufen. Bitte logge dich erneut ein.');
+                return;
+            }
+            
             if (!res.ok) throw new Error('Failed to load achievements');
             const data = await res.json();
             setStatus(data);
+            setError(null);
         } catch (err) {
-            setError(err.message);
+            setError(err.message === 'Failed to load achievements' 
+                ? 'Fehler beim Laden der Erfolge. Bitte lade die Seite neu.' 
+                : err.message);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        if (!token) {
+            setLoading(false);
+            return;
+        }
+        
         fetchStatus();
         const interval = setInterval(fetchStatus, isVisible ? 60000 : 10 * 60000);
         return () => clearInterval(interval);
@@ -80,7 +99,52 @@ const Achievements = () => {
     };
 
     if (loading) return <div className="flex-center" style={{ height: '50vh' }}><h3>Lade Erfolge...</h3></div>;
-    if (error && !status) return <div className="glass-panel" style={{ color: '#ef4444' }}>{error}</div>;
+    
+    // Auth-Check Fallback UI for Guests
+    if (!token) {
+        return (
+            <div className="flex-center" style={{ minHeight: '60vh', flexDirection: 'column', gap: '2rem' }}>
+                <div className="glass-panel" style={{ 
+                    maxWidth: '500px', 
+                    textAlign: 'center', 
+                    padding: '3rem',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+                }}>
+                    <div style={{ 
+                        width: '80px', height: '80px', borderRadius: '50%', 
+                        background: 'rgba(59, 130, 246, 0.1)', display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem',
+                        color: 'var(--accent-primary)'
+                    }}>
+                        <Lock size={40} />
+                    </div>
+                    <h2 style={{ marginBottom: '1rem' }}>Exklusive Erfolge</h2>
+                    <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '2rem' }}>
+                        Bitte logge dich ein, um deine persönlichen Erfolge zu tracken, tägliche Belohnungen abzuholen und Meilensteine in KoalaCoins einzulösen.
+                    </p>
+                    <button 
+                        className="btn-primary" 
+                        onClick={() => navigate('/login')}
+                        style={{ width: '100%', padding: '1rem', fontWeight: 'bold' }}
+                    >
+                        Jetzt Anmelden
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (error && !status) return (
+        <div className="flex-center" style={{ minHeight: '40vh' }}>
+            <div className="glass-panel" style={{ color: '#ef4444', textAlign: 'center', padding: '2rem' }}>
+                <Shield size={32} style={{ marginBottom: '1rem' }} />
+                <p>{error}</p>
+                <button className="btn-ghost" onClick={() => fetchStatus()} style={{ marginTop: '1rem' }}>Erneut versuchen</button>
+            </div>
+        </div>
+    );
 
     const getIcon = (iconName) => {
         const icons = { Trophy, Medal, Award, Crown };

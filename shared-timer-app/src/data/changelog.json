@@ -1,5 +1,11 @@
 [
   {
+    "id": 39,
+    "version": "2.24.2",
+    "date": "2026-04-16",
+    "changes": "- **Achievements**: Implemented authentication short-circuiting to prevent unnecessary API traffic for guests.\n- **Achievements**: Replaced generic error messages with a clean guest fallback UI and login call-to-action.\n- **Achievements**: Enhanced error handling to specifically detect and notify users of expired sessions (401/403).\n- **Backend**: Optimized log handling to prevent expected unauthorized requests from bloating system logs."
+  },
+  {
     "id": 38,
     "version": "2.24.1",
     "date": "2026-04-16",
