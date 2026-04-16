@@ -105,11 +105,12 @@ module.exports = function (io) {
             try {
                 const result = await apiDataService.getEsportsSchedule();
                 safeEmit(socket, EVENTS.API_ESPORTS_DATA, { 
-                    data: result.data, 
-                    timestamp: result.timestamp 
+                    data: Array.isArray(result?.data) ? result.data : [], 
+                    timestamp: result?.timestamp || Date.now()
                 });
             } catch (err) {
                 console.error('Socket fetchEsportsData error:', err.message);
+                safeEmit(socket, EVENTS.API_ESPORTS_DATA, { data: [], timestamp: Date.now(), error: err.message });
             }
         });
 
@@ -152,8 +153,8 @@ module.exports = function (io) {
             try {
                 const result = await apiDataService.getPolymarketOdds({ forceRefreshMatch: payload?.forceRefreshMatch || null });
                 const emission = { 
-                    data: result.data, 
-                    timestamp: result.timestamp 
+                    data: Array.isArray(result?.data) ? result.data : [], 
+                    timestamp: result?.timestamp || Date.now()
                 };
                 if (payload?.forceRefreshMatch && result.changed) {
                     safeEmit(io, EVENTS.API_ODDS_DATA, emission);
@@ -163,6 +164,7 @@ module.exports = function (io) {
             } catch (err) {
                 console.error('Socket fetchPolymarketOddsData error:', err.message);
                 dbLayer.logError('Socket fetchPolymarketOddsData error', err.stack);
+                safeEmit(socket, EVENTS.API_ODDS_DATA, { data: [], timestamp: Date.now(), error: err.message });
             }
         });
 

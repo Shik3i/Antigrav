@@ -98,7 +98,11 @@ export const PersistentDataProvider = ({ children, socket }) => {
         const handleEsportsData = (payload) => {
             const { data, timestamp } = payload || {};
             console.log('[PersistentData] API_ESPORTS_DATA received:', data?.length, 'items');
-            setEsportsMatches(data || []);
+            
+            // Bulletproof type checking
+            const safeData = Array.isArray(data) ? data : [];
+            setEsportsMatches(safeData);
+
             if (timestamp) setEsportsScheduleUpdatedAt(new Date(timestamp));
             setEsportsLoaded(true);
             setLoadingEsports(false);
@@ -113,7 +117,11 @@ export const PersistentDataProvider = ({ children, socket }) => {
         const handleOddsData = (payload) => {
             const { data, timestamp } = payload || {};
             console.log('[PersistentData] API_ODDS_DATA received');
-            setEsportsOdds(data || []);
+            
+            // Bulletproof type checking
+            const safeData = Array.isArray(data) ? data : [];
+            setEsportsOdds(safeData);
+
             if (timestamp) setEsportsOddsUpdatedAt(new Date(timestamp));
             // Odds don't set loadingEsports to false because matches are usually what we wait for
         };

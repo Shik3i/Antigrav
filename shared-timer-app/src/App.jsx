@@ -53,7 +53,7 @@ import { getStoredValue, setStoredValue } from './utils/clientStorage';
 import { scheduleDeferred } from './utils/deferred';
 import { usePageVisibility } from './hooks/usePageVisibility';
 import { FloatingWidgetSkeleton, RouteSkeleton, WidgetPillSkeleton, ViewLoader } from './components/LoadingSkeletons';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { PersistentDataProvider } from './context/PersistentDataContext';
 import ToastContainer from './components/ToastContainer';
 
@@ -105,6 +105,7 @@ const EsportsNotificationHandler = ({ selectedLeagues, socket, enabled }) => {
 
 function InnerApp() {
   const { user, setUser, token } = useAuth();
+  const { showToast } = useToast();
   const [pokemonConfigs, setPokemonConfigs] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -183,14 +184,18 @@ function InnerApp() {
       setIsConnected(true);
     });
 
-    newSocket.on(EVENTS.GLOBAL_ANNOUNCEMENT, (data) => {
+    const handleAnnouncement = (data) => {
       if (data && data.message) {
         setGlobalAnnouncement(data.message);
+        // Also trigger a global toast for immediate visibility
+        showToast(data.message, 'info', 15000);
+        
         setTimeout(() => {
           setGlobalAnnouncement(prev => prev === data.message ? '' : prev);
         }, 15000);
       }
-    });
+    };
+    newSocket.on(EVENTS.GLOBAL_ANNOUNCEMENT, handleAnnouncement);
 
     // Live coin balance update using functional update
     newSocket.on(EVENTS.COIN_BALANCE_UPDATE, ({ balance }) => {
@@ -218,6 +223,8 @@ function InnerApp() {
 
     return () => {
       window.removeEventListener('message', handleWindowMessage);
+      newSocket.off(EVENTS.GLOBAL_ANNOUNCEMENT, handleAnnouncement);
+      newSocket.off(EVENTS.COIN_BALANCE_UPDATE);
       newSocket.disconnect(); 
     };
   }, [token]);

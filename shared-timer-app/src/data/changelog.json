@@ -1,5 +1,11 @@
 [
   {
+    "id": 38,
+    "version": "2.24.1",
+    "date": "2026-04-16",
+    "changes": "- **Esports Filtering**: Fixed Esports filtering crash by enforcing array type-safety in backend and frontend.\n- **Server Broadcast**: Resolved Server Broadcast failure by integrating announcements with the global Toast system.\n- **Polymarket UI**: Fixed Firefox loading spinner flicker in Polymarket page by prioritizing global state retention.\n- **Socket Stability**: Improved socket listener stability in App.jsx with mandatory cleanup routines."
+  },
+  {
     "id": 37,
     "version": "2.24.0",
     "date": "2026-04-16",

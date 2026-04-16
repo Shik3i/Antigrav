@@ -277,7 +277,7 @@ const PolymarketGeneral = () => {
             </div>
 
             {/* Content List */}
-            {loading ? (
+            {loading && bets.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {[1, 2, 3].map(i => (
                         <div key={i} className="glass-panel" style={{ height: '140px', opacity: 0.3, animation: 'pulse 2s infinite' }}></div>
