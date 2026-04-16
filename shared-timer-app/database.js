@@ -238,6 +238,19 @@ function initializeDatabaseSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_bets_userid ON Bets(userId);');
   db.run('CREATE INDEX IF NOT EXISTS idx_bets_status ON Bets(status);');
   db.run('CREATE INDEX IF NOT EXISTS idx_timer_user_completed ON TimerEvents(userId, completedAt DESC)');
+  // --- NavbarSettings ---
+  db.run(`CREATE TABLE IF NOT EXISTS NavbarSettings (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    path TEXT NOT NULL,
+    category TEXT DEFAULT 'Other',
+    isVisible BOOLEAN DEFAULT 1,
+    sortOrder INTEGER DEFAULT 0,
+    has_daily_badge BOOLEAN DEFAULT 0
+  )`, () => {
+    db.run("ALTER TABLE NavbarSettings ADD COLUMN has_daily_badge BOOLEAN DEFAULT 0", () => {});
+  });
+
   db.run('CREATE INDEX IF NOT EXISTS idx_navbar_visible_sort ON NavbarSettings(isVisible, sortOrder)');
   db.run('CREATE INDEX IF NOT EXISTS idx_navbar_sort ON NavbarSettings(sortOrder)');
   db.run('CREATE INDEX IF NOT EXISTS idx_esports_teams_name ON EsportsTeams(name)');
@@ -595,18 +608,7 @@ function initializeDatabaseSchema() {
     FOREIGN KEY(inventory_id) REFERENCES Idle_Inventory(id) ON DELETE SET NULL
   )`);
 
-  // --- NavbarSettings ---
-  db.run(`CREATE TABLE IF NOT EXISTS NavbarSettings (
-    key TEXT PRIMARY KEY,
-    label TEXT NOT NULL,
-    path TEXT NOT NULL,
-    category TEXT DEFAULT 'Other',
-    isVisible BOOLEAN DEFAULT 1,
-    sortOrder INTEGER DEFAULT 0,
-    has_daily_badge BOOLEAN DEFAULT 0
-  )`, () => {
-    db.run("ALTER TABLE NavbarSettings ADD COLUMN has_daily_badge BOOLEAN DEFAULT 0", () => {});
-    
+  // --- end NavbarSettings ---
     // Phase 20 Migration: Color Sync Tables
     db.run(`CREATE TABLE IF NOT EXISTS ColorSync_Scores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -759,7 +761,6 @@ function initializeDatabaseSchema() {
         db.run(`INSERT OR IGNORE INTO PokemonTypeColors (type_name, hex_color) VALUES (?, ?)`, [name, hex]);
       });
     });
-  });
 
   // ─── MMO Market Prices Table ──────────────────────────────────
   db.run(`CREATE TABLE IF NOT EXISTS MMO_MarketPrices (
