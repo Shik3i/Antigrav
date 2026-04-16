@@ -10,9 +10,9 @@ const BET_RESOLUTION_COOLDOWN = 10 * 60 * 1000;
 const FORCE_REFRESH_COOLDOWN = 60 * 1000;
 
 const NEWS_TTL = 15 * 60 * 1000;
-const SCHEDULE_TTL = 6 * 60 * 60 * 1000;
+const SCHEDULE_TTL = 60 * 60 * 1000;
 const TEAMS_TTL = 15 * 60 * 1000;
-const POLY_TTL = 10 * 60 * 1000;
+const POLY_TTL = 60 * 60 * 1000;
 const TWITCH_TTL = 60 * 1000;
 const CONFIG_TTL = 15 * 60 * 1000;
 const ERROR_COOLDOWN = 5 * 60 * 1000;
@@ -97,7 +97,8 @@ async function resolveCached(cache, fetcher, options = {}) {
         return {
             data: cache.data,
             changed: false,
-            source: 'cache'
+            source: 'cache',
+            timestamp: cache.timestamp
         };
     }
 
@@ -119,7 +120,8 @@ async function resolveCached(cache, fetcher, options = {}) {
             return {
                 data: cache.data,
                 changed,
-                source: 'network'
+                source: 'network',
+                timestamp: cache.timestamp
             };
         } catch (err) {
             markError(cache, err);
@@ -127,7 +129,8 @@ async function resolveCached(cache, fetcher, options = {}) {
                 return {
                     data: cache.data,
                     changed: false,
-                    source: 'stale'
+                    source: 'stale',
+                    timestamp: cache.timestamp
                 };
             }
             throw err;
@@ -439,7 +442,8 @@ async function getPolymarketOdds(options = {}) {
         return {
             data: cache.data,
             changed: false,
-            source: 'cache'
+            source: 'cache',
+            timestamp: cache.timestamp
         };
     }
 
@@ -474,7 +478,8 @@ async function getPolymarketOdds(options = {}) {
             return {
                 data: cache.data,
                 changed,
-                source: 'network'
+                source: 'network',
+                timestamp: cache.timestamp
             };
         } catch (err) {
             markError(cache, err);
@@ -482,7 +487,8 @@ async function getPolymarketOdds(options = {}) {
                 return {
                     data: cache.data,
                     changed: false,
-                    source: 'stale'
+                    source: 'stale',
+                    timestamp: cache.timestamp
                 };
             }
             throw err;

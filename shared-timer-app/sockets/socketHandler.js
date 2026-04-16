@@ -103,8 +103,11 @@ module.exports = function (io) {
 
         socket.on(EVENTS.GET_API_ESPORTS, async () => {
             try {
-                const data = await apiController.fetchEsportsData();
-                safeEmit(socket, EVENTS.API_ESPORTS_DATA, data);
+                const result = await apiDataService.getEsportsSchedule();
+                safeEmit(socket, EVENTS.API_ESPORTS_DATA, { 
+                    data: result.data, 
+                    timestamp: result.timestamp 
+                });
             } catch (err) {
                 console.error('Socket fetchEsportsData error:', err.message);
             }
@@ -148,10 +151,14 @@ module.exports = function (io) {
         socket.on(EVENTS.GET_API_ODDS, async (payload = {}) => {
             try {
                 const result = await apiDataService.getPolymarketOdds({ forceRefreshMatch: payload?.forceRefreshMatch || null });
+                const emission = { 
+                    data: result.data, 
+                    timestamp: result.timestamp 
+                };
                 if (payload?.forceRefreshMatch && result.changed) {
-                    safeEmit(io, EVENTS.API_ODDS_DATA, result.data);
+                    safeEmit(io, EVENTS.API_ODDS_DATA, emission);
                 } else {
-                    safeEmit(socket, EVENTS.API_ODDS_DATA, result.data);
+                    safeEmit(socket, EVENTS.API_ODDS_DATA, emission);
                 }
             } catch (err) {
                 console.error('Socket fetchPolymarketOddsData error:', err.message);

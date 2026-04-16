@@ -54,6 +54,7 @@ import { scheduleDeferred } from './utils/deferred';
 import { usePageVisibility } from './hooks/usePageVisibility';
 import { FloatingWidgetSkeleton, RouteSkeleton, WidgetPillSkeleton, ViewLoader } from './components/LoadingSkeletons';
 import { ToastProvider } from './context/ToastContext';
+import { PersistentDataProvider } from './context/PersistentDataContext';
 import ToastContainer from './components/ToastContainer';
 
 // Global styles for the app container
@@ -96,6 +97,11 @@ function formatTimerTitle(ms) {
   const seconds = totalSeconds % 60;
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
+
+const EsportsNotificationHandler = ({ selectedLeagues, socket, enabled }) => {
+  useEsportsNotifications(selectedLeagues, socket, { enabled });
+  return null;
+};
 
 function InnerApp() {
   const { user, setUser, token } = useAuth();
@@ -154,11 +160,9 @@ function InnerApp() {
     }
   }, [activeRoomId, globalSocket, navigate]);
 
-  // Esports live match notifications
-  const selectedLeagues = user.preferences?.esportsLeagues || DEFAULT_LEAGUES;
-  useEsportsNotifications(selectedLeagues, globalSocket, {
-    enabled: deferredFeaturesReady && selectedLeagues.length > 0
-  });
+  // Esports live match notifications configuration
+  const selectedLeagues = React.useMemo(() => user.preferences?.esportsLeagues || DEFAULT_LEAGUES, [user.preferences?.esportsLeagues]);
+  const esportsEnabled = deferredFeaturesReady && selectedLeagues.length > 0;
 
   useEffect(() => {
     return scheduleDeferred(() => setDeferredFeaturesReady(true), 1200);
@@ -462,6 +466,12 @@ function InnerApp() {
   return (
       <>
       <ToastContainer />
+      <PersistentDataProvider socket={globalSocket}>
+      <EsportsNotificationHandler 
+        selectedLeagues={selectedLeagues} 
+        socket={globalSocket} 
+        enabled={esportsEnabled} 
+      />
       <GlobalAudioController socket={globalSocket} roomState={roomState} />
       
       {/* Pokemon Background Layer */}
@@ -678,6 +688,7 @@ function InnerApp() {
           )}
         </div>
       </div>
+      </PersistentDataProvider>
       </>
   );
 }

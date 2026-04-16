@@ -1,5 +1,11 @@
 [
   {
+    "id": 37,
+    "version": "2.24.0",
+    "date": "2026-04-16",
+    "changes": "- **Esports Performance-Stabilisierung**: Implementierung einer robusten Lazy-Loading Cache-Architektur im Backend zur drastischen Reduzierung von API-Latenzen.\n- **Persistent Context**: Einführung des `PersistentDataContext` zur globalen Erhaltung von Esports- und Wett-Daten über alle Dashboard-Tabs hinweg (SPA).\n- **Cache Age Tracking**: Der \"Schedule Stand\" Zeitstempel basiert nun auf der tatsächlichen Cache-Erstellung im Server-RAM statt auf dem lokalen Empfangszeitpunkt.\n- **Over-Fetching Prevention**: Optimierung der Hintergrund-Synchronisation durch intelligentes Stale-While-Revalidate und Minimierung redundanter Socket-Events."
+  },
+  {
     "id": 36,
     "version": "2.23.0",
     "date": "2026-04-16",

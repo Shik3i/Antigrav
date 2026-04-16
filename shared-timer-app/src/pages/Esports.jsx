@@ -4,6 +4,7 @@ import { LEAGUE_COLORS } from '../hooks/useEsportsNotifications';
 import { useAuth } from '../context/AuthContext';
 import { usePageVisibility } from '../hooks/usePageVisibility';
 import { useToast } from '../context/ToastContext';
+import { usePersistentData } from '../context/PersistentDataContext';
 
 const INTERNATIONAL_EVENTS = [
     { name: 'First Stand 2026', start: new Date('2026-03-16T10:00:00Z'), end: new Date('2026-03-22T23:59:59Z'), location: 'São Paulo, Brazil' },
@@ -14,13 +15,17 @@ const INTERNATIONAL_EVENTS = [
 const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) => {
     const { token, user, setUser } = useAuth();
     const { showToast } = useToast();
-    const [matches, setMatches] = useState([]);
-    const [odds, setOdds] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const { 
+        esportsMatches: matches, 
+        esportsOdds: odds, 
+        esportsScheduleUpdatedAt: scheduleUpdatedAt,
+        esportsOddsUpdatedAt: oddsUpdatedAt,
+        loadingEsports: loading,
+        esportsError: error,
+        loadEsportsData
+    } = usePersistentData();
+
     const [now, setNow] = useState(new Date());
-    const [scheduleUpdatedAt, setScheduleUpdatedAt] = useState(null);
-    const [oddsUpdatedAt, setOddsUpdatedAt] = useState(null);
     const isVisible = usePageVisibility();
 
     const [bettingState, setBettingState] = useState(null);
@@ -35,56 +40,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
     }, [isVisible]);
 
     useEffect(() => {
-        if (!socket) return;
-
-        // Timeout if server doesn't respond
-        const timeout = setTimeout(() => {
-            setLoading(false);
-            if (matches.length === 0) setError('Could not load esports schedule. Please try refreshing.');
-        }, 10000);
-
-        let responses = 0;
-        const checkDone = () => {
-            responses++;
-            if (responses >= 2) {
-                setLoading(false);
-                clearTimeout(timeout);
-            }
-        };
-
-        const handleSchedule = (data) => {
-            setMatches(data || []);
-            setScheduleUpdatedAt(new Date());
-            checkDone();
-        };
-
-        const handleOdds = (data) => {
-            setOdds(data || []);
-            setOddsUpdatedAt(new Date());
-            checkDone();
-        };
-
-        socket.on('api_esports_data', handleSchedule);
-        socket.on('api_odds_data', handleOdds);
-
-        const requestData = () => {
-            socket.emit('get_api_esports');
-            socket.emit('get_api_odds');
-        };
-
-        if (socket.connected) {
-            requestData();
-        } else {
-            socket.on('connect', requestData);
-        }
-
-        return () => {
-            socket.off('api_esports_data', handleSchedule);
-            socket.off('api_odds_data', handleOdds);
-            socket.off('connect', requestData);
-            clearTimeout(timeout);
-        };
-    }, [socket]);
+        loadEsportsData();
+    }, [loadEsportsData]);
 
     const formatDate = (isoString) => {
         const date = new Date(isoString);

@@ -3,11 +3,16 @@ import axios from 'axios';
 import { Plus, Link as LinkIcon, ExternalLink, TrendingUp, Search, Calendar, Hash, Info, AlertTriangle, Users, ChevronDown, ChevronUp, Trash2, CheckCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import { useToast } from '../context/ToastContext';
+import { usePersistentData } from '../context/PersistentDataContext';
 
 const PolymarketGeneral = () => {
     const { showToast } = useToast();
-    const [bets, setBets] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { 
+        generalBets: bets, 
+        loadingGeneral: loading, 
+        loadGeneralBets,
+        setGeneralBets 
+    } = usePersistentData();
     const [error, setError] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState({ title: '', url: '' });
@@ -22,21 +27,10 @@ const PolymarketGeneral = () => {
     const [resovledAccordionOpen, setResolvedAccordionOpen] = useState(false);
     const [polymarketSettings, setPolymarketSettings] = useState({ allowUsersToAdd: false });
 
-    const fetchBets = async () => {
-        try {
-            setLoading(true);
-            const res = await axios.get('/api/polymarket/general');
-            setBets(res.data);
-            setLoading(false);
-        } catch (err) {
-            console.error('Failed to fetch general bets:', err);
-            setError('Gegebenenfalls konnten die Wetten nicht geladen werden.');
-            setLoading(false);
-        }
-    };
+    const fetchBets = () => loadGeneralBets(true);
 
     useEffect(() => {
-        fetchBets();
+        loadGeneralBets();
         fetchCurrentUser();
         fetchPolymarketSettings();
     }, []);
