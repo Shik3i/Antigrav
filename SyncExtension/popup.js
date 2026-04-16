@@ -268,13 +268,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderRoomPeers();
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && (changes.roomPeers || changes.extensionInstanceId || changes.targetTabId)) {
-            renderRoomPeers();
-            populateTabs();
-        }
-        if (area === 'local' && (changes.history || changes.roomPeers)) {
-            loadHistory();
-            renderLatestActivity();
+        if (area === 'local') {
+            if (changes.roomPeers || changes.extensionInstanceId || changes.targetTabId) {
+                renderRoomPeers();
+                populateTabs();
+            }
+            if (changes.history) {
+                loadHistory();
+                renderLatestActivity();
+            }
         }
     });
 
