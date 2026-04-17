@@ -93,9 +93,16 @@ export const AuthProvider = ({ children }) => {
             fetch('/api/auth/me', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-                .then(res => res.json())
+                .then(async (res) => {
+                    if (res.status === 401 || res.status === 403 || res.status === 404) {
+                        logout();
+                        return null;
+                    }
+
+                    return res.json();
+                })
                 .then(data => {
-                    if (data.id) {
+                    if (data?.id) {
                         setAuthUser(prev => {
                             // Preserve local preferences if needed, but merge backend overrides
                             const updated = { ...prev, ...data };

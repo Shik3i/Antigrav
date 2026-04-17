@@ -22,7 +22,16 @@ const calculateStats = (unit, slotId = null) => {
 };
 
 exports.syncIdleProgress = async (userId) => {
-    const profile = await dbLayer.getIdleProfile(userId);
+    let profile = await dbLayer.getIdleProfile(userId);
+    if (!profile) {
+        await dbLayer.createIdleProfile(userId);
+        profile = await dbLayer.getIdleProfile(userId);
+    }
+
+    if (!profile) {
+        throw new Error(`Idle profile could not be initialized for user ${userId}`);
+    }
+
     const roster = await dbLayer.getIdleRoster(userId);
     const now = new Date();
     const lastSync = profile.last_sync_at ? new Date(profile.last_sync_at) : now;

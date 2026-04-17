@@ -327,14 +327,8 @@ const authenticateToken = (req, res, next) => {
                     is_superadmin: user.is_superadmin === 1 || user.is_superadmin === true || decoded.is_superadmin === true
                 };
             } else {
-                // If user not in DB, but JWT is valid and has is_superadmin, trust it for admin session
-                console.warn('[AUTH] User not found in DB, using token payload:', decoded.userId || decoded.id);
-                req.user = {
-                    ...decoded,
-                    id: decoded.userId || decoded.id || 'admin_session',
-                    userId: decoded.userId || decoded.id || 'admin_session',
-                    is_superadmin: decoded.is_superadmin === true
-                };
+                console.warn('[AUTH] User not found in DB for token payload:', decoded.userId || decoded.id);
+                return res.status(401).json({ error: 'Session is no longer valid' });
             }
             next();
         } catch (err) {
@@ -368,11 +362,9 @@ const optionalAuthenticateToken = (req, res, next) => {
                         displayName: user.displayName,
                         is_superadmin: user.is_superadmin === 1 || user.is_superadmin === true
                     };
-                } else {
-                    req.user = { ...decoded, id: decoded.userId || decoded.id, userId: decoded.userId || decoded.id };
                 }
             } catch (dbErr) {
-                req.user = { ...decoded, id: decoded.userId || decoded.id, userId: decoded.userId || decoded.id };
+                console.warn('[AUTH] Optional auth DB lookup failed:', dbErr.message);
             }
         }
         next();

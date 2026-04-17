@@ -1,5 +1,11 @@
 [
   {
+    "id": 32,
+    "version": "2.19.2",
+    "date": "2026-04-17",
+    "changes": "- **Auth Session Guard**: JWT-Sessions ohne gültigen Datenbank-User werden jetzt sauber mit `401` beendet, statt als Phantom-Session weiterzulaufen.\n- **Auto Logout**: Der stille `/auth/me`-Refresh meldet Clients bei ungültigen oder veralteten Sessions automatisch ab.\n- **Idle-Game Stabilität**: Fehlende Idle-Profile werden beim Statusabruf initialisiert, um Folgefehler nach Neustarts oder DB-Wechseln zu vermeiden."
+  },
+  {
     "id": 31,
     "version": "2.19.1",
     "date": "2026-04-17",
