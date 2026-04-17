@@ -8,6 +8,7 @@ const TIMER_TAB_URLS = ["*://timer.shik3i.net/*", "http://localhost:3001/*", "*:
 
 // Bug 1 Fix: In-memory playback state cache so bridge.js heartbeats (which lack playbackState) never erase it
 let cachedPlaybackState = null;
+let lastBroadcastTime = 0;
 
 function addDevLog(message, type = 'info') {
     chrome.storage.local.get(['devModeEnabled', 'devLogs'], (data) => {
@@ -45,7 +46,16 @@ function broadcastToTimerTabs(message) {
     });
 }
 
-function announceLocalTabStatus() {
+function announceLocalTabStatus(force = false) {
+    const now = Date.now();
+    // Throttle automated broadcasts to prevent the infinite ping-pong loop (Fix 2 regression)
+    // Only allow if it's a manual action (force) or if 2 seconds have passed since last broadcast.
+    if (!force && (now - lastBroadcastTime) < 2000) {
+        addDevLog('Broadcasting status throttled (too frequent)', 'warn');
+        return;
+    }
+    lastBroadcastTime = now;
+
     chrome.storage.local.get(['targetTabId'], (storageData) => {
         const targetTabId = storageData.targetTabId;
         const playbackState = cachedPlaybackState;
@@ -246,7 +256,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Also handle TAB_SELECTION_CHANGED here so it is never accidentally skipped
     if (message.type === 'TAB_SELECTION_CHANGED') {
-        announceLocalTabStatus();
+        announceLocalTabStatus(true); // Force because user manually interacted
         return true;
     }
 
