@@ -2,7 +2,7 @@ export function getStoredValue(key, fallback = null) {
   try {
     const value = localStorage.getItem(key);
     return value ?? fallback;
-  } catch (error) {
+  } catch {
     return fallback;
   }
 }
@@ -14,7 +14,7 @@ export function setStoredValue(key, value) {
     } else {
       localStorage.setItem(key, value);
     }
-  } catch (error) {
+  } catch {
     // Ignore storage failures in private mode or restricted contexts.
   }
 }

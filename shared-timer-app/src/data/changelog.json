@@ -1,5 +1,11 @@
 [
   {
+    "id": 41,
+    "version": "2.25.1",
+    "date": "2026-04-17",
+    "changes": "- **Safe Cleanup**: Removed clearly unused icon imports and one unused state setter from the frontend.\n- **Null-Safety Cleanup**: Simplified unused `catch` parameters to `catch {}` in local utility code without changing behavior.\n- **Maintenance Release**: Kept existing debug logs intact while tightening a few low-risk cleanup spots."
+  },
+  {
     "id": 40,
     "version": "2.25.0",
     "date": "2026-04-17",

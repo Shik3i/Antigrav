@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Timer, Plus, Trash2, Globe, Eye, Lock, X, Maximize, Link as LinkIcon } from 'lucide-react';
+import { Timer, Plus, Trash2, Globe, Lock, X, Maximize, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Countdowns = ({ user }) => {

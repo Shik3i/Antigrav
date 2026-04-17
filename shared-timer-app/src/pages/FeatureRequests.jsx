@@ -26,7 +26,7 @@ const FeatureRequests = () => {
 
 
     // Guest Voting State
-    const [guestId, setGuestId] = useState(() => {
+    const [guestId] = useState(() => {
         let gid = localStorage.getItem('feature_guest_id');
         if (!gid) {
             gid = 'guest_' + Math.random().toString(36).substr(2, 9);

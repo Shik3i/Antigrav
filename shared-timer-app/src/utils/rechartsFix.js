@@ -15,7 +15,7 @@ export function applyRechartsStyleSheetFix() {
           return Array.from(sheets).filter((sheet) => {
             try {
               return !!sheet && !!sheet.cssRules;
-            } catch (error) {
+            } catch {
               return false;
             }
           });

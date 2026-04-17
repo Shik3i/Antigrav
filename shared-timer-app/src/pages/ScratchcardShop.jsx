@@ -2,18 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
     Trophy, 
-    Wallet, 
     Zap, 
     Info, 
     ChevronDown, 
     ChevronUp, 
     ShoppingBag, 
-    Coins,
     Sparkles,
-    AlertCircle,
     Volume2,
     VolumeX,
-    TrendingUp,
     Star
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
