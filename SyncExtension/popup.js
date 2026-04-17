@@ -130,16 +130,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             targetTabSelect.appendChild(option);
         });
 
+        // --- CRITICAL DESIGN RULE: NEVER AUTOMATICALLY CHANGE THE TARGET TAB ---
+        // We only highlight matches (isMatch). The user MUST choose manually.
+        // DO NOT add logic that sets targetTabSelect.value to anything other than 
+        // currentTargetTabId or 'none'.
         if (currentTargetTabId && currentTargetTabId !== 'none') {
             targetTabSelect.value = currentTargetTabId;
-        } else if (bestMatchId) {
-            targetTabSelect.value = bestMatchId;
-            chrome.storage.local.set({ targetTabId: bestMatchId });
-            statusDiv.innerText = "Smart Match Auto-Selected! ⭐";
-            statusDiv.style.color = '#fbbf24';
-            statusDiv.style.display = 'block';
-            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
-            announceTabStatus();
         } else {
             targetTabSelect.value = 'none';
         }
@@ -340,10 +336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const myState = info && info.videoState !== 'N/A' ? (info.videoState === 'Playing' ? 'playing' : 'paused') : null;
                     updateUI(myState);
                 }).catch((err) => {
-                    // Only log if it's NOT a common connection error, or if we want to be silent about background polling
-                    if (!err.message.includes('Receiving end does not exist')) {
-                        logToDev(`Popup Peer Render: ${err.message}`, 'warn');
-                    }
+                    logToDev(`Popup Peer Render: ${err.message}`, 'warn');
                     updateUI(null);
                 });
             } else {

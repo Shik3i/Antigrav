@@ -81,8 +81,9 @@ function sendHeartbeat() {
                 }, 1000);
             } else {
                 if (isContextValid()) {
-                    chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge heartbeat failed: ${err.message}`, logType: 'warn' }).catch(() => {});
+                    chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge heartbeat transient failure: ${err.message}`, logType: 'warn' }).catch(() => {});
                 }
+                // We do NOT clear the interval here as it might be a temporary context issue
             }
         });
 }

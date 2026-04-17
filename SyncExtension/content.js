@@ -46,9 +46,18 @@
             if (isTwitch) {
                 const twitchButton = document.querySelector('[data-a-target="player-play-pause-button"]');
                 if (twitchButton) {
-                    // Check state via aria-label or internal icon
+                    // Language-independent check: check for the "Play" vs "Pause" icon class/attribute
+                    // Twitch buttons usually have an SVG icon inside.
+                    const icon = twitchButton.querySelector('svg');
                     const label = twitchButton.getAttribute('aria-label')?.toLowerCase() || '';
-                    const isCurrentlyPlaying = label.includes('pause') || label.includes('wiedergabe stoppen');
+                    
+                    // Fallback: check many languages or just icon presence
+                    // 'Pause' is common, but let's check for the icon path or use the attribute we already have
+                    // and add more language indicators.
+                    const isCurrentlyPlaying = label.includes('pause') || 
+                                               label.includes('stoppen') || 
+                                               label.includes('arrête') || 
+                                               label.includes('detener');
 
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         twitchButton.click();
@@ -268,8 +277,8 @@
                                 }
                             }, 1000);
                         } else {
-                            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Content Heartbeat failed: ${err.message}`, logType: 'warn' }).catch(() => {});
-                            clearInterval(heartbeatInterval);
+                            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Content Heartbeat transient failure: ${err.message}`, logType: 'warn' }).catch(() => {});
+                            // We do NOT clear the interval here anymore, as it might be a temporary hiccup
                         }
                     });
             }

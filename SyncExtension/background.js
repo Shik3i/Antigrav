@@ -95,12 +95,24 @@ function announceLocalTabStatus(reason = 'broadcast') {
     });
 }
 
+let forceSyncUpdateQueue = Promise.resolve();
+
 function updateForceSyncState(timestamp, updater) {
     if (!timestamp) return;
 
-    chrome.storage.local.get(['forceSyncState'], (storageData) => {
-        const nextState = updater(storageData.forceSyncState || {});
-        chrome.storage.local.set({ forceSyncState: nextState });
+    // Use a queue to prevent race conditions during simultaneous storage updates (e.g. multiple ACKs)
+    forceSyncUpdateQueue = forceSyncUpdateQueue.then(() => {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['forceSyncState'], (storageData) => {
+                try {
+                    const nextState = updater(storageData.forceSyncState || {});
+                    chrome.storage.local.set({ forceSyncState: nextState }, resolve);
+                } catch (e) {
+                    addDevLog(`Error in forceSyncState updater: ${e.message}`, 'error');
+                    resolve();
+                }
+            });
+        });
     });
 }
 
@@ -215,6 +227,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Flag to keep the message channel open for async responses if needed
+    let isAsync = false;
 
     // Bug A Fix: HEARTBEAT handled FIRST, outside the INBOUND/OUTBOUND block.
     // Previously this check was inside that block and could never be reached because
@@ -531,7 +545,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendCommand();
             }
         });
+        isAsync = true;
     }
 
-    return;
+    return isAsync;
 });
