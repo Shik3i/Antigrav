@@ -6,7 +6,7 @@ import Timer from '../components/Timer';
 import ReactionBar from '../components/ReactionBar';
 import MemberPanel from '../components/MemberPanel';
 import PersonalCounter from '../components/PersonalCounter';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import ClockWidget from '../components/ClockWidget';
 import WeatherWidget from '../components/WeatherWidget';

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Database, Plus, Trash2, Save, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2, TrendingUp, LayoutDashboard, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];

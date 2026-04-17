@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 
 export function useSocketRoom(socket, { activeRoomId, activeToken, user, enabled = true }) {
     const [roomState, setRoomState] = useState(null);

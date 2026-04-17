@@ -1,5 +1,11 @@
 [
   {
+    "id": 40,
+    "version": "2.25.0",
+    "date": "2026-04-17",
+    "changes": "- **Codebase Cleanup & Archiving**: Unused database clones and temporary scripts safely moved to `/archive/` to declutter the root directory.\n- **SocketEvents Consolidation**: Replaced redundant `.js` files with a central `socketEvents.json` source of truth, resolving ESM/CJS build conflicts.\n- **Architecture Optimization**: Backend now caches socket events in RAM; Frontend utilizes path-aware JSON imports for improved Vite compatibility."
+  },
+  {
     "id": 39,
     "version": "2.24.2",
     "date": "2026-04-16",

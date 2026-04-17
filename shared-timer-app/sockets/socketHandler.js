@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken'); // used for secure invite links
 const dbLayer = require('../database');
 const roomManager = require('../roomManager');
-const EVENTS = require('../socketEvents');
+const EVENTS = require('../socketEvents.json');
 const sanitize = require('../sanitize');
 const apiController = require('../controllers/apiController');
 const apiDataService = require('../services/apiDataService');

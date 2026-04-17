@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 
 const PersistentDataContext = createContext();
 

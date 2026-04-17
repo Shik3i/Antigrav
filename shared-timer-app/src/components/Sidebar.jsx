@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History, Grid3X3, Shield } from 'lucide-react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
 import Avatar from './Avatar';
 import { fetchJson } from '../utils/apiClient';

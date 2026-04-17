@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Trash2, Eraser } from 'lucide-react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 
 const SharedCanvas = ({ roomState, socket }) => {
     const canvasRef = useRef(null);

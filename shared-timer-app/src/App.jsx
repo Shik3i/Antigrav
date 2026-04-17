@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
-import EVENTS from './socketEvents';
+import EVENTS from '../socketEvents.json';
 import Sidebar from './components/Sidebar';
 // Page imports
 const Home = React.lazy(() => import('./pages/Home'));

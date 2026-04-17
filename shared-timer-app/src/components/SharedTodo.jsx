@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CheckSquare, Square, Trash2, Plus } from 'lucide-react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 
 const SharedTodo = ({ roomState, socket }) => {
     const [newTodo, setNewTodo] = useState('');

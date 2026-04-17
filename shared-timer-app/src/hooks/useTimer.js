@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 
 export function useTimer(roomState, socket) {
     const [localRemainingMs, setLocalRemainingMs] = useState(0);

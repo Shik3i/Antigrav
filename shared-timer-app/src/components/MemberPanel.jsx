@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Link, X, Clock, Timer, History, Settings as SettingsIcon, Tv, Play, Pause, Plug, UserPlus, UserCheck, ChevronDown, Gamepad2, Swords, Coins } from 'lucide-react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import Avatar from './Avatar';
 import UserContextMenu from './UserContextMenu';
 import { fetchJson } from '../utils/apiClient';

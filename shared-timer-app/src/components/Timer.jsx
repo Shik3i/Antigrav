@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Play, Pause, RotateCcw, Repeat, StopCircle } from 'lucide-react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import { getNextPokemon } from '../utils/pokemonUtils';
 import { useAuth } from '../context/AuthContext';

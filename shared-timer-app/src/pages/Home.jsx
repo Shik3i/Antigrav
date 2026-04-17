@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Users, Clock, Plus, UserCheck } from 'lucide-react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import { generateRandomRoomName } from '../utils/randomNames';
 
 const Home = ({ user, globalSocket }) => {

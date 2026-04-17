@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, Check, X, Circle, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 
 const Friends = ({ socket, embedded }) => {
     const { user, isGuest } = useAuth();

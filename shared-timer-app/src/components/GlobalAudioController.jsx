@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import EVENTS from '../socketEvents';
+import EVENTS from '../../socketEvents.json';
 import { playAlarmSound, playPingSound } from '../utils/soundGenerator';
 import { useAuth } from '../context/AuthContext';
 
