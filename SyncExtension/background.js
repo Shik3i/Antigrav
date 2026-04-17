@@ -9,6 +9,9 @@ const TIMER_TAB_URLS = ["*://timer.shik3i.net/*", "http://localhost:3001/*", "*:
 // Bug 1 Fix: In-memory playback state cache so bridge.js heartbeats (which lack playbackState) never erase it
 let cachedPlaybackState = null;
 
+// Traffic Optimization: Cooldown for status broadcasts to prevent noise/bursts
+let lastStatusBroadcastTime = 0;
+
 function addDevLog(message, type = 'info') {
     chrome.storage.local.get(['devModeEnabled', 'devLogs'], (data) => {
         if (data.devModeEnabled !== true) return;
@@ -53,6 +56,17 @@ function broadcastToTimerTabs(message) {
 }
 
 function announceLocalTabStatus(reason = 'broadcast') {
+    const now = Date.now();
+    const cooldown = reason === 'broadcast' ? 500 : 2000;
+    
+    if (now - lastStatusBroadcastTime < cooldown) {
+        // Only log if it's a broadcast that was throttled, heartbeats can be silent
+        if (reason === 'broadcast') {
+            addDevLog(`Status broadcast throttled (${reason})`, 'info');
+        }
+        return;
+    }
+
     chrome.storage.local.get(['targetTabId'], (storageData) => {
         const targetTabId = storageData.targetTabId;
         const playbackState = cachedPlaybackState;
@@ -89,6 +103,7 @@ function announceLocalTabStatus(reason = 'broadcast') {
                 const tabTitle = tab.title ? tab.title.substring(0, 30) : null;
                 const payload = createPayload(tabTitle, !!tabTitle);
                 addDevLog(`OUTBOUND: Status (${reason}) - ${tabTitle || 'No Title'}`, 'success');
+                lastStatusBroadcastTime = Date.now();
                 broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
             });
         });
@@ -152,7 +167,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'extension-tab-status-heartbeat') {
-        announceLocalTabStatus();
+        announceLocalTabStatus('response');
         updateBadgeStatus();
         pruneRoomPeers(); // Periodically clean up old peers
     }
@@ -240,15 +255,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 cachedPlaybackState = message.playbackState;
                 // Write to storage so popup.js changes.localPlaybackState listener fires
                 chrome.storage.local.set({ localPlaybackState: message.playbackState });
-                announceLocalTabStatus();
+                announceLocalTabStatus('response');
             }
         } else if (message.source === 'bridge') {
-            addDevLog(`Heartbeat (bridge): triggering status broadcast`, 'info');
-            // Fix 1: Bridge heartbeat (every 15s) was always intended to trigger a status
-            // broadcast — bridge.js even says so in its comment. The handler was dead code
-            // before (Bug A fix) and then ignored for bridge source. Now we use it to keep
-            // roomPeers on all peers fresh every 15 seconds.
-            announceLocalTabStatus();
+            addDevLog(`Heartbeat (bridge): triggering quiet status update`, 'info');
+            announceLocalTabStatus('response');
         }
     }
 
