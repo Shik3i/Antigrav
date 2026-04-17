@@ -33,24 +33,40 @@ window.addEventListener('message', (event) => {
         return;
     }
 
-    // New Generic Pipe: React App -> Extension (Inbound to Extension)
-    if (event.data.type === 'EXTENSION_INBOUND' && event.data.payload) {
-        if (!isContextValid()) return; // Extension was reloaded, silently drop
+// New Generic Pipe: React App -> Extension (Inbound to Extension)
+if (event.data.type === 'EXTENSION_INBOUND' && event.data.payload) {
+    if (!isContextValid()) return; 
+    try {
         chrome.runtime.sendMessage({
             source: 'timer_website',
             type: 'EXTENSION_INBOUND',
             payload: event.data.payload,
             senderName: event.data.senderName || null
         }).catch(err => console.debug('Bridge could not reach background worker:', err.message));
+    } catch (e) {
+        console.debug('Bridge: Context invalidated during sendMessage');
     }
+}
 });
 
 // Proactively announce presence to the React App as soon as bridge.js is loaded
 setTimeout(() => {
-    if (isContextValid()) {
-        window.postMessage({ action: 'EXTENSION_PONG' }, window.location.origin);
-    }
+if (isContextValid()) {
+    window.postMessage({ action: 'EXTENSION_PONG' }, window.location.origin);
+}
 }, 100);
+
+// HEARTBEAT: Send a ping to background.js every 15 seconds to keep it alive
+// and trigger a tab status broadcast.
+setInterval(() => {
+if (isContextValid()) {
+    try {
+        chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'bridge' }).catch(() => {});
+    } catch (e) {
+        // Context lost
+    }
+}
+}, 15000);
 
 // Listen for reverse messages from the Extension generic pipe
 // and forward them to the React Website so it can sync the room.

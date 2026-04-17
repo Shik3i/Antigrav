@@ -3,6 +3,8 @@ import { Trophy, CalendarClock, Globe, TrendingUp, ExternalLink, Timer, Star } f
 import { LEAGUE_COLORS } from '../hooks/useEsportsNotifications';
 import { useAuth } from '../context/AuthContext';
 import { usePageVisibility } from '../hooks/usePageVisibility';
+import { useToast } from '../context/ToastContext';
+import { usePersistentData } from '../context/PersistentDataContext';
 
 const INTERNATIONAL_EVENTS = [
     { name: 'First Stand 2026', start: new Date('2026-03-16T10:00:00Z'), end: new Date('2026-03-22T23:59:59Z'), location: 'São Paulo, Brazil' },
@@ -12,18 +14,22 @@ const INTERNATIONAL_EVENTS = [
 
 const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) => {
     const { token, user, setUser } = useAuth();
-    const [matches, setMatches] = useState([]);
-    const [odds, setOdds] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const { showToast } = useToast();
+    const { 
+        esportsMatches: matches, 
+        esportsOdds: odds, 
+        esportsScheduleUpdatedAt: scheduleUpdatedAt,
+        esportsOddsUpdatedAt: oddsUpdatedAt,
+        loadingEsports: loading,
+        esportsError: error,
+        loadEsportsData
+    } = usePersistentData();
+
     const [now, setNow] = useState(new Date());
-    const [scheduleUpdatedAt, setScheduleUpdatedAt] = useState(null);
-    const [oddsUpdatedAt, setOddsUpdatedAt] = useState(null);
     const isVisible = usePageVisibility();
 
     const [bettingState, setBettingState] = useState(null);
     const [isPlacingBet, setIsPlacingBet] = useState(false);
-    const [betMessage, setBetMessage] = useState(null);
 
     const favoriteTeams = user?.preferences?.favoriteTeams || [];
     const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
@@ -34,56 +40,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
     }, [isVisible]);
 
     useEffect(() => {
-        if (!socket) return;
-
-        // Timeout if server doesn't respond
-        const timeout = setTimeout(() => {
-            setLoading(false);
-            if (matches.length === 0) setError('Could not load esports schedule. Please try refreshing.');
-        }, 10000);
-
-        let responses = 0;
-        const checkDone = () => {
-            responses++;
-            if (responses >= 2) {
-                setLoading(false);
-                clearTimeout(timeout);
-            }
-        };
-
-        const handleSchedule = (data) => {
-            setMatches(data || []);
-            setScheduleUpdatedAt(new Date());
-            checkDone();
-        };
-
-        const handleOdds = (data) => {
-            setOdds(data || []);
-            setOddsUpdatedAt(new Date());
-            checkDone();
-        };
-
-        socket.on('api_esports_data', handleSchedule);
-        socket.on('api_odds_data', handleOdds);
-
-        const requestData = () => {
-            socket.emit('get_api_esports');
-            socket.emit('get_api_odds');
-        };
-
-        if (socket.connected) {
-            requestData();
-        } else {
-            socket.on('connect', requestData);
-        }
-
-        return () => {
-            socket.off('api_esports_data', handleSchedule);
-            socket.off('api_odds_data', handleOdds);
-            socket.off('connect', requestData);
-            clearTimeout(timeout);
-        };
-    }, [socket]);
+        loadEsportsData();
+    }, [loadEsportsData]);
 
     const formatDate = (isoString) => {
         const date = new Date(isoString);
@@ -191,16 +149,43 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
 
         for (const odd of odds) {
             const slug = (odd.slug || '').toLowerCase();
-            const hasT1 = slug.includes(t1Poly);
-            const hasT2 = slug.includes(t2Poly);
-            if (!hasT1 || !hasT2) continue;
+            const title = (odd.title || '').toLowerCase();
+            
+            const p1 = `${t1Poly}-${t2Poly}`;
+            const p2 = `${t2Poly}-${t1Poly}`;
+
+            const matchesPermutations = slug.includes(p1) || slug.includes(p2) || title.includes(p1) || title.includes(p2);
+            const hasT1 = slug.includes(t1Poly) || slug.includes(match.team1.name?.toLowerCase().replace(/\s+/g, '-'));
+            const hasT2 = slug.includes(t2Poly) || slug.includes(match.team2.name?.toLowerCase().replace(/\s+/g, '-'));
+            
+            // Fuzzy match outcomes to team names/codes to definitively link them
+            let matchedOutcomes = false;
+            if (odd.outcomes && odd.outcomes.length >= 2) {
+                const normalize = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const o0 = normalize(odd.outcomes[0].name);
+                const o1 = normalize(odd.outcomes[1].name);
+                
+                const t1Ids = [match.team1.code, match.team1.name, t1Poly].map(normalize).filter(Boolean);
+                const t2Ids = [match.team2.code, match.team2.name, t2Poly].map(normalize).filter(Boolean);
+                
+                const o0MatchesT1 = t1Ids.some(id => o0.includes(id) || id.includes(o0));
+                const o0MatchesT2 = t2Ids.some(id => o0.includes(id) || id.includes(o0));
+                const o1MatchesT1 = t1Ids.some(id => o1.includes(id) || id.includes(o1));
+                const o1MatchesT2 = t2Ids.some(id => o1.includes(id) || id.includes(o1));
+                
+                if ((o0MatchesT1 && o1MatchesT2) || (o0MatchesT2 && o1MatchesT1)) matchedOutcomes = true;
+            }
+
+            if (!matchesPermutations && !(hasT1 && hasT2) && !matchedOutcomes) {
+                continue;
+            }
 
             // Extract date from slug (format: lol-team1-team2-YYYY-MM-DD)
             const dateMatch = slug.match(/(\d{4}-\d{2}-\d{2})/);
             if (dateMatch) {
                 const slugDate = new Date(dateMatch[1] + 'T00:00:00Z');
                 const diffDays = Math.abs(matchDate - slugDate) / (1000 * 60 * 60 * 24);
-                if (diffDays > 1.5) continue; // Skip slugs from different days
+                if (diffDays > 1.5) continue;
             }
             return odd;
         }
@@ -269,7 +254,6 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
         if (stakeCents <= 0) return;
 
         setIsPlacingBet(true);
-        setBetMessage(null);
         try {
             const res = await fetch('/api/esports/bets', {
                 method: 'POST',
@@ -292,17 +276,13 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to place bet');
-            setBetMessage({ type: 'success', text: 'Wette erfolgreich platziert!' });
+            showToast('Wette erfolgreich platziert!', 'success');
             
             if (user && setUser) {
                 setUser({ ...user, koala_balance: (user.koala_balance || 0) - stakeCents });
             }
-            setTimeout(() => {
-                setBettingState(null);
-                setBetMessage(null);
-            }, 3000);
         } catch (err) {
-            setBetMessage({ type: 'error', text: err.message });
+            showToast(err.message, 'error');
         } finally {
             setIsPlacingBet(false);
         }
@@ -315,15 +295,6 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                     <Trophy size={32} color="var(--accent-primary)" />
                     <h1 style={{ margin: 0, fontSize: '2.5rem' }}>LoL Esports</h1>
                 </div>
-                {user && (
-                    <button 
-                        className="btn-primary" 
-                        style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none' }}
-                        onClick={() => window.location.href = '/global-bets'}
-                    >
-                        <TrendingUp size={18} /> Community Bets
-                    </button>
-                )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
@@ -448,7 +419,7 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
 
             {!loading && !error && filteredMatches.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {filteredMatches.map(match => {
+                    {filteredMatches.map((match, index) => {
                         const leagueColor = getLeagueColor(match.league);
                         const matchOdds = findOddsForMatch(match);
                         let t1Outcome = matchOdds ? matchOdds.outcomes[0] : null;
@@ -499,6 +470,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                      forceRefreshMatch: {
                                                          team1: match.team1.code,
                                                          team2: match.team2.code,
+                                                         team1Name: match.team1.name,
+                                                         team2Name: match.team2.name,
                                                          startTime: match.startTime
                                                      } 
                                                  });
@@ -574,7 +547,7 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                 <div className="esports-match-teams">
                                     <div className="esports-team">
                                         <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                            {match.team1.image ? <img src={forceHttps(match.team1.image)} alt={match.team1.code} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
+                                            {match.team1.image ? <img src={forceHttps(match.team1.image)} alt={match.team1.code} width="48" height="48" loading={index < 2 ? "eager" : "lazy"} fetchpriority={index === 0 ? "high" : "auto"} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
                                         </div>
                                         <div style={{ minWidth: 0, overflow: 'hidden' }}>
                                             <div className="esports-team-name" title={match.team1.name}>{match.team1.name}</div>
@@ -598,7 +571,7 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                             )}
                                         </div>
                                         <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                            {match.team2.image ? <img src={forceHttps(match.team2.image)} alt={match.team2.code} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
+                                            {match.team2.image ? <img src={forceHttps(match.team2.image)} alt={match.team2.code} width="48" height="48" loading={index < 2 ? "eager" : "lazy"} fetchpriority={index === 0 ? "high" : "auto"} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Trophy size={24} color="var(--text-muted)" />}
                                         </div>
                                     </div>
                                 </div>
@@ -646,6 +619,8 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                                     forceRefreshMatch: {
                                                                         team1: match.team1.code,
                                                                         team2: match.team2.code,
+                                                                        team1Name: match.team1.name,
+                                                                        team2Name: match.team2.name,
                                                                         startTime: match.startTime
                                                                     } 
                                                                 });
@@ -766,14 +741,10 @@ const Esports = ({ selectedLeagues = ['LCK', 'LEC', 'Prime League'], socket }) =
                                                                 </div>
                                                             </div>
 
-                                                            {betMessage && (
-                                                                <div style={{ marginTop: '12px', padding: '8px', borderRadius: '6px', fontSize: '0.85rem', background: betMessage.type === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)', color: betMessage.type === 'error' ? '#ef4444' : '#10b981' }}>
-                                                                    {betMessage.text}
-                                                                </div>
-                                                            )}
+
 
                                                             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                                                <button className="btn-ghost" onClick={() => { setBettingState(null); setBetMessage(null); }}>Abbrechen</button>
+                                                                <button className="btn-ghost" onClick={() => { setBettingState(null); }}>Abbrechen</button>
                                                                 <button className="btn-primary" onClick={handlePlaceBet} disabled={
                                                                     isPlacingBet || 
                                                                     !bettingState.stakeInput ||

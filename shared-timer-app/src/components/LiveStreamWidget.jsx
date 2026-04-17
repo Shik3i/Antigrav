@@ -27,7 +27,8 @@ const LiveStreamWidget = () => {
         { id: 'tolkin', name: 'Tolkin' },
         { id: 'lec', name: 'LEC' },
         { id: 'lck', name: 'LCK' },
-        { id: 'riotgames', name: 'Riot Games' }
+        { id: 'riotgames', name: 'Riot Games' },
+        { id: 'primeleague', name: 'Prime League' }
     ];
 
     const fetchStatus = async () => {
@@ -137,7 +138,10 @@ const LiveStreamWidget = () => {
     };
 
     const getStatusFor = (id) => channelStatus.find(s => s.user_login.toLowerCase() === id.toLowerCase());
-    const liveCount = channelStatus.filter(s => s.is_live).length;
+    const liveCount = channels.filter(ch => {
+        const s = getStatusFor(ch.id);
+        return s && s.is_live;
+    }).length;
 
     if (!showWidget) return null;
 
@@ -147,6 +151,7 @@ const LiveStreamWidget = () => {
             <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="glass-card animate-fade-in stream-trigger"
+                aria-label="Stream umschalten"
                 style={{
                     position: 'fixed',
                     bottom: '80px',
@@ -293,10 +298,20 @@ const LiveStreamWidget = () => {
                             {!isMinimized && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{activeChannel}</span>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => setIsMinimized(!isMinimized)}>
+                            <button 
+                                className="btn-ghost" 
+                                style={{ padding: '4px' }} 
+                                onClick={() => setIsMinimized(!isMinimized)}
+                                aria-label={isMinimized ? "Fenster vergrößern" : "Fenster minimieren"}
+                            >
                                 {isMinimized ? <Maximize2 size={14} color="var(--text-muted)" /> : <Minimize2 size={14} color="var(--text-muted)" />}
                             </button>
-                            <button className="btn-ghost" style={{ padding: '4px' }} onClick={() => setIsPlayerOpen(false)}>
+                            <button 
+                                className="btn-ghost" 
+                                style={{ padding: '4px' }} 
+                                onClick={() => setIsPlayerOpen(false)}
+                                aria-label="Stream schließen"
+                            >
                                 <X size={14} color="#ef4444" />
                             </button>
                         </div>

@@ -238,6 +238,19 @@ function initializeDatabaseSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_bets_userid ON Bets(userId);');
   db.run('CREATE INDEX IF NOT EXISTS idx_bets_status ON Bets(status);');
   db.run('CREATE INDEX IF NOT EXISTS idx_timer_user_completed ON TimerEvents(userId, completedAt DESC)');
+  // --- NavbarSettings ---
+  db.run(`CREATE TABLE IF NOT EXISTS NavbarSettings (
+    key TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    path TEXT NOT NULL,
+    category TEXT DEFAULT 'Other',
+    isVisible BOOLEAN DEFAULT 1,
+    sortOrder INTEGER DEFAULT 0,
+    has_daily_badge BOOLEAN DEFAULT 0
+  )`, () => {
+    db.run("ALTER TABLE NavbarSettings ADD COLUMN has_daily_badge BOOLEAN DEFAULT 0", () => {});
+  });
+
   db.run('CREATE INDEX IF NOT EXISTS idx_navbar_visible_sort ON NavbarSettings(isVisible, sortOrder)');
   db.run('CREATE INDEX IF NOT EXISTS idx_navbar_sort ON NavbarSettings(sortOrder)');
   db.run('CREATE INDEX IF NOT EXISTS idx_esports_teams_name ON EsportsTeams(name)');
@@ -595,15 +608,7 @@ function initializeDatabaseSchema() {
     FOREIGN KEY(inventory_id) REFERENCES Idle_Inventory(id) ON DELETE SET NULL
   )`);
 
-  // --- NavbarSettings ---
-  db.run(`CREATE TABLE IF NOT EXISTS NavbarSettings (
-    key TEXT PRIMARY KEY,
-    label TEXT NOT NULL,
-    path TEXT NOT NULL,
-    category TEXT DEFAULT 'Other',
-    isVisible BOOLEAN DEFAULT 1,
-    sortOrder INTEGER DEFAULT 0
-  )`, () => {
+  // --- end NavbarSettings ---
     // Phase 20 Migration: Color Sync Tables
     db.run(`CREATE TABLE IF NOT EXISTS ColorSync_Scores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -687,7 +692,7 @@ function initializeDatabaseSchema() {
             VALUES ('admin', 'Admin Panel', '/admin', 'System', 1, 4)`);
     
     // Fix: Feature Roadmap path (was /roadmap, should be /features)
-    db.run("UPDATE NavbarSettings SET path = '/features' WHERE key = 'roadmap'");
+    // Removed because it overrides persistence: db.run("UPDATE NavbarSettings SET path = '/features' WHERE key = 'roadmap'");
 
     // LoL Idle Game Link
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
@@ -696,15 +701,15 @@ function initializeDatabaseSchema() {
     // Shift other games to make room for 1.5 (or just use REAL if SQLite allows, but it's INTEGER)
     // Actually, SQLite INTEGER can store REAL if needed, but let's be clean.
     // I'll update the sortOrder of existing ones.
-    db.run("UPDATE NavbarSettings SET sortOrder = 3 WHERE key = 'scratch-cards' AND category = 'Games'");
-    db.run("UPDATE NavbarSettings SET sortOrder = 4 WHERE key = 'rift-defense' AND category = 'Games'");
-    db.run("UPDATE NavbarSettings SET sortOrder = 5 WHERE key = 'game-leaderboards' AND category = 'Games'");
-    db.run("UPDATE NavbarSettings SET sortOrder = 2 WHERE key = 'lol-idle' AND category = 'Games'");
+    // Removed because it overrides persistence: db.run("UPDATE NavbarSettings SET sortOrder = 3 WHERE key = 'scratch-cards' AND category = 'Games'");
+    // Removed because it overrides persistence: db.run("UPDATE NavbarSettings SET sortOrder = 4 WHERE key = 'rift-defense' AND category = 'Games'");
+    // Removed because it overrides persistence: db.run("UPDATE NavbarSettings SET sortOrder = 5 WHERE key = 'game-leaderboards' AND category = 'Games'");
+    // Removed because it overrides persistence: db.run("UPDATE NavbarSettings SET sortOrder = 2 WHERE key = 'lol-idle' AND category = 'Games'");
 
     // Color Sync Link
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
             VALUES ('colorsync', 'Color Sync', '/color-sync', 'Games', 1, 6)`);
-    db.run("UPDATE NavbarSettings SET sortOrder = 6 WHERE key = 'colorsync' AND category = 'Games'");
+    // Removed because it overrides persistence: db.run("UPDATE NavbarSettings SET sortOrder = 6 WHERE key = 'colorsync' AND category = 'Games'");
 
     // Leveling Tracker Link
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
@@ -756,7 +761,6 @@ function initializeDatabaseSchema() {
         db.run(`INSERT OR IGNORE INTO PokemonTypeColors (type_name, hex_color) VALUES (?, ?)`, [name, hex]);
       });
     });
-  });
 
   // ─── MMO Market Prices Table ──────────────────────────────────
   db.run(`CREATE TABLE IF NOT EXISTS MMO_MarketPrices (
@@ -3539,8 +3543,8 @@ module.exports = {
 
         settings.forEach(item => {
           db.run(
-            'UPDATE NavbarSettings SET isVisible = ?, sortOrder = ? WHERE key = ?',
-            [item.isVisible ? 1 : 0, item.sortOrder, item.key],
+            'UPDATE NavbarSettings SET isVisible = ?, sortOrder = ?, label = ?, category = ?, has_daily_badge = ? WHERE key = ?',
+            [item.isVisible ? 1 : 0, item.sortOrder, item.label, item.category, item.has_daily_badge ? 1 : 0, item.key],
             (err) => {
               if (err) hasError = true;
               completed++;

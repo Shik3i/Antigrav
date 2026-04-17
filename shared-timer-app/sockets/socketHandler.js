@@ -103,10 +103,14 @@ module.exports = function (io) {
 
         socket.on(EVENTS.GET_API_ESPORTS, async () => {
             try {
-                const data = await apiController.fetchEsportsData();
-                safeEmit(socket, EVENTS.API_ESPORTS_DATA, data);
+                const result = await apiDataService.getEsportsSchedule();
+                safeEmit(socket, EVENTS.API_ESPORTS_DATA, { 
+                    data: Array.isArray(result?.data) ? result.data : [], 
+                    timestamp: result?.timestamp || Date.now()
+                });
             } catch (err) {
                 console.error('Socket fetchEsportsData error:', err.message);
+                safeEmit(socket, EVENTS.API_ESPORTS_DATA, { data: [], timestamp: Date.now(), error: err.message });
             }
         });
 
@@ -148,14 +152,19 @@ module.exports = function (io) {
         socket.on(EVENTS.GET_API_ODDS, async (payload = {}) => {
             try {
                 const result = await apiDataService.getPolymarketOdds({ forceRefreshMatch: payload?.forceRefreshMatch || null });
+                const emission = { 
+                    data: Array.isArray(result?.data) ? result.data : [], 
+                    timestamp: result?.timestamp || Date.now()
+                };
                 if (payload?.forceRefreshMatch && result.changed) {
-                    safeEmit(io, EVENTS.API_ODDS_DATA, result.data);
+                    safeEmit(io, EVENTS.API_ODDS_DATA, emission);
                 } else {
-                    safeEmit(socket, EVENTS.API_ODDS_DATA, result.data);
+                    safeEmit(socket, EVENTS.API_ODDS_DATA, emission);
                 }
             } catch (err) {
                 console.error('Socket fetchPolymarketOddsData error:', err.message);
                 dbLayer.logError('Socket fetchPolymarketOddsData error', err.stack);
+                safeEmit(socket, EVENTS.API_ODDS_DATA, { data: [], timestamp: Date.now(), error: err.message });
             }
         });
 

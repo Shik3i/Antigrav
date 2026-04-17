@@ -101,6 +101,10 @@ exports.getStatus = async (req, res) => {
         });
 
     } catch (err) {
+        // Skip log for unauthorized fetches (redundant since middleware handles most)
+        if (err.message && (err.message.includes('401') || err.message.includes('Unauthorized'))) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
         console.error('Error fetching achievement status:', err);
         res.status(500).json({ error: 'Failed to fetch achievements' });
     }

@@ -47,7 +47,7 @@ const findTeamLogo = (name, teams) => {
     return team ? forceHttps(team.image) : null;
 };
 
-const MatchGroup = React.memo(({ group, isUpcoming, teams }) => {
+const MatchGroup = React.memo(({ group, isUpcoming, teams, priority = false }) => {
     const [t1Error, setT1Error] = useState(false);
     const [t2Error, setT2Error] = useState(false);
     
@@ -104,8 +104,11 @@ const MatchGroup = React.memo(({ group, isUpcoming, teams }) => {
                                 <img 
                                     src={t1Logo} 
                                     alt={t1Name} 
+                                    width="40"
+                                    height="40"
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                                    loading="lazy" 
+                                    loading={priority ? "eager" : "lazy"} 
+                                    fetchpriority={priority ? "high" : "auto"}
                                     onError={() => setT1Error(true)}
                                 />
                             ) : (
@@ -124,8 +127,11 @@ const MatchGroup = React.memo(({ group, isUpcoming, teams }) => {
                                 <img 
                                     src={t2Logo} 
                                     alt={t2Name} 
+                                    width="40"
+                                    height="40"
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                                    loading="lazy" 
+                                    loading={priority ? "eager" : "lazy"} 
+                                    fetchpriority={priority ? "high" : "auto"}
                                     onError={() => setT2Error(true)}
                                 />
                             ) : (
@@ -384,7 +390,7 @@ const GlobalBets = () => {
                         No upcoming bets at the moment.
                     </div>
                 ) : (
-                    groupedUpcoming.map(group => <MatchGroup key={group.name + group.date} group={group} isUpcoming={true} teams={teams} />)
+                    groupedUpcoming.map((group, idx) => <MatchGroup key={group.name + group.date} group={group} isUpcoming={true} teams={teams} priority={idx === 0} />)
                 )}
             </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import { usePageVisibility } from './usePageVisibility';
+import { usePersistentData } from '../context/PersistentDataContext';
 
 const LEAGUE_COLORS = {
     'LCK': '#ef4444',
@@ -26,39 +27,53 @@ const matchesLeague = (leagueName, toggleId) => {
 };
 
 /**
- * Fetches /api/esports once on mount and then every hour to get the schedule.
- * Locally checks every 60 seconds if a match from a selected league
- * has started (by comparing startTime to Date.now()).
+ * Monitors esports schedule. 
  * Fires a browser notification + chime when a match goes live.
+ * Avoids redundant fetching if context data is already fresh.
  */
 const useEsportsNotifications = (selectedLeagues, socket, options = {}) => {
     const { enabled = true } = options;
     const notifiedRef = useRef(new Set());
-    const [schedule, setSchedule] = useState([]);
     const isVisible = usePageVisibility();
+    
+    const { 
+        esportsMatches: schedule, 
+        esportsLoaded,
+        esportsScheduleUpdatedAt,
+        loadEsportsData 
+    } = usePersistentData();
 
-    // Fetch schedule from API — once on mount, then hourly
+    // Background sync check — run on mount and then periodically
+    // But ONLY fetch if data is missing or older than 55 minutes
     useEffect(() => {
         if (!enabled || !selectedLeagues || selectedLeagues.length === 0 || !socket) return;
 
-        const handleData = (data) => setSchedule(data || []);
-        socket.on('api_esports_data', handleData);
+        const checkAndFetch = () => {
+            if (!socket.connected) return;
 
-        const fetchSchedule = () => {
-            if (socket.connected) socket.emit('get_api_esports');
+            const now = Date.now();
+            const lastUpdate = esportsScheduleUpdatedAt ? new Date(esportsScheduleUpdatedAt).getTime() : 0;
+            const ageMs = now - lastUpdate;
+            const needsFetch = !esportsLoaded || ageMs > 55 * 60 * 1000;
+
+            if (needsFetch) {
+                console.log('[EsportsNotifications] Schedule stale or missing, requesting update...');
+                loadEsportsData();
+            }
         };
 
-        fetchSchedule();
-        const fetchInterval = setInterval(fetchSchedule, isVisible ? 60 * 60 * 1000 : 3 * 60 * 60 * 1000);
-        return () => {
-            socket.off('api_esports_data', handleData);
-            clearInterval(fetchInterval);
-        };
-    }, [enabled, isVisible, selectedLeagues, socket]);
+        // Initial check
+        checkAndFetch();
+
+        // Check every 5 minutes in background (passive)
+        const fetchInterval = setInterval(checkAndFetch, 5 * 60 * 1000);
+        
+        return () => clearInterval(fetchInterval);
+    }, [enabled, selectedLeagues, socket, esportsLoaded, esportsScheduleUpdatedAt, loadEsportsData]);
 
     // Local time check — every 60 seconds, compare startTime to now
     useEffect(() => {
-        if (!enabled || !selectedLeagues || selectedLeagues.length === 0 || schedule.length === 0) return;
+        if (!enabled || !selectedLeagues || selectedLeagues.length === 0 || !schedule || schedule.length === 0) return;
 
         const checkMatches = () => {
             const now = Date.now();
@@ -69,7 +84,6 @@ const useEsportsNotifications = (selectedLeagues, socket, options = {}) => {
 
                 const matchTime = new Date(match.startTime).getTime();
                 // Trigger if match should have started within the last 2 minutes
-                // (covers the 60s polling window + some buffer)
                 if (matchTime <= now && matchTime > now - 2 * 60 * 1000) {
                     notifiedRef.current.add(match.id);
 

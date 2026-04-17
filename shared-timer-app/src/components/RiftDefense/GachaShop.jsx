@@ -263,7 +263,7 @@ const GachaShop = ({ onPurchase }) => {
                         {lastDraw.rarityTier >= 8 ? 'LEGENDÄR' : lastDraw.rarityTier >= 5 ? 'EPISCH' : 'SELTEN'} UNLOCKED
                     </div>
                     {lastDraw.image ? (
-                        <img src={lastDraw.image} alt="" style={styles.resultLogo} />
+                        <img src={lastDraw.image} alt="" width="120" height="120" loading="lazy" style={styles.resultLogo} />
                     ) : (
                         <div style={{ fontSize: '3rem', fontWeight: 900, margin: '20px 0' }}>{lastDraw.teamCode}</div>
                     )}

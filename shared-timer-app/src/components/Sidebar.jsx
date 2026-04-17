@@ -107,15 +107,6 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    useEffect(() => {
-        if (!roomState) {
-            document.title = 'KoalaSync';
-            return;
-        }
-        const timeStr = formatTime(localRemainingMs);
-        document.title = `${timeStr} - ${roomState.name || 'KoalaSync'}`;
-    }, [localRemainingMs, roomState]);
-
     const handleAction = (e, action) => {
         e.stopPropagation();
         if (roomState) {
@@ -133,14 +124,6 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const [lastVisits, setLastVisits] = useState({});
     
     useEffect(() => {
-        const visits = {};
-        const dailyKeys = ['achievements', 'colorsync', 'scratch-cards', 'lol-idle', 'rift-defense'];
-        dailyKeys.forEach(key => {
-            const val = localStorage.getItem(`last_visit_${key}`);
-            if (val) visits[key] = parseInt(val);
-        });
-        setLastVisits(visits);
-        
         const fetchNav = async () => {
             try {
                 const data = await fetchJson('/api/navbar-settings', { token: '' });
@@ -154,6 +137,17 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         fetchNav();
     }, []);
 
+    useEffect(() => {
+        const visits = {};
+        navSettings.forEach(item => {
+            if (item.has_daily_badge) {
+                const val = localStorage.getItem(`last_visit_${item.key}`);
+                if (val) visits[item.key] = parseInt(val);
+            }
+        });
+        setLastVisits(visits);
+    }, [navSettings]);
+
     const markAsVisited = (key) => {
         const now = Date.now();
         localStorage.setItem(`last_visit_${key}`, now.toString());
@@ -161,8 +155,8 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     };
 
     const isBadgeVisible = (key) => {
-        const dailyKeys = ['achievements', 'colorsync', 'scratch-cards', 'lol-idle', 'rift-defense'];
-        if (!dailyKeys.includes(key)) return false;
+        const item = navSettings.find(n => n.key === key);
+        if (!item || !item.has_daily_badge) return false;
         
         const startOfToday = new Date();
         startOfToday.setUTCHours(0, 0, 0, 0);

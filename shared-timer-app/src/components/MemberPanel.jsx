@@ -4,7 +4,7 @@ import EVENTS from '../socketEvents';
 import Avatar from './Avatar';
 import UserContextMenu from './UserContextMenu';
 import { fetchJson } from '../utils/apiClient';
-import { getTimerToken, setStoredValue } from '../utils/clientStorage';
+import { getTimerToken } from '../utils/clientStorage';
 
 const InviteFriendsDropdown = ({ socket, roomId, friends, isOpen, setIsOpen }) => {
     const [inviteNotice, setInviteNotice] = useState('');
@@ -52,7 +52,7 @@ const InviteFriendsDropdown = ({ socket, roomId, friends, isOpen, setIsOpen }) =
     );
 };
 
-const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersCollapsed, togglePomodoro, copyInviteLink, roomTokens, socket, roomId, eventHistory, serverTimeOffset, showCounter, toggleCounter }) => {
+const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersCollapsed, togglePomodoro, copyInviteLink, roomTokens, socket, roomId, eventHistory, serverTimeOffset, showCounter, toggleCounter, onLeaveRoom }) => {
     const currentMinutes = roomState.config.durationMs / 60000;
     const [durationInput, setDurationInput] = useState(currentMinutes);
     const [pauseInput, setPauseInput] = useState(roomState?.config?.pomodoro?.pauseMinutes || 5);
@@ -431,24 +431,14 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                         </div>
                     </details>
 
-                    <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} onClick={() => {
-                        socket.emit(EVENTS.LEAVE_ROOM);
-                        setStoredValue('activeRoomId', null);
-                        setStoredValue('activeToken', null);
-                        window.location.href = '/';
-                    }}>
+                    <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} onClick={() => onLeaveRoom?.()}>
                         Leave Room
                     </button>
                 </div>
             )}
             {userRole === 'read' && (
                 <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '24px' }}>
-                    <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => {
-                        socket.emit(EVENTS.LEAVE_ROOM);
-                        setStoredValue('activeRoomId', null);
-                        setStoredValue('activeToken', null);
-                        window.location.href = '/';
-                    }}>
+                    <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => onLeaveRoom?.()}>
                         Leave Room
                     </button>
                 </div>

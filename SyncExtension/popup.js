@@ -8,9 +8,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const tabControls = document.getElementById('tabControls');
     const tabHistory = document.getElementById('tabHistory');
     const tabDev = document.getElementById('tabDev');
+    const tabSettings = document.getElementById('tabSettings');
+    
     const contentControls = document.getElementById('contentControls');
     const contentHistory = document.getElementById('contentHistory');
     const contentDev = document.getElementById('contentDev');
+    const contentSettings = document.getElementById('contentSettings');
+    
+    const filterNoiseToggle = document.getElementById('filterNoiseToggle');
+    const notificationsToggle = document.getElementById('notificationsToggle');
     const historyList = document.getElementById('historyList');
     const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
     const refreshDevBtn = document.getElementById('refreshDevBtn');
@@ -18,6 +24,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const forceSyncBtn = document.getElementById('forceSyncBtn');
     const syncStatus = document.getElementById('syncStatus');
     const syncStatusText = document.getElementById('syncStatusText');
+    const latestActivity = document.getElementById('latestActivity');
+    const latestActivityText = document.getElementById('latestActivityText');
+    const latestActivityTime = document.getElementById('latestActivityTime');
+    const latestActivityAcks = document.getElementById('latestActivityAcks');
 
     let detectedRoomId = null;
     let hasTimerTab = false;
@@ -30,33 +40,98 @@ document.addEventListener('DOMContentLoaded', async () => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    // Populate open tabs
-    const tabs = await chrome.tabs.query({});
-    tabs.forEach(tab => {
-        if (tab.url && !tab.url.startsWith('chrome://')) {
+    const BLACKLIST_DOMAINS = [
+        'mail.google.com', 'outlook.live.com', 'outlook.office.com', 'gmx.net', 'web.de',
+        'web.whatsapp.com', 'web.telegram.org', 'discord.com', 'element.io', 'app.slack.com',
+        'atlassian.net', 'jira', 'trello.com', 'notion.so', 'monday.com', 'asana.com',
+        'github.com', 'gitlab.com', 'bitbucket.org',
+        'linkedin.com', 'twitter.com', 'x.com', 'facebook.com', 'instagram.com',
+        'timer.shik3i.net', 'localhost', 'zoom.us', 'teams.microsoft.com', 'meet.google.com'
+    ];
+
+    // Populate open tabs with Smart Matching
+    const populateTabs = async () => {
+        const storageData = await new Promise(r => chrome.storage.local.get(['targetTabId', 'roomPeers', 'filterNoiseTabs'], r));
+        const currentTargetTabId = storageData.targetTabId;
+        const peers = storageData.roomPeers || {};
+        const isFilterActive = storageData.filterNoiseTabs !== false;
+        
+        const peerTitles = Object.values(peers)
+            .map(p => p.tabTitle)
+            .filter(t => t && t.length > 3);
+
+        const tabs = await chrome.tabs.query({});
+        
+        while (targetTabSelect.options.length > 1) {
+            targetTabSelect.remove(1);
+        }
+
+        let bestMatchId = null;
+
+        // FIRST: Scan all tabs for the Timer/Bridge - BEFORE filtering for the dropdown
+        tabs.forEach(tab => {
+            if (tab.url && (tab.url.includes('timer.shik3i.net/') || tab.url.includes('localhost:3001/'))) {
+                hasTimerTab = true;
+                try {
+                    const url = new URL(tab.url);
+                    const match = url.pathname.match(/\/room\/([^\/]+)/);
+                    if (match && match[1]) detectedRoomId = match[1];
+                } catch (e) { }
+            }
+        });
+
+        const sortedTabs = tabs
+            .filter(tab => {
+                if (!tab.url || tab.url.startsWith('chrome://')) return false;
+                if (isFilterActive && tab.id !== currentTargetTabId) {
+                    const urlStr = tab.url.toLowerCase();
+                    if (BLACKLIST_DOMAINS.some(d => urlStr.includes(d.toLowerCase()))) return false;
+                }
+                return true;
+            })
+            .map(tab => {
+                const isMatch = peerTitles.some(pt => {
+                    const t1 = (tab.title || '').toLowerCase();
+                    const t2 = (pt || '').toLowerCase();
+                    return t1.startsWith(t2) || t2.startsWith(t1) || (t1.length > 10 && t2.includes(t1.substring(0, 15)));
+                });
+                return { ...tab, isMatch };
+            })
+            .sort((a, b) => (b.isMatch ? 1 : 0) - (a.isMatch ? 1 : 0));
+
+        sortedTabs.forEach(tab => {
             const option = document.createElement('option');
             option.value = tab.id;
-            option.textContent = `${tab.id} - ${tab.title.substring(0, 30)}`;
+            const title = (tab.title || 'Loading...');
+            let label = `${tab.id} - ${title.substring(0, 40)}`;
+            if (tab.isMatch) {
+                label = `⭐ MATCH: ${title.substring(0, 35)}`;
+                option.style.fontWeight = 'bold';
+                option.style.color = '#fbbf24';
+                if (!bestMatchId) bestMatchId = tab.id;
+            }
+            option.textContent = label;
             targetTabSelect.appendChild(option);
-        }
+        });
 
-        if (tab.url && (tab.url.includes('timer.shik3i.net/') || tab.url.includes('localhost:3001/'))) {
-            hasTimerTab = true;
+        if (currentTargetTabId && currentTargetTabId !== 'none') {
+            targetTabSelect.value = currentTargetTabId;
+        } else if (bestMatchId) {
+            targetTabSelect.value = bestMatchId;
+            chrome.storage.local.set({ targetTabId: bestMatchId });
+            statusDiv.innerText = "Smart Match Auto-Selected! ⭐";
+            statusDiv.style.color = '#fbbf24';
+            statusDiv.style.display = 'block';
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+            announceTabStatus();
+        } else {
+            targetTabSelect.value = 'none';
         }
+    };
 
-        // Auto-detect timer room if one is open
-        if (tab.url && (tab.url.includes('timer.shik3i.net/room/') || tab.url.includes('localhost:3001/room/'))) {
-            try {
-                const url = new URL(tab.url);
-                const match = url.pathname.match(/\/room\/([^\/]+)/);
-                if (match && match[1]) {
-                    detectedRoomId = match[1];
-                }
-            } catch (e) { }
-        }
-    });
+    await populateTabs();
 
-    // Update connection status UI
+    // UI Feedback for Connection
     const connStatus = document.getElementById('connectionStatus');
     const connDot = document.getElementById('connectionDot');
     const connText = document.getElementById('connectionText');
@@ -67,90 +142,85 @@ document.addEventListener('DOMContentLoaded', async () => {
         connDot.style.background = '#4CAF50';
         connDot.style.boxShadow = '0 0 8px #4CAF50';
         connText.style.color = '#4CAF50';
-        connText.textContent = detectedRoomId
-            ? `Timer tab detected (Room: ${detectedRoomId})`
-            : 'Timer tab detected';
-    } else {
-        connText.textContent = 'No timer tab detected';
+        connText.textContent = detectedRoomId ? `Timer detected (Room: ${detectedRoomId})` : 'Timer detected';
     }
 
-    // Check if background.js flagged a newer version from someone in the room
-    const updateBanner = document.getElementById('updateBanner');
-    const updateVersionText = document.getElementById('updateVersionText');
-    chrome.storage.local.get(['updateAvailable'], (data) => {
-        if (data.updateAvailable) {
-            const myVersion = chrome.runtime.getManifest().version;
-            // Only show if still newer (user might have updated already)
-            const pa = myVersion.split('.').map(Number);
-            const pb = data.updateAvailable.split('.').map(Number);
-            let isNewer = false;
-            for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-                const na = pa[i] || 0, nb = pb[i] || 0;
-                if (na < nb) { isNewer = true; break; }
-                if (na > nb) break;
-            }
-            if (isNewer) {
-                updateVersionText.textContent = `v${data.updateAvailable}`;
-                updateBanner.style.display = 'block';
-            } else {
-                // We're up-to-date, clear the flag
-                chrome.storage.local.remove('updateAvailable');
-            }
+    // Settings Toggle Logic
+    chrome.storage.local.get(['targetTabId', 'extensionInstanceId', 'filterNoiseTabs', 'notificationsEnabled'], (data) => {
+        extensionInstanceId = data.extensionInstanceId;
+        if (!extensionInstanceId) {
+            console.warn('Popup: extensionInstanceId not found, waiting for background...');
         }
-    });
 
-    // Load existing settings
-    chrome.storage.local.get(['targetTabId', 'extensionInstanceId'], (data) => {
-        extensionInstanceId = data.extensionInstanceId || crypto.randomUUID();
-        if (!data.extensionInstanceId) {
-            chrome.storage.local.set({ extensionInstanceId });
-        }
+        const isFilterActive = data.filterNoiseTabs !== false;
+        filterNoiseToggle.checked = isFilterActive;
+
+        // Notifications are ON by default
+        notificationsToggle.checked = data.notificationsEnabled !== false;
+
         if (data.targetTabId !== undefined) {
             targetTabSelect.value = data.targetTabId === null ? 'none' : data.targetTabId;
-        } else {
-            targetTabSelect.value = 'none';
         }
-        // Announce tab status AFTER restoring saved value (so the title is correct)
         if (hasTimerTab) {
             announceTabStatus();
             announceVersion();
         }
     });
 
-    // Auto-Save
+    filterNoiseToggle.addEventListener('change', () => {
+        chrome.storage.local.set({ filterNoiseTabs: filterNoiseToggle.checked }, () => {
+            populateTabs();
+        });
+    });
+
+    notificationsToggle.addEventListener('change', () => {
+        chrome.storage.local.set({ notificationsEnabled: notificationsToggle.checked });
+    });
+
     targetTabSelect.addEventListener('change', () => {
-        let targetTabId = targetTabSelect.value;
-        if (targetTabId === 'none' || targetTabId === '') {
-            targetTabId = null;
-        } else {
-            targetTabId = parseInt(targetTabId, 10);
+        let val = targetTabSelect.value;
+        let id = val === 'none' ? null : parseInt(val, 10);
+        
+        // Proactive injection for better UX (so bidirectional sync starts immediately)
+        if (id) {
+            chrome.scripting.executeScript({
+                target: { tabId: id },
+                files: ['content.js']
+            }).then(() => {
+                statusDiv.innerText = "Sync Script Loaded! ✅";
+                statusDiv.style.color = '#4CAF50';
+                statusDiv.style.display = 'block';
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
+            }).catch((err) => { 
+                console.warn("Injection failed:", err.message);
+                statusDiv.innerText = "Restricted Page! ❌";
+                statusDiv.style.color = '#ef4444';
+                statusDiv.style.display = 'block';
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 4000);
+            });
         }
 
-        chrome.storage.local.set({ targetTabId }, () => {
-            statusDiv.innerText = "Target Tab Auto-Saved!";
+        chrome.storage.local.set({ targetTabId: id }, () => {
+            statusDiv.innerText = "Auto-Saved!";
             statusDiv.style.color = '#4CAF50';
             statusDiv.style.display = 'block';
             setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
         });
-        // Re-announce tab status to peers when selection changes
         announceTabStatus();
     });
 
-    // --- Room Peer Status ---
+    // Peer Status
     function announceTabStatus() {
         if (!extensionInstanceId) return;
-
         const selVal = targetTabSelect.value;
         const selOption = targetTabSelect.options[targetTabSelect.selectedIndex];
-        const tabTitle = (selVal && selVal !== 'none' && selOption)
-            ? selOption.textContent.replace(/^\d+ - /, '').trim()
-            : null;
+        const tabTitle = (selVal && selVal !== 'none' && selOption) ? selOption.textContent.replace(/^\d+ - /, '').replace(/⭐ MATCH: /, '').trim() : null;
         chrome.runtime.sendMessage({
             type: 'EXTENSION_OUTBOUND',
             source: 'extension_popup',
             payload: {
                 action: 'tab_status',
-                tabTitle: tabTitle,
+                tabTitle,
                 isReady: !!tabTitle,
                 version: chrome.runtime.getManifest().version,
                 instanceId: extensionInstanceId
@@ -160,7 +230,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function announceVersion() {
         if (!hasTimerTab || !extensionInstanceId) return;
-
         chrome.runtime.sendMessage({
             type: 'EXTENSION_OUTBOUND',
             source: 'extension_popup',
@@ -173,426 +242,314 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderRoomPeers() {
-        const panel = document.getElementById('roomStatusPanel');
-        const list = document.getElementById('roomPeerList');
         chrome.storage.local.get(['roomPeers'], (data) => {
+            const list = document.getElementById('roomPeerList');
+            if(!list) return;
             const peers = data.roomPeers || {};
-            // Evict peers not seen in last 10 minutes
             const now = Date.now();
             const active = Object.entries(peers).filter(([, v]) => {
-                if ((now - v.lastSeen) >= 10 * 60 * 1000) return false;
-                if (v.instanceId && extensionInstanceId && v.instanceId === extensionInstanceId) return false;
-                return true;
+                if ((now - v.lastSeen) >= 60 * 1000) return false;
+                return v.instanceId !== extensionInstanceId;
             });
 
-            // Build "You" entry from current target tab selection
-            const selVal = targetTabSelect.value;
-            const selOption = targetTabSelect.options[targetTabSelect.selectedIndex];
-            const myTabTitle = (selVal && selVal !== 'none' && selOption)
-                ? selOption.textContent.replace(/^\d+ - /, '').trim()
-                : null;
-            const myVersion = chrome.runtime.getManifest().version;
-
-            // Always show the panel (min: shows "You")
-            panel.style.display = 'block';
+            const myVal = targetTabSelect.value;
+            const myOption = targetTabSelect.options[targetTabSelect.selectedIndex];
+            const myTitle = (myVal && myVal !== 'none' && myOption) ? myOption.textContent.replace(/^\d+ - /, '').replace(/⭐ MATCH: /, '').trim() : null;
+            const myTabId = myVal && myVal !== 'none' ? parseInt(myVal, 10) : null;
+            
             list.innerHTML = '';
 
-            // Render own entry first
-            const makeRow = (name, tabTitle, isReady, version, isSelf) => {
+            const makeRow = (name, tabTitle, isReady, version, isSelf, playbackState) => {
                 const row = document.createElement('div');
                 row.style.cssText = `display:flex;align-items:center;gap:6px;background:${isSelf ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.04)'};padding:6px 8px;border-radius:6px;font-size:10px;color:#e2e8f0;`;
-                const dot = isReady ? '🟢' : '🔴';
-                const ver = version ? `<span style="color:#6b7280;margin-left:auto;">v${version}</span>` : '';
-                const label = isSelf ? `<em style="color:#6b7280;">(You)</em>` : '';
                 const safeName = escapeHtml(name);
-                const safeTabTitle = escapeHtml(tabTitle);
+                const safeTitle = escapeHtml(tabTitle);
                 const titleHtml = tabTitle
-                    ? `<span style="color:#a5b4fc;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safeTabTitle}">${safeTabTitle}</span>`
+                    ? `<span style="color:#a5b4fc;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeTitle}</span>`
                     : `<span style="color:#6b7280;font-style:italic;">No tab</span>`;
-                row.innerHTML = `<span>${dot}</span><strong style="min-width:45px;">${safeName}</strong>${label}${titleHtml}${ver}`;
+
+                // Play/Pause icon: show state if known, else readiness dot
+                let stateIcon;
+                if (!isReady) {
+                    stateIcon = `<span title="No tab selected" style="font-size:11px;">🔴</span>`;
+                } else if (playbackState === 'playing') {
+                    stateIcon = `<span title="Playing" style="font-size:11px;">▶️</span>`;
+                } else if (playbackState === 'paused') {
+                    stateIcon = `<span title="Paused" style="font-size:11px;">⏸️</span>`;
+                } else {
+                    stateIcon = `<span title="Ready (state unknown)" style="font-size:11px;">🟢</span>`;
+                }
+
+                row.innerHTML = `${stateIcon}<strong style="min-width:45px;">${safeName}</strong>${titleHtml}<span style="color:#6b7280;margin-left:auto;">v${version}</span>`;
                 list.appendChild(row);
             };
 
-            makeRow('You', myTabTitle, !!myTabTitle, myVersion, true);
-            active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false));
+            // For "You": query content.js directly for live state
+            if (myTabId) {
+                chrome.tabs.sendMessage(myTabId, { action: 'get_debug_info' }).then(info => {
+                    const myState = info && info.videoState !== 'N/A'
+                        ? (info.videoState === 'Playing' ? 'playing' : 'paused')
+                        : null;
+                    makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, myState);
+                    active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                    document.getElementById('roomStatusPanel').style.display = 'block';
+                }).catch(() => {
+                    // content.js not reachable yet — render without state
+                    makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, null);
+                    active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                    document.getElementById('roomStatusPanel').style.display = 'block';
+                });
+            } else {
+                makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, null);
+                active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                document.getElementById('roomStatusPanel').style.display = 'block';
+            }
         });
     }
 
-    // Render peers on open and whenever storage changes
     renderRoomPeers();
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && (changes.roomPeers || changes.extensionInstanceId)) renderRoomPeers();
+        if (area === 'local') {
+            if (changes.roomPeers || changes.extensionInstanceId || changes.targetTabId || changes.localPlaybackState) {
+                renderRoomPeers();
+                populateTabs();
+            }
+            if (changes.history) {
+                loadHistory();
+                renderLatestActivity();
+            }
+        }
     });
 
-    const peerHeartbeat = setInterval(() => {
-        announceTabStatus();
-        renderRoomPeers();
-    }, 30000);
+    setInterval(() => { announceTabStatus(); renderRoomPeers(); }, 30000);
 
-    // Media Controls Helper
+    // Commands
     function sendMediaCommand(action) {
-        let targetTabIdStr = targetTabSelect.value;
-        let targetTabId = targetTabIdStr === 'none' || targetTabIdStr === '' ? null : parseInt(targetTabIdStr, 10);
-
-        if (!targetTabId) {
-            console.warn("No valid target tab selected to execute local command.");
-            statusDiv.innerText = "Select Target JS!";
+        let val = targetTabSelect.value;
+        let id = val === 'none' ? null : parseInt(val, 10);
+        if (!id) {
+            statusDiv.innerText = "Select Target!";
             statusDiv.style.color = '#dc3545';
             statusDiv.style.display = 'block';
             setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
             return;
         }
-
-        // Send to background worker to handle targeting and bidirectional sync
         chrome.runtime.sendMessage({
             type: 'EXTENSION_OUTBOUND',
             source: 'extension_popup',
-            payload: {
-                action: action,
-                timestamp: new Date().toISOString()
-            }
-        }).catch(err => console.debug("Popup to background message warning:", err));
-
-        // Reload history tab slightly after background worker processes it
-        setTimeout(() => {
-            loadHistory();
-        }, 250);
+            payload: { action, timestamp: new Date().toISOString() }
+        }).catch(() => {});
+        setTimeout(() => loadHistory(), 250);
     }
 
     playBtn.addEventListener('click', () => sendMediaCommand('play'));
     pauseBtn.addEventListener('click', () => sendMediaCommand('pause'));
 
-    // --- Force Sync Logic ---
-    function updateSyncStatus(text, color) {
-        syncStatus.style.display = 'block';
-        syncStatusText.textContent = text;
-        syncStatusText.style.color = color || 'var(--text-muted)';
-    }
-
-    function hideSyncStatus(delay = 4000) {
-        setTimeout(() => { syncStatus.style.display = 'none'; }, delay);
-    }
-
-    function waitForForceSyncReady(timestamp, timeoutMs = 9000) {
-        return new Promise((resolve) => {
-            let resolved = false;
-
-            const finish = (result) => {
-                if (resolved) return;
-                resolved = true;
-                chrome.storage.onChanged.removeListener(handleChange);
-                clearTimeout(timeoutId);
-                resolve(result);
-            };
-
-            const evaluateState = (state) => {
-                if (!state || state.timestamp !== timestamp) return false;
-                if (state.stage === 'error') {
-                    finish({
-                        ok: false,
-                        error: state.error || 'force_sync_failed',
-                        remoteReadyCount: Object.keys(state.remoteReady || {}).length
-                    });
-                    return true;
-                }
-                if (state.localReady) {
-                    finish({
-                        ok: true,
-                        remoteReadyCount: Object.keys(state.remoteReady || {}).length
-                    });
-                    return true;
-                }
-                return false;
-            };
-
-            const handleChange = (changes, area) => {
-                if (area !== 'local' || !changes.forceSyncState) return;
-                evaluateState(changes.forceSyncState.newValue);
-            };
-
-            const timeoutId = setTimeout(() => {
-                chrome.storage.local.get(['forceSyncState'], (data) => {
-                    const state = data.forceSyncState;
-                    finish({
-                        ok: false,
-                        error: state?.error || 'timeout',
-                        remoteReadyCount: Object.keys(state?.remoteReady || {}).length
-                    });
-                });
-            }, timeoutMs);
-
-            chrome.storage.onChanged.addListener(handleChange);
-            chrome.storage.local.get(['forceSyncState'], (data) => {
-                evaluateState(data.forceSyncState);
-            });
-        });
-    }
-
+    // Force Sync
     forceSyncBtn.addEventListener('click', async () => {
-        let targetTabIdStr = targetTabSelect.value;
-        let targetTabId = targetTabIdStr === 'none' || targetTabIdStr === '' ? null : parseInt(targetTabIdStr, 10);
+        let val = targetTabSelect.value;
+        let id = val === 'none' ? null : parseInt(val, 10);
+        if (!id) return;
 
-        if (!targetTabId) {
-            updateSyncStatus('❌ Select a Target Tab first!', '#dc3545');
-            hideSyncStatus(3000);
-            return;
-        }
-
-        // Phase 0: Get current video time from local tab
-        updateSyncStatus('⏳ Reading video position...', '#f59e0b');
-        let currentVideoTime = 0;
+        updateSyncStatus('⏳ Reading time...', '#f59e0b');
         try {
-            const debugInfo = await chrome.tabs.sendMessage(targetTabId, { action: 'get_debug_info' });
-            if (debugInfo && debugInfo.currentTime && debugInfo.currentTime !== 'N/A') {
-                currentVideoTime = parseFloat(debugInfo.currentTime);
-            }
-        } catch (e) {
-            updateSyncStatus('❌ Cannot read video time', '#dc3545');
-            hideSyncStatus(3000);
-            return;
+            const di = await chrome.tabs.sendMessage(id, { action: 'get_debug_info' });
+            if (!di || di.currentTime === 'N/A') throw new Error();
+            const time = parseFloat(di.currentTime);
+            const ts = new Date().toISOString();
+
+            updateSyncStatus(`⏳ Syncing to ${time.toFixed(1)}s...`, '#f59e0b');
+            
+            // 1. Reset state and start sync
+            await chrome.storage.local.set({ 
+                forceSyncState: { 
+                    timestamp: ts, 
+                    targetTime: time, 
+                    localReady: false, 
+                    remoteReady: {}, 
+                    updatedAt: Date.now() 
+                } 
+            });
+            
+            // 2. Broadcast OUTBOUND pause/seek. 
+            // Note: background.js now handles the local INBOUND trigger automatically.
+            const msg = { 
+                type: 'EXTENSION_OUTBOUND', 
+                source: 'extension_popup', 
+                payload: { action: 'force_sync_pause_seek', targetTime: time, timestamp: ts } 
+            };
+            chrome.runtime.sendMessage(msg).catch(() => {});
+
+            // 3. Polling for readiness
+            const startTime = Date.now();
+            const pollInterval = setInterval(async () => {
+                const elapsed = Date.now() - startTime;
+                const { roomPeers, forceSyncState } = await new Promise(r => 
+                    chrome.storage.local.get(['roomPeers', 'forceSyncState'], r)
+                );
+
+                const peersInRoom = Object.keys(roomPeers || {}).filter(k => 
+                    k !== 'You' && (Date.now() - roomPeers[k].lastSeen < 60000)
+                );
+                const readyPeers = Object.keys(forceSyncState?.remoteReady || {});
+
+                // Success: All known peers are ready
+                if (peersInRoom.length > 0 && peersInRoom.every(p => readyPeers.includes(p))) {
+                    clearInterval(pollInterval);
+                    finalizeSync(ts);
+                    return;
+                }
+
+                // Fallback (3s): No peers in room detected
+                if (elapsed >= 3000 && peersInRoom.length === 0) {
+                    clearInterval(pollInterval);
+                    updateSyncStatus('⚠️ No peers responded – syncing locally only', '#f59e0b');
+                    setTimeout(() => finalizeSync(ts), 1500);
+                    return;
+                }
+
+                // Timeout (8s): Some peers are still not ready
+                if (elapsed >= 8000) {
+                    clearInterval(pollInterval);
+                    updateSyncStatus('⚠️ Timeout – not all peers confirmed ready', '#f59e0b');
+                    setTimeout(() => finalizeSync(ts), 1500);
+                    return;
+                }
+            }, 300);
+
+        } catch(e) { 
+            updateSyncStatus('❌ Failed', '#dc3545'); 
+            hideSyncStatus(); 
         }
-
-        const timestamp = new Date().toISOString();
-
-        // Phase 1: Send pause + seek to everyone (including self)
-        updateSyncStatus(`⏳ Syncing to ${currentVideoTime.toFixed(1)}s...`, '#f59e0b');
-
-        await chrome.storage.local.set({
-            forceSyncState: {
-                timestamp,
-                stage: 'starting',
-                targetTime: currentVideoTime,
-                localReady: false,
-                remoteReady: {},
-                error: null,
-                updatedAt: Date.now()
-            }
-        });
-
-        // Send to self (local extension)
-        chrome.runtime.sendMessage({
-            type: 'EXTENSION_INBOUND',
-            source: 'force_sync_initiator',
-            payload: {
-                action: 'force_sync_pause_seek',
-                targetTime: currentVideoTime,
-                timestamp: timestamp
-            }
-        }).catch(() => { });
-
-        // Send to others via OUTBOUND pipe (through React -> Socket -> others)
-        chrome.runtime.sendMessage({
-            type: 'EXTENSION_OUTBOUND',
-            source: 'extension_popup',
-            payload: {
-                action: 'force_sync_pause_seek',
-                targetTime: currentVideoTime,
-                timestamp: timestamp
-            }
-        }).catch(() => { });
-
-        // Phase 2: Wait for seek to complete (give buffer time)
-        updateSyncStatus('⏳ Waiting for ready signal...', '#f59e0b');
-        const readyResult = await waitForForceSyncReady(timestamp);
-
-        if (!readyResult.ok) {
-            updateSyncStatus(`❌ Force Sync failed: ${readyResult.error}`, '#dc3545');
-            hideSyncStatus(5000);
-            return;
-        }
-
-        // Phase 3: Send play to everyone
-        if (readyResult.remoteReadyCount > 0) {
-            updateSyncStatus(`▶ Starting playback (${readyResult.remoteReadyCount} peer ready)...`, '#6366f1');
-        } else {
-            updateSyncStatus('▶ Starting playback...', '#6366f1');
-        }
-
-        chrome.runtime.sendMessage({
-            type: 'EXTENSION_INBOUND',
-            source: 'force_sync_initiator',
-            payload: {
-                action: 'force_sync_play',
-                timestamp: timestamp
-            }
-        }).catch(() => { });
-
-        chrome.runtime.sendMessage({
-            type: 'EXTENSION_OUTBOUND',
-            source: 'extension_popup',
-            payload: {
-                action: 'force_sync_play',
-                timestamp: timestamp
-            }
-        }).catch(() => { });
-
-        updateSyncStatus('✅ Force Sync complete!', '#4CAF50');
-        hideSyncStatus(4000);
-
-        setTimeout(() => loadHistory(), 500);
     });
 
-    // --- Tabs & History Logic ---
-    function switchTab(tabId) {
-        tabControls.classList.remove('active');
-        tabHistory.classList.remove('active');
-        tabDev.classList.remove('active');
-        contentControls.classList.remove('active');
-        contentHistory.classList.remove('active');
-        contentDev.classList.remove('active');
+    function finalizeSync(ts) {
+        chrome.runtime.sendMessage({ 
+            type: 'EXTENSION_OUTBOUND', 
+            source: 'extension_popup', 
+            payload: { action: 'force_sync_play', timestamp: ts } 
+        });
+        updateSyncStatus('✅ Done!', '#4CAF50');
+        hideSyncStatus();
+    }
 
-        if (tabId === 'history') {
-            tabHistory.classList.add('active');
-            contentHistory.classList.add('active');
-            loadHistory();
-        } else if (tabId === 'dev') {
-            tabDev.classList.add('active');
-            contentDev.classList.add('active');
-            loadDevInfo();
-        } else {
-            tabControls.classList.add('active');
-            contentControls.classList.add('active');
-        }
+    function updateSyncStatus(t, c) { syncStatus.style.display='block'; syncStatusText.textContent=t; syncStatusText.style.color=c; }
+    function hideSyncStatus() { setTimeout(()=>syncStatus.style.display='none', 3000); }
+
+    // History & Tabs
+    function switchTab(id) {
+        [tabControls, tabHistory, tabDev, tabSettings].forEach(t => t.classList.remove('active'));
+        [contentControls, contentHistory, contentDev, contentSettings].forEach(c => c.classList.remove('active'));
+        document.getElementById('tab' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
+        document.getElementById('content' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
+        if (id === 'history') loadHistory();
+        if (id === 'dev') loadDevInfo();
     }
 
     tabControls.addEventListener('click', () => switchTab('controls'));
     tabHistory.addEventListener('click', () => switchTab('history'));
     tabDev.addEventListener('click', () => switchTab('dev'));
-    refreshHistoryBtn.addEventListener('click', () => loadHistory());
-    refreshDevBtn.addEventListener('click', () => loadDevInfo());
+    tabSettings.addEventListener('click', () => switchTab('settings'));
+    
+    if (refreshHistoryBtn) refreshHistoryBtn.addEventListener('click', () => loadHistory());
+    if (refreshDevBtn) refreshDevBtn.addEventListener('click', () => loadDevInfo());
+
+    function timeAgo(isoTimestamp) {
+        const diff = Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 1000);
+        if (diff < 5)  return 'gerade eben';
+        if (diff < 60) return `vor ${diff}s`;
+        const m = Math.floor(diff / 60);
+        if (m < 60)    return `vor ${m} Min.`;
+        const h = Math.floor(m / 60);
+        if (h < 24)    return `vor ${h} Std.`;
+        return new Date(isoTimestamp).toLocaleDateString();
+    }
+
+    let _historyData = [];
 
     function loadHistory() {
         chrome.storage.local.get(['history'], (data) => {
-            const currentHistory = data.history || [];
-
-            // Update the Latest Activity pill on the main tab
-            const latestDiv = document.getElementById('latestActivity');
-            const latestText = document.getElementById('latestActivityText');
-            const latestTime = document.getElementById('latestActivityTime');
-            const latestAcks = document.getElementById('latestActivityAcks');
-
-            if (currentHistory.length > 0) {
-                const latest = currentHistory[0];
-                const actionColor = latest.action === 'play' ? '#28a745' : '#dc3545';
-                const actionIcon = latest.action === 'play' ? '▶' : '⏸';
-                const sourceText = latest.source === 'timer_website' ? 'Web' : 'Local';
-
-                latestText.innerHTML = `<span style="color: ${actionColor}; font-weight: bold;">${actionIcon} ${latest.action.toUpperCase()}</span> (${sourceText})`;
-                latestTime.textContent = new Date(latest.timestamp).toLocaleTimeString();
-                latestDiv.style.display = 'block';
-
-                // Display ACKs if any exist for this action
-                if (latest.acks && latest.acks.length > 0) {
-                    latestAcks.style.display = 'block';
-                    latestAcks.textContent = `✓ Ack: ${latest.acks.join(', ')}`;
-                } else {
-                    latestAcks.style.display = 'none';
-                }
-            } else {
-                latestDiv.style.display = 'none';
-            }
-
-            // Update the full History tab
-            if (currentHistory.length === 0) {
-                historyList.innerHTML = '<div style="text-align:center; color: #666; padding: 20px 0;">No history yet.</div>';
-                return;
-            }
-
-            historyList.innerHTML = '';
-            currentHistory.forEach(item => {
-                const div = document.createElement('div');
-                const actionLabels = {
-                    'play': '▶ Play',
-                    'pause': '⏸ Pause',
-                    'force_sync_pause_seek': '⏱ Sync Seek',
-                    'force_sync_play': '⏱ Sync Play'
-                };
-                const isPause = item.action === 'pause' || item.action === 'force_sync_pause_seek';
-                div.className = `history-item ${isPause ? 'pause' : 'play'}`;
-
-                const date = new Date(item.timestamp);
-                const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-                // Source badge
-                const sourceLabel = item.source === 'timer_website' ? 'Web' :
-                    item.source === 'extension_popup' ? 'Ext' :
-                        item.source === 'force_sync_initiator' ? 'Sync' : 'Ext';
-                const sourceColor = item.source === 'timer_website' ? '#60a5fa' : '#a78bfa';
-
-                // Sender name
-                const sender = item.senderName || (item.source === 'extension_popup' ? 'You' : '');
-                const safeAction = escapeHtml(actionLabels[item.action] || item.action);
-                const safeSender = escapeHtml(sender);
-
-                // ACK list
-                let ackHtml = '';
-                if (item.acks && item.acks.length > 0) {
-                    ackHtml = `<div style="font-size: 9px; color: #6ee7b7; margin-top: 3px;">✓ ${escapeHtml(item.acks.join(', '))}</div>`;
-                }
-
-                div.innerHTML = `
-                    <div style="display: flex; flex-direction: column; gap: 2px; flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span class="history-action">${safeAction}</span>
-                            ${sender ? `<span style="font-size: 10px; color: #e2e8f0; font-weight: 500;">${safeSender}</span>` : ''}
-                            <span style="font-size: 8px; padding: 1px 5px; border-radius: 3px; background: ${sourceColor}22; color: ${sourceColor}; font-weight: 600;">${sourceLabel}</span>
-                        </div>
-                        ${ackHtml}
-                    </div>
-                    <span class="history-time">${timeString}</span>
-                `;
-                historyList.appendChild(div);
-            });
+            _historyData = data.history || [];
+            renderHistory();
         });
     }
 
-    function loadDevInfo() {
-        devInfo.innerHTML = "Fetching diagnostics...";
-        let targetTabIdStr = targetTabSelect.value;
-        let targetTabId = targetTabIdStr === 'none' || targetTabIdStr === '' ? null : parseInt(targetTabIdStr, 10);
+    function renderHistory() {
+        historyList.innerHTML = _historyData.length
+            ? ''
+            : '<div style="text-align:center;color:#666;padding:20px 0;">No history.</div>';
 
-        if (!targetTabId) {
-            devInfo.innerHTML = '<span style="color: #dc3545; font-weight: bold;">Select a Target Tab (Video) in the "Controls" tab first.</span>';
-            return;
-        }
-
-        chrome.tabs.sendMessage(targetTabId, { action: 'get_debug_info' })
-            .then(response => {
-                if (!response) {
-                    devInfo.innerHTML = '<span style="color: #dc3545">No response. Is the page fully loaded? Make sure the content script is running.</span>';
-                    return;
-                }
-
-                const renderRow = (label, value) => `
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0;">
-                        <strong>${escapeHtml(label)}:</strong> <span style="color: #fff; text-align: right; max-width: 65%; word-break: break-all;">${escapeHtml(value)}</span>
-                    </div>
-                `;
-
-                devInfo.innerHTML = `
-                    ${renderRow('Detection', response.detectionStatus)}
-                    ${renderRow('Video State', response.videoState)}
-                    ${renderRow('Current Time', response.currentTime)}
-                    ${renderRow('Ready State', response.readyState)}
-                    ${renderRow('Source URL', response.sourceUrl)}
-                `;
-            })
-            .catch(err => {
-                devInfo.innerHTML = `<span style="color: #dc3545">Error connecting to tab:<br>${escapeHtml(err.message)}</span>`;
-            });
+        _historyData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = `history-item ${item.action.includes('pause') ? 'pause' : 'play'}`;
+            const safeName = escapeHtml(item.senderName || 'You');
+            const actionLabel = item.action === 'force_sync_pause_seek' ? 'FORCE SYNC' :
+                                item.action === 'force_sync_play'       ? 'FORCE PLAY' :
+                                item.action.toUpperCase();
+            div.innerHTML = `
+                <div style="flex:1;">
+                    <strong>${actionLabel}</strong>
+                    <span style="font-size:10px;color:var(--text-muted);"> ${safeName}</span>
+                </div>
+                <span class="history-time" data-ts="${escapeHtml(item.timestamp)}">${timeAgo(item.timestamp)}</span>`;
+            historyList.appendChild(div);
+        });
     }
 
-    // Auto-refresh when background.js writes new history (e.g. command from website)
-    chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.history) {
-            loadHistory();
+    // Refresh relative timestamps every 30 seconds while popup is open
+    setInterval(() => {
+        historyList.querySelectorAll('.history-time[data-ts]').forEach(el => {
+            el.textContent = timeAgo(el.dataset.ts);
+        });
+        // Also update latestActivity time if visible
+        if (latestActivityTime && latestActivityTime.dataset.ts) {
+            latestActivityTime.textContent = timeAgo(latestActivityTime.dataset.ts);
         }
-    });
+    }, 30000);
 
-    // Load on initial popup open
+    function loadDevInfo() {
+        let id = targetTabSelect.value === 'none' ? null : parseInt(targetTabSelect.value, 10);
+        if(!id) { devInfo.innerHTML = 'No tab selected.'; return; }
+        chrome.tabs.sendMessage(id, { action: 'get_debug_info' }).then(r => {
+            devInfo.innerHTML = r ? Object.entries(r).map(([k,v])=>`<strong>${k}:</strong> ${v}`).join('<br>') : 'No response.';
+        }).catch(e => { devInfo.innerHTML = 'Error: ' + e.message; });
+    }
+
+    function renderLatestActivity() {
+        if (!latestActivity) return;
+        chrome.storage.local.get(['history'], (data) => {
+            const hist = data.history || [];
+            if (hist.length === 0) {
+                latestActivity.style.display = 'none';
+                return;
+            }
+
+            const last = hist[0];
+            const now = Date.now();
+            const lastTime = new Date(last.timestamp).getTime();
+            
+            // Only show activity if it's less than 5 minutes old
+            if (now - lastTime > 5 * 60 * 1000) {
+                latestActivity.style.display = 'none';
+                return;
+            }
+
+            latestActivity.style.display = 'block';
+            const actionColor = last.action.includes('pause') ? '#ef4444' : '#10b981';
+            const sender = escapeHtml(last.senderName || 'You');
+            latestActivityText.innerHTML = `<strong style="color: ${actionColor}">${last.action.toUpperCase()}</strong> by ${sender}`;
+            latestActivityTime.textContent = timeAgo(last.timestamp);
+            latestActivityTime.dataset.ts = last.timestamp;
+
+            if (last.acks && last.acks.length > 0) {
+                latestActivityAcks.style.display = 'block';
+                latestActivityAcks.textContent = `ACK: ${last.acks.join(', ')}`;
+            } else {
+                latestActivityAcks.style.display = 'none';
+            }
+        });
+    }
+    
     loadHistory();
-
-    window.addEventListener('unload', () => {
-        clearInterval(peerHeartbeat);
-    });
+    renderLatestActivity();
 });

@@ -10,9 +10,9 @@ const BET_RESOLUTION_COOLDOWN = 10 * 60 * 1000;
 const FORCE_REFRESH_COOLDOWN = 60 * 1000;
 
 const NEWS_TTL = 15 * 60 * 1000;
-const SCHEDULE_TTL = 6 * 60 * 60 * 1000;
+const SCHEDULE_TTL = 60 * 60 * 1000;
 const TEAMS_TTL = 15 * 60 * 1000;
-const POLY_TTL = 10 * 60 * 1000;
+const POLY_TTL = 60 * 60 * 1000;
 const TWITCH_TTL = 60 * 1000;
 const CONFIG_TTL = 15 * 60 * 1000;
 const ERROR_COOLDOWN = 5 * 60 * 1000;
@@ -97,7 +97,8 @@ async function resolveCached(cache, fetcher, options = {}) {
         return {
             data: cache.data,
             changed: false,
-            source: 'cache'
+            source: 'cache',
+            timestamp: cache.timestamp
         };
     }
 
@@ -119,7 +120,8 @@ async function resolveCached(cache, fetcher, options = {}) {
             return {
                 data: cache.data,
                 changed,
-                source: 'network'
+                source: 'network',
+                timestamp: cache.timestamp
             };
         } catch (err) {
             markError(cache, err);
@@ -127,7 +129,8 @@ async function resolveCached(cache, fetcher, options = {}) {
                 return {
                     data: cache.data,
                     changed: false,
-                    source: 'stale'
+                    source: 'stale',
+                    timestamp: cache.timestamp
                 };
             }
             throw err;
@@ -241,21 +244,39 @@ async function getEsportsTeams(options = {}) {
     return resolveCached(caches.esportsTeams, async () => dbLayer.getAllEsportsTeams(), options);
 }
 
-function generateSlugsForMatch(mappingDict, team1Code, team2Code, startTime) {
-    const normalizedTeam1 = mappingDict[(team1Code || '').toLowerCase()] || (team1Code || '').toLowerCase();
-    const normalizedTeam2 = mappingDict[(team2Code || '').toLowerCase()] || (team2Code || '').toLowerCase();
+function generateSlugsForMatch(mappingDict, t1Code, t2Code, t1Name, t2Name, startTime) {
+    const normalize = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Mapped codes (or raw codes)
+    const normalizedCode1 = mappingDict[(t1Code || '').toLowerCase()] || (t1Code || '').toLowerCase();
+    const normalizedCode2 = mappingDict[(t2Code || '').toLowerCase()] || (t2Code || '').toLowerCase();
+    
+    // Normalized names
+    const normalizedName1 = normalize(t1Name);
+    const normalizedName2 = normalize(t2Name);
+
+    // Some Polymarket slugs use acronyms like 'g2' and 'fnc', others use full names.
+    // Create an array of possible identifiers for each team.
+    const t1Identifiers = Array.from(new Set([normalizedCode1, normalizedName1].filter(Boolean)));
+    const t2Identifiers = Array.from(new Set([normalizedCode2, normalizedName2].filter(Boolean)));
+
     const matchDate = new Date(startTime);
-    const generated = [];
+    const generated = new Set();
 
     for (let index = -2; index <= 5; index += 1) {
         const date = new Date(matchDate);
         date.setDate(date.getDate() + index);
         const dateStr = date.toISOString().split('T')[0];
-        generated.push(`lol-${normalizedTeam1}-${normalizedTeam2}-${dateStr}`);
-        generated.push(`lol-${normalizedTeam2}-${normalizedTeam1}-${dateStr}`);
+        
+        for (const id1 of t1Identifiers) {
+            for (const id2 of t2Identifiers) {
+                generated.add(`lol-${id1}-${id2}-${dateStr}`);
+                generated.add(`lol-${id2}-${id1}-${dateStr}`);
+            }
+        }
     }
 
-    return generated;
+    return Array.from(generated);
 }
 
 async function fetchPolymarketOddsUpstream(forceRefreshMatch = null) {
@@ -267,14 +288,14 @@ async function fetchPolymarketOddsUpstream(forceRefreshMatch = null) {
         if (forceRefreshMatch.slug) {
             slugsToTry.push(forceRefreshMatch.slug);
         } else {
-            slugsToTry.push(...generateSlugsForMatch(mappingDict, forceRefreshMatch.team1, forceRefreshMatch.team2, forceRefreshMatch.startTime));
+            slugsToTry.push(...generateSlugsForMatch(mappingDict, forceRefreshMatch.team1, forceRefreshMatch.team2, forceRefreshMatch.team1Name, forceRefreshMatch.team2Name, forceRefreshMatch.startTime));
         }
     } else {
         schedule.forEach((match) => {
             if (!match.team1 || !match.team2 || match.team1.code === 'TBD' || match.team2.code === 'TBD') {
                 return;
             }
-            slugsToTry.push(...generateSlugsForMatch(mappingDict, match.team1.code, match.team2.code, match.startTime));
+            slugsToTry.push(...generateSlugsForMatch(mappingDict, match.team1.code, match.team2.code, match.team1.name, match.team2.name, match.startTime));
         });
     }
 
@@ -421,7 +442,8 @@ async function getPolymarketOdds(options = {}) {
         return {
             data: cache.data,
             changed: false,
-            source: 'cache'
+            source: 'cache',
+            timestamp: cache.timestamp
         };
     }
 
@@ -456,7 +478,8 @@ async function getPolymarketOdds(options = {}) {
             return {
                 data: cache.data,
                 changed,
-                source: 'network'
+                source: 'network',
+                timestamp: cache.timestamp
             };
         } catch (err) {
             markError(cache, err);
@@ -464,7 +487,8 @@ async function getPolymarketOdds(options = {}) {
                 return {
                     data: cache.data,
                     changed: false,
-                    source: 'stale'
+                    source: 'stale',
+                    timestamp: cache.timestamp
                 };
             }
             throw err;
@@ -497,7 +521,7 @@ async function getTwitchAccessToken() {
 }
 
 async function getTwitchStatus(options = {}) {
-    const channels = ['handofblood', 'eintrachtspandau', 'tolkin', 'lec', 'lck', 'riotgames'];
+    const channels = ['handofblood', 'eintrachtspandau', 'tolkin', 'lec', 'lck', 'riotgames', 'primeleague', 'spielestyler'];
 
     return resolveCached(caches.twitchStatus, async () => {
         const token = await getTwitchAccessToken().catch(() => null);
@@ -525,7 +549,7 @@ async function getTwitchStatus(options = {}) {
             const stream = liveStreams.find((entry) => entry.user_login.toLowerCase() === login.toLowerCase());
             return {
                 user_login: login,
-                is_live: Boolean(stream) && stream.game_name === 'League of Legends',
+                is_live: Boolean(stream) && (login === 'spielestyler' || stream.game_name === 'League of Legends'),
                 game_name: stream ? stream.game_name : null,
                 viewer_count: stream ? stream.viewer_count : 0,
                 thumbnail_url: stream ? stream.thumbnail_url : null

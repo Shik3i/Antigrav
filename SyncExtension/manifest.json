@@ -1,14 +1,19 @@
 {
   "manifest_version": 3,
   "name": "SyncExtension",
-  "version": "2.1",
+  "version": "2.6",
   "description": "Minimal Media-Sync for HTML5 videos.",
+  "icons": {
+    "16": "icons/icon128.png",
+    "48": "icons/icon128.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": [
     "tabs",
     "storage",
     "scripting",
-    "clipboardWrite",
-    "alarms"
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -20,18 +25,14 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Media Sync"
+    "default_title": "Media Sync",
+    "default_icon": {
+      "16": "icons/icon128.png",
+      "48": "icons/icon128.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "all_frames": true,
-      "js": [
-        "content.js"
-      ]
-    },
     {
       "matches": [
         "https://timer.shik3i.net/*",

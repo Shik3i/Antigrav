@@ -27,8 +27,9 @@ function broadcastToTimerTabs(message) {
 }
 
 function announceLocalTabStatus() {
-    chrome.storage.local.get(['targetTabId'], (storageData) => {
+    chrome.storage.local.get(['targetTabId', 'localPlaybackState'], (storageData) => {
         const targetTabId = storageData.targetTabId;
+        const playbackState = storageData.localPlaybackState || null;
 
         getOrCreateExtensionInstanceId((instanceId) => {
             const version = chrome.runtime.getManifest().version;
@@ -40,6 +41,7 @@ function announceLocalTabStatus() {
                         action: 'tab_status',
                         tabTitle: null,
                         isReady: false,
+                        playbackState: null,
                         version,
                         instanceId
                     }
@@ -49,12 +51,14 @@ function announceLocalTabStatus() {
 
             chrome.tabs.get(targetTabId, (tab) => {
                 if (chrome.runtime.lastError || !tab) {
+                    chrome.storage.local.set({ targetTabId: 'none' });
                     broadcastToTimerTabs({
                         type: 'EXTENSION_OUTBOUND',
                         payload: {
                             action: 'tab_status',
                             tabTitle: null,
                             isReady: false,
+                            playbackState: null,
                             version,
                             instanceId
                         }
@@ -69,6 +73,7 @@ function announceLocalTabStatus() {
                         action: 'tab_status',
                         tabTitle,
                         isReady: !!tabTitle,
+                        playbackState,
                         version,
                         instanceId
                     }
@@ -87,6 +92,26 @@ function updateForceSyncState(timestamp, updater) {
     });
 }
 
+function showPeerActionNotification(senderName, action) {
+    chrome.storage.local.get(['notificationsEnabled'], (data) => {
+        if (data.notificationsEnabled === false) return;
+
+        let actionLabel = action === 'play' ? 'gestartet' :
+                          action === 'pause' ? 'pausiert' :
+                          action === 'force_sync_pause_seek' ? 'Synchronisierung gestartet' :
+                          action === 'force_sync_play' ? 'Synchronisierung abgeschlossen' :
+                          action.toUpperCase();
+
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon128.png',
+            title: 'Sync Extension',
+            message: `${senderName || 'Ein Teilnehmer'} hat das Video ${actionLabel}.`,
+            priority: 1
+        });
+    });
+}
+
 chrome.runtime.onInstalled.addListener(() => {
     chrome.alarms.create('extension-tab-status-heartbeat', { periodInMinutes: 1 });
 });
@@ -98,6 +123,79 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'extension-tab-status-heartbeat') {
         announceLocalTabStatus();
+        updateBadgeStatus();
+        pruneRoomPeers(); // Periodically clean up old peers
+    }
+});
+function updateBadgeStatus() {
+    chrome.storage.local.get(['targetTabId'], (data) => {
+        if (data.targetTabId && data.targetTabId !== 'none') {
+            chrome.action.setBadgeText({ text: 'ON' });
+            chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+        } else {
+            chrome.action.setBadgeText({ text: '' });
+        }
+    });
+}
+
+function compareVersions(a, b) {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const diff = (pa[i] || 0) - (pb[i] || 0);
+        if (diff !== 0) return diff;
+    }
+    return 0;
+}
+
+// Memory Cleanup: Prune peers that haven't been seen in > 1 minute to prevent storage bloat.
+function pruneRoomPeers() {
+    chrome.storage.local.get(['roomPeers'], (data) => {
+        const peers = data.roomPeers || {};
+        const now = Date.now();
+        let changed = false;
+
+        Object.keys(peers).forEach(name => {
+            if ((now - peers[name].lastSeen) > 60 * 1000) {
+                delete peers[name];
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            chrome.storage.local.set({ roomPeers: peers });
+        }
+    });
+}
+
+// Monitor Tab closure: If the target tab is closed, clear it immediately.
+chrome.tabs.onRemoved.addListener((tabId) => {
+    chrome.storage.local.get(['targetTabId'], (data) => {
+        if (data.targetTabId === tabId) {
+            chrome.storage.local.set({ targetTabId: 'none' });
+            updateBadgeStatus();
+            announceLocalTabStatus();
+        }
+    });
+});
+
+// Proactive Injection: When the user selects a target tab, inject the sync logic immediately.
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.targetTabId) {
+        const newId = changes.targetTabId.newValue;
+        if (newId && newId !== 'none') {
+            chrome.scripting.executeScript({
+                target: { tabId: newId },
+                files: ['content.js']
+            }).then(() => {
+                console.log(`Background: Proactively injected sync script into tab ${newId}`);
+                // Refresh status so the timer tab knows we are ready
+                announceLocalTabStatus();
+            }).catch(err => {
+                console.warn(`Background: Proactive injection failed for tab ${newId}:`, err.message);
+            });
+        }
+        updateBadgeStatus();
     }
 });
 
@@ -162,6 +260,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     peers[peerName] = {
                         tabTitle: p.tabTitle || null,
                         isReady: p.isReady || false,
+                        playbackState: p.playbackState || null,
                         version: p.version || null,
                         instanceId: p.instanceId || null,
                         lastSeen: Date.now()
@@ -197,6 +296,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return true;
         }
 
+        // 2d. Handle Heartbeat (Keep-Alive) from content.js or bridge.js
+        if (message.type === 'EXTENSION_HEARTBEAT') {
+            // If content.js sent a playbackState, store it for our own tab_status broadcasts
+            if (message.source === 'content' && message.playbackState) {
+                chrome.storage.local.set({ localPlaybackState: message.playbackState });
+            }
+            return true;
+        }
+
         // 3. Handle actionable payloads (like play, pause, seek, etc.) meant for the Video Tab
         chrome.storage.local.get(['targetTabId', 'history'], (storageData) => {
             const currentHistory = storageData.history || [];
@@ -226,6 +334,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 };
                 currentHistory.unshift(logEntry);
                 chrome.storage.local.set({ history: currentHistory.slice(0, 50) });
+
+                // Show notification if it's an inbound message from another user
+                if (message.type === 'EXTENSION_INBOUND' && message.senderName) {
+                    showPeerActionNotification(message.senderName, actionTarget);
+                }
             }
 
             if (storageData.targetTabId && storageData.targetTabId !== 'none') {
@@ -236,6 +349,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                         // Verified ACK: content.js confirmed the action succeeded
                         if (response.status === 'playing' || response.status === 'paused') {
+                            const newState = response.status === 'playing' ? 'playing' : 'paused';
+                            chrome.storage.local.set({ localPlaybackState: newState }, () => {
+                                announceLocalTabStatus();
+                            });
                             // Forward ACK to all React Timer tabs via OUTBOUND pipe
                             broadcastToTimerTabs({
                                 type: 'EXTENSION_OUTBOUND',
@@ -298,7 +415,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             chrome.scripting.executeScript({
                                 target: { tabId: storageData.targetTabId },
                                 files: ['content.js']
-                            }).then(() => setTimeout(() => sendCommand(1), 500)).catch(e => console.error("Inject Err", e));
+                            }).then(() => {
+                                setTimeout(() => sendCommand(1), 500);
+                            }).catch(e => {
+                                // Double safety: tab might have closed between check and injection
+                                console.error("Inject Err", e.message);
+                                if (e.message.includes('No tab with id')) {
+                                    chrome.storage.local.set({ targetTabId: 'none' });
+                                }
+                            });
                         }
                     });
                 };

@@ -635,7 +635,7 @@ const ScratchcardShop = () => {
                                                                         overflow: 'hidden',
                                                                         border: isWinPart ? '1px solid #f59e0b' : 'none'
                                                                     }}>
-                                                                        <img src={findTeamImage(code)} alt={code} style={{ width: '80%', height: '80%', objectFit: 'contain', opacity: isWinPart ? 1 : 0.4 }} />
+                                                                        <img src={findTeamImage(code)} alt={code} width="40" height="40" loading="lazy" style={{ width: '80%', height: '80%', objectFit: 'contain', opacity: isWinPart ? 1 : 0.4 }} />
                                                                     </div>
                                                                 );
                                                             })}
@@ -867,7 +867,7 @@ const ScratchcardShop = () => {
                                             >
                                                 <div className={revealedFields[idx] ? 'reveal-pop' : ''} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                     {findTeamImage(code) ? (
-                                                        <img src={findTeamImage(code)} alt={code} style={styles.teamLogo} />
+                                                        <img src={findTeamImage(code)} alt={code} width="40" height="40" loading="lazy" style={styles.teamLogo} />
                                                     ) : (
                                                         <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{code}</span>
                                                     )}
@@ -1039,7 +1039,7 @@ const ScratchcardShop = () => {
                                             background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)'
                                         }}>
                                             <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', width: '20px' }}>#{rank}</span>
-                                            {teamInfo?.image && <img src={teamInfo.image} alt="" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
+                                            {teamInfo?.image && <img src={teamInfo.image} alt="" width="24" height="24" loading="lazy" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{teamInfo?.name || t.team_code}</div>
                                             </div>

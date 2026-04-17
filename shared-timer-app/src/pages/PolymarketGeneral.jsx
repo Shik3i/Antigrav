@@ -2,10 +2,17 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, Link as LinkIcon, ExternalLink, TrendingUp, Search, Calendar, Hash, Info, AlertTriangle, Users, ChevronDown, ChevronUp, Trash2, CheckCircle } from 'lucide-react';
 import Avatar from '../components/Avatar';
+import { useToast } from '../context/ToastContext';
+import { usePersistentData } from '../context/PersistentDataContext';
 
 const PolymarketGeneral = () => {
-    const [bets, setBets] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { showToast } = useToast();
+    const { 
+        generalBets: bets, 
+        loadingGeneral: loading, 
+        loadGeneralBets,
+        setGeneralBets 
+    } = usePersistentData();
     const [error, setError] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [formData, setFormData] = useState({ title: '', url: '' });
@@ -20,21 +27,10 @@ const PolymarketGeneral = () => {
     const [resovledAccordionOpen, setResolvedAccordionOpen] = useState(false);
     const [polymarketSettings, setPolymarketSettings] = useState({ allowUsersToAdd: false });
 
-    const fetchBets = async () => {
-        try {
-            setLoading(true);
-            const res = await axios.get('/api/polymarket/general');
-            setBets(res.data);
-            setLoading(false);
-        } catch (err) {
-            console.error('Failed to fetch general bets:', err);
-            setError('Gegebenenfalls konnten die Wetten nicht geladen werden.');
-            setLoading(false);
-        }
-    };
+    const fetchBets = () => loadGeneralBets(true);
 
     useEffect(() => {
-        fetchBets();
+        loadGeneralBets();
         fetchCurrentUser();
         fetchPolymarketSettings();
     }, []);
@@ -93,13 +89,13 @@ const PolymarketGeneral = () => {
         
         const betAmount = parseInt(amount);
         if (isNaN(betAmount) || betAmount <= 0) {
-            alert('Bitte einen gültigen Wetteinsatz eingeben.');
+            showToast('Bitte einen gültigen Wetteinsatz eingeben.', 'warning');
             return;
         }
 
         const token = localStorage.getItem('timerToken');
         if (!token) {
-            alert('Bitte einloggen, um zu wetten.');
+            showToast('Bitte einloggen, um zu wetten.', 'warning');
             return;
         }
 
@@ -117,7 +113,7 @@ const PolymarketGeneral = () => {
             setBettingStatus(prev => ({ ...prev, [betId]: 'success' }));
             setCurrentBet({ outcomeIndex: 0, amount: '' });
             
-            alert(`Wette erfolgreich platziert! ${betAmount} KC wurden abgezogen.`);
+            showToast(`Wette erfolgreich platziert! ${betAmount} KC wurden abgezogen.`, 'success');
             
             setTimeout(() => {
                 setBettingStatus(prev => ({ ...prev, [betId]: 'idle' }));
@@ -126,7 +122,7 @@ const PolymarketGeneral = () => {
         } catch (err) {
             console.error('Betting failed:', err);
             setBettingStatus(prev => ({ ...prev, [betId]: 'error' }));
-            alert(err.response?.data?.error || 'Wette konnte nicht platziert werden.');
+            showToast(err.response?.data?.error || 'Wette konnte nicht platziert werden.', 'error');
         }
     };
 
@@ -140,7 +136,7 @@ const PolymarketGeneral = () => {
             });
             fetchBets();
         } catch (err) {
-            alert('Löschen fehlgeschlagen: ' + (err.response?.data?.error || err.message));
+            showToast('Löschen fehlgeschlagen: ' + (err.response?.data?.error || err.message), 'error');
         }
     };
 
@@ -151,13 +147,13 @@ const PolymarketGeneral = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.data.success) {
-                alert(res.data.message);
+                showToast(res.data.message, 'success');
                 fetchBets();
             } else {
-                alert(res.data.message || 'Check abgeschlossen: Markt noch offen.');
+                showToast(res.data.message || 'Check abgeschlossen: Markt noch offen.', 'info');
             }
         } catch (err) {
-            alert('Resolution fehlgeschlagen: ' + (err.response?.data?.error || err.message));
+            showToast('Resolution fehlgeschlagen: ' + (err.response?.data?.error || err.message), 'error');
         }
     };
 
@@ -281,7 +277,7 @@ const PolymarketGeneral = () => {
             </div>
 
             {/* Content List */}
-            {loading ? (
+            {loading && bets.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {[1, 2, 3].map(i => (
                         <div key={i} className="glass-panel" style={{ height: '140px', opacity: 0.3, animation: 'pulse 2s infinite' }}></div>

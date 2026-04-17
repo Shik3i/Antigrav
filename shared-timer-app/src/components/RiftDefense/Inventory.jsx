@@ -271,7 +271,7 @@ const Inventory = ({ refreshTrigger }) => {
                         >
                             <div style={styles.avatarContainer(rColor)}>
                                 <div style={styles.starBadge}>{'⭐'.repeat(star)}</div>
-                                <img src={findTeamImage(teamCode)} alt={teamCode} style={styles.avatarImg} />
+                                <img src={findTeamImage(teamCode)} alt={teamCode} width="84" height="84" loading="lazy" style={styles.avatarImg} />
                                 <div style={styles.countBadge}>x{count}</div>
                             </div>
                             <div style={styles.teamLabel}>{teamCode}</div>
@@ -327,7 +327,7 @@ const Inventory = ({ refreshTrigger }) => {
                         <div style={styles.modalContent(rColor)} onClick={e => e.stopPropagation()}>
                             <div style={styles.modalHeader}>
                                 <div style={{...styles.avatarContainer(rColor), width: '120px', height: '120px'}}>
-                                    <img src={findTeamImage(teamCode)} alt="" style={styles.avatarImg} />
+                                    <img src={findTeamImage(teamCode)} alt="" width="120" height="120" loading="lazy" style={styles.avatarImg} />
                                 </div>
                                 <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900 }}>{teamCode}</h3>
                                 <div style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{'⭐'.repeat(starLevel)}</div>

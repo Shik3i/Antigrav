@@ -103,7 +103,7 @@ const GameMap = ({ onGameOver }) => {
                             >
                                 {pt ? (
                                     findTeamImage(pt.teamCode) ? (
-                                        <img src={findTeamImage(pt.teamCode)} alt={pt.teamCode} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+                                        <img src={findTeamImage(pt.teamCode)} alt={pt.teamCode} width="24" height="24" loading="lazy" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
                                     ) : (
                                         <span style={{ fontSize: '0.7rem', fontWeight: 800 }}>{pt.teamCode}</span>
                                     )
@@ -143,7 +143,7 @@ const GameMap = ({ onGameOver }) => {
                             boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)'
                         }}>
                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                 {findTeamImage(hoveredTower.teamCode) && <img src={findTeamImage(hoveredTower.teamCode)} alt="" style={{ width: '20px', height: '20px' }} />}
+                                 {findTeamImage(hoveredTower.teamCode) && <img src={findTeamImage(hoveredTower.teamCode)} alt="" width="20" height="20" loading="lazy" style={{ width: '20px', height: '20px' }} />}
                                  <span style={{ fontWeight: 800 }}>{hoveredTower.teamCode}</span>
                                  <span style={{ color: '#fbbf24', marginLeft: 'auto' }}>{'⭐'.repeat(hoveredTower.starLevel)}</span>
                              </div>
@@ -234,7 +234,7 @@ const GameMap = ({ onGameOver }) => {
                                 <div key={t.id} style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            {findTeamImage(t.teamCode) && <img src={findTeamImage(t.teamCode)} alt={t.teamCode} style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
+                                            {findTeamImage(t.teamCode) && <img src={findTeamImage(t.teamCode)} alt={t.teamCode} width="20" height="20" loading="lazy" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
                                             <span style={{ fontWeight: 800 }}>{t.teamCode}</span>
                                         </div>
                                         <span style={{ color: '#fbbf24' }}>{'⭐'.repeat(t.starLevel)}</span>
