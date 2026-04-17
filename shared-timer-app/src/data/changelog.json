@@ -1,5 +1,11 @@
 [
   {
+    "id": 31,
+    "version": "2.19.1",
+    "date": "2026-04-17",
+    "changes": "- **Repository Cleanup**: Entfernte ungenutzte Hooks, Template-Artefakte und temporäre Hilfsdateien aus dem Refactoring-Nachlauf.\n- **Socket Events**: Konsolidierung der Client-/Server-Eventnamen auf eine gemeinsame Shared-Definition zur Vermeidung von Drift.\n- **Structure Polish**: Bereinigung eines ungenutzten Context-Rests und Aktualisierung der README auf den realen Projektstand."
+  },
+  {
     "id": 30,
     "version": "2.19.0",
     "date": "2026-04-15",
