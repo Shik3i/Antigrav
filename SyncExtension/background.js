@@ -8,7 +8,6 @@ const TIMER_TAB_URLS = ["*://timer.shik3i.net/*", "http://localhost:3001/*", "*:
 
 // Bug 1 Fix: In-memory playback state cache so bridge.js heartbeats (which lack playbackState) never erase it
 let cachedPlaybackState = null;
-let lastBroadcastTime = 0;
 
 function addDevLog(message, type = 'info') {
     chrome.storage.local.get(['devModeEnabled', 'devLogs'], (data) => {
@@ -40,73 +39,57 @@ function getOrCreateExtensionInstanceId(callback) {
 
 function broadcastToTimerTabs(message) {
     chrome.tabs.query({ url: TIMER_TAB_URLS }, (tabs) => {
+        if (tabs.length === 0) {
+            addDevLog('No active Timer tabs found for broadcast', 'warn');
+            return;
+        }
+        addDevLog(`Broadcasting ${message.type} to ${tabs.length} timer tab(s)`, 'info');
         tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, message).catch(() => { });
+            chrome.tabs.sendMessage(tab.id, message).catch((err) => { 
+                addDevLog(`Failed to send to timer tab ${tab.id}: ${err.message}`, 'error');
+            });
         });
     });
 }
 
-function announceLocalTabStatus(force = false) {
-    const now = Date.now();
-    // Throttle automated broadcasts to prevent the infinite ping-pong loop (Fix 2 regression)
-    // Only allow if it's a manual action (force) or if 2 seconds have passed since last broadcast.
-    if (!force && (now - lastBroadcastTime) < 2000) {
-        addDevLog('Broadcasting status throttled (too frequent)', 'warn');
-        return;
-    }
-    lastBroadcastTime = now;
-
+function announceLocalTabStatus(reason = 'broadcast') {
     chrome.storage.local.get(['targetTabId'], (storageData) => {
         const targetTabId = storageData.targetTabId;
         const playbackState = cachedPlaybackState;
 
         getOrCreateExtensionInstanceId((instanceId) => {
             const version = chrome.runtime.getManifest().version;
+            
+            const createPayload = (tabTitle, isReady) => ({
+                action: 'tab_status',
+                tabTitle,
+                isReady,
+                playbackState,
+                version,
+                instanceId,
+                reason // 'broadcast' (needs reply) or 'response' (end of chain)
+            });
 
             if (!targetTabId || targetTabId === 'none') {
-                broadcastToTimerTabs({
-                    type: 'EXTENSION_OUTBOUND',
-                    payload: {
-                        action: 'tab_status',
-                        tabTitle: null,
-                        isReady: false,
-                        playbackState: null,
-                        version,
-                        instanceId
-                    }
-                });
+                const payload = createPayload(null, false);
+                addDevLog(`OUTBOUND: Status (${reason}) - No tab selected`, 'info');
+                broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
                 return;
             }
 
             chrome.tabs.get(targetTabId, (tab) => {
                 if (chrome.runtime.lastError || !tab) {
                     chrome.storage.local.set({ targetTabId: 'none' });
-                    broadcastToTimerTabs({
-                        type: 'EXTENSION_OUTBOUND',
-                        payload: {
-                            action: 'tab_status',
-                            tabTitle: null,
-                            isReady: false,
-                            playbackState: null,
-                            version,
-                            instanceId
-                        }
-                    });
+                    const payload = createPayload(null, false);
+                    addDevLog(`OUTBOUND: Status (${reason}) - Tab ${targetTabId} not found`, 'warn');
+                    broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
                     return;
                 }
 
                 const tabTitle = tab.title ? tab.title.substring(0, 30) : null;
-                broadcastToTimerTabs({
-                    type: 'EXTENSION_OUTBOUND',
-                    payload: {
-                        action: 'tab_status',
-                        tabTitle,
-                        isReady: !!tabTitle,
-                        playbackState,
-                        version,
-                        instanceId
-                    }
-                });
+                const payload = createPayload(tabTitle, !!tabTitle);
+                addDevLog(`OUTBOUND: Status (${reason}) - ${tabTitle || 'No Title'}`, 'success');
+                broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
             });
         });
     });
@@ -184,7 +167,9 @@ function pruneRoomPeers() {
         let changed = false;
 
         Object.keys(peers).forEach(name => {
-            if ((now - peers[name].lastSeen) > 60 * 1000) {
+            const lastSeen = peers[name].lastSeen;
+            if (!lastSeen || (now - lastSeen) > 60 * 1000) {
+                addDevLog(`Pruning inactive peer: ${name} (Last seen: ${lastSeen ? Math.round((now-lastSeen)/1000)+'s ago' : 'never'})`, 'info');
                 delete peers[name];
                 changed = true;
             }
@@ -256,7 +241,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Also handle TAB_SELECTION_CHANGED here so it is never accidentally skipped
     if (message.type === 'TAB_SELECTION_CHANGED') {
-        announceLocalTabStatus(true); // Force because user manually interacted
+        addDevLog('TAB_SELECTION_CHANGED detected -> broadcasting status', 'info');
+        announceLocalTabStatus('broadcast'); 
         return true;
     }
 
@@ -264,11 +250,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!message.payload) return true;
 
         const p = message.payload;
-        addDevLog(`${message.type}: ${p.action}`, 'info');
+        if (p.action !== 'tab_status') {
+             addDevLog(`${message.type}: ${p.action}`, 'info');
+        }
 
         // 1. Handle incoming ACKs from other users via the React Bridge
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'EXTENSION_SYNC_ACK') {
             const ackName = message.senderName || p.userDisplayName || 'Unknown';
+            addDevLog(`ACK received from ${ackName} for ${p.originalAction}`, 'success');
             chrome.storage.local.get(['history'], (storageData) => {
                 const currentHistory = storageData.history || [];
                 if (currentHistory.length === 0) return;
@@ -311,9 +300,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // 2b. Handle tab_status announcements from other users
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'tab_status') {
             getOrCreateExtensionInstanceId((instanceId) => {
-                if (p.instanceId && p.instanceId === instanceId) return;
+                if (p.instanceId && p.instanceId === instanceId) {
+                    addDevLog(`INBOUND: Status from self (ignored) - ID: ${p.instanceId}`, 'info');
+                    return;
+                }
 
                 const peerName = message.senderName || p.senderName || 'Unknown';
+                const reason = p.reason || 'broadcast';
+                addDevLog(`INBOUND: Status (${reason}) from ${peerName}`, 'success');
+
                 chrome.storage.local.get(['roomPeers'], (data) => {
                     const peers = data.roomPeers || {};
                     peers[peerName] = {
@@ -327,11 +322,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     chrome.storage.local.set({ roomPeers: peers });
                 });
 
-                // Fix 2: Immediately respond with our own status so the announcing peer
-                // can also see us. Without this, peer visibility depends on alarm timing
-                // (up to 1 min) or the next bridge heartbeat (up to 15s). With this fix,
-                // both sides see each other within one socket round-trip.
-                announceLocalTabStatus();
+                // RESPONSE LOGIC:
+                // Only reply if the sender asked for a broadcast (discovery).
+                // If they explicitly sent a 'response', we stop here to avoid infinite loops.
+                if (reason === 'broadcast') {
+                    addDevLog(`Responding to ${peerName}'s discovery broadcast...`, 'info');
+                    announceLocalTabStatus('response');
+                } else {
+                    addDevLog(`Peer ${peerName} sent a response - chain ends here.`, 'info');
+                }
             });
             return true;
         }
@@ -392,6 +391,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
             // Log core actions to history
             if (['play', 'pause', 'force_sync_pause_seek', 'force_sync_play'].includes(actionTarget)) {
+                addDevLog(`Action Logger: ${message.type} ${actionTarget} from ${message.source || 'remote'}`, 'info');
                 const logEntry = {
                     action: actionTarget,
                     timestamp: p.timestamp || new Date().toISOString(),
