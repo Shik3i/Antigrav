@@ -168,7 +168,7 @@ function pruneRoomPeers() {
 
         Object.keys(peers).forEach(name => {
             const lastSeen = peers[name].lastSeen;
-            if (!lastSeen || (now - lastSeen) > 60 * 1000) {
+            if (!lastSeen || (now - lastSeen) > 120 * 1000) {
                 addDevLog(`Pruning inactive peer: ${name} (Last seen: ${lastSeen ? Math.round((now-lastSeen)/1000)+'s ago' : 'never'})`, 'info');
                 delete peers[name];
                 changed = true;
@@ -258,19 +258,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'EXTENSION_SYNC_ACK') {
             const ackName = message.senderName || p.userDisplayName || 'Unknown';
             addDevLog(`ACK received from ${ackName} for ${p.originalAction}`, 'success');
+            
+            // 1a. Update history (legacy)
             chrome.storage.local.get(['history'], (storageData) => {
                 const currentHistory = storageData.history || [];
-                if (currentHistory.length === 0) return;
-
-                const targetEntry = currentHistory.find(entry => entry.timestamp === p.timestamp && entry.action === p.originalAction);
-                if (targetEntry) {
-                    if (!targetEntry.acks) targetEntry.acks = [];
-                    if (ackName && !targetEntry.acks.includes(ackName)) {
-                        targetEntry.acks.push(ackName);
-                        chrome.storage.local.set({ history: currentHistory });
+                if (currentHistory.length > 0) {
+                    const targetEntry = currentHistory.find(entry => entry.timestamp === p.timestamp && entry.action === p.originalAction);
+                    if (targetEntry) {
+                        if (!targetEntry.acks) targetEntry.acks = [];
+                        if (ackName && !targetEntry.acks.includes(ackName)) {
+                            targetEntry.acks.push(ackName);
+                            chrome.storage.local.set({ history: currentHistory });
+                        }
                     }
                 }
             });
+
+            // 1b. Update forceSyncState for real-time Two-Phase validation
+            if (p.originalAction === 'force_sync_pause_seek' && p.timestamp) {
+                updateForceSyncState(p.timestamp, (currentState) => {
+                    const remoteAcks = currentState.remoteAcks || {};
+                    remoteAcks[ackName] = true;
+                    return { ...currentState, remoteAcks, updatedAt: Date.now() };
+                });
+            }
             return true;
         }
 

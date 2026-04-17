@@ -272,8 +272,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(!list) return;
             const peers = data.roomPeers || {};
             const now = Date.now();
-            const active = Object.entries(peers).filter(([, v]) => {
-                if ((now - v.lastSeen) >= 60 * 1000) return false;
+            const activePeers = Object.entries(peers).filter(([, v]) => {
+                if ((now - v.lastSeen) >= 120 * 1000) return false;
                 return v.instanceId !== extensionInstanceId;
             });
 
@@ -282,52 +282,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             const myTitle = (myVal && myVal !== 'none' && myOption) ? myOption.textContent.replace(/^\d+ - /, '').replace(/⭐ MATCH: /, '').trim() : null;
             const myTabId = myVal && myVal !== 'none' ? parseInt(myVal, 10) : null;
             
-            list.innerHTML = '';
+            // Helper logic to render all rows at once
+            const updateUI = (myState) => {
+                list.innerHTML = '';
+                
+                const makeRow = (name, tabTitle, isReady, version, isSelf, playbackState) => {
+                    const row = document.createElement('div');
+                    row.style.cssText = `display:flex;align-items:center;gap:6px;background:${isSelf ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.04)'};padding:6px 8px;border-radius:6px;font-size:10px;color:#e2e8f0;`;
+                    const safeName = escapeHtml(name);
+                    const safeTitle = escapeHtml(tabTitle);
+                    const titleHtml = tabTitle
+                        ? `<span style="color:#a5b4fc;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeTitle}</span>`
+                        : `<span style="color:#6b7280;font-style:italic;">No tab</span>`;
 
-            const makeRow = (name, tabTitle, isReady, version, isSelf, playbackState) => {
-                const row = document.createElement('div');
-                row.style.cssText = `display:flex;align-items:center;gap:6px;background:${isSelf ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.04)'};padding:6px 8px;border-radius:6px;font-size:10px;color:#e2e8f0;`;
-                const safeName = escapeHtml(name);
-                const safeTitle = escapeHtml(tabTitle);
-                const titleHtml = tabTitle
-                    ? `<span style="color:#a5b4fc;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeTitle}</span>`
-                    : `<span style="color:#6b7280;font-style:italic;">No tab</span>`;
+                    let stateIcon;
+                    if (!isReady) {
+                        stateIcon = `<span title="No tab selected" style="font-size:11px;">🔴</span>`;
+                    } else if (playbackState === 'playing') {
+                        stateIcon = `<span title="Playing" style="font-size:11px;">▶️</span>`;
+                    } else if (playbackState === 'paused') {
+                        stateIcon = `<span title="Paused" style="font-size:11px;">⏸️</span>`;
+                    } else {
+                        stateIcon = `<span title="Ready (state unknown)" style="font-size:11px;">🟢</span>`;
+                    }
 
-                // Play/Pause icon: show state if known, else readiness dot
-                let stateIcon;
-                if (!isReady) {
-                    stateIcon = `<span title="No tab selected" style="font-size:11px;">🔴</span>`;
-                } else if (playbackState === 'playing') {
-                    stateIcon = `<span title="Playing" style="font-size:11px;">▶️</span>`;
-                } else if (playbackState === 'paused') {
-                    stateIcon = `<span title="Paused" style="font-size:11px;">⏸️</span>`;
-                } else {
-                    stateIcon = `<span title="Ready (state unknown)" style="font-size:11px;">🟢</span>`;
-                }
+                    row.innerHTML = `${stateIcon}<strong style="min-width:45px;">${safeName}</strong>${titleHtml}<span style="color:#6b7280;margin-left:auto;">v${version}</span>`;
+                    list.appendChild(row);
+                };
 
-                row.innerHTML = `${stateIcon}<strong style="min-width:45px;">${safeName}</strong>${titleHtml}<span style="color:#6b7280;margin-left:auto;">v${version}</span>`;
-                list.appendChild(row);
+                makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, myState);
+                activePeers.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                document.getElementById('roomStatusPanel').style.display = 'block';
             };
 
-            // For "You": query content.js directly for live state
             if (myTabId) {
                 chrome.tabs.sendMessage(myTabId, { action: 'get_debug_info' }).then(info => {
-                    const myState = info && info.videoState !== 'N/A'
-                        ? (info.videoState === 'Playing' ? 'playing' : 'paused')
-                        : null;
-                    makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, myState);
-                    active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
-                    document.getElementById('roomStatusPanel').style.display = 'block';
-                }).catch(() => {
-                    // content.js not reachable yet — render without state
-                    makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, null);
-                    active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
-                    document.getElementById('roomStatusPanel').style.display = 'block';
-                });
+                    const myState = info && info.videoState !== 'N/A' ? (info.videoState === 'Playing' ? 'playing' : 'paused') : null;
+                    updateUI(myState);
+                }).catch(() => updateUI(null));
             } else {
-                makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, null);
-                active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
-                document.getElementById('roomStatusPanel').style.display = 'block';
+                updateUI(null);
             }
         });
     }
@@ -409,14 +403,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // 2. Broadcast OUTBOUND pause/seek. 
             // Note: background.js now handles the local INBOUND trigger automatically.
-            const msg = { 
-                type: 'EXTENSION_OUTBOUND', 
-                source: 'extension_popup', 
-                payload: { action: 'force_sync_pause_seek', targetTime: time, timestamp: ts } 
-            };
             chrome.runtime.sendMessage(msg).catch(() => {});
 
-            // 3. Polling for readiness
+            // 3. Polling for readiness (Two-Phase: 5s for ACK, 60s for Buffer)
             const startTime = Date.now();
             const pollInterval = setInterval(async () => {
                 const elapsed = Date.now() - startTime;
@@ -425,33 +414,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 );
 
                 const peersInRoom = Object.keys(roomPeers || {}).filter(k => 
-                    k !== 'You' && (Date.now() - roomPeers[k].lastSeen < 60000)
+                    k !== 'You' && (Date.now() - roomPeers[k].lastSeen < 120000)
                 );
+                const acks = forceSyncState?.remoteAcks || {};
                 const readyPeers = Object.keys(forceSyncState?.remoteReady || {});
+                const responsivePeers = peersInRoom.filter(p => acks[p]);
 
-                // Success: All known peers are ready
-                if (peersInRoom.length > 0 && peersInRoom.every(p => readyPeers.includes(p))) {
+                // Phase 1: Wait for initial ACKs (max 5s)
+                if (elapsed < 5000) {
+                    const missingAcks = peersInRoom.filter(p => !acks[p]);
+                    if (missingAcks.length > 0) {
+                        updateSyncStatus(`⏳ Waiting for ACKs (${peersInRoom.length - missingAcks.length}/${peersInRoom.length})...`, '#f59e0b');
+                        return; // Still waiting for first contact
+                    }
+                }
+
+                // Phase 2: Wait for Buffer (Ready)
+                // If 5s passed, we only wait for those who acknowledged. 
+                const targetPeers = elapsed >= 5000 ? responsivePeers : peersInRoom;
+
+                if (targetPeers.length > 0) {
+                    const nonReady = targetPeers.filter(p => !readyPeers.includes(p));
+                    if (nonReady.length === 0) {
+                        // SUCCESS: Everyone responsive is ready! Finalize now.
+                        clearInterval(pollInterval);
+                        finalizeSync(ts);
+                        return;
+                    }
+                    updateSyncStatus(`⏳ Buffering: ${targetPeers.length - nonReady.length}/${targetPeers.length} ready...`, '#f59e0b');
+                } else if (elapsed >= 5000 && peersInRoom.length > 0) {
+                    // No one acknowledged within 5s
                     clearInterval(pollInterval);
-                    finalizeSync(ts);
+                    updateSyncStatus('⚠️ No response from peers – syncing locally', '#f59e0b');
+                    setTimeout(() => finalizeSync(ts), 1500);
                     return;
                 }
 
-                // Fallback (3s): No peers in room detected
+                // Room Fallback: No peers in room at all
                 if (elapsed >= 3000 && peersInRoom.length === 0) {
                     clearInterval(pollInterval);
-                    updateSyncStatus('⚠️ No peers responded – syncing locally only', '#f59e0b');
+                    updateSyncStatus('⚠️ No peers in room – syncing locally', '#f59e0b');
                     setTimeout(() => finalizeSync(ts), 1500);
                     return;
                 }
 
-                // Timeout (8s): Some peers are still not ready
-                if (elapsed >= 8000) {
+                // Global Timeout (60s)
+                if (elapsed >= 60000) {
                     clearInterval(pollInterval);
-                    updateSyncStatus('⚠️ Timeout – not all peers confirmed ready', '#f59e0b');
+                    updateSyncStatus('⚠️ Sync timed out', '#f59e0b');
                     setTimeout(() => finalizeSync(ts), 1500);
                     return;
                 }
-            }, 300);
+            }, 500);
 
         } catch(e) { 
             updateSyncStatus('❌ Failed', '#dc3545'); 

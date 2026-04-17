@@ -33,7 +33,7 @@
 
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         ytButton.click();
-                        setTimeout(() => { isProcessingCommand = false; }, 200);
+                        setTimeout(() => { isProcessingCommand = false; }, 1000);
                         return;
                     } else {
                         isProcessingCommand = false;
@@ -52,7 +52,7 @@
 
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         twitchButton.click();
-                        setTimeout(() => { isProcessingCommand = false; }, 200);
+                        setTimeout(() => { isProcessingCommand = false; }, 1000);
                         return;
                     } else {
                         isProcessingCommand = false;
@@ -81,7 +81,7 @@
         } catch (e) {
             console.error('SyncExtension: Error in media action:', e);
         }
-        setTimeout(() => { isProcessingCommand = false; }, 200);
+        setTimeout(() => { isProcessingCommand = false; }, 1000);
     }
 
     // --- Helper: poll video state with timeout ---
