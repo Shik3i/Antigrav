@@ -21,6 +21,7 @@ const routePrefetchers = new Map([
     ['/tetris', () => import('../pages/Tetris')],
     ['/wordle', () => import('../pages/Wordle')],
     ['/games/koalaflap', () => import('../pages/KoalaFlap')],
+    ['/games/tower-climb', () => import('../pages/TowerClimb')],
 ]);
 
 const prefetchedRoutes = new Set();

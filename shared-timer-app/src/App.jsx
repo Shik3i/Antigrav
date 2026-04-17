@@ -36,6 +36,7 @@ const LevelingTracker = React.lazy(() => import('./pages/LevelingTracker'));
 const Tetris = React.lazy(() => import('./pages/Tetris'));
 const PolymarketGeneral = React.lazy(() => import('./pages/PolymarketGeneral'));
 const Wordle = React.lazy(() => import('./pages/Wordle'));
+const TowerClimb = React.lazy(() => import('./pages/TowerClimb'));
 const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
 const LiveStreamWidget = React.lazy(() => import('./components/LiveStreamWidget'));
@@ -49,7 +50,7 @@ import { User, Settings as SettingsIcon, LogOut, Menu, X, Timer as TimerIcon, Ba
 import { getNextPokemon } from './utils/pokemonUtils';
 import { useAuth } from './context/AuthContext';
 import { fetchJson } from './utils/apiClient';
-import { getStoredValue, setStoredValue } from './utils/clientStorage';
+import { AUTH_SESSION_INVALIDATED_EVENT, getStoredValue, setStoredValue } from './utils/clientStorage';
 import { scheduleDeferred } from './utils/deferred';
 import { usePageVisibility } from './hooks/usePageVisibility';
 import { FloatingWidgetSkeleton, RouteSkeleton, WidgetPillSkeleton, ViewLoader } from './components/LoadingSkeletons';
@@ -135,6 +136,26 @@ function InnerApp() {
       setActiveToken(null);
     }
   }, [token]);
+
+  useEffect(() => {
+    let lastNoticeAt = 0;
+
+    const handleInvalidSession = (event) => {
+      const now = Date.now();
+      if (now - lastNoticeAt < 1500) return;
+      lastNoticeAt = now;
+
+      showToast(
+        event?.detail?.message || 'Deine Sitzung war nicht mehr gueltig. Bitte logge dich erneut ein.',
+        'warning',
+        6500
+      );
+    };
+
+    window.addEventListener(AUTH_SESSION_INVALIDATED_EVENT, handleInvalidSession);
+    return () => window.removeEventListener(AUTH_SESSION_INVALIDATED_EVENT, handleInvalidSession);
+  }, [showToast]);
+
   const [globalSocket, setGlobalSocket] = useState(null);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -683,6 +704,7 @@ function InnerApp() {
                 <Route path="/tetris" element={<Tetris />} />
                 <Route path="/polymarket-general" element={<PolymarketGeneral />} />
                 <Route path="/wordle" element={<Wordle user={user} token={token} />} />
+                <Route path="/games/tower-climb" element={<TowerClimb />} />
                 <Route path="/c" element={<SharedCountdown />} />
                 <Route path="*" element={<div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-main)' }}><h2>404 - Seite nicht gefunden</h2><p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Die gesuchte Seite existiert nicht.</p><a href="/" style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-card)', borderRadius: '8px', color: 'var(--text-main)', textDecoration: 'none', border: '1px solid var(--border-color)' }}>Zurück zur Startseite</a></div>} />
               </Routes>

@@ -181,6 +181,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         'lol-idle': <Trophy size={18} color="#6366f1" />,
         'colorsync': <Palette size={18} color="var(--accent-primary)" />,
         'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
+        'tower-climb': <Shield size={18} color="#3b82f6" />,
         'settings': <Settings size={18} />,
         'roadmap': <Lightbulb size={18} color="#fbbf24" />,
         'changelog': <History size={18} color="#94a3b8" />,

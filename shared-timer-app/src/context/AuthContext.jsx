@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { clearStoredAuth, notifyInvalidSession } from '../utils/clientStorage';
 
 const AuthContext = createContext();
 
@@ -75,8 +76,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setToken(null);
         setAuthUser(null);
-        localStorage.removeItem('timerToken');
-        localStorage.removeItem('timerAuthUser');
+        clearStoredAuth();
     };
 
     useEffect(() => {
@@ -93,7 +93,19 @@ export const AuthProvider = ({ children }) => {
             fetch('/api/auth/me', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-                .then(res => res.json())
+                .then(async (res) => {
+                    const data = await res.json().catch(() => null);
+                    if (!res.ok) {
+                        if (res.status === 401) {
+                            setToken(null);
+                            setAuthUser(null);
+                            clearStoredAuth();
+                            notifyInvalidSession();
+                        }
+                        throw new Error(data?.error || `Request failed: ${res.status}`);
+                    }
+                    return data;
+                })
                 .then(data => {
                     if (data.id) {
                         setAuthUser(prev => {
@@ -104,7 +116,9 @@ export const AuthProvider = ({ children }) => {
                         });
                     }
                 })
-                .catch(console.error);
+                .catch(error => {
+                    console.error('Auth bootstrap failed:', error);
+                });
         }
     }, []); // Run once on mount to silently update state
 

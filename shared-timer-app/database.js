@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { TOWER_CLIMB_CONFIG, getTowerMultiplierTable, getTowerPayout } = require('./config/towerClimb');
 
 // Determine DB file path: env var for Docker, fallback for local dev
 const dbFilePath = process.env.DB_PATH || path.join(__dirname, 'data', 'timerapp.db');
@@ -326,6 +327,27 @@ function initializeDatabaseSchema() {
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(userId) REFERENCES Users(id)
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS TowerClimbRounds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    bet INTEGER NOT NULL,
+    tilesPerLevel INTEGER NOT NULL,
+    levelCount INTEGER NOT NULL DEFAULT 8,
+    currentLevel INTEGER NOT NULL DEFAULT 0,
+    currentMultiplier REAL NOT NULL DEFAULT 1,
+    selectedTiles TEXT NOT NULL DEFAULT '[]',
+    trapPattern TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    payout INTEGER NOT NULL DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolvedAt DATETIME,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_tower_rounds_user_created ON TowerClimbRounds(userId, createdAt DESC)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tower_rounds_user_status ON TowerClimbRounds(userId, status)');
+  db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_tower_rounds_user_running ON TowerClimbRounds(userId) WHERE status = 'running'");
 
   // PolymarketGeneralBets: for user-submitted custom bets
   db.run(`CREATE TABLE IF NOT EXISTS PolymarketGeneralBets (
@@ -726,6 +748,10 @@ function initializeDatabaseSchema() {
     // Wordle Link
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder) 
             VALUES ('wordle', 'Wordle', '/wordle', 'Games', 1, 8)`);
+
+    // Tower Climb Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder)
+            VALUES ('tower-climb', 'Tower Climb', '/games/tower-climb', 'Games', 1, 9)`);
 
 
     // ─── Leveling Milestones Table ───────────────────────────────
@@ -2215,6 +2241,414 @@ const recordGameScore = (userId, gameId, score, coinsEarned) => {
   });
 };
 
+const safeJsonParse = (value, fallback) => {
+  try {
+    if (typeof value === 'string') {
+      return JSON.parse(value);
+    }
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const mapTowerRoundRow = (row) => {
+  if (!row) return null;
+
+  const selectedTiles = safeJsonParse(row.selectedTiles, []);
+  const multiplierTable = getTowerMultiplierTable(row.tilesPerLevel);
+  const safeCurrentLevel = Math.max(0, Math.min(row.currentLevel || 0, row.levelCount || TOWER_CLIMB_CONFIG.levelCount));
+  const currentPayout = row.status === 'cashed_out'
+    ? row.payout || 0
+    : (row.status === 'running' && safeCurrentLevel > 0
+        ? getTowerPayout(row.bet, row.tilesPerLevel, safeCurrentLevel)
+        : 0);
+
+  return {
+    id: row.id,
+    userId: row.userId,
+    bet: row.bet,
+    tilesPerLevel: row.tilesPerLevel,
+    levelCount: row.levelCount,
+    currentLevel: safeCurrentLevel,
+    currentMultiplier: Number(row.currentMultiplier || multiplierTable[safeCurrentLevel] || 1),
+    selectedTiles,
+    status: row.status,
+    payout: row.payout || 0,
+    currentPayout,
+    canCashout: row.status === 'running' && safeCurrentLevel > 0,
+    multiplierTable,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    resolvedAt: row.resolvedAt
+  };
+};
+
+const getTowerRoundById = (roundId) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM TowerClimbRounds WHERE id = ?', [roundId], (err, row) => {
+      if (err) reject(err);
+      else resolve(mapTowerRoundRow(row));
+    });
+  });
+};
+
+const getActiveTowerRound = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      "SELECT * FROM TowerClimbRounds WHERE userId = ? AND status = 'running' ORDER BY createdAt DESC LIMIT 1",
+      [userId],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(mapTowerRoundRow(row));
+      }
+    );
+  });
+};
+
+const getLatestTowerRound = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      'SELECT * FROM TowerClimbRounds WHERE userId = ? ORDER BY createdAt DESC LIMIT 1',
+      [userId],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(mapTowerRoundRow(row));
+      }
+    );
+  });
+};
+
+const getTowerHistory = (userId, limit = 10) => {
+  return new Promise((resolve, reject) => {
+    db.all(
+      "SELECT * FROM TowerClimbRounds WHERE userId = ? AND status != 'running' ORDER BY createdAt DESC LIMIT ?",
+      [userId, limit],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve((rows || []).map(mapTowerRoundRow));
+      }
+    );
+  });
+};
+
+const startTowerRound = (userId, bet, tilesPerLevel) => {
+  return new Promise((resolve, reject) => {
+    const trapPattern = Array.from(
+      { length: TOWER_CLIMB_CONFIG.levelCount },
+      () => Math.floor(Math.random() * tilesPerLevel)
+    );
+
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+
+      db.get(
+        "SELECT * FROM TowerClimbRounds WHERE userId = ? AND status = 'running' ORDER BY createdAt DESC LIMIT 1",
+        [userId],
+        (activeErr, activeRow) => {
+          if (activeErr) {
+            db.run('ROLLBACK');
+            return reject(activeErr);
+          }
+
+          if (activeRow) {
+            db.run('ROLLBACK');
+            const error = new Error('A tower round is already running.');
+            error.status = 409;
+            error.activeRound = mapTowerRoundRow(activeRow);
+            return reject(error);
+          }
+
+          db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (userErr, user) => {
+            if (userErr) {
+              db.run('ROLLBACK');
+              return reject(userErr);
+            }
+            if (!user) {
+              db.run('ROLLBACK');
+              const error = new Error('User not found.');
+              error.status = 404;
+              return reject(error);
+            }
+            if ((user.koala_balance || 0) < bet) {
+              db.run('ROLLBACK');
+              const error = new Error('Not enough KoalaCoins.');
+              error.status = 400;
+              return reject(error);
+            }
+
+            db.run(
+              `INSERT INTO TowerClimbRounds (
+                userId, bet, tilesPerLevel, levelCount, currentLevel, currentMultiplier,
+                selectedTiles, trapPattern, status, payout, updatedAt
+              ) VALUES (?, ?, ?, ?, 0, 1, '[]', ?, 'running', 0, CURRENT_TIMESTAMP)`,
+              [userId, bet, tilesPerLevel, TOWER_CLIMB_CONFIG.levelCount, JSON.stringify(trapPattern)],
+              function (insertErr) {
+                if (insertErr) {
+                  db.run('ROLLBACK');
+                  return reject(insertErr);
+                }
+
+                const roundId = this.lastID;
+                db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [bet, userId], (balanceErr) => {
+                  if (balanceErr) {
+                    db.run('ROLLBACK');
+                    return reject(balanceErr);
+                  }
+
+                  db.run(
+                    'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+                    [userId, -bet, `Tower Climb Start (Bet: ${(bet / 100).toFixed(2)} KC)`],
+                    (txErr) => {
+                      if (txErr) {
+                        db.run('ROLLBACK');
+                        return reject(txErr);
+                      }
+
+                      db.run('COMMIT', async (commitErr) => {
+                        if (commitErr) return reject(commitErr);
+
+                        try {
+                          const round = await getTowerRoundById(roundId);
+                          resolve({
+                            round,
+                            newBalance: (user.koala_balance || 0) - bet
+                          });
+                        } catch (fetchErr) {
+                          reject(fetchErr);
+                        }
+                      });
+                    }
+                  );
+                });
+              }
+            );
+          });
+        }
+      );
+    });
+  });
+};
+
+const resolveTowerPick = (userId, tileIndex, expectedLevel) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+
+      db.get(
+        "SELECT * FROM TowerClimbRounds WHERE userId = ? AND status = 'running' ORDER BY createdAt DESC LIMIT 1",
+        [userId],
+        (roundErr, row) => {
+          if (roundErr) {
+            db.run('ROLLBACK');
+            return reject(roundErr);
+          }
+
+          if (!row) {
+            db.run('ROLLBACK');
+            const error = new Error('No active tower round found.');
+            error.status = 404;
+            return reject(error);
+          }
+
+          if (tileIndex >= row.tilesPerLevel) {
+            db.run('ROLLBACK');
+            const error = new Error('Selected tile is out of range.');
+            error.status = 400;
+            return reject(error);
+          }
+
+          const trapPattern = safeJsonParse(row.trapPattern, []);
+          const selectedTiles = safeJsonParse(row.selectedTiles, []);
+
+          if (row.currentLevel >= row.levelCount) {
+            db.run('ROLLBACK');
+            const error = new Error('The tower is complete. Cash out to finish the round.');
+            error.status = 400;
+            return reject(error);
+          }
+
+          if (expectedLevel !== row.currentLevel) {
+            db.run('ROLLBACK');
+            const error = new Error('The round state has already moved. Please refresh the board.');
+            error.status = 409;
+            return reject(error);
+          }
+
+          if (selectedTiles.some((selection) => selection.level === row.currentLevel)) {
+            db.run('ROLLBACK');
+            const error = new Error('This level has already been resolved.');
+            error.status = 409;
+            return reject(error);
+          }
+
+          const trapIndex = trapPattern[row.currentLevel];
+          const hitTrap = tileIndex === trapIndex;
+          const multipliers = getTowerMultiplierTable(row.tilesPerLevel);
+          const nextLevel = hitTrap ? row.currentLevel : row.currentLevel + 1;
+          const nextMultiplier = multipliers[nextLevel] || row.currentMultiplier || 1;
+          const selection = {
+            level: row.currentLevel,
+            tileIndex,
+            trapIndex,
+            result: hitTrap ? 'trap' : 'safe'
+          };
+          const nextSelections = [...selectedTiles, selection];
+
+          const finishRound = hitTrap;
+          const nextStatus = finishRound ? 'lost' : 'running';
+          const resolvedAt = finishRound ? ', resolvedAt = CURRENT_TIMESTAMP' : '';
+          const score = finishRound ? row.currentLevel : null;
+
+          db.run(
+            `UPDATE TowerClimbRounds
+             SET currentLevel = ?, currentMultiplier = ?, selectedTiles = ?, status = ?, updatedAt = CURRENT_TIMESTAMP${resolvedAt}
+             WHERE id = ?`,
+            [nextLevel, nextMultiplier, JSON.stringify(nextSelections), nextStatus, row.id],
+            (updateErr) => {
+              if (updateErr) {
+                db.run('ROLLBACK');
+                return reject(updateErr);
+              }
+
+              const finalizeCommit = async () => {
+                db.run('COMMIT', async (commitErr) => {
+                  if (commitErr) return reject(commitErr);
+
+                  try {
+                    const [round, user] = await Promise.all([
+                      getTowerRoundById(row.id),
+                      getUser(userId)
+                    ]);
+                    resolve({
+                      round,
+                      outcome: hitTrap ? 'trap' : 'safe',
+                      newBalance: user?.koala_balance || 0
+                    });
+                  } catch (fetchErr) {
+                    reject(fetchErr);
+                  }
+                });
+              };
+
+              if (!finishRound) {
+                return finalizeCommit();
+              }
+
+              db.run(
+                'INSERT INTO GameScores (userId, gameId, score, coinsEarned) VALUES (?, ?, ?, ?)',
+                [userId, TOWER_CLIMB_CONFIG.gameId, score, 0],
+                (scoreErr) => {
+                  if (scoreErr) {
+                    db.run('ROLLBACK');
+                    return reject(scoreErr);
+                  }
+                  finalizeCommit();
+                }
+              );
+            }
+          );
+        }
+      );
+    });
+  });
+};
+
+const cashoutTowerRound = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+
+      db.get(
+        "SELECT * FROM TowerClimbRounds WHERE userId = ? AND status = 'running' ORDER BY createdAt DESC LIMIT 1",
+        [userId],
+        (roundErr, row) => {
+          if (roundErr) {
+            db.run('ROLLBACK');
+            return reject(roundErr);
+          }
+
+          if (!row) {
+            db.run('ROLLBACK');
+            const error = new Error('No active tower round found.');
+            error.status = 404;
+            return reject(error);
+          }
+
+          if (row.currentLevel <= 0) {
+            db.run('ROLLBACK');
+            const error = new Error('You must clear at least one level before cashing out.');
+            error.status = 400;
+            return reject(error);
+          }
+
+          const payout = getTowerPayout(row.bet, row.tilesPerLevel, row.currentLevel);
+
+          db.run(
+            `UPDATE TowerClimbRounds
+             SET status = 'cashed_out', payout = ?, updatedAt = CURRENT_TIMESTAMP, resolvedAt = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [payout, row.id],
+            (updateErr) => {
+              if (updateErr) {
+                db.run('ROLLBACK');
+                return reject(updateErr);
+              }
+
+              db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [payout, userId], (balanceErr) => {
+                if (balanceErr) {
+                  db.run('ROLLBACK');
+                  return reject(balanceErr);
+                }
+
+                db.run(
+                  'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+                  [userId, payout, `Tower Climb Cashout (Level ${row.currentLevel}, x${Number(row.currentMultiplier || 1).toFixed(2)})`],
+                  (txErr) => {
+                    if (txErr) {
+                      db.run('ROLLBACK');
+                      return reject(txErr);
+                    }
+
+                    db.run(
+                      'INSERT INTO GameScores (userId, gameId, score, coinsEarned) VALUES (?, ?, ?, ?)',
+                      [userId, TOWER_CLIMB_CONFIG.gameId, row.currentLevel, payout],
+                      (scoreErr) => {
+                        if (scoreErr) {
+                          db.run('ROLLBACK');
+                          return reject(scoreErr);
+                        }
+
+                        db.run('COMMIT', async (commitErr) => {
+                          if (commitErr) return reject(commitErr);
+
+                          try {
+                            const [round, user] = await Promise.all([
+                              getTowerRoundById(row.id),
+                              getUser(userId)
+                            ]);
+                            resolve({
+                              round,
+                              payout,
+                              newBalance: user?.koala_balance || 0
+                            });
+                          } catch (fetchErr) {
+                            reject(fetchErr);
+                          }
+                        });
+                      }
+                    );
+                  }
+                );
+              });
+            }
+          );
+        }
+      );
+    });
+  });
+};
+
 const addPolymarketGeneralBet = (userId, title, slug, url, outcomes) => {
   return new Promise((resolve, reject) => {
     db.run(
@@ -3346,6 +3780,12 @@ module.exports = {
   getBettingAccuracyLeaderboard,
   recordGameScore,
   getGameLeaderboards,
+  getActiveTowerRound,
+  getLatestTowerRound,
+  getTowerHistory,
+  startTowerRound,
+  resolveTowerPick,
+  cashoutTowerRound,
   getGameUpgradesConfig,
   getUserUpgrades,
   purchaseUpgrade,

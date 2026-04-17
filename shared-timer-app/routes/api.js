@@ -8,6 +8,7 @@ const idleGameController = require('../controllers/idleGameController');
 const colorSyncController = require('../controllers/colorSyncController');
 const polymarketController = require('../controllers/polymarketController');
 const wordleController = require('../controllers/wordleController');
+const towerController = require('../controllers/towerController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -176,6 +177,14 @@ router.post('/idle/roster/mode', authController.authenticateToken, idleGameContr
 router.post('/idle/tournament/complete', authController.authenticateToken, idleGameController.validateTournament);
 
 router.post('/games/tetris/submit', authController.authenticateToken, apiController.submitTetrisScore);
+
+// ─── Tower Climb ────────────────────────────────────────────
+router.get('/tower/config', towerController.getConfig);
+router.get('/tower/state', authController.authenticateToken, towerController.getState);
+router.get('/tower/history', authController.authenticateToken, towerController.getHistory);
+router.post('/tower/start', authController.authenticateToken, towerController.startRound);
+router.post('/tower/pick', authController.authenticateToken, towerController.pickTile);
+router.post('/tower/cashout', authController.authenticateToken, towerController.cashoutRound);
 
 // ─── Polymarket General ───────────────────────────────────
 router.get('/polymarket/settings', polymarketController.getSettings);

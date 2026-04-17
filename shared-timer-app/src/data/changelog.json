@@ -1,5 +1,11 @@
 [
   {
+    "id": 42,
+    "version": "2.26.0",
+    "date": "2026-04-17",
+    "changes": "- **Tower Climb**: Neues serverautoritaeres Risk-Game mit Einsatz, Cashout, persistenter Rundenlogik, Verlauf und Leaderboard-Integration hinzugefuegt.\n- **Tower UX**: Dynamisches Einblenden der Ebenen, Auto-Start-Option fuer neue Runden und reduzierte Board-Beschriftung fuer ein klareres Spielgefuehl umgesetzt.\n- **Session Handling**: Ungueltige Login-Tokens werden nun automatisch bereinigt und mit einem sichtbaren Hinweis fuer erneuten Login begleitet.\n- **Local DevOps**: Linux/macOS-kompatibles `restart_server.sh` fuer den lokalen Restart-Workflow ergaenzt."
+  },
+  {
     "id": 41,
     "version": "2.25.1",
     "date": "2026-04-17",

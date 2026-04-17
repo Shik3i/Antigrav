@@ -14,7 +14,7 @@ const formatSprintTime = (ms) => {
 };
 
 const GameLeaderboards = () => {
-    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [] });
+    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [], tower: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [koalaSortField, setKoalaSortField] = useState('highscore');
@@ -29,15 +29,18 @@ const GameLeaderboards = () => {
     const [riftBossesSortDir, setRiftBossesSortDir] = useState('desc');
     const [tetrisSortField, setTetrisSortField] = useState('highscore');
     const [tetrisSortDir, setTetrisSortDir] = useState('desc');
+    const [towerSortField, setTowerSortField] = useState('highscore');
+    const [towerSortDir, setTowerSortDir] = useState('desc');
 
     useEffect(() => {
         const fetchLeaderboards = async () => {
             try {
-                const [lbRes, scratchRes, riftRes, tetrisRes] = await Promise.all([
+                const [lbRes, scratchRes, riftRes, tetrisRes, towerRes] = await Promise.all([
                     axios.get('/api/games/leaderboard?gameId=koala_flap'),
                     axios.get('/api/scratchcards/stats'),
                     axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } })),
-                    axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [], cumulative: [] } }))
+                    axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [], cumulative: [] } })),
+                    axios.get('/api/games/leaderboard?gameId=tower_climb').catch(() => ({ data: { highscores: [], cumulative: [] } }))
                 ]);
 
                 const scratchList = (scratchRes.data.leaderboard || []).map(row => ({
@@ -79,11 +82,26 @@ const GameLeaderboards = () => {
                     }
                 });
 
+                const towerMap = {};
+                (towerRes.data.highscores || []).forEach(row => {
+                    towerMap[row.userId || row.displayName] = { ...row };
+                });
+                (towerRes.data.cumulative || []).forEach(row => {
+                    const key = row.userId || row.displayName;
+                    if (towerMap[key]) {
+                        towerMap[key].totalEarned = row.totalEarned || 0;
+                        towerMap[key].totalScore = row.totalScore || 0;
+                    } else {
+                        towerMap[key] = { ...row, highscore: 0 };
+                    }
+                });
+
                 setLeaderboards({ 
                     koala: Object.values(highscoreMap), 
                     scratch: scratchList, 
                     rift: riftRes.data.leaderboards || { highestWave: [], totalMinions: [], totalBosses: [] },
-                    tetris: Object.values(tetrisMap)
+                    tetris: Object.values(tetrisMap),
+                    tower: Object.values(towerMap)
                 });
                 setLoading(false);
             } catch (err) {
@@ -113,11 +131,21 @@ const GameLeaderboards = () => {
             : <ArrowDown size={11} style={{ opacity: 0.3 }} />;
     };
 
+    const getAccentRgb = (accentColor) => ({
+        '#f59e0b': '245,158,11',
+        '#3b82f6': '59,130,246',
+        '#10b981': '16,185,129',
+        '#8b5cf6': '139,92,246',
+        '#ec4899': '236,72,153',
+        '#ef4444': '239,68,68'
+    }[accentColor] || '148,163,184');
+
     // Shared table renderer — uses CSS Grid for perfect column alignment
     const renderTable = ({ data, columns, sortField, sortDir, onSort, accentColor }) => {
         // Build grid template: [rank 28px] [avatar+name flex] [col widths...]
         const colWidths = columns.map(c => c.width || '100px');
         const gridTemplate = `28px 1fr ${colWidths.join(' ')}`;
+        const accentRgb = getAccentRgb(accentColor);
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -154,9 +182,9 @@ const GameLeaderboards = () => {
                         <div key={index} style={{
                             display: 'grid', gridTemplateColumns: gridTemplate,
                             alignItems: 'center', padding: '10px 16px', gap: '8px',
-                            background: index === 0 ? `rgba(${accentColor === '#f59e0b' ? '245,158,11' : accentColor === '#3b82f6' ? '59,130,246' : '16,185,129'}, 0.08)` : 'rgba(255,255,255,0.025)',
+                            background: index === 0 ? `rgba(${accentRgb}, 0.08)` : 'rgba(255,255,255,0.025)',
                             borderRadius: '10px',
-                            border: index === 0 ? `1px solid rgba(${accentColor === '#f59e0b' ? '245,158,11' : accentColor === '#3b82f6' ? '59,130,246' : '16,185,129'}, 0.2)` : '1px solid rgba(255,255,255,0.04)',
+                            border: index === 0 ? `1px solid rgba(${accentRgb}, 0.2)` : '1px solid rgba(255,255,255,0.04)',
                         }}>
                             {/* Rank */}
                             <div style={{
@@ -203,6 +231,7 @@ const GameLeaderboards = () => {
     const sortedRiftMinions = sortData(leaderboards.rift.totalMinions, riftMinionsSortField, riftMinionsSortDir);
     const sortedRiftBosses = sortData(leaderboards.rift.totalBosses, riftBossesSortField, riftBossesSortDir);
     const sortedTetris = sortData(leaderboards.tetris, tetrisSortField, tetrisSortDir);
+    const sortedTower = sortData(leaderboards.tower, towerSortField, towerSortDir);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '48px', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
@@ -346,6 +375,33 @@ const GameLeaderboards = () => {
                             { field: 'sprintHighscore', label: 'Sprint (40L)', width: '120px', format: v => formatSprintTime(v) },
                             { field: 'maxLevel', label: 'Max Level', width: '90px' },
                             { field: 'totalLines', label: 'Total Lines (Lifetime)', width: '150px', format: v => v.toLocaleString() }
+                        ]
+                    })}
+                </div>
+            </section>
+
+            {/* Tower Climb */}
+            <section>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ShieldCheck size={18} color="#fff" />
+                    </div>
+                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TOWER CLIMB</h2>
+                </div>
+                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <ShieldCheck size={18} color="#8b5cf6" />
+                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    </div>
+                    {renderTable({
+                        data: sortedTower,
+                        accentColor: '#8b5cf6',
+                        sortField: towerSortField,
+                        sortDir: towerSortDir,
+                        onSort: (f) => handleSort(towerSortField, setTowerSortField, towerSortDir, setTowerSortDir, f),
+                        columns: [
+                            { field: 'highscore', label: 'Best Level', width: '100px', format: v => v.toLocaleString() },
+                            { field: 'totalEarned', label: 'Total Cashout', width: '120px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
                         ]
                     })}
                 </div>
