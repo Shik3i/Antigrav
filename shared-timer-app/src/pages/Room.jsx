@@ -111,7 +111,6 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
 
         socket.on(EVENTS.ROOM_EVENT, handleRoomEvent);
         socket.on(EVENTS.ROOM_EVENT_SYNC, handleRoomEventSync);
-        console.log('Listening to EVENTS.ROOM_EVENT:', EVENTS.ROOM_EVENT);
 
         if (id) {
             socket.emit('REQUEST_ROOM_EVENT_SYNC', { roomId: id });

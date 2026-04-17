@@ -205,27 +205,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusDiv.style.color = '#4CAF50';
             statusDiv.style.display = 'block';
             setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
+            // Bug 3 Fix: Trigger immediate status broadcast to all peers
+            chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch(() => {});
         });
         announceTabStatus();
     });
 
-    // Peer Status
+    // Bug D Fix: Delegate to background.js so the broadcast always includes cachedPlaybackState.
+    // The old version built its own tab_status payload without playbackState, causing the
+    // green-circle regression on peers. background.js's announceLocalTabStatus() has the full state.
     function announceTabStatus() {
-        if (!extensionInstanceId) return;
-        const selVal = targetTabSelect.value;
-        const selOption = targetTabSelect.options[targetTabSelect.selectedIndex];
-        const tabTitle = (selVal && selVal !== 'none' && selOption) ? selOption.textContent.replace(/^\d+ - /, '').replace(/⭐ MATCH: /, '').trim() : null;
-        chrome.runtime.sendMessage({
-            type: 'EXTENSION_OUTBOUND',
-            source: 'extension_popup',
-            payload: {
-                action: 'tab_status',
-                tabTitle,
-                isReady: !!tabTitle,
-                version: chrome.runtime.getManifest().version,
-                instanceId: extensionInstanceId
-            }
-        }).catch(() => {});
+        chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch(() => {});
     }
 
     function announceVersion() {

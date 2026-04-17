@@ -33,7 +33,7 @@
 
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         ytButton.click();
-                        setTimeout(() => { isProcessingCommand = false; }, 500);
+                        setTimeout(() => { isProcessingCommand = false; }, 200);
                         return;
                     } else {
                         isProcessingCommand = false;
@@ -52,7 +52,7 @@
 
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         twitchButton.click();
-                        setTimeout(() => { isProcessingCommand = false; }, 500);
+                        setTimeout(() => { isProcessingCommand = false; }, 200);
                         return;
                     } else {
                         isProcessingCommand = false;
@@ -81,7 +81,7 @@
         } catch (e) {
             console.error('SyncExtension: Error in media action:', e);
         }
-        setTimeout(() => { isProcessingCommand = false; }, 500);
+        setTimeout(() => { isProcessingCommand = false; }, 200);
     }
 
     // --- Helper: poll video state with timeout ---
@@ -294,11 +294,18 @@
 
     // Check for videos immediately and periodically
     let observer;
+    let fallbackInterval = null;
+
     const initSync = () => {
         const video = findVideo();
         if (video) {
             attachVideoListeners(video);
             if (observer) observer.disconnect();
+            // Bug 4 Fix: Clear fallback interval once video is found and attached
+            if (video.dataset.syncAttached === 'true' && fallbackInterval) {
+                clearInterval(fallbackInterval);
+                fallbackInterval = null;
+            }
         }
     };
 
@@ -311,7 +318,7 @@
     });
 
     initSync();
-    setInterval(initSync, 5000); // Rare fallback check
+    fallbackInterval = setInterval(initSync, 5000); // Rare fallback check, cleared once video is attached
     observer.observe(document.body, { childList: true, subtree: true });
 
 })();

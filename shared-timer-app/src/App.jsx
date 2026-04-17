@@ -70,14 +70,6 @@ const appStyle = {
 // We will instantiate the socket inside App to control its lifecycle
 const DEFAULT_LEAGUES = ['LEC', 'LCS', 'LCK', 'LPL', 'VCT_LOCK_IN', 'VCT_EMEA', 'VCT_AMERICAS', 'VCT_PACIFIC'];
 
-const POKEMON_TYPES_MAP = {
-  normal: '#A8A878', fire: '#F08030', water: '#6890F0', grass: '#78C850',
-  electric: '#F8D030', ice: '#98D8D8', fighting: '#C03028', poison: '#A040A0',
-  ground: '#E0C068', flying: '#A890F0', psychic: '#F85888', bug: '#A8B820',
-  rock: '#B8A038', ghost: '#705898', dragon: '#7038F8', dark: '#705848',
-  steel: '#B8B8D0', fairy: '#EE99AC'
-};
-
 const DEFAULT_TITLE = 'KoalaSync';
 const EMPTY_ROOM_TOKENS = { readToken: null, writeToken: null };
 
@@ -252,7 +244,8 @@ function InnerApp() {
 
   useEffect(() => {
     return scheduleDeferred(() => {
-      window.postMessage({ action: 'EXTENSION_PING' }, '*');
+      // W1 Fix: use window.location.origin instead of '*'
+      window.postMessage({ action: 'EXTENSION_PING' }, window.location.origin);
     }, 900);
   }, []);
 
