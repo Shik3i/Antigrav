@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const contentSettings = document.getElementById('contentSettings');
     
     const filterNoiseToggle = document.getElementById('filterNoiseToggle');
+    const notificationsToggle = document.getElementById('notificationsToggle');
     const historyList = document.getElementById('historyList');
     const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
     const refreshDevBtn = document.getElementById('refreshDevBtn');
@@ -145,7 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Settings Toggle Logic
-    chrome.storage.local.get(['targetTabId', 'extensionInstanceId', 'filterNoiseTabs'], (data) => {
+    chrome.storage.local.get(['targetTabId', 'extensionInstanceId', 'filterNoiseTabs', 'notificationsEnabled'], (data) => {
         extensionInstanceId = data.extensionInstanceId;
         if (!extensionInstanceId) {
             console.warn('Popup: extensionInstanceId not found, waiting for background...');
@@ -153,6 +154,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const isFilterActive = data.filterNoiseTabs !== false;
         filterNoiseToggle.checked = isFilterActive;
+
+        // Notifications are ON by default
+        notificationsToggle.checked = data.notificationsEnabled !== false;
 
         if (data.targetTabId !== undefined) {
             targetTabSelect.value = data.targetTabId === null ? 'none' : data.targetTabId;
@@ -167,6 +171,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.storage.local.set({ filterNoiseTabs: filterNoiseToggle.checked }, () => {
             populateTabs();
         });
+    });
+
+    notificationsToggle.addEventListener('change', () => {
+        chrome.storage.local.set({ notificationsEnabled: notificationsToggle.checked });
     });
 
     targetTabSelect.addEventListener('change', () => {
@@ -247,29 +255,62 @@ document.addEventListener('DOMContentLoaded', async () => {
             const myVal = targetTabSelect.value;
             const myOption = targetTabSelect.options[targetTabSelect.selectedIndex];
             const myTitle = (myVal && myVal !== 'none' && myOption) ? myOption.textContent.replace(/^\d+ - /, '').replace(/⭐ MATCH: /, '').trim() : null;
+            const myTabId = myVal && myVal !== 'none' ? parseInt(myVal, 10) : null;
             
             list.innerHTML = '';
-            const makeRow = (name, tabTitle, isReady, version, isSelf) => {
+
+            const makeRow = (name, tabTitle, isReady, version, isSelf, playbackState) => {
                 const row = document.createElement('div');
                 row.style.cssText = `display:flex;align-items:center;gap:6px;background:${isSelf ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.04)'};padding:6px 8px;border-radius:6px;font-size:10px;color:#e2e8f0;`;
-                const dot = isReady ? '🟢' : '🔴';
                 const safeName = escapeHtml(name);
                 const safeTitle = escapeHtml(tabTitle);
-                const titleHtml = tabTitle ? `<span style="color:#a5b4fc;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeTitle}</span>` : `<span style="color:#6b7280;font-style:italic;">No tab</span>`;
-                row.innerHTML = `<span>${dot}</span><strong style="min-width:45px;">${safeName}</strong>${titleHtml}<span style="color:#6b7280;margin-left:auto;">v${version}</span>`;
+                const titleHtml = tabTitle
+                    ? `<span style="color:#a5b4fc;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeTitle}</span>`
+                    : `<span style="color:#6b7280;font-style:italic;">No tab</span>`;
+
+                // Play/Pause icon: show state if known, else readiness dot
+                let stateIcon;
+                if (!isReady) {
+                    stateIcon = `<span title="No tab selected" style="font-size:11px;">🔴</span>`;
+                } else if (playbackState === 'playing') {
+                    stateIcon = `<span title="Playing" style="font-size:11px;">▶️</span>`;
+                } else if (playbackState === 'paused') {
+                    stateIcon = `<span title="Paused" style="font-size:11px;">⏸️</span>`;
+                } else {
+                    stateIcon = `<span title="Ready (state unknown)" style="font-size:11px;">🟢</span>`;
+                }
+
+                row.innerHTML = `${stateIcon}<strong style="min-width:45px;">${safeName}</strong>${titleHtml}<span style="color:#6b7280;margin-left:auto;">v${version}</span>`;
                 list.appendChild(row);
             };
 
-            makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true);
-            active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false));
-            document.getElementById('roomStatusPanel').style.display = 'block';
+            // For "You": query content.js directly for live state
+            if (myTabId) {
+                chrome.tabs.sendMessage(myTabId, { action: 'get_debug_info' }).then(info => {
+                    const myState = info && info.videoState !== 'N/A'
+                        ? (info.videoState === 'Playing' ? 'playing' : 'paused')
+                        : null;
+                    makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, myState);
+                    active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                    document.getElementById('roomStatusPanel').style.display = 'block';
+                }).catch(() => {
+                    // content.js not reachable yet — render without state
+                    makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, null);
+                    active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                    document.getElementById('roomStatusPanel').style.display = 'block';
+                });
+            } else {
+                makeRow('You', myTitle, !!myTitle, chrome.runtime.getManifest().version, true, null);
+                active.forEach(([name, info]) => makeRow(name, info.tabTitle, info.isReady, info.version, false, info.playbackState || null));
+                document.getElementById('roomStatusPanel').style.display = 'block';
+            }
         });
     }
 
     renderRoomPeers();
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area === 'local') {
-            if (changes.roomPeers || changes.extensionInstanceId || changes.targetTabId) {
+            if (changes.roomPeers || changes.extensionInstanceId || changes.targetTabId || changes.localPlaybackState) {
                 renderRoomPeers();
                 populateTabs();
             }
@@ -413,19 +454,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (refreshHistoryBtn) refreshHistoryBtn.addEventListener('click', () => loadHistory());
     if (refreshDevBtn) refreshDevBtn.addEventListener('click', () => loadDevInfo());
 
+    function timeAgo(isoTimestamp) {
+        const diff = Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 1000);
+        if (diff < 5)  return 'gerade eben';
+        if (diff < 60) return `vor ${diff}s`;
+        const m = Math.floor(diff / 60);
+        if (m < 60)    return `vor ${m} Min.`;
+        const h = Math.floor(m / 60);
+        if (h < 24)    return `vor ${h} Std.`;
+        return new Date(isoTimestamp).toLocaleDateString();
+    }
+
+    let _historyData = [];
+
     function loadHistory() {
         chrome.storage.local.get(['history'], (data) => {
-            const hist = data.history || [];
-            historyList.innerHTML = hist.length ? '' : '<div style="text-align:center;color:#666;padding:20px 0;">No history.</div>';
-            hist.forEach(item => {
-                const div = document.createElement('div');
-                div.className = `history-item ${item.action.includes('pause') ? 'pause' : 'play'}`;
-                const safeName = escapeHtml(item.senderName || 'You');
-                div.innerHTML = `<div style="flex:1;"><strong>${item.action.toUpperCase()}</strong> <span style="font-size:10px;">${safeName}</span></div><span class="history-time">${new Date(item.timestamp).toLocaleTimeString()}</span>`;
-                historyList.appendChild(div);
-            });
+            _historyData = data.history || [];
+            renderHistory();
         });
     }
+
+    function renderHistory() {
+        historyList.innerHTML = _historyData.length
+            ? ''
+            : '<div style="text-align:center;color:#666;padding:20px 0;">No history.</div>';
+
+        _historyData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = `history-item ${item.action.includes('pause') ? 'pause' : 'play'}`;
+            const safeName = escapeHtml(item.senderName || 'You');
+            const actionLabel = item.action === 'force_sync_pause_seek' ? 'FORCE SYNC' :
+                                item.action === 'force_sync_play'       ? 'FORCE PLAY' :
+                                item.action.toUpperCase();
+            div.innerHTML = `
+                <div style="flex:1;">
+                    <strong>${actionLabel}</strong>
+                    <span style="font-size:10px;color:var(--text-muted);"> ${safeName}</span>
+                </div>
+                <span class="history-time" data-ts="${escapeHtml(item.timestamp)}">${timeAgo(item.timestamp)}</span>`;
+            historyList.appendChild(div);
+        });
+    }
+
+    // Refresh relative timestamps every 30 seconds while popup is open
+    setInterval(() => {
+        historyList.querySelectorAll('.history-time[data-ts]').forEach(el => {
+            el.textContent = timeAgo(el.dataset.ts);
+        });
+        // Also update latestActivity time if visible
+        if (latestActivityTime && latestActivityTime.dataset.ts) {
+            latestActivityTime.textContent = timeAgo(latestActivityTime.dataset.ts);
+        }
+    }, 30000);
 
     function loadDevInfo() {
         let id = targetTabSelect.value === 'none' ? null : parseInt(targetTabSelect.value, 10);
@@ -458,7 +538,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const actionColor = last.action.includes('pause') ? '#ef4444' : '#10b981';
             const sender = escapeHtml(last.senderName || 'You');
             latestActivityText.innerHTML = `<strong style="color: ${actionColor}">${last.action.toUpperCase()}</strong> by ${sender}`;
-            latestActivityTime.textContent = new Date(last.timestamp).toLocaleTimeString();
+            latestActivityTime.textContent = timeAgo(last.timestamp);
+            latestActivityTime.dataset.ts = last.timestamp;
 
             if (last.acks && last.acks.length > 0) {
                 latestActivityAcks.style.display = 'block';

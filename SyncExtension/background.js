@@ -27,8 +27,9 @@ function broadcastToTimerTabs(message) {
 }
 
 function announceLocalTabStatus() {
-    chrome.storage.local.get(['targetTabId'], (storageData) => {
+    chrome.storage.local.get(['targetTabId', 'localPlaybackState'], (storageData) => {
         const targetTabId = storageData.targetTabId;
+        const playbackState = storageData.localPlaybackState || null;
 
         getOrCreateExtensionInstanceId((instanceId) => {
             const version = chrome.runtime.getManifest().version;
@@ -40,6 +41,7 @@ function announceLocalTabStatus() {
                         action: 'tab_status',
                         tabTitle: null,
                         isReady: false,
+                        playbackState: null,
                         version,
                         instanceId
                     }
@@ -49,15 +51,14 @@ function announceLocalTabStatus() {
 
             chrome.tabs.get(targetTabId, (tab) => {
                 if (chrome.runtime.lastError || !tab) {
-                    // TAB IS GONE: Clear the target for the user to prevent stuck state
                     chrome.storage.local.set({ targetTabId: 'none' });
-                    
                     broadcastToTimerTabs({
                         type: 'EXTENSION_OUTBOUND',
                         payload: {
                             action: 'tab_status',
                             tabTitle: null,
                             isReady: false,
+                            playbackState: null,
                             version,
                             instanceId
                         }
@@ -72,6 +73,7 @@ function announceLocalTabStatus() {
                         action: 'tab_status',
                         tabTitle,
                         isReady: !!tabTitle,
+                        playbackState,
                         version,
                         instanceId
                     }
@@ -87,6 +89,26 @@ function updateForceSyncState(timestamp, updater) {
     chrome.storage.local.get(['forceSyncState'], (storageData) => {
         const nextState = updater(storageData.forceSyncState || {});
         chrome.storage.local.set({ forceSyncState: nextState });
+    });
+}
+
+function showPeerActionNotification(senderName, action) {
+    chrome.storage.local.get(['notificationsEnabled'], (data) => {
+        if (data.notificationsEnabled === false) return;
+
+        let actionLabel = action === 'play' ? 'gestartet' :
+                          action === 'pause' ? 'pausiert' :
+                          action === 'force_sync_pause_seek' ? 'Synchronisierung gestartet' :
+                          action === 'force_sync_play' ? 'Synchronisierung abgeschlossen' :
+                          action.toUpperCase();
+
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon128.png',
+            title: 'Sync Extension',
+            message: `${senderName || 'Ein Teilnehmer'} hat das Video ${actionLabel}.`,
+            priority: 1
+        });
     });
 }
 
@@ -238,6 +260,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     peers[peerName] = {
                         tabTitle: p.tabTitle || null,
                         isReady: p.isReady || false,
+                        playbackState: p.playbackState || null,
                         version: p.version || null,
                         instanceId: p.instanceId || null,
                         lastSeen: Date.now()
@@ -275,8 +298,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // 2d. Handle Heartbeat (Keep-Alive) from content.js or bridge.js
         if (message.type === 'EXTENSION_HEARTBEAT') {
-            // Heartbeat only keeps the service worker alive.
-            // announceLocalTabStatus and updateBadgeStatus are handled by the 1min alarm.
+            // If content.js sent a playbackState, store it for our own tab_status broadcasts
+            if (message.source === 'content' && message.playbackState) {
+                chrome.storage.local.set({ localPlaybackState: message.playbackState });
+            }
             return true;
         }
 
@@ -309,6 +334,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 };
                 currentHistory.unshift(logEntry);
                 chrome.storage.local.set({ history: currentHistory.slice(0, 50) });
+
+                // Show notification if it's an inbound message from another user
+                if (message.type === 'EXTENSION_INBOUND' && message.senderName) {
+                    showPeerActionNotification(message.senderName, actionTarget);
+                }
             }
 
             if (storageData.targetTabId && storageData.targetTabId !== 'none') {
@@ -319,6 +349,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                         // Verified ACK: content.js confirmed the action succeeded
                         if (response.status === 'playing' || response.status === 'paused') {
+                            const newState = response.status === 'playing' ? 'playing' : 'paused';
+                            chrome.storage.local.set({ localPlaybackState: newState }, () => {
+                                announceLocalTabStatus();
+                            });
                             // Forward ACK to all React Timer tabs via OUTBOUND pipe
                             broadcastToTimerTabs({
                                 type: 'EXTENSION_OUTBOUND',

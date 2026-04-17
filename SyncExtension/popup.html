@@ -325,7 +325,7 @@
 </head>
 
 <body>
-  <h2>Media Sync <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">v2.5</span></h2>
+  <h2>Media Sync <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">v2.6</span></h2>
 
   <div id="updateBanner"
     style="display: none; margin-bottom: 12px; padding: 10px 12px; background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1)); border: 1px solid #f59e0b; border-radius: 8px; text-align: center; animation: fadeIn 0.3s;">
@@ -430,6 +430,17 @@
       </div>
       <label class="switch">
         <input type="checkbox" id="filterNoiseToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-info">
+        <h4>Remote Notifications</h4>
+        <p>Show a browser notification when a peer presses Play or Pause.</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="notificationsToggle" checked>
         <span class="slider"></span>
       </label>
     </div>
