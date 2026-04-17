@@ -1502,7 +1502,14 @@ exports.updateNavbarSettings = async (req, res, next) => {
         if (!settings || !Array.isArray(settings)) {
             return res.status(400).json({ error: 'Settings must be an array' });
         }
-        await dbLayer.updateNavbarSettings(settings);
+
+        // Backend-side normalization for extra robustness
+        const normalizedSettings = settings.map((item, index) => ({
+            ...item,
+            sortOrder: index + 1
+        }));
+
+        await dbLayer.updateNavbarSettings(normalizedSettings);
         apiDataService.invalidateNavbarSettingsCache();
         res.json({ success: true });
     } catch (err) {

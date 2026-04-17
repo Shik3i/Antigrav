@@ -72,12 +72,20 @@ const Admin = ({ socket }) => {
     };
 
     const handleSaveNavbarSettings = async () => {
-    
         try {
-            await axios.post('/api/admin/navbar-settings', { settings: navbarSettings }, {
+            // Normalize sort orders before saving to ensure sequential numbers (1, 2, 3...)
+            const normalizedSettings = navbarSettings.map((item, index) => ({
+                ...item,
+                sortOrder: index + 1
+            }));
+
+            await axios.post('/api/admin/navbar-settings', { settings: normalizedSettings }, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
-            addLog('Success', 'Navbar settings saved.', 'success');
+            
+            // Update local state with normalized values to keep UI in sync
+            setNavbarSettings(normalizedSettings);
+            addLog('Success', 'Navbar settings saved and normalized.', 'success');
         } catch (err) {
             console.error('[Admin API Debug] Save failed for Navbar Settings:', {
                 status: err.response?.status,
@@ -2499,18 +2507,27 @@ const Admin = ({ socket }) => {
                                                                         style={{ padding: '6px', opacity: isFirst ? 0.2 : 1 }}
                                                                         disabled={isFirst}
                                                                         title="Move Up"
-                                                                        onClick={() => {
-                                                                            const newSettings = [...navbarSettings];
-                                                                            const neighbor = categoryItems[nestedIndex - 1];
-                                                                            const idxSelf = newSettings.findIndex(n => n.key === item.key);
-                                                                            const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
-                                                                            
-                                                                            const tempOrder = newSettings[idxSelf].sortOrder;
-                                                                            newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
-                                                                            newSettings[idxNeighbor].sortOrder = tempOrder;
-                                                                            
-                                                                            newSettings.sort((a,b) => a.sortOrder - b.sortOrder);
-                                                                            setNavbarSettings(newSettings);
+                                                                         onClick={() => {
+                                                                            setNavbarSettings(prev => {
+                                                                                const newSettings = [...prev];
+                                                                                const currentCategoryItems = newSettings.filter(n => n.category === category);
+                                                                                const neighbor = currentCategoryItems[nestedIndex - 1];
+                                                                                
+                                                                                if (!neighbor) return prev;
+
+                                                                                const idxSelf = newSettings.findIndex(n => n.key === item.key);
+                                                                                const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
+                                                                                
+                                                                                if (idxSelf === -1 || idxNeighbor === -1) return prev;
+
+                                                                                console.log(`[Navbar] Moving ${item.key} UP. Swapping sortOrder ${newSettings[idxSelf].sortOrder} with ${newSettings[idxNeighbor].sortOrder}`);
+
+                                                                                const tempOrder = newSettings[idxSelf].sortOrder;
+                                                                                newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
+                                                                                newSettings[idxNeighbor].sortOrder = tempOrder;
+                                                                                
+                                                                                return [...newSettings].sort((a,b) => a.sortOrder - b.sortOrder);
+                                                                            });
                                                                         }}
                                                                     >
                                                                         <ChevronUp size={16} />
@@ -2521,17 +2538,26 @@ const Admin = ({ socket }) => {
                                                                         disabled={isLast}
                                                                         title="Move Down"
                                                                         onClick={() => {
-                                                                            const newSettings = [...navbarSettings];
-                                                                            const neighbor = categoryItems[nestedIndex + 1];
-                                                                            const idxSelf = newSettings.findIndex(n => n.key === item.key);
-                                                                            const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
-                                                                            
-                                                                            const tempOrder = newSettings[idxSelf].sortOrder;
-                                                                            newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
-                                                                            newSettings[idxNeighbor].sortOrder = tempOrder;
-                                                                            
-                                                                            newSettings.sort((a,b) => a.sortOrder - b.sortOrder);
-                                                                            setNavbarSettings(newSettings);
+                                                                            setNavbarSettings(prev => {
+                                                                                const newSettings = [...prev];
+                                                                                const currentCategoryItems = newSettings.filter(n => n.category === category);
+                                                                                const neighbor = currentCategoryItems[nestedIndex + 1];
+                                                                                
+                                                                                if (!neighbor) return prev;
+
+                                                                                const idxSelf = newSettings.findIndex(n => n.key === item.key);
+                                                                                const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
+                                                                                
+                                                                                if (idxSelf === -1 || idxNeighbor === -1) return prev;
+
+                                                                                console.log(`[Navbar] Moving ${item.key} DOWN. Swapping sortOrder ${newSettings[idxSelf].sortOrder} with ${newSettings[idxNeighbor].sortOrder}`);
+
+                                                                                const tempOrder = newSettings[idxSelf].sortOrder;
+                                                                                newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
+                                                                                newSettings[idxNeighbor].sortOrder = tempOrder;
+                                                                                
+                                                                                return [...newSettings].sort((a,b) => a.sortOrder - b.sortOrder);
+                                                                            });
                                                                         }}
                                                                     >
                                                                         <ChevronDown size={16} />
