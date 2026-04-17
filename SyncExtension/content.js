@@ -255,9 +255,18 @@
             if (video || window.koalaSyncInjected) {
                 const playbackState = video ? (video.paused ? 'paused' : 'playing') : null;
                 // 2. Double protection with try/catch because sendMessage throws synchronously on invalid context
-                chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content', playbackState }).catch(() => {
-                    clearInterval(heartbeatInterval);
-                });
+                chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content', playbackState })
+                    .catch(err => {
+                        if (err.message?.includes('Receiving end does not exist')) {
+                            setTimeout(() => {
+                                if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+                                    chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content', playbackState }).catch(() => {});
+                                }
+                            }, 1000);
+                        } else {
+                            clearInterval(heartbeatInterval);
+                        }
+                    });
             }
         } catch (e) {
             // Context is definitely gone

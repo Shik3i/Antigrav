@@ -177,7 +177,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (hasTimerTab) {
             announceTabStatus();
-            announceVersion();
+            if (extensionInstanceId) {
+                announceVersion();
+            } else {
+                // Fallback: instanceId wurde noch nicht generiert — kurz warten und nochmal
+                setTimeout(() => {
+                    chrome.storage.local.get(['extensionInstanceId'], (d) => {
+                        extensionInstanceId = d.extensionInstanceId;
+                        if (extensionInstanceId) announceVersion();
+                    });
+                }, 500);
+            }
         }
     });
 
@@ -325,9 +335,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderRoomPeers();
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area === 'local') {
-            if (changes.roomPeers || changes.extensionInstanceId || changes.targetTabId || changes.localPlaybackState) {
+            if (changes.roomPeers || changes.extensionInstanceId || changes.localPlaybackState) {
+                renderRoomPeers(); // reicht für Peer-Anzeige
+            }
+            if (changes.targetTabId) {
                 renderRoomPeers();
-                populateTabs();
+                populateTabs(); // nur wenn sich der Tab wirklich geändert hat
             }
             if (changes.history) {
                 loadHistory();

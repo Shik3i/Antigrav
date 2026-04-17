@@ -311,13 +311,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 chrome.storage.local.get(['roomPeers'], (data) => {
                     const peers = data.roomPeers || {};
+                    const existing = peers[peerName] || {};
                     peers[peerName] = {
-                        tabTitle: p.tabTitle || null,
-                        isReady: p.isReady || false,
-                        playbackState: p.playbackState || null,
-                        version: p.version || null,
-                        instanceId: p.instanceId || null,
-                        lastSeen: Date.now()
+                        tabTitle:      p.tabTitle      ?? existing.tabTitle,
+                        isReady:       p.isReady       ?? existing.isReady,
+                        playbackState: p.playbackState ?? existing.playbackState,
+                        version:       p.version       ?? existing.version,
+                        instanceId:    p.instanceId    ?? existing.instanceId,
+                        lastSeen:      Date.now()
                     };
                     chrome.storage.local.set({ roomPeers: peers });
                 });

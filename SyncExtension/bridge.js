@@ -58,15 +58,22 @@ if (isContextValid()) {
 
 // HEARTBEAT: Send a ping to background.js every 15 seconds to keep it alive
 // and trigger a tab status broadcast.
-setInterval(() => {
-if (isContextValid()) {
-    try {
-        chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'bridge' }).catch(() => {});
-    } catch (e) {
-        // Context lost
-    }
+function sendHeartbeat() {
+    if (!isContextValid()) return;
+    chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'bridge' })
+        .catch(err => {
+            if (err.message?.includes('Receiving end does not exist')) {
+                setTimeout(() => {
+                    if (isContextValid()) {
+                        chrome.runtime.sendMessage({
+                            type: 'EXTENSION_HEARTBEAT', source: 'bridge'
+                        }).catch(() => {});
+                    }
+                }, 1000);
+            }
+        });
 }
-}, 15000);
+setInterval(sendHeartbeat, 15000);
 
 // Listen for reverse messages from the Extension generic pipe
 // and forward them to the React Website so it can sync the room.
