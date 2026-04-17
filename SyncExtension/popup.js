@@ -24,6 +24,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const historyList = document.getElementById('historyList');
     const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
     const refreshDevBtn = document.getElementById('refreshDevBtn');
+    const logList = document.getElementById('logList');
+    const clearLogsBtn = document.getElementById('clearLogsBtn');
+    const devModeToggle = document.getElementById('devModeToggle');
+    const tabLogs = document.getElementById('tabLogs');
+    const contentLogs = document.getElementById('contentLogs');
     const devInfo = document.getElementById('devInfo');
     const forceSyncBtn = document.getElementById('forceSyncBtn');
     const syncStatus = document.getElementById('syncStatus');
@@ -149,8 +154,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         connText.textContent = detectedRoomId ? `Timer detected (Room: ${detectedRoomId})` : 'Timer detected';
     }
 
-    // Settings Toggle Logic
-    chrome.storage.local.get(['targetTabId', 'extensionInstanceId', 'filterNoiseTabs', 'notificationsEnabled'], (data) => {
+    // Settings & Dev Toggle Logic
+    chrome.storage.local.get(['targetTabId', 'extensionInstanceId', 'filterNoiseTabs', 'notificationsEnabled', 'devModeEnabled'], (data) => {
         extensionInstanceId = data.extensionInstanceId;
         if (!extensionInstanceId) {
             console.warn('Popup: extensionInstanceId not found, waiting for background...');
@@ -162,6 +167,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Notifications are ON by default
         notificationsToggle.checked = data.notificationsEnabled !== false;
 
+        // Dev Mode
+        const isDevMode = data.devModeEnabled === true;
+        devModeToggle.checked = isDevMode;
+        tabLogs.style.display = isDevMode ? 'block' : 'none';
+
         if (data.targetTabId !== undefined) {
             targetTabSelect.value = data.targetTabId === null ? 'none' : data.targetTabId;
         }
@@ -169,6 +179,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             announceTabStatus();
             announceVersion();
         }
+    });
+
+    devModeToggle.addEventListener('change', () => {
+        const enabled = devModeToggle.checked;
+        chrome.storage.local.set({ devModeEnabled: enabled }, () => {
+            tabLogs.style.display = enabled ? 'block' : 'none';
+            // If we're on the logs tab and it's being hidden, switch to controls
+            if (!enabled && tabLogs.classList.contains('active')) {
+                switchTab('controls');
+            }
+        });
     });
 
     filterNoiseToggle.addEventListener('change', () => {
@@ -312,6 +333,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 loadHistory();
                 renderLatestActivity();
             }
+            if (changes.devLogs && tabLogs.classList.contains('active')) {
+                renderDevLogs();
+            }
+            if (changes.devModeEnabled) {
+                const enabled = changes.devModeEnabled.newValue;
+                tabLogs.style.display = enabled ? 'block' : 'none';
+                if (!enabled && tabLogs.classList.contains('active')) switchTab('controls');
+            }
         }
     });
 
@@ -432,17 +461,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // History & Tabs
     function switchTab(id) {
-        [tabControls, tabHistory, tabDev, tabSettings].forEach(t => t.classList.remove('active'));
-        [contentControls, contentHistory, contentDev, contentSettings].forEach(c => c.classList.remove('active'));
-        document.getElementById('tab' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
-        document.getElementById('content' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
+        [tabControls, tabHistory, tabDev, tabLogs, tabSettings].forEach(t => t.classList.remove('active'));
+        [contentControls, contentHistory, contentDev, contentLogs, contentSettings].forEach(c => c.classList.remove('active'));
+        
+        const targetTab = document.getElementById('tab' + id.charAt(0).toUpperCase() + id.slice(1));
+        const targetContent = document.getElementById('content' + id.charAt(0).toUpperCase() + id.slice(1));
+        
+        if (targetTab) targetTab.classList.add('active');
+        if (targetContent) targetContent.classList.add('active');
+        
         if (id === 'history') loadHistory();
         if (id === 'dev') loadDevInfo();
+        if (id === 'logs') renderDevLogs();
     }
 
     tabControls.addEventListener('click', () => switchTab('controls'));
     tabHistory.addEventListener('click', () => switchTab('history'));
     tabDev.addEventListener('click', () => switchTab('dev'));
+    tabLogs.addEventListener('click', () => switchTab('logs'));
     tabSettings.addEventListener('click', () => switchTab('settings'));
     
     if (refreshHistoryBtn) refreshHistoryBtn.addEventListener('click', () => loadHistory());
@@ -522,6 +558,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.tabs.sendMessage(id, { action: 'get_debug_info' }).then(r => {
             devInfo.innerHTML = r ? Object.entries(r).map(([k,v])=>`<strong>${k}:</strong> ${v}`).join('<br>') : 'No response.';
         }).catch(e => { devInfo.innerHTML = 'Error: ' + e.message; });
+    }
+
+    function renderDevLogs() {
+        chrome.storage.local.get(['devLogs'], (data) => {
+            const logs = data.devLogs || [];
+            if (logs.length === 0) {
+                logList.innerHTML = '<div style="text-align:center; color:#666; padding:20px 0;">No logs yet.</div>';
+                return;
+            }
+            
+            logList.innerHTML = logs.map(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                let color = '#94a3b8'; // info
+                if (log.type === 'error') color = '#f87171';
+                if (log.type === 'success') color = '#4ade80';
+                if (log.type === 'warn') color = '#fbbf24';
+                
+                return `<div style="margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 2px;">
+                    <span style="color: #64748b;">[${time}]</span> 
+                    <span style="color: ${color};">${escapeHtml(log.message)}</span>
+                </div>`;
+            }).join('');
+        });
+    }
+
+    if (clearLogsBtn) {
+        clearLogsBtn.addEventListener('click', () => {
+            chrome.storage.local.set({ devLogs: [] }, () => {
+                renderDevLogs();
+            });
+        });
     }
 
     function renderLatestActivity() {

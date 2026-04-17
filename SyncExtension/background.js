@@ -9,6 +9,22 @@ const TIMER_TAB_URLS = ["*://timer.shik3i.net/*", "http://localhost:3001/*", "*:
 // Bug 1 Fix: In-memory playback state cache so bridge.js heartbeats (which lack playbackState) never erase it
 let cachedPlaybackState = null;
 
+function addDevLog(message, type = 'info') {
+    chrome.storage.local.get(['devModeEnabled', 'devLogs'], (data) => {
+        if (data.devModeEnabled !== true) return;
+        
+        const logs = data.devLogs || [];
+        logs.unshift({
+            timestamp: new Date().toISOString(),
+            message,
+            type
+        });
+        
+        // Rolling buffer: keep only last 50 entries
+        chrome.storage.local.set({ devLogs: logs.slice(0, 50) });
+    });
+}
+
 function getOrCreateExtensionInstanceId(callback) {
     chrome.storage.local.get(['extensionInstanceId'], (storageData) => {
         if (storageData.extensionInstanceId) {
@@ -190,10 +206,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
                 target: { tabId: newId },
                 files: ['content.js']
             }).then(() => {
+                addDevLog(`Proactively injected content.js into tab ${newId}`, 'success');
                 console.log(`Background: Proactively injected sync script into tab ${newId}`);
                 // Refresh status so the timer tab knows we are ready
                 announceLocalTabStatus();
             }).catch(err => {
+                addDevLog(`Proactive injection failed for tab ${newId}: ${err.message}`, 'error');
                 console.warn(`Background: Proactive injection failed for tab ${newId}:`, err.message);
             });
         }
@@ -208,6 +226,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // EXTENSION_HEARTBEAT doesn't match INBOUND or OUTBOUND.
     if (message.type === 'EXTENSION_HEARTBEAT') {
         if (message.source === 'content' && message.playbackState) {
+            addDevLog(`Heartbeat (content): ${message.playbackState}`, 'info');
             if (cachedPlaybackState !== message.playbackState) {
                 cachedPlaybackState = message.playbackState;
                 // Write to storage so popup.js changes.localPlaybackState listener fires
@@ -215,6 +234,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 announceLocalTabStatus();
             }
         } else if (message.source === 'bridge') {
+            addDevLog(`Heartbeat (bridge): triggering status broadcast`, 'info');
             // Fix 1: Bridge heartbeat (every 15s) was always intended to trigger a status
             // broadcast — bridge.js even says so in its comment. The handler was dead code
             // before (Bug A fix) and then ignored for bridge source. Now we use it to keep
@@ -234,6 +254,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!message.payload) return true;
 
         const p = message.payload;
+        addDevLog(`${message.type}: ${p.action}`, 'info');
 
         // 1. Handle incoming ACKs from other users via the React Bridge
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'EXTENSION_SYNC_ACK') {
