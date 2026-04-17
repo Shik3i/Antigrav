@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const clearLogsBtn = document.getElementById('clearLogsBtn');
     const copyLogsBtn = document.getElementById('copyLogsBtn');
     const devModeToggle = document.getElementById('devModeToggle');
+    const bridgeModeSelect = document.getElementById('bridgeMode');
     const tabLogs = document.getElementById('tabLogs');
     const contentLogs = document.getElementById('contentLogs');
     const devInfo = document.getElementById('devInfo');
@@ -65,10 +66,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Populate open tabs with Smart Matching
     const populateTabs = async () => {
-        const storageData = await new Promise(r => chrome.storage.local.get(['targetTabId', 'roomPeers', 'filterNoiseTabs'], r));
+        const storageData = await new Promise(r => chrome.storage.local.get(['targetTabId', 'roomPeers', 'filterNoiseTabs', 'bridgeDomainMode'], r));
         const currentTargetTabId = storageData.targetTabId;
         const peers = storageData.roomPeers || {};
         const isFilterActive = storageData.filterNoiseTabs !== false;
+        
+        if (bridgeModeSelect) {
+            bridgeModeSelect.value = storageData.bridgeDomainMode || 'production';
+        }
         
         const peerTitles = Object.values(peers)
             .map(p => p.tabTitle)
@@ -185,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         if (hasTimerTab) {
-            announceTabStatus();
+            // REMOVED automated announceTabStatus() to prevent noise on popup open
             if (extensionInstanceId) {
                 announceVersion();
             } else {
@@ -220,6 +225,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     notificationsToggle.addEventListener('change', () => {
         chrome.storage.local.set({ notificationsEnabled: notificationsToggle.checked });
     });
+
+    if (bridgeModeSelect) {
+        bridgeModeSelect.addEventListener('change', () => {
+            const mode = bridgeModeSelect.value;
+            chrome.storage.local.set({ bridgeDomainMode: mode }, () => {
+                logToDev(`Bridge Mode changed to: ${mode}`, 'success');
+                // Force a tab refresh and re-announce if we are active
+                populateTabs();
+                announceTabStatus();
+            });
+        });
+    }
 
     targetTabSelect.addEventListener('change', () => {
         let val = targetTabSelect.value;
@@ -370,7 +387,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    setInterval(() => { announceTabStatus(); renderRoomPeers(); }, 30000);
+    setInterval(() => { renderRoomPeers(); }, 30000);
 
     // Commands
     function sendMediaCommand(action) {

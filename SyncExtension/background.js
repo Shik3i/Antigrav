@@ -4,7 +4,14 @@
  * Listens for messages from popup.js and bridge.js
  */
 
-const TIMER_TAB_URLS = ["*://timer.shik3i.net/*", "http://localhost:3001/*", "*://*.timer.shik3i.net/*"];
+const PRODUCTION_URLS = ["*://timer.shik3i.net/*", "*://*.timer.shik3i.net/*"];
+const LOCALHOST_URLS = ["http://localhost:3001/*"];
+
+async function getTimerTabUrls() {
+    const data = await new Promise(r => chrome.storage.local.get(['bridgeDomainMode'], r));
+    const mode = data.bridgeDomainMode || 'production';
+    return mode === 'localhost' ? LOCALHOST_URLS : PRODUCTION_URLS;
+}
 
 // Bug 1 Fix: In-memory playback state cache so bridge.js heartbeats (which lack playbackState) never erase it
 let cachedPlaybackState = null;
@@ -41,15 +48,19 @@ function getOrCreateExtensionInstanceId(callback) {
 }
 
 function broadcastToTimerTabs(message) {
-    chrome.tabs.query({ url: TIMER_TAB_URLS }, (tabs) => {
-        if (tabs.length === 0) {
-            addDevLog('No active Timer tabs found for broadcast', 'warn');
-            return;
-        }
-        addDevLog(`Broadcasting ${message.type} to ${tabs.length} timer tab(s)`, 'info');
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, message).catch((err) => { 
-                addDevLog(`Failed to send to timer tab ${tab.id}: ${err.message}`, 'error');
+    getTimerTabUrls().then(urls => {
+        chrome.tabs.query({ url: urls }, (tabs) => {
+            if (tabs.length === 0) {
+                // Heartbeats are silent if no tabs found, but active commands log a warning
+                if (['EXTENSION_PONG', 'EXTENSION_HEARTBEAT'].includes(message.type)) return;
+                addDevLog(`No active Timer tabs (${urls[0]}...) found for broadcast`, 'info');
+                return;
+            }
+            addDevLog(`Broadcasting ${message.type} to ${tabs.length} timer tab(s)`, 'info');
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, message).catch((err) => { 
+                    addDevLog(`Failed to send to timer tab ${tab.id}: ${err.message}`, 'error');
+                });
             });
         });
     });
@@ -60,7 +71,6 @@ function announceLocalTabStatus(reason = 'broadcast') {
     const cooldown = reason === 'broadcast' ? 500 : 2000;
     
     if (now - lastStatusBroadcastTime < cooldown) {
-        // Only log if it's a broadcast that was throttled, heartbeats can be silent
         if (reason === 'broadcast') {
             addDevLog(`Status broadcast throttled (${reason})`, 'info');
         }
@@ -69,6 +79,12 @@ function announceLocalTabStatus(reason = 'broadcast') {
 
     chrome.storage.local.get(['targetTabId'], (storageData) => {
         const targetTabId = storageData.targetTabId;
+        
+        // LAZY STATUS: If no tab is selected and it's just a routine heartbeat, 
+        // don't bother the room with "No tab selected" updates.
+        if (reason !== 'broadcast' && (!targetTabId || targetTabId === 'none')) {
+            return;
+        }
         const playbackState = cachedPlaybackState;
 
         getOrCreateExtensionInstanceId((instanceId) => {
