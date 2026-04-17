@@ -42,9 +42,15 @@ if (event.data.type === 'EXTENSION_INBOUND' && event.data.payload) {
             type: 'EXTENSION_INBOUND',
             payload: event.data.payload,
             senderName: event.data.senderName || null
-        }).catch(err => console.debug('Bridge could not reach background worker:', err.message));
+        }).catch(err => {
+            if (isContextValid()) {
+                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge error: ${err.message}`, logType: 'warn' }).catch(() => {});
+            }
+        });
     } catch (e) {
-        console.debug('Bridge: Context invalidated during sendMessage');
+        if (isContextValid()) {
+            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge context error: ${e.message}`, logType: 'warn' }).catch(() => {});
+        }
     }
 }
 });
@@ -67,9 +73,16 @@ function sendHeartbeat() {
                     if (isContextValid()) {
                         chrome.runtime.sendMessage({
                             type: 'EXTENSION_HEARTBEAT', source: 'bridge'
-                        }).catch(() => {});
+                        }).catch(e => {
+                             // Context likely gone now, console only
+                             console.warn('Bridge: Persistent heartbeat failure');
+                        });
                     }
                 }, 1000);
+            } else {
+                if (isContextValid()) {
+                    chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge heartbeat failed: ${err.message}`, logType: 'warn' }).catch(() => {});
+                }
             }
         });
 }

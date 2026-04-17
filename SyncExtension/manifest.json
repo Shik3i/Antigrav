@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SyncExtension",
-  "version": "2.8.4",
+  "version": "2.8.8",
   "description": "Minimal Media-Sync for HTML5 videos.",
   "icons": {
     "16": "icons/icon128.png",

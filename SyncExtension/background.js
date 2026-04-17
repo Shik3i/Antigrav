@@ -236,14 +236,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             // roomPeers on all peers fresh every 15 seconds.
             announceLocalTabStatus();
         }
-        return true;
+    }
+
+    // New Central Logging Service for all extension parts
+    if (message.type === 'ADD_DEV_LOG') {
+        addDevLog(message.message, message.logType || 'info');
+        return;
     }
 
     // Also handle TAB_SELECTION_CHANGED here so it is never accidentally skipped
     if (message.type === 'TAB_SELECTION_CHANGED') {
         addDevLog('TAB_SELECTION_CHANGED detected -> broadcasting status', 'info');
         announceLocalTabStatus('broadcast'); 
-        return true;
     }
 
     if (message.type === 'EXTENSION_INBOUND' || message.type === 'EXTENSION_OUTBOUND') {
@@ -282,7 +286,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return { ...currentState, remoteAcks, updatedAt: Date.now() };
                 });
             }
-            return true;
+            return;
         }
 
         // 2. Handle version announcements from other users
@@ -395,8 +399,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         targetTime: p.targetTime ?? null,
                         localReady: false,
                         remoteReady: {},
+                        remoteAcks: {},
                         error: null,
                         updatedAt: Date.now()
+                    }
+                });
+            }
+            
+            // Bug Fix: Immediate ACK for Force Sync (Receipt Confirmation)
+            // This ensures the initiator doesn't wait 5 seconds for peers that are just buffering.
+            if (message.type === 'EXTENSION_INBOUND' && actionTarget === 'force_sync_pause_seek') {
+                addDevLog(`Immediate ACK sent for ${actionTarget}`, 'info');
+                broadcastToTimerTabs({
+                    type: 'EXTENSION_OUTBOUND',
+                    payload: {
+                        action: 'EXTENSION_SYNC_ACK',
+                        originalAction: actionTarget,
+                        timestamp: p.timestamp
                     }
                 });
             }
@@ -445,6 +464,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                         // Force Sync: content.js confirmed seek is ready
                         if (response.status === 'seek_ready') {
+                            addDevLog(`Force Sync Phase 1 Ready: Tab ${storageData.targetTabId} at ${response.currentTime}`, 'success');
+                            
                             updateForceSyncState(p.timestamp, (currentState) => ({
                                 ...currentState,
                                 timestamp: p.timestamp,
@@ -481,6 +502,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             }));
                         }
                     }).catch(err => {
+                        addDevLog(`Failed to send message to target tab: ${err.message}`, 'error');
                         console.warn('Background: Failed to send message to target tab:', err.message);
                         updateForceSyncState(p.timestamp, (currentState) => ({
                             ...currentState,
@@ -497,6 +519,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             }).then(() => {
                                 setTimeout(() => sendCommand(1), 500);
                             }).catch(e => {
+                                addDevLog(`Retry injection failed: ${e.message}`, 'error');
                                 console.error('Inject Err', e.message);
                                 if (e.message.includes('No tab with id')) {
                                     chrome.storage.local.set({ targetTabId: 'none' });
@@ -510,5 +533,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
     }
 
-    return true; // async
+    return;
 });

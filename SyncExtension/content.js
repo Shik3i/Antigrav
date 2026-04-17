@@ -68,8 +68,10 @@
                     if (v.paused) {
                         v.play().catch(e => {
                             if (e.name === 'NotAllowedError') {
+                                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: 'SyncExtension: Autoplay blocked. Please click the page once.', logType: 'warn' }).catch(() => {});
                                 console.warn('SyncExtension: Autoplay blocked. Please click the page once to enable sync.');
                             } else {
+                                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `SyncExtension: Native play failed: ${e.message}`, logType: 'error' }).catch(() => {});
                                 console.debug('SyncExtension: Native play failed:', e.message);
                             }
                         });
@@ -79,6 +81,7 @@
                 }
             });
         } catch (e) {
+            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `SyncExtension: Error in media action: ${e.message}`, logType: 'error' }).catch(() => {});
             console.error('SyncExtension: Error in media action:', e);
         }
         setTimeout(() => { isProcessingCommand = false; }, 1000);
@@ -168,6 +171,7 @@
                     result.detectionStatus = 'No <video> element found';
                 }
             } catch (e) {
+                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Content: Debug info error: ${e.message}`, logType: 'warn' }).catch(() => {});
                 result.detectionStatus = `Error: ${e.message}`;
             }
 
@@ -238,7 +242,7 @@
             return true; // async
         }
 
-        return true;
+        return;
     });
 
     // HEARTBEAT: Ping background.js every 15 seconds to keep it alive
@@ -264,12 +268,13 @@
                                 }
                             }, 1000);
                         } else {
+                            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Content Heartbeat failed: ${err.message}`, logType: 'warn' }).catch(() => {});
                             clearInterval(heartbeatInterval);
                         }
                     });
             }
         } catch (e) {
-            // Context is definitely gone
+            // Context is definitely gone - no way to log here as sendMessage would throw
             clearInterval(heartbeatInterval);
         }
     }, 15000);
@@ -290,7 +295,9 @@
             type: 'EXTENSION_OUTBOUND',
             source: 'video_native_event',
             payload: payload
-        }).catch(() => {});
+        }).catch((err) => {
+            console.warn('Silent sync failure (context likely gone)');
+        });
     }
 
     function attachVideoListeners(video) {

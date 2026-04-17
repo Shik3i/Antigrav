@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const refreshDevBtn = document.getElementById('refreshDevBtn');
     const logList = document.getElementById('logList');
     const clearLogsBtn = document.getElementById('clearLogsBtn');
+    const copyLogsBtn = document.getElementById('copyLogsBtn');
     const devModeToggle = document.getElementById('devModeToggle');
     const tabLogs = document.getElementById('tabLogs');
     const contentLogs = document.getElementById('contentLogs');
@@ -48,6 +49,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+
+    const logToDev = (message, logType = 'info') => {
+        chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message, logType }).catch(() => {});
+    };
 
     const BLACKLIST_DOMAINS = [
         'mail.google.com', 'outlook.live.com', 'outlook.office.com', 'gmx.net', 'web.de',
@@ -85,7 +90,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const url = new URL(tab.url);
                     const match = url.pathname.match(/\/room\/([^\/]+)/);
                     if (match && match[1]) detectedRoomId = match[1];
-                } catch (e) { }
+                } catch (e) {
+                    logToDev(`Error parsing URL ${tab.url}: ${e.message}`, 'warn');
+                }
             }
         });
 
@@ -158,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.storage.local.get(['targetTabId', 'extensionInstanceId', 'filterNoiseTabs', 'notificationsEnabled', 'devModeEnabled'], (data) => {
         extensionInstanceId = data.extensionInstanceId;
         if (!extensionInstanceId) {
-            console.warn('Popup: extensionInstanceId not found, waiting for background...');
+            logToDev('Popup: extensionInstanceId not found, waiting for background...', 'warn');
         }
 
         const isFilterActive = data.filterNoiseTabs !== false;
@@ -172,8 +179,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         devModeToggle.checked = isDevMode;
         tabLogs.style.display = isDevMode ? 'block' : 'none';
 
-        if (data.targetTabId !== undefined) {
-            targetTabSelect.value = data.targetTabId === null ? 'none' : data.targetTabId;
+        if (data.targetTabId !== undefined && data.targetTabId !== 'none') {
+            const id = parseInt(data.targetTabId, 10);
+            targetTabSelect.value = id;
+            
+            // Proactive check/inject on startup
+            chrome.tabs.sendMessage(id, { action: 'ping' }).catch(() => {
+                chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }).catch(() => {});
+            });
         }
         if (hasTimerTab) {
             announceTabStatus();
@@ -227,7 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusDiv.style.display = 'block';
                 setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
             }).catch((err) => { 
-                console.warn("Injection failed:", err.message);
+                logToDev(`Injection failed: ${err.message}`, 'warn');
                 statusDiv.innerText = "Restricted Page! ❌";
                 statusDiv.style.color = '#ef4444';
                 statusDiv.style.display = 'block';
@@ -241,7 +254,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusDiv.style.display = 'block';
             setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
             // Bug 3 Fix: Trigger immediate status broadcast to all peers
-            chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch(() => {});
+            chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch((err) => {
+                logToDev(`Failed to send TAB_SELECTION_CHANGED: ${err.message}`, 'warn');
+            });
         });
         announceTabStatus();
     });
@@ -250,7 +265,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // The old version built its own tab_status payload without playbackState, causing the
     // green-circle regression on peers. background.js's announceLocalTabStatus() has the full state.
     function announceTabStatus() {
-        chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch(() => {});
+        chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch((err) => {
+            logToDev(`Failed to announce tab status: ${err.message}`, 'warn');
+        });
     }
 
     function announceVersion() {
@@ -263,7 +280,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 version: chrome.runtime.getManifest().version,
                 instanceId: extensionInstanceId
             }
-        }).catch(() => {});
+        }).catch((err) => {
+            logToDev(`Failed to announce version: ${err.message}`, 'warn');
+        });
     }
 
     function renderRoomPeers() {
@@ -316,10 +335,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             if (myTabId) {
+                // Use safe messaging to avoid "Receiving end does not exist" logs
                 chrome.tabs.sendMessage(myTabId, { action: 'get_debug_info' }).then(info => {
                     const myState = info && info.videoState !== 'N/A' ? (info.videoState === 'Playing' ? 'playing' : 'paused') : null;
                     updateUI(myState);
-                }).catch(() => updateUI(null));
+                }).catch((err) => {
+                    // Only log if it's NOT a common connection error, or if we want to be silent about background polling
+                    if (!err.message.includes('Receiving end does not exist')) {
+                        logToDev(`Popup Peer Render: ${err.message}`, 'warn');
+                    }
+                    updateUI(null);
+                });
             } else {
                 updateUI(null);
             }
@@ -368,7 +394,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             type: 'EXTENSION_OUTBOUND',
             source: 'extension_popup',
             payload: { action, timestamp: new Date().toISOString() }
-        }).catch(() => {});
+        }).catch((err) => {
+            logToDev(`Failed to send media command ${action}: ${err.message}`, 'error');
+        });
         setTimeout(() => loadHistory(), 250);
     }
 
@@ -403,7 +431,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // 2. Broadcast OUTBOUND pause/seek. 
             // Note: background.js now handles the local INBOUND trigger automatically.
-            chrome.runtime.sendMessage(msg).catch(() => {});
+            const msg = { 
+                type: 'EXTENSION_OUTBOUND', 
+                source: 'extension_popup', 
+                payload: { action: 'force_sync_pause_seek', targetTime: time, timestamp: ts } 
+            };
+            chrome.runtime.sendMessage(msg).catch((err) => {
+                logToDev(`Failed to send force_sync_pause_seek: ${err.message}`, 'error');
+            });
 
             // 3. Polling for readiness (Two-Phase: 5s for ACK, 60s for Buffer)
             const startTime = Date.now();
@@ -468,6 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 500);
 
         } catch(e) { 
+            logToDev(`Force sync failed: ${e.message}`, 'error');
             updateSyncStatus('❌ Failed', '#dc3545'); 
             hideSyncStatus(); 
         }
@@ -475,9 +511,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function finalizeSync(ts) {
         chrome.runtime.sendMessage({ 
-            type: 'EXTENSION_OUTBOUND', 
+            type: 'EXTENSION_OUTBOUND',
             source: 'extension_popup', 
             payload: { action: 'force_sync_play', timestamp: ts } 
+        }).catch((err) => {
+            logToDev(`Failed to send force_sync_play: ${err.message}`, 'error');
         });
         updateSyncStatus('✅ Done!', '#4CAF50');
         hideSyncStatus();
@@ -515,7 +553,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const findPeersFeedback = document.getElementById('findPeersFeedback');
     if (findPeersBtn) {
         findPeersBtn.addEventListener('click', () => {
-            chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch(() => {});
+            chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch((err) => {
+                logToDev(`Failed to broadcast find peers: ${err.message}`, 'warn');
+            });
             if (findPeersFeedback) {
                 findPeersFeedback.textContent = "📡 Announcement Broadcasted!";
                 findPeersFeedback.style.display = 'block';
@@ -584,7 +624,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!id) { devInfo.innerHTML = 'No tab selected.'; return; }
         chrome.tabs.sendMessage(id, { action: 'get_debug_info' }).then(r => {
             devInfo.innerHTML = r ? Object.entries(r).map(([k,v])=>`<strong>${k}:</strong> ${v}`).join('<br>') : 'No response.';
-        }).catch(e => { devInfo.innerHTML = 'Error: ' + e.message; });
+        }).catch(e => { 
+            logToDev(`Failed to load dev info: ${e.message}`, 'error');
+            devInfo.innerHTML = 'Error: ' + e.message; 
+        });
     }
 
     function renderDevLogs() {
@@ -609,11 +652,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             }).join('');
         });
     }
-
+    
     if (clearLogsBtn) {
         clearLogsBtn.addEventListener('click', () => {
             chrome.storage.local.set({ devLogs: [] }, () => {
                 renderDevLogs();
+            });
+        });
+    }
+    
+    if (copyLogsBtn) {
+        copyLogsBtn.addEventListener('click', () => {
+            chrome.storage.local.get(['devLogs'], (data) => {
+                const logs = data.devLogs || [];
+                if (logs.length === 0) {
+                    copyLogsBtn.textContent = 'EMPTY!';
+                    setTimeout(() => { copyLogsBtn.textContent = 'COPY'; }, 1000);
+                    return;
+                }
+                
+                const text = logs.map(log => {
+                    const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const type = (log.type || 'info').toUpperCase();
+                    return `[${time}] [${type}] ${log.message}`;
+                }).join('\n');
+                
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = copyLogsBtn.textContent;
+                    copyLogsBtn.textContent = 'COPIED!';
+                    copyLogsBtn.style.color = '#4ade80';
+                    setTimeout(() => { 
+                        copyLogsBtn.textContent = originalText;
+                        copyLogsBtn.style.color = '';
+                    }, 2000);
+                }).catch(err => {
+                    logToDev(`Failed to copy logs: ${err.message}`, 'error');
+                    copyLogsBtn.textContent = 'ERROR!';
+                    setTimeout(() => { copyLogsBtn.textContent = 'COPY'; }, 2000);
+                });
             });
         });
     }
