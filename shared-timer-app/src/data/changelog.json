@@ -1,15 +1,63 @@
 [
   {
-    "id": 32,
-    "version": "2.19.2",
+    "id": 40,
+    "version": "2.24.3",
     "date": "2026-04-17",
     "changes": "- **Auth Session Guard**: JWT-Sessions ohne gültigen Datenbank-User werden jetzt sauber mit `401` beendet, statt als Phantom-Session weiterzulaufen.\n- **Auto Logout**: Der stille `/auth/me`-Refresh meldet Clients bei ungültigen oder veralteten Sessions automatisch ab.\n- **Idle-Game Stabilität**: Fehlende Idle-Profile werden beim Statusabruf initialisiert, um Folgefehler nach Neustarts oder DB-Wechseln zu vermeiden."
   },
   {
+    "id": 39,
+    "version": "2.24.2",
+    "date": "2026-04-16",
+    "changes": "- **Achievements**: Implemented authentication short-circuiting to prevent unnecessary API traffic for guests.\n- **Achievements**: Replaced generic error messages with a clean guest fallback UI and login call-to-action.\n- **Achievements**: Enhanced error handling to specifically detect and notify users of expired sessions (401/403).\n- **Backend**: Optimized log handling to prevent expected unauthorized requests from bloating system logs."
+  },
+  {
+    "id": 38,
+    "version": "2.24.1",
+    "date": "2026-04-16",
+    "changes": "- **Esports Filtering**: Fixed Esports filtering crash by enforcing array type-safety in backend and frontend.\n- **Server Broadcast**: Resolved Server Broadcast failure by integrating announcements with the global Toast system.\n- **Polymarket UI**: Fixed Firefox loading spinner flicker in Polymarket page by prioritizing global state retention.\n- **Socket Stability**: Improved socket listener stability in App.jsx with mandatory cleanup routines."
+  },
+  {
+    "id": 37,
+    "version": "2.24.0",
+    "date": "2026-04-16",
+    "changes": "- **Esports Performance-Stabilisierung**: Implementierung einer robusten Lazy-Loading Cache-Architektur im Backend zur drastischen Reduzierung von API-Latenzen.\n- **Persistent Context**: Einführung des `PersistentDataContext` zur globalen Erhaltung von Esports- und Wett-Daten über alle Dashboard-Tabs hinweg (SPA).\n- **Cache Age Tracking**: Der \"Schedule Stand\" Zeitstempel basiert nun auf der tatsächlichen Cache-Erstellung im Server-RAM statt auf dem lokalen Empfangszeitpunkt.\n- **Over-Fetching Prevention**: Optimierung der Hintergrund-Synchronisation durch intelligentes Stale-While-Revalidate und Minimierung redundanter Socket-Events."
+  },
+  {
+    "id": 36,
+    "version": "2.23.0",
+    "date": "2026-04-16",
+    "changes": "- **Performance Optimization (Code Splitting)**: Umstellung der Hauptseiten auf dynamische Imports (`React.lazy`), um die initiale Ladezeit zu minimieren.\n- **ViewLoader Component**: Implementierung eines modernen, zentrierten Lade-Spinners für flüssigere Seitenübergänge.\n- **PWA Caching Strategy**: Einführung einer intelligenten Caching-Logik für externe LoL-Esports-Bilder (`static.lolesports.com`) mit einer 7-tägigen Ablauffrist.\n- **UI Cleanup**: Entfernung redundanter Navigations-Buttons auf der Esports-Seite zur Verbesserung der Übersichtlichkeit."
+  },
+  {
+    "id": 35,
+    "version": "2.22.0",
+    "date": "2026-04-16",
+    "changes": "- **Global Toast System**: Ersetzung von blockierenden Browser-Alerts durch ein modernes, globales Benachrichtigungssystem mit Glasmorphismus-Design.\n- **UI Design Optimization**: Optimierung des MMO Leveling Tracker Headers durch ein kompakteres, horizontales Layout (FWC & Stream Info in einer Zeile).\n- **Smooth Transitions**: Implementierung von CSS-basierten Fade- und Slide-Effekten für flüssige Tab-Wechsel.\n- **UX Stability**: Entfernung des automatischen Schließens von Esports-Wett-Overlays zur Verbesserung des Workflows bei Mehrfachwetten.\n- **Aria-Labeling**: Verbesserung der Barrierefreiheit durch Hinzufügen von `aria-label` zu Stream-Buttons."
+  },
+  {
+    "id": 34,
+    "version": "2.21.2",
+    "date": "2026-04-15",
+    "changes": "- **Esports Odds Matching**: Grundlegende Reparatur der Matching-Logik zwischen LoL-Schedule und Polymarket.\n- **Backend Slug-Expansion**: Automatische Abfrage von Permutationen aus Team-Codes UND vollen Team-Namen, um auch regionale Ligen (Prime League) besser zu erfassen.\n- **Frontend Robustness**: Implementierung einer zwei-stufigen Verifizierung via Outcome-Namen (Fuzzy Match), falls die Slugs nicht exakt übereinstimmen.\n- **Performance Fix**: Entfernung redundanter Console-Logs im Render-Cycle zur Reduzierung der Browserlast."
+  },
+  {
+    "id": 33,
+    "version": "2.21.1",
+    "date": "2026-04-15",
+    "changes": "- **Room Lifecycle Fix**: Das aktive Raum-Abo bleibt nun global bestehen, auch wenn du von der Raumseite auf andere Unterseiten navigierst.\n- **Explicit Leave Cleanup**: Der Raum wird nur noch beim echten \"Leave Room\" oder beim Browser-Disconnect verlassen, inklusive sauberem State-Reset.\n- **Global Title Timer**: Der Tab-Titel wird nun zentral und sekundengenau weiter aktualisiert, auch außerhalb der Raumseite und in Hintergrund-Tabs."
+  },
+  {
+    "id": 32,
+    "version": "2.21.0",
+    "date": "2026-04-15",
+    "changes": "- **Admin Panel**: Persistente Speicherung der Navigations-Reihenfolge und editierbare Labels/Kategorien hinzugefügt.\n- **Dynamic Sidebar**: Die täglichen \"Daily Visit\" Badges werden nun dynamisch über das Admin-Panel gesteuert.\n- **Twitch Integration**: Integration von \"Prime League\" im globalen Widget und isolierter Live-Status für \"Spielestyler\" im Leveling Tracker."
+  },
+  {
     "id": 31,
-    "version": "2.19.1",
-    "date": "2026-04-17",
-    "changes": "- **Repository Cleanup**: Entfernte ungenutzte Hooks, Template-Artefakte und temporäre Hilfsdateien aus dem Refactoring-Nachlauf.\n- **Socket Events**: Konsolidierung der Client-/Server-Eventnamen auf eine gemeinsame Shared-Definition zur Vermeidung von Drift.\n- **Structure Polish**: Bereinigung eines ungenutzten Context-Rests und Aktualisierung der README auf den realen Projektstand."
+    "version": "2.20.0",
+    "date": "2026-04-15",
+    "changes": "- **Performance Bundle**: Umstellung auf lokale Schriftarten (@fontsource/inter, @fontsource/outfit) zur Reduzierung von Render-Blocking-Ressourcen.\n- **Layout Stability (CLS)**: Umfassende Bild-Optimierung mit expliziten Dimensionen, Lazy-Loading und LCP-Priorisierung zur Behebung von Layout-Shifts.\n- **UI Refinement**: Entfernung des Zeitstempels im Tagesschau-Newsticker für ein saubereres Erscheinungsbild."
   },
   {
     "id": 30,
