@@ -2397,7 +2397,7 @@ const Admin = ({ socket }) => {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        {Array.from(new Set([...navbarSettings.map(n => n.category), 'Timers', 'Esports', 'Games', 'System'])).map(category => {
+                        {['Timers', 'Esports', 'Games', 'System', 'Other', ...new Set(navbarSettings.map(n => n.category).filter(c => !['Timers', 'Esports', 'Games', 'System', 'Other'].includes(c)))].map(category => {
                             const categoryItems = navbarSettings.filter(item => item.category === category);
                             if (categoryItems.length === 0) return null;
 
