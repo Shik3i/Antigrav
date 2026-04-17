@@ -173,14 +173,9 @@ const TowerClimb = () => {
 
       if (result.round.status === 'running') {
         setActiveRound(result.round);
-        const nextStep = result.round.currentLevel >= result.round.levelCount
-          ? 'Tower vollständig geklärt. Jetzt auszahlen!'
-          : `Sicher! Level ${result.round.currentLevel}/${result.round.levelCount}.`;
-        showToast(nextStep, 'success');
       } else {
         setActiveRound(null);
         setLatestRound(result.round);
-        showToast('Falle getroffen. Einsatz verloren.', 'error');
         await refreshHistory();
       }
 
@@ -241,13 +236,6 @@ const TowerClimb = () => {
             </div>
           </div>
           
-          {/* Quick Stats in Header */}
-          <div style={{ display: 'flex', gap: '12px' }}>
-             <div style={{ padding: '12px 20px', borderRadius: '18px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Guthaben</span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b' }}>{formatKC(user?.koala_balance || 0)} KC</span>
-             </div>
-          </div>
         </div>
 
         {isGuest && (
