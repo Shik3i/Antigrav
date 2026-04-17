@@ -1,5 +1,11 @@
 [
   {
+    "id": 43,
+    "version": "2.27.0",
+    "date": "2026-04-18",
+    "changes": "- **Tower Climb UX**: Immersion-Upgrade mit 500ms 'Druck-Test'-Animation (Squid Game Stil) und physischer Belastungs-Visualisierung.\n- **Tower Climb**: Pfad-Visualisierung mittels Avatar-Icons und vollständiges Aufdecken sicherer Tiles in abgeschlossenen Ebenen zur Erhöhung der Transparenz.\n- **UI Cleanup**: Redundante Guthaben-Anzeige und Benachrichtigungs-Spam im Tower Climb entfernt."
+  },
+  {
     "id": 42,
     "version": "2.26.0",
     "date": "2026-04-17",

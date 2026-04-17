@@ -11,9 +11,9 @@ const formatKC = (cents) => (cents / 100).toLocaleString('de-DE', {
 });
 
 const STATUS_META = {
-  running: { label: 'Running', color: '#3b82f6', bg: 'rgba(59,130,246,0.14)' },
-  cashed_out: { label: 'Cashed Out', color: '#10b981', bg: 'rgba(16,185,129,0.14)' },
-  lost: { label: 'Lost', color: '#ef4444', bg: 'rgba(239,68,68,0.14)' },
+  running: { label: 'Laufend', color: '#3b82f6', bg: 'rgba(59,130,246,0.14)' },
+  cashed_out: { label: 'Ausgezahlt', color: '#10b981', bg: 'rgba(16,185,129,0.14)' },
+  lost: { label: 'Verloren', color: '#ef4444', bg: 'rgba(239,68,68,0.14)' },
   idle: { label: 'Idle', color: 'var(--text-muted)', bg: 'rgba(148,163,184,0.12)' }
 };
 
@@ -30,6 +30,7 @@ const TowerClimb = () => {
   const [autoStartRounds, setAutoStartRounds] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(false);
+  const [revealingTile, setRevealingTile] = useState(null); // { level: number, index: number }
   const [error, setError] = useState('');
 
   const syncBalance = useCallback((newBalance) => {
@@ -164,12 +165,18 @@ const TowerClimb = () => {
     if (!activeRound || actionBusy) return;
 
     setActionBusy(true);
+    setRevealingTile({ level: activeRound.currentLevel, index: tileIndex });
     setError('');
+
+    // Parallel fetch and suspense delay (faster 500ms)
+    const suspensePromise = new Promise(resolve => setTimeout(resolve, 500));
+    const pickPromise = fetchJson('/api/tower/pick', {
+      method: 'POST',
+      body: JSON.stringify({ tileIndex, expectedLevel: activeRound.currentLevel })
+    });
+
     try {
-      const result = await fetchJson('/api/tower/pick', {
-        method: 'POST',
-        body: JSON.stringify({ tileIndex, expectedLevel: activeRound.currentLevel })
-      });
+      const [_, result] = await Promise.all([suspensePromise, pickPromise]);
 
       if (result.round.status === 'running') {
         setActiveRound(result.round);
@@ -184,6 +191,7 @@ const TowerClimb = () => {
       setError(err.message || 'Spielzug konnte nicht ausgewertet werden.');
       await loadAuthedData();
     } finally {
+      setRevealingTile(null);
       setActionBusy(false);
     }
   };
@@ -341,44 +349,60 @@ const TowerClimb = () => {
                           let border = '1px solid rgba(255,255,255,0.08)';
                           let color = 'var(--text-main)';
                           let icon = null;
+                          let text = '';
 
                           if (resolvedSelection) {
-                            if (tileIndex === resolvedSelection.tileIndex && resolvedSelection.result === 'safe') {
-                              background = 'linear-gradient(135deg, rgba(16,185,129,0.3) 0%, rgba(5,150,105,0.3) 100%)';
+                            const isPicked = tileIndex === resolvedSelection.tileIndex;
+                            const isTrap = tileIndex === resolvedSelection.trapIndex;
+                            const wasSafeChoice = resolvedSelection.result === 'safe';
+
+                            if (isPicked && wasSafeChoice) {
+                              background = 'linear-gradient(135deg, rgba(16,185,129,0.4) 0%, rgba(5,150,105,0.4) 100%)';
                               border = '2px solid #10b981';
                               color = '#fff';
-                              icon = <Shield size={20} />;
-                            } else if (tileIndex === resolvedSelection.tileIndex && resolvedSelection.result === 'trap') {
-                              background = 'linear-gradient(135deg, rgba(239,68,68,0.3) 0%, rgba(220,38,38,0.3) 100%)';
+                              icon = <User size={20} strokeWidth={3} />;
+                              text = 'Sicher';
+                            } else if (isPicked && !wasSafeChoice) {
+                              background = 'linear-gradient(135deg, rgba(239,68,68,0.4) 0%, rgba(220,38,38,0.4) 100%)';
                               border = '2px solid #ef4444';
                               color = '#fff';
                               icon = <AlertCircle size={20} />;
-                            } else if (tileIndex === resolvedSelection.trapIndex) {
+                              text = 'Falle';
+                            } else if (isTrap) {
                               background = 'rgba(239,68,68,0.1)';
                               border = '1px dashed rgba(239,68,68,0.3)';
                               color = '#fca5a5';
                               icon = <AlertCircle size={16} opacity={0.6} />;
+                              text = 'Falle';
                             } else {
-                              background = 'rgba(255,255,255,0.02)';
-                              border = '1px solid rgba(255,255,255,0.04)';
-                              color = 'rgba(255,255,255,0.2)';
+                              // Other safe tile in a resolved level
+                              background = 'rgba(16,185,129,0.05)';
+                              border = '1px solid rgba(16,185,129,0.2)';
+                              color = 'rgba(16,185,129,0.6)';
+                              icon = <Shield size={16} />;
+                              text = 'Sicher';
                             }
                           } else if (isCurrentLevel) {
                             background = 'rgba(59,130,246,0.1)';
                             border = '1px solid rgba(59,130,246,0.3)';
                             color = '#bfdbfe';
-                          } else if (isUpcomingLevel) {
-                            opacity: 0.5;
                           }
 
+                          const isRevealing = revealingTile?.level === levelIndex && revealingTile?.index === tileIndex;
                           const isClickable = isCurrentLevel && !resolvedSelection && !actionBusy;
+
+                          let animClass = '';
+                          if (isRevealing) animClass = 'revealing-pulse';
+                          else if (resolvedSelection && tileIndex === resolvedSelection.tileIndex) {
+                            animClass = resolvedSelection.result === 'safe' ? 'success-pop' : 'trap-shake';
+                          }
 
                           return (
                             <button
                               key={tileIndex}
                               onClick={() => isClickable && handlePick(tileIndex)}
-                              disabled={!isClickable}
-                              className={`tower-tile ${isClickable ? 'clickable' : ''}`}
+                              disabled={!isClickable || isRevealing}
+                              className={`tower-tile ${isClickable ? 'clickable' : ''} ${animClass}`}
                               style={{
                                 minHeight: '80px',
                                 borderRadius: '20px',
@@ -395,12 +419,19 @@ const TowerClimb = () => {
                                 gap: '8px',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.05em',
-                                boxShadow: isClickable ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
+                                boxShadow: (isClickable || isRevealing) ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
                               }}
                             >
-                              {icon}
-                              {isCurrentLevel && !resolvedSelection && !actionBusy ? 'Wählen' : ''}
-                              {resolvedSelection && tileIndex === resolvedSelection.tileIndex ? (resolvedSelection.result === 'safe' ? 'Sicher' : 'Falle') : ''}
+                              {isRevealing ? (
+                                <div style={{ fontSize: '1.2rem', fontWeight: 900, opacity: 0.6, animation: 'pulse 0.3s infinite alternate' }}>?</div>
+                              ) : icon}
+                              
+                              {!isRevealing && (
+                                <>
+                                  {isCurrentLevel && !resolvedSelection && !actionBusy ? 'Wählen' : ''}
+                                  {text}
+                                </>
+                              )}
                             </button>
                           );
                         })}
@@ -619,6 +650,38 @@ const TowerClimb = () => {
         .tower-tile.clickable:active {
           transform: scale(0.96) translateY(-2px);
         }
+        
+        /* Physical Reveal Animations (Squid Game vibe) */
+        .revealing-pulse {
+          animation: scanPulse 0.25s infinite alternate;
+          border-color: rgba(255,255,255,0.4) !important;
+          background: rgba(255,255,255,0.05) !important;
+        }
+        @keyframes scanPulse {
+          0% { transform: scale(1); filter: brightness(1); }
+          100% { transform: scale(0.97); filter: brightness(0.8); }
+        }
+
+        .success-pop {
+          animation: successPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes successPop {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.15); filter: brightness(1.2); }
+          100% { transform: scale(1); }
+        }
+
+        .trap-shake {
+          animation: trapShake 0.4s linear;
+        }
+        @keyframes trapShake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-8px) rotate(-1deg); }
+          40% { transform: translateX(8px) rotate(1deg); }
+          60% { transform: translateX(-6px) rotate(-0.5deg); }
+          80% { transform: translateX(6px) rotate(0.5deg); }
+        }
+
         .avatar-pulse {
           animation: avatarPulse 2s infinite ease-in-out;
         }
@@ -626,6 +689,13 @@ const TowerClimb = () => {
           0% { transform: scale(1); opacity: 0.8; }
           50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 8px rgba(59,130,246,0.5)); }
           100% { transform: scale(1); opacity: 0.8; }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
