@@ -214,6 +214,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 chrome.storage.local.set({ localPlaybackState: message.playbackState });
                 announceLocalTabStatus();
             }
+        } else if (message.source === 'bridge') {
+            // Fix 1: Bridge heartbeat (every 15s) was always intended to trigger a status
+            // broadcast — bridge.js even says so in its comment. The handler was dead code
+            // before (Bug A fix) and then ignored for bridge source. Now we use it to keep
+            // roomPeers on all peers fresh every 15 seconds.
+            announceLocalTabStatus();
         }
         return true;
     }
@@ -289,6 +295,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     };
                     chrome.storage.local.set({ roomPeers: peers });
                 });
+
+                // Fix 2: Immediately respond with our own status so the announcing peer
+                // can also see us. Without this, peer visibility depends on alarm timing
+                // (up to 1 min) or the next bridge heartbeat (up to 15s). With this fix,
+                // both sides see each other within one socket round-trip.
+                announceLocalTabStatus();
             });
             return true;
         }

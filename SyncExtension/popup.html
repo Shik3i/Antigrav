@@ -325,7 +325,7 @@
 </head>
 
 <body>
-  <h2>Media Sync <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">v2.6</span></h2>
+  <h2>Media Sync <span id="popupVersion" style="font-size: 10px; color: var(--text-muted); font-weight: normal;"></span></h2>
 
   <div id="updateBanner"
     style="display: none; margin-bottom: 12px; padding: 10px 12px; background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1)); border: 1px solid #f59e0b; border-radius: 8px; text-align: center; animation: fadeIn 0.3s;">
@@ -418,7 +418,14 @@
       style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; font-size: 11px; color: #e2e8f0; font-family: monospace; overflow-x: auto; white-space: pre-wrap;">
       Loading Diagnostics...
     </div>
-  </div>
+
+    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+      <button id="findPeersBtn"
+        style="width: 100%; padding: 9px; font-size: 12px; font-weight: bold; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; border-radius: 8px; cursor: pointer; letter-spacing: 0.4px; transition: all 0.2s;">
+        📡 Find Peers (Force Announce)
+      </button>
+      <div id="findPeersFeedback" style="display:none; font-size: 10px; text-align: center; color: #6ee7b7; padding: 4px;"></div>
+    </div>
 
   <div id="contentSettings" class="tab-content">
     <h3 style="font-size: 14px; margin: 0 0 15px 0; color: var(--text-muted);">Preferences</h3>

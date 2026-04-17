@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    // Always show the version from manifest.json — never hardcode it in HTML
+    const versionSpan = document.getElementById('popupVersion');
+    if (versionSpan) versionSpan.textContent = `v${chrome.runtime.getManifest().version}`;
+
     const targetTabSelect = document.getElementById('targetTab');
     const statusDiv = document.getElementById('status');
     const playBtn = document.getElementById('playBtn');
@@ -443,6 +447,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (refreshHistoryBtn) refreshHistoryBtn.addEventListener('click', () => loadHistory());
     if (refreshDevBtn) refreshDevBtn.addEventListener('click', () => loadDevInfo());
+
+    const findPeersBtn = document.getElementById('findPeersBtn');
+    const findPeersFeedback = document.getElementById('findPeersFeedback');
+    if (findPeersBtn) {
+        findPeersBtn.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ type: 'TAB_SELECTION_CHANGED' }).catch(() => {});
+            if (findPeersFeedback) {
+                findPeersFeedback.textContent = "📡 Announcement Broadcasted!";
+                findPeersFeedback.style.display = 'block';
+                setTimeout(() => {
+                    findPeersFeedback.style.display = 'none';
+                }, 3000);
+            }
+        });
+    }
 
     function timeAgo(isoTimestamp) {
         const diff = Math.floor((Date.now() - new Date(isoTimestamp).getTime()) / 1000);
