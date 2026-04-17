@@ -9,6 +9,15 @@ const ALLOWED_ORIGINS = new Set([
     'http://localhost:3001'
 ]);
 
+// Helper: check if extension context is still valid
+function isContextValid() {
+    try {
+        return !!chrome.runtime?.id;
+    } catch (e) {
+        return false;
+    }
+}
+
 // --- Environment Validation ---
 chrome.storage.local.get(['bridgeDomainMode'], (data) => {
     const mode = data.bridgeDomainMode || 'production';
