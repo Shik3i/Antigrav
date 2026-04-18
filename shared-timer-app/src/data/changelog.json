@@ -1,5 +1,11 @@
 [
   {
+    "id": 61,
+    "version": "2.37.0",
+    "date": "2026-04-18",
+    "changes": "- **Admin: Sidebar-Management**: Vollständige Umstellung auf ein kategorie-basiertes System. Verlinkungen können nun einfach via Dropdown zwischen Gruppen (z.B. Timers, Tools, Games) verschoben werden.\n- **Admin: UI-Stablisierung**: Durchgängige Umstellung aller Symbole auf einen ausfallsicheren Namespace, um Abstürze durch fehlende Referenzen (z.B. RefreshCw) zu verhindern.\n- **Admin: Design-Refinement**: Korrektur der Layout-Verzerrungen und Implementierung eines konsistenten Dark-Themes für alle Auswahlmenüs.\n- **Sidebar: Neue Struktur**: Einführung der Kategorie \"Tools\" zur besseren Organisation spezialisierter Anwendungen.\n- **Datenbank**: Resiliente Schema-Migration für die Navigations-Einstellungen zur Gewährleistung der Abwärtskompatibilität."
+  },
+  {
     "id": 60,
     "version": "2.36.2",
     "date": "2026-04-18",

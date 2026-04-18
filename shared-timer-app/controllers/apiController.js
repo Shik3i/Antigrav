@@ -46,8 +46,24 @@ exports.getActivityHistory = async (req, res, next) => {
 };
 
 exports.fetchNewsData = async () => {
-    const { data } = await apiDataService.getNews();
-    return data;
+    try {
+        // Return Tagesschau articles from cache
+        const feeds = await dbLayer.getRssFeeds();
+        const tagesschau = feeds.find(f => f.is_default || f.name.toLowerCase().includes('tagesschau'));
+        if (!tagesschau) return [];
+        
+        const articles = await dbLayer.getCachedArticles([tagesschau.id], 15);
+        return articles.map(a => ({
+            title: a.title,
+            link: a.link,
+            imageUrl: a.imageUrl,
+            snippet: a.snippet,
+            pubDate: a.pubDate
+        }));
+    } catch (err) {
+        console.error('fetchNewsData error:', err);
+        return [];
+    }
 };
 
 exports.getNews = async (req, res, next) => {
@@ -55,7 +71,7 @@ exports.getNews = async (req, res, next) => {
         const news = await exports.fetchNewsData();
         safeJson(res, news);
     } catch (err) {
-        console.error('Failed to fetch News RSS:', err);
+        console.error('Failed to fetch News from DB:', err);
         res.status(500).json({ error: 'Failed to fetch news feed' });
     }
 };
@@ -1645,6 +1661,167 @@ exports.getDailyStatus = async (req, res, next) => {
         } catch (e) { }
 
         res.json(result);
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ─── RSS News Handlers ─────────────────────────────────────────
+
+exports.getRssFeeds = async (req, res, next) => {
+    try {
+        const feeds = await dbLayer.getRssFeeds();
+        res.json(feeds);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getRssArticles = async (req, res, next) => {
+    try {
+        const userId = req.user?.userId || req.user?.id;
+        let hiddenFeedIds = [];
+        if (userId) {
+            const prefs = await dbLayer.getUserRssPreferences(userId);
+            hiddenFeedIds = prefs.filter(p => p.isHidden).map(p => p.feedId);
+        }
+
+        const allFeeds = await dbLayer.getRssFeeds();
+        const visibleFeedIds = allFeeds
+            .filter(f => !hiddenFeedIds.includes(f.id))
+            .map(f => f.id);
+
+        if (visibleFeedIds.length === 0) return res.json([]);
+
+        // Get up to 100 articles from cache
+        const articles = await dbLayer.getCachedArticles(visibleFeedIds, 100);
+        res.json(articles);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateRssPreference = async (req, res, next) => {
+    try {
+        const { feedId, isHidden } = req.body;
+        const userId = req.user?.userId || req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        
+        await dbLayer.updateUserRssPreference(userId, feedId, isHidden);
+        res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// RSS Admin
+exports.getAdminRssFeeds = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const feeds = await dbLayer.getRssFeeds();
+        res.json(feeds);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.addAdminRssFeed = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { name, url, icon } = req.body;
+        if (!name || !url) return res.status(400).json({ error: 'Name and URL required' });
+        
+        const feed = await dbLayer.addRssFeed(name, url, icon);
+        
+        // Background fetch initial articles
+        const rssService = require('../services/rssService');
+        rssService.refreshFeed(feed.id, feed.url).catch(e => console.error('[Admin RSS] Initial fetch failed:', e.message));
+
+        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'ADD_RSS_FEED', { name, url });
+        res.status(201).json(feed);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateAdminRssFeed = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { id } = req.params;
+        const { name, url, icon } = req.body;
+        await dbLayer.updateRssFeed(id, name, url, icon);
+        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'UPDATE_RSS_FEED', { id, name, url });
+        res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.deleteAdminRssFeed = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { id } = req.params;
+        await dbLayer.deleteRssFeed(id);
+        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'DELETE_RSS_FEED', { id });
+        res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getAdminRssStats = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const stats = await dbLayer.getRssCacheStats();
+        res.json(stats);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getAdminRssArticles = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = parseInt(req.query.offset) || 0;
+        const articles = await dbLayer.getAdminRssArticles(limit, offset);
+        res.json(articles);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.deleteAdminRssArticle = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { id } = req.params;
+        await dbLayer.deleteRssArticle(id);
+        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'DELETE_RSS_ARTICLE', { id });
+        res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.purgeAdminRssArticles = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { hours } = req.body;
+        const changes = await dbLayer.purgeRssArticles(hours || 24);
+        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'PURGE_RSS_CACHE', { hours });
+        res.json({ success: true, deleted: changes });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.manualRefreshAllRss = async (req, res, next) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const rssService = require('../services/rssService');
+        const stats = await rssService.refreshAllFeeds();
+        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'MANUAL_RSS_REFRESH', stats);
+        res.json({ success: true, stats });
     } catch (err) {
         next(err);
     }

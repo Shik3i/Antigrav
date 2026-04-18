@@ -250,9 +250,27 @@ function initializeDatabaseSchema() {
     category TEXT DEFAULT 'Other',
     isVisible BOOLEAN DEFAULT 1,
     sortOrder INTEGER DEFAULT 0,
-    has_daily_badge BOOLEAN DEFAULT 0
+    has_daily_badge BOOLEAN DEFAULT 0,
+    icon TEXT
   )`, () => {
-    db.run("ALTER TABLE NavbarSettings ADD COLUMN has_daily_badge BOOLEAN DEFAULT 0", () => {});
+    // Sequential migration for existing tables
+    db.serialize(() => {
+      // Safely add missing columns if they don't exist
+      db.run("ALTER TABLE NavbarSettings ADD COLUMN has_daily_badge BOOLEAN DEFAULT 0", (err) => {});
+      db.run("ALTER TABLE NavbarSettings ADD COLUMN icon TEXT", (err) => {
+        // Now it's safe to run inserts/updates that use the icon column
+        
+        // Migration: Ensure News Feed exists in NavbarSettings under 'Tools' category
+        db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder, icon) 
+                VALUES ('news', 'News Feed', '/news', 'Tools', 1, 30, 'Rss')`);
+        
+        // Force category and icon for the news entry to ensure it moves to the new group
+        db.run(`UPDATE NavbarSettings SET category = 'Tools', icon = 'Rss' WHERE key = 'news'`);
+        
+        // Optional: Ensure a reasonable sort order if it's currently 0 or default
+        db.run(`UPDATE NavbarSettings SET sortOrder = 30 WHERE key = 'news' AND (sortOrder = 0 OR sortOrder IS NULL)`);
+      });
+    });
   });
 
   db.run('CREATE INDEX IF NOT EXISTS idx_navbar_visible_sort ON NavbarSettings(isVisible, sortOrder)');
@@ -890,6 +908,43 @@ function initializeDatabaseSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_lotto_tickets_draw ON LottoTickets(drawDate, status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_lotto_tickets_user_draw ON LottoTickets(userId, drawDate)');
   
+  // --- RSS News Tables ---
+  db.run(`CREATE TABLE IF NOT EXISTS RssFeeds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
+    icon TEXT,
+    is_default BOOLEAN DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, () => {
+    // Seed default Tagesschau feed
+    db.run(`INSERT OR IGNORE INTO RssFeeds (name, url, icon, is_default) VALUES (?, ?, ?, ?)`,
+      ['Tagesschau', 'https://www.tagesschau.de/xml/rss2/', 'https://www.tagesschau.de/favicon.ico', 1]);
+  });
+
+  db.run(`CREATE TABLE IF NOT EXISTS RssArticles_Cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    feedId INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    imageUrl TEXT,
+    snippet TEXT,
+    link TEXT NOT NULL,
+    pubDate DATETIME,
+    cachedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(feedId) REFERENCES RssFeeds(id) ON DELETE CASCADE
+  )`);
+
+    db.run('CREATE INDEX IF NOT EXISTS idx_rss_articles_feed_date ON RssArticles_Cache(feedId, pubDate DESC)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_rss_feeds_default ON RssFeeds(is_default)');
+
+  db.run(`CREATE TABLE IF NOT EXISTS UserRssPreferences (
+    userId TEXT NOT NULL,
+    feedId INTEGER NOT NULL,
+    isHidden BOOLEAN DEFAULT 0,
+    PRIMARY KEY (userId, feedId),
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE,
+    FOREIGN KEY(feedId) REFERENCES RssFeeds(id) ON DELETE CASCADE
+  )`);
 
   // Signal database is ready and mirror initial logs
   db.run("SELECT 1", () => {
@@ -4086,33 +4141,51 @@ module.exports = {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
-        let completed = 0;
-        let hasError = false;
+        
+        try {
+          // 1. Get current keys to identify what to delete
+          const newKeys = settings.map(s => s.key);
+          const placeholders = newKeys.map(() => '?').join(',');
 
-        if (settings.length === 0) {
-          db.run('COMMIT');
-          return resolve();
+          // 2. Delete items not in the new set (orphaned items)
+          db.run(`DELETE FROM NavbarSettings WHERE key NOT IN (${placeholders})`, newKeys);
+
+          // 3. Upsert all provided settings
+          const stmt = db.prepare(`
+            INSERT INTO NavbarSettings (key, label, path, category, isVisible, sortOrder, has_daily_badge, icon) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET 
+              label = excluded.label,
+              path = excluded.path,
+              category = excluded.category,
+              isVisible = excluded.isVisible,
+              sortOrder = excluded.sortOrder,
+              has_daily_badge = excluded.has_daily_badge,
+              icon = excluded.icon
+          `);
+
+          settings.forEach(item => {
+            stmt.run([
+              item.key, 
+              item.label, 
+              item.path, 
+              item.category, 
+              item.isVisible ? 1 : 0, 
+              item.sortOrder || 0, 
+              item.has_daily_badge ? 1 : 0,
+              item.icon || null
+            ]);
+          });
+          stmt.finalize();
+
+          db.run('COMMIT', (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        } catch (err) {
+          db.run('ROLLBACK');
+          reject(err);
         }
-
-        settings.forEach(item => {
-          db.run(
-            'UPDATE NavbarSettings SET isVisible = ?, sortOrder = ?, label = ?, category = ?, has_daily_badge = ? WHERE key = ?',
-            [item.isVisible ? 1 : 0, item.sortOrder, item.label, item.category, item.has_daily_badge ? 1 : 0, item.key],
-            (err) => {
-              if (err) hasError = true;
-              completed++;
-              if (completed === settings.length) {
-                if (hasError) {
-                  db.run('ROLLBACK');
-                  reject(new Error('Failed to update some navbar settings'));
-                } else {
-                  db.run('COMMIT');
-                  resolve();
-                }
-              }
-            }
-          );
-        });
       });
     });
   },
@@ -4386,6 +4459,189 @@ module.exports = {
       db.all("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT ?", [limit], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
+      });
+    });
+  },
+
+  // --- RSS News Functions ---
+  getRssFeeds: () => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM RssFeeds ORDER BY is_default DESC, name ASC', [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  getRssFeedById: (id) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT * FROM RssFeeds WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+  },
+
+  addRssFeed: (name, url, icon = null) => {
+    return new Promise((resolve, reject) => {
+      db.run('INSERT INTO RssFeeds (name, url, icon) VALUES (?, ?, ?)', [name, url, icon], function (err) {
+        if (err) reject(err);
+        else resolve({ id: this.lastID, name, url, icon });
+      });
+    });
+  },
+
+  updateRssFeed: (id, name, url, icon) => {
+    return new Promise((resolve, reject) => {
+      db.run('UPDATE RssFeeds SET name = ?, url = ?, icon = ? WHERE id = ?', [name, url, icon, id], function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  deleteRssFeed: (id) => {
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM RssFeeds WHERE id = ?', [id], function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  /**
+   * Updates cached articles for a feed.
+   * Logic: Deletes old articles for this feed and inserts new ones.
+   */
+  updateRssArticlesCache: (feedId, articles) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        // Clear old cache for this feed
+        db.run('DELETE FROM RssArticles_Cache WHERE feedId = ?', [feedId]);
+        
+        const stmt = db.prepare('INSERT INTO RssArticles_Cache (feedId, title, imageUrl, snippet, link, pubDate) VALUES (?, ?, ?, ?, ?, ?)');
+        articles.forEach(art => {
+          stmt.run([feedId, art.title, art.imageUrl || null, art.snippet || null, art.link, art.pubDate]);
+        });
+        stmt.finalize();
+        
+        db.run('COMMIT', (err) => {
+          if (err) reject(err);
+          else resolve(true);
+        });
+      });
+    });
+  },
+
+  getCachedArticles: (feedIds = null, limit = 100) => {
+    return new Promise((resolve, reject) => {
+      let query = `
+        SELECT a.*, f.name as feedName, f.icon as feedIcon
+        FROM RssArticles_Cache a
+        JOIN RssFeeds f ON a.feedId = f.id
+      `;
+      const params = [];
+
+      if (feedIds && feedIds.length > 0) {
+        const placeholders = feedIds.map(() => '?').join(',');
+        query += ` WHERE a.feedId IN (${placeholders})`;
+        params.push(...feedIds);
+      }
+
+      query += ` ORDER BY a.pubDate DESC LIMIT ?`;
+      params.push(limit);
+
+      db.all(query, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  updateUserRssPreference: (userId, feedId, isHidden) => {
+    return new Promise((resolve, reject) => {
+      db.run(`
+        INSERT INTO UserRssPreferences (userId, feedId, isHidden)
+        VALUES (?, ?, ?)
+        ON CONFLICT(userId, feedId) DO UPDATE SET isHidden = excluded.isHidden
+      `, [userId, feedId, isHidden ? 1 : 0], function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  getUserRssPreferences: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT feedId, isHidden FROM UserRssPreferences WHERE userId = ?', [userId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  /**
+   * Admin: Get statistics about the RSS cache
+   */
+  getRssCacheStats: () => {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT 
+          f.id, f.name, 
+          COUNT(a.id) as articleCount,
+          MAX(a.cachedAt) as lastCachedAt
+        FROM RssFeeds f
+        LEFT JOIN RssArticles_Cache a ON f.id = a.feedId
+        GROUP BY f.id
+      `;
+      db.all(query, [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  /**
+   * Admin: Get a list of all cached articles with metadata
+   */
+  getAdminRssArticles: (limit = 100, offset = 0) => {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT a.id, a.title, a.pubDate, a.cachedAt, a.link, f.name as feedName
+        FROM RssArticles_Cache a
+        JOIN RssFeeds f ON a.feedId = f.id
+        ORDER BY a.cachedAt DESC
+        LIMIT ? OFFSET ?
+      `;
+      db.all(query, [limit, offset], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  /**
+   * Admin: Delete a single article from cache
+   */
+  deleteRssArticle: (id) => {
+    return new Promise((resolve, reject) => {
+      db.run('DELETE FROM RssArticles_Cache WHERE id = ?', [id], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  /**
+   * Admin/System: Purge articles older than X hours
+   */
+  purgeRssArticles: (hoursThreshold) => {
+    return new Promise((resolve, reject) => {
+      const query = `DELETE FROM RssArticles_Cache WHERE cachedAt < datetime('now', '-' || ? || ' hours')`;
+      db.run(query, [hoursThreshold], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
       });
     });
   },

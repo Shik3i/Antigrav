@@ -622,7 +622,12 @@ function getAdminCacheStatus() {
         esportsTeams: snapshotCache(caches.esportsTeams),
         twitchStatus: snapshotCache(caches.twitchStatus),
         navbarSettings: snapshotCache(caches.navbarSettings),
-        pokemonConfigs: snapshotCache(caches.pokemonConfigs)
+        pokemonConfigs: snapshotCache(caches.pokemonConfigs),
+        rssNews: {
+            isCached: true, // DB backed
+            items: 0, // Will be filled if we want to query DB here, but let's keep it simple
+            ageSeconds: 0 // Placeholder or actual DB query result
+        }
     };
 }
 
@@ -644,6 +649,10 @@ function flushAdminCache(target) {
     }
     if (target === 'pokemon-configs' || target === 'all') {
         clearCache(caches.pokemonConfigs);
+    }
+    if (target === 'rss' || target === 'all') {
+        // Since RSS is DB based, we might want to clear the articles table
+        dbLayer.db.run('DELETE FROM RssArticles_Cache');
     }
     return getAdminCacheStatus();
 }
