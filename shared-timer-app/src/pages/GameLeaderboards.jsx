@@ -14,13 +14,15 @@ const formatSprintTime = (ms) => {
 };
 
 const GameLeaderboards = () => {
-    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [], tower: [] });
+    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], blackjack: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [], tower: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [koalaSortField, setKoalaSortField] = useState('highscore');
     const [koalaSortDir, setKoalaSortDir] = useState('desc');
     const [scratchSortField, setScratchSortField] = useState('totalEarned');
     const [scratchSortDir, setScratchSortDir] = useState('desc');
+    const [blackjackSortField, setBlackjackSortField] = useState('totalWon');
+    const [blackjackSortDir, setBlackjackSortDir] = useState('desc');
     const [riftWaveSortField, setRiftWaveSortField] = useState('value');
     const [riftWaveSortDir, setRiftWaveSortDir] = useState('desc');
     const [riftMinionsSortField, setRiftMinionsSortField] = useState('value');
@@ -35,9 +37,10 @@ const GameLeaderboards = () => {
     useEffect(() => {
         const fetchLeaderboards = async () => {
             try {
-                const [lbRes, scratchRes, riftRes, tetrisRes, towerRes] = await Promise.all([
+                const [lbRes, scratchRes, blackjackRes, riftRes, tetrisRes, towerRes] = await Promise.all([
                     axios.get('/api/games/leaderboard?gameId=koala_flap'),
                     axios.get('/api/scratchcards/stats'),
+                    axios.get('/api/blackjack/leaderboard?sortBy=totalWon').catch(() => ({ data: { leaderboard: [] } })),
                     axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } })),
                     axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [], cumulative: [] } })),
                     axios.get('/api/games/leaderboard?gameId=tower_climb').catch(() => ({ data: { highscores: [], cumulative: [] } }))
@@ -99,6 +102,7 @@ const GameLeaderboards = () => {
                 setLeaderboards({ 
                     koala: Object.values(highscoreMap), 
                     scratch: scratchList, 
+                    blackjack: blackjackRes.data.leaderboard || [],
                     rift: riftRes.data.leaderboards || { highestWave: [], totalMinions: [], totalBosses: [] },
                     tetris: Object.values(tetrisMap),
                     tower: Object.values(towerMap)
@@ -227,6 +231,7 @@ const GameLeaderboards = () => {
 
     const sortedKoala = sortData(leaderboards.koala, koalaSortField, koalaSortDir);
     const sortedScratch = sortData(leaderboards.scratch, scratchSortField, scratchSortDir);
+    const sortedBlackjack = sortData(leaderboards.blackjack, blackjackSortField, blackjackSortDir);
     const sortedRiftWave = sortData(leaderboards.rift.highestWave, riftWaveSortField, riftWaveSortDir);
     const sortedRiftMinions = sortData(leaderboards.rift.totalMinions, riftMinionsSortField, riftMinionsSortDir);
     const sortedRiftBosses = sortData(leaderboards.rift.totalBosses, riftBossesSortField, riftBossesSortDir);
@@ -293,6 +298,35 @@ const GameLeaderboards = () => {
                             { field: 'totalEarned', label: 'Gewinn', width: '100px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' },
                             { field: 'ticketsWon', label: 'Tickets Won', width: '110px', suffix: 'Lose' },
                             { field: 'totalBought', label: 'Total Bought', width: '115px', suffix: 'Lose' }
+                        ]
+                    })}
+                </div>
+            </section>
+
+            {/* Blackjack */}
+            <section>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Trophy size={18} color="#fff" />
+                    </div>
+                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>BLACKJACK</h2>
+                </div>
+                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <Coins size={18} color="#22c55e" />
+                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    </div>
+                    {renderTable({
+                        data: sortedBlackjack,
+                        accentColor: '#22c55e',
+                        sortField: blackjackSortField,
+                        sortDir: blackjackSortDir,
+                        onSort: (f) => handleSort(blackjackSortField, setBlackjackSortField, blackjackSortDir, setBlackjackSortDir, f),
+                        columns: [
+                            { field: 'totalWon', label: 'Net Profit', width: '110px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' },
+                            { field: 'gamesPlayed', label: 'Games', width: '80px', format: v => v.toLocaleString() },
+                            { field: 'blackjacksHit', label: 'Blackjacks', width: '100px', format: v => v.toLocaleString() },
+                            { field: 'totalWagered', label: 'Gesetzt', width: '110px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
                         ]
                     })}
                 </div>

@@ -71,6 +71,7 @@ const Tetris = React.lazy(() => import('./pages/Tetris'));
 const PolymarketGeneral = React.lazy(() => import('./pages/PolymarketGeneral'));
 const Wordle = React.lazy(() => import('./pages/Wordle'));
 const TowerClimb = React.lazy(() => import('./pages/TowerClimb'));
+const Blackjack = React.lazy(() => import('./pages/Blackjack'));
 const LottoImitat = React.lazy(() => import('./pages/LottoImitat'));
 const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
@@ -398,14 +399,14 @@ function InnerApp() {
           )}
 
           {pendingInvite && (
-             <div style={{ position: 'fixed', top: globalAnnouncement ? '62px' : '12px', right: '12px', zIndex: 10001, width: 'min(360px, calc(100vw - 24px))', background: 'rgba(15, 23, 42, 0.96)', color: 'white', padding: '16px', borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.35)', boxShadow: '0 18px 50px rgba(0,0,0,0.35)' }}>
-               <div style={{ fontWeight: 700, marginBottom: '6px' }}>Raumeinladung</div>
-               <div style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.82)', marginBottom: '14px' }}>{pendingInvite.inviterName} lädt dich ein: "{pendingInvite.roomName}".</div>
-               <div style={{ display: 'flex', gap: '10px' }}>
-                 <button className="btn-primary" style={{ flex: 1 }} onClick={() => { const inv = pendingInvite; setPendingInvite(null); navigate(`/room/${inv.roomId}`); }}>Beitreten</button>
-                 <button className="btn-ghost" style={{ flex: 1 }} onClick={() => setPendingInvite(null)}>Schließen</button>
-               </div>
-             </div>
+            <div style={{ position: 'fixed', top: globalAnnouncement ? '62px' : '12px', right: '12px', zIndex: 10001, width: 'min(360px, calc(100vw - 24px))', background: 'rgba(15, 23, 42, 0.96)', color: 'white', padding: '16px', borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.35)', boxShadow: '0 18px 50px rgba(0,0,0,0.35)' }}>
+              <div style={{ fontWeight: 700, marginBottom: '6px' }}>Raumeinladung</div>
+              <div style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.82)', marginBottom: '14px' }}>{pendingInvite.inviterName} lädt dich ein: "{pendingInvite.roomName}".</div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={() => { const inv = pendingInvite; setPendingInvite(null); navigate(`/room/${inv.roomId}`); }}>Beitreten</button>
+                <button className="btn-ghost" style={{ flex: 1 }} onClick={() => setPendingInvite(null)}>Schließen</button>
+              </div>
+            </div>
           )}
 
           {!isConnected && (
@@ -454,7 +455,8 @@ function InnerApp() {
                       <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={activeSocket} />} />
                       <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={activeSocket} />} />
                       <Route path="/admin" element={<Admin socket={activeSocket} />} />
-                      {/* Catch all other routes */}
+                      
+                      {/* Sub-pages and secondary routes */}
                       <Route path="/highscores" element={<Highscores />} />
                       <Route path="/koala-dashboard" element={<KoalaDashboard />} />
                       <Route path="/achievements" element={<Achievements />} />
@@ -478,6 +480,7 @@ function InnerApp() {
                       <Route path="/polymarket-general" element={<PolymarketGeneral />} />
                       <Route path="/wordle" element={<Wordle user={user} token={token} />} />
                       <Route path="/games/tower-climb" element={<TowerClimb />} />
+                      <Route path="/games/blackjack" element={<Blackjack socket={activeSocket} />} />
                       <Route path="/lotto" element={<LottoImitat />} />
                       <Route path="/news" element={<News socket={activeSocket} />} />
                       <Route path="/c" element={<SharedCountdown />} />

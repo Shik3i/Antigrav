@@ -1,9 +1,21 @@
 [
   {
+    "id": 64,
+    "version": "2.39.0",
+    "date": "2026-04-19",
+    "changes": "- **Wartungsmodus (Maintenance Mode)**: Einführung einer granularen Sperr-Funktion für einzelne Seiten via Admin-Panel.\n- **Admin: Navigation Settings**: Neuer Toggle zum Sperren von Pfaden direkt in der Sidebar-Verwaltung.\n- **Route Guard**: Implementierung des `MaintenanceGuard` zur Zugriffsbeschränkung; inklusive automatischer Pfadprüfung gegen die Datenbank-Einstellungen.\n- **Premium Maintenance UI**: Neues glasmorphisches Interface (`MaintenanceScreen.jsx`) für gesperrte Ansichten.\n- **Superadmin Bypass**: Superadmins behalten vollen Zugriff auf alle Seiten, unterstützt durch einen fixierten Warn-Banner als visuellen Hinweis.\n- **Global State Management**: Migration der Navbar-Settings in den `PersistentDataContext` zur konsistenten Status-Synchronisation im gesamten Frontend."
+  },
+  {
+    "id": 63,
+    "version": "2.38.1",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Status-UX**: Die doppelte Anzeige fuer Zugstatus und Countdown wurde entfernt und in einem einzigen Statusblock oben rechts zusammengefuehrt.\n- **Blackjack Layout-Tuning**: Der mittige Tischbereich zeigt nun nur noch die ruhige Tischmarke statt redundanter Timer-Informationen."
+  },
+  {
     "id": 62,
     "version": "2.38.0",
     "date": "2026-04-19",
-    "changes": "- **Wartungsmodus (Maintenance Mode)**: Einführung einer granularen Sperr-Funktion für einzelne Seiten via Admin-Panel.\n- **Admin: Navigation Settings**: Neuer Toggle zum Sperren von Pfaden direkt in der Sidebar-Verwaltung.\n- **Route Guard**: Implementierung des `MaintenanceGuard` zur Zugriffsbeschränkung; inklusive automatischer Pfadprüfung gegen die Datenbank-Einstellungen.\n- **Premium Maintenance UI**: Neues glasmorphisches Interface (`MaintenanceScreen.jsx`) für gesperrte Ansichten.\n- **Superadmin Bypass**: Superadmins behalten vollen Zugriff auf alle Seiten, unterstützt durch einen fixierten Warn-Banner als visuellen Hinweis.\n- **Global State Management**: Migration der Navbar-Settings in den `PersistentDataContext` zur konsistenten Status-Synchronisation im gesamten Frontend."
+    "changes": "- **Blackjack Multiplayer**: Neues Live-Blackjack mit mehreren Raeumen, Socket-Updates, Dealer-Logik, Settlement und Auto-Stand nach 90 Sekunden umgesetzt.\n- **Blackjack Tisch-UX**: Tischlayout, Kartenanimationen, Auto-Bet, Gewinner-Markierung und spielerrelative Sitzpositionen fuer ein klareres Casino-Gefuehl verbessert.\n- **Leaderboards**: Blackjack-Rangliste in die zentrale `GameLeaderboards`-Seite uebernommen und die dedizierte Ranglistenansicht vereinheitlicht.\n- **Live Testing**: Restart-Workflow, Raumtests und Multiplayer-Bot fuer lokale Verifikation des Blackjack-Flows integriert."
   },
   {
     "id": 61,
@@ -21,7 +33,7 @@
     "id": 59,
     "version": "2.36.1",
     "date": "2026-04-18",
-    "changes": "- **Architektur-Dokumentation**: Vollständige Überarbeitung der `README.md` mit Fokus auf System-Design, Echtzeit-Statusverwaltung via `roomManager.js` und Richtlinien für zukünftige Coding-Agenten.\n- **Projekt-Übersicht**: Detaillierte Auflistung der Tech-Stack Komponenten (React 19, Socket.io, Express, SQLite) und der Verzeichnisstruktur."
+    "changes": "- **Architektur-Dokumentation**: Vollständige Überarbeitung der `README.md` mit Fokus on System-Design, Echtzeit-Statusverwaltung via `roomManager.js` und Richtlinien für zukünftige Coding-Agenten.\n- **Projekt-Übersicht**: Detaillierte Auflistung der Tech-Stack Komponenten (React 19, Socket.io, Express, SQLite) und der Verzeichnisstruktur."
   },
   {
     "id": 58,
@@ -93,7 +105,7 @@
     "id": 47,
     "version": "2.30.0",
     "date": "2026-04-18",
-    "changes": "- **Lotto Audit & Fixes**: Korrektur der Gewinnklassen-Logik (Klasse 1-9) zur Gewährleistung mathematisch korrekter Auszahlungen.\n- **Duplikat-Prävention**: Implementierung einer strikten plattformübergreifenden Prüfung zur Vermeidung doppelter Ticket-Einreichungen.\n- **React Stability Patch**: Behebung des Hook-Violation (Error #300) Absturzes durch Refactoring der Memoization-Logik.\n- **Bulk Quick-Tipp**: Schnelles Hinzufügen von 5 bis 50 Zufalls-Tickets inklusive automatischer Einzigartigkeits-Garantie.\n- **Backend Robustness**: Atomare Transaktionssicherung beim Ticketkauf und optimierte Historien-Abfrage in der Datenbank."
+    "changes": "- **Lotto Audit & Fixes**: Korrektur der Gewinnklassen-Logik (Klasse 1-9) zur Gewährleistung mathematisch korrekter Auszahlungen.\n- **Duplikat-Prävention**: Implementierung einer strikten plattformübergreifenden Prüfung zur Vermeidung doppelter Ticket-Einreichungen.\n- **React Stability Patch**: Behebung des Hook-Violation (Error #300) Absturzes durch Refactoring der Memoization-Logik.\n- **Bulk Quick-Tipp**: Schnelles Hinzufügen von 5 bis 50 Zufalls-Tickets inklusive automatischer Einzigartigkeits-Garantie.\n- **Backend Robustness**: Atomare Transaktionssicherung beim Ticketkauf and optimierte Historien-Abfrage in der Datenbank."
   },
   {
     "id": 46,
@@ -153,7 +165,7 @@
     "id": 37,
     "version": "2.24.0",
     "date": "2026-04-16",
-    "changes": "- **Esports Performance-Stabilisierung**: Implementierung einer robusten Lazy-Loading Cache-Architektur im Backend zur drastischen Reduzierung von API-Latenzen.\n- **Persistent Context**: Einführung des `PersistentDataContext` zur globalen Erhaltung von Esports- und Wett-Daten über alle Dashboard-Tabs hinweg (SPA).\n- **Cache Age Tracking**: Der \"Schedule Stand\" Zeitstempel basiert nun auf der tatsächlichen Cache-Erstellung im Server-RAM statt auf dem lokalen Empfangszeitpunkt.\n- **Over-Fetching Prevention**: Optimierung der Hintergrund-Synchronisation durch intelligentes Stale-While-Revalidate und Minimierung redundanter Socket-Events."
+    "changes": "- **Esports Performance-Stabilisierung**: Implementierung einer robusten Lazy-Loading Cache-Architektur im Backend zur drastischen Reduzierung von API-Latenzen.\n- **Persistent Context**: Einführung des `PersistentDataContext` zur globalen Erhaltung von Esports- und Wett-Daten über alle Dashboard-Tabs hinweg (SPA).\n- **Cache Age Tracking**: Der \"Schedule Stand\" Zeitstempel basiert nun auf der tatsächlichen Cache-Erstellung im Server-RAM statt auf dem lokalen Empfangszeitpunkt.\n- **Over-Fetching Prevention**: Optimierung der Hintergrund-Synchronisation durch intelligentes Stale-While-Revalidate and Minimierung redundanter Socket-Events."
   },
   {
     "id": 36,
@@ -165,49 +177,49 @@
     "id": 35,
     "version": "2.22.0",
     "date": "2026-04-16",
-    "changes": "- **Global Toast System**: Ersetzung von blockierenden Browser-Alerts durch ein modernes, globales Benachrichtigungssystem mit Glasmorphismus-Design.\n- **UI Design Optimization**: Optimierung des MMO Leveling Tracker Headers durch ein kompakteres, horizontales Layout (FWC & Stream Info in einer Zeile).\n- **Smooth Transitions**: Implementierung von CSS-basierten Fade- und Slide-Effekten für flüssige Tab-Wechsel.\n- **UX Stability**: Entfernung des automatischen Schließens von Esports-Wett-Overlays zur Verbesserung des Workflows bei Mehrfachwetten.\n- **Aria-Labeling**: Verbesserung der Barrierefreiheit durch Hinzufügen von `aria-label` zu Stream-Buttons."
+    "changes": "- **Global Toast System**: Ersetzung von blockierenden Browser-Alerts durch ein modernes, globales Benachrichtigungssystem with Glasmorphismus-Design.\n- **UI Design Optimization**: Optimierung des MMO Leveling Tracker Headers durch ein kompakteres, horizontales Layout (FWC & Stream Info in einer Zeile).\n- **Smooth Transitions**: Implementierung von CSS-basierten Fade- und Slide-Effekten für flüssige Tab-Wechsel.\n- **UX Stability**: Entfernung des automatischen Schließens von Esports-Wett-Overlays zur Verbesserung des Workflows bei Mehrfachwetten.\n- **Aria-Labeling**: Verbesserung der Barrierefreiheit durch Hinzufügen von `aria-label` zu Stream-Buttons."
   },
   {
     "id": 34,
     "version": "2.21.2",
     "date": "2026-04-15",
-    "changes": "- **Esports Odds Matching**: Grundlegende Reparatur der Matching-Logik zwischen LoL-Schedule und Polymarket.\n- **Backend Slug-Expansion**: Automatische Abfrage von Permutationen aus Team-Codes UND vollen Team-Namen, um auch regionale Ligen (Prime League) besser zu erfassen.\n- **Frontend Robustness**: Implementierung einer zwei-stufigen Verifizierung via Outcome-Namen (Fuzzy Match), falls die Slugs nicht exakt übereinstimmen.\n- **Performance Fix**: Entfernung redundanter Console-Logs im Render-Cycle zur Reduzierung der Browserlast."
+    "changes": "- **Esports Odds Matching**: Grundlegende Reparatur der Matching-Logik zwischen LoL-Schedule and Polymarket.\n- **Backend Slug-Expansion**: Automatische Abfrage von Permutationen aus Team-Codes UND vollen Team-Namen, um auch regionale Ligen (Prime League) besser zu erfassen.\n- **Frontend Robustness**: Implementierung einer zwei-stufigen Verifizierung via Outcome-Namen (Fuzzy Match), falls die Slugs nicht exakt übereinstimmen.\n- **Performance Fix**: Entfernung redundanter Console-Logs im Render-Cycle zur Reduzierung der Browserlast."
   },
   {
     "id": 33,
     "version": "2.21.1",
     "date": "2026-04-15",
-    "changes": "- **Room Lifecycle Fix**: Das aktive Raum-Abo bleibt nun global bestehen, auch wenn du von der Raumseite auf andere Unterseiten navigierst.\n- **Explicit Leave Cleanup**: Der Raum wird nur noch beim echten \"Leave Room\" oder beim Browser-Disconnect verlassen, inklusive sauberem State-Reset.\n- **Global Title Timer**: Der Tab-Titel wird nun zentral und sekundengenau weiter aktualisiert, auch außerhalb der Raumseite und in Hintergrund-Tabs."
+    "changes": "- **Room Lifecycle Fix**: Das aktive Raum-Abo bleibt nun global bestehen, auch wenn du von der Raumseite auf andere Unterseiten navigierst.\n- **Explicit Leave Cleanup**: Der Raum wird nur noch beim echten \"Leave Room\" oder beim Browser-Disconnect verlassen, inklusive sauberem State-Reset.\n- **Global Title Timer**: Der Tab-Titel wird nun zentral und sekundengenau weiter aktualisiert, auch außerhalb der Raumseite and in Hintergrund-Tabs."
   },
   {
     "id": 32,
     "version": "2.21.0",
     "date": "2026-04-15",
-    "changes": "- **Admin Panel**: Persistente Speicherung der Navigations-Reihenfolge und editierbare Labels/Kategorien hinzugefügt.\n- **Dynamic Sidebar**: Die täglichen \"Daily Visit\" Badges werden nun dynamisch über das Admin-Panel gesteuert.\n- **Twitch Integration**: Integration von \"Prime League\" im globalen Widget und isolierter Live-Status für \"Spielestyler\" im Leveling Tracker."
+    "changes": "- **Admin Panel**: Persistente Speicherung der Navigations-Reihenfolge and editierbare Labels/Kategorien hinzugefügt.\n- **Dynamic Sidebar**: Die täglichen \"Daily Visit\" Badges werden nun dynamisch über das Admin-Panel gesteuert.\n- **Twitch Integration**: Integration von \"Prime League\" im globalen Widget and isolierter Live-Status für \"Spielestyler\" im Leveling Tracker."
   },
   {
     "id": 31,
     "version": "2.20.0",
     "date": "2026-04-15",
-    "changes": "- **Performance Bundle**: Umstellung auf lokale Schriftarten (@fontsource/inter, @fontsource/outfit) zur Reduzierung von Render-Blocking-Ressourcen.\n- **Layout Stability (CLS)**: Umfassende Bild-Optimierung mit expliziten Dimensionen, Lazy-Loading und LCP-Priorisierung zur Behebung von Layout-Shifts.\n- **UI Refinement**: Entfernung des Zeitstempels im Tagesschau-Newsticker für ein saubereres Erscheinungsbild."
+    "changes": "- **Performance Bundle**: Umstellung auf lokale Schriftarten (@fontsource/inter, @fontsource/outfit) zur Reduzierung von Render-Blocking-Ressourcen.\n- **Layout Stability (CLS)**: Umfassende Bild-Optimierung mit expliziten Dimensionen, Lazy-Loading and LCP-Priorisierung zur Behebung von Layout-Shifts.\n- **UI Refinement**: Entfernung des Zeitstempels im Tagesschau-Newsticker für ein saubereres Erscheinungsbild."
   },
   {
     "id": 30,
     "version": "2.19.0",
     "date": "2026-04-15",
-    "changes": "- **System-Infrastruktur**: Vollständiges Refactoring der Server-Architektur für verbesserte Stabilität und reibungslose Synchronisation.\n- **Dependency Audit**: Anwendung von Sicherheits-Patches zur Schließung von Infrastruktur-Lücken."
+    "changes": "- **System-Infrastruktur**: Vollständiges Refactoring der Server-Architektur für verbesserte Stabilität and reibungslose Synchronisation.\n- **Dependency Audit**: Anwendung von Sicherheits-Patches zur Schließung von Infrastruktur-Lücken."
   },
   {
     "id": 29,
     "version": "2.18.0",
     "date": "2026-04-15",
-    "changes": "- **Social Minigames**: Einführung von interaktiven Coinflip- und Deathroll-Spielen direkt in den Timer-Räumen.\n- **Premium Animationen**: Synchronisierte 3D-CSS-Animationen für den Münzwurf und interaktive Würfel-Effekte.\n- **Turn-Logic**: Implementierung einer zugbasierten Spielsteuerung für Deathroll zur Förderung der Fairness.\n- **Socket-Stabilisierung**: Vollständiges Refactoring des Socket-Lebenszyklus und Fehlerbehebung bei Event-Übertragungen.\n- **UI/UX Polishing**: Vereinheitlichung der Minigame-Timings auf 5 Sekunden für ein flüssigeres Spielerlebnis."
+    "changes": "- **Social Minigames**: Einführung von interaktiven Coinflip- and Deathroll-Spielen direkt in den Timer-Räumen.\n- **Premium Animationen**: Synchronisierte 3D-CSS-Animationen für den Münzwurf and interaktive Würfel-Effekte.\n- **Turn-Logic**: Implementierung einer zugbasierten Spielsteuerung für Deathroll zur Förderung der Fairness.\n- **Socket-Stabilisierung**: Vollständiges Refactoring des Socket-Lebenszyklus and Fehlerbehebung bei Event-Übertragungen.\n- **UI/UX Polishing**: Vereinheitlichung der Minigame-Timings auf 5 Sekunden für ein flüssigeres Spielerlebnis."
   },
   {
     "id": 28,
     "version": "2.17.5",
     "date": "2026-04-13",
-    "changes": "- **UI/UX Polishing**: Reduzierung der vertikalen Abstände (Gap & Padding) für ein kompakteres Design.\n- **Layout-Optimierung**: Straffung des Headers und des Spielbereichs, um Scrolling auf Standardbildschirmen zu minimieren.\n- **Visual Hierarchy**: Bessere Platznutzung zwischen Titel, Modus-Auswahl und Spielfeld."
+    "changes": "- **UI/UX Polishing**: Reduzierung der vertikalen Abstände (Gap & Padding) für ein kompakteres Design.\n- **Layout-Optimierung**: Straffung des Headers and des Spielbereichs, um Scrolling auf Standardbildschirmen zu minimieren.\n- **Visual Hierarchy**: Bessere Platznutzung zwischen Titel, Modus-Auswahl and Spielfeld."
   },
   {
     "id": 27,
@@ -219,43 +231,43 @@
     "id": 26,
     "version": "2.17.3",
     "date": "2026-04-13",
-    "changes": "- **Wordle Archive Bugfix**: Fix der Reaktivität beim Datumswechsel durch Korrektur der React-Hook-Abhängigkeiten.\n- **Navigations-Limit**: Implementierung eines MIN_DATE (12.04.2026), um ungültige Historien-Abfragen zu verhindern.\n- **UI Polish**: Der 'Zurück'-Button wird nun korrekt deaktiviert, wenn das Startdatum der Historie erreicht ist.\n- **State Sync**: Leaderboard und Wordle-Grid aktualisieren sich nun zuverlässig und synchron beim Blättern im Archiv."
+    "changes": "- **Wordle Archive Bugfix**: Fix der Reaktivität beim Datumswechsel durch Korrektur der React-Hook-Abhängigkeiten.\n- **Navigations-Limit**: Implementierung eines MIN_DATE (12.04.2026), um ungültige Historien-Abfragen zu verhindern.\n- **UI Polish**: Der 'Zurück'-Button wird nun korrekt deaktiviert, wenn das Startdatum der Historie erreicht ist.\n- **State Sync**: Leaderboard and Wordle-Grid aktualisieren sich nun zuverlässig and synchron beim Blättern im Archiv."
   },
   {
     "id": 25,
     "version": "2.17.2",
     "date": "2026-04-13",
-    "changes": "- **Wordle Archiv-Modus**: Spiele verpasste Dailies nach und sichere dir die 10 KC Belohnung auch nachträglich.\n- **Historische Bestenlisten**: Navigiere durch vergangene Tage und sieh dir die Ergebnisse der Community für jedes Datum an.\n- **Datum-Navigation**: Neue Steuerungsleiste im Wordle-Header zum einfachen Wechseln zwischen Heute und dem Archiv.\n- **Sicherheits-Check**: Schutz der API gegen den Abruf von zukünftigen Wörtern und Leaderboards."
+    "changes": "- **Wordle Archiv-Modus**: Spiele verpasste Dailies nach and sichere dir die 10 KC Belohnung auch nachträglich.\n- **Historische Bestenlisten**: Navigiere durch vergangene Tage and sieh dir die Ergebnisse der Community für jedes Datum an.\n- **Datum-Navigation**: Neue Steuerungsleiste im Wordle-Header zum einfachen Wechseln zwischen Heute and dem Archiv.\n- **Sicherheits-Check**: Schutz der API gegen den Abruf von zukünftigen Wörtern and Leaderboards."
   },
   {
     "id": 24,
     "version": "2.17.1",
     "date": "2026-04-13",
-    "changes": "- **Wordle Logic Fix**: Implementierung des Two-Pass-Algorithmus zur korrekten Auswertung von Doppelbuchstaben.\n- **Dynamisches Leaderboard**: Echtzeit-Sichtbarkeit der Mitspieler-Fortschritte während des aktiven Spiels.\n- **Strategie-Schutz**: Maskierung der Buchstaben durch reine Farbkacheln (Grün/Gelb/Grau), solange das eigene Daily noch läuft.\n- **Transparenz-Upgrade**: Vollständige Offenlegung der Wörter anderer Spieler nach Spielende zur taktischen Analyse.\n- **Social UI**: Integration von Avataren und Display-Namen direkt im Wordle-Leaderboard."
+    "changes": "- **Wordle Logic Fix**: Implementierung des Two-Pass-Algorithmus zur korrekten Auswertung von Doppelbuchstaben.\n- **Dynamisches Leaderboard**: Echtzeit-Sichtbarkeit der Mitspieler-Fortschritte während des aktiven Spiels.\n- **Strategie-Schutz**: Maskierung der Buchstaben durch reine Farbkacheln (Grün/Gelb/Grau), solange das eigene Daily noch läuft.\n- **Transparenz-Upgrade**: Vollständige Offenlegung der Wörter anderer Spieler nach Spielende zur taktischen Analyse.\n- **Social UI**: Integration von Avataren and Display-Namen direkt im Wordle-Leaderboard."
   },
   {
     "id": 23,
     "version": "2.17.0",
     "date": "2026-04-12",
-    "changes": "- **Polymarket Multi-Choice Support**: Automatisierte Aggregation komplexer Märkte (z.B. Turniersieger, Wahlen) in eine übersichtliche Auswahlliste.\n- **Transparenz-Upgrade**: Live-Rechner im Wett-Fenster zeigt sofort erwartete Anteile (Shares) und den potenziellen Gewinn in KC an.\n- **Cascade Refund System**: Vollautomatisierte Rückerstattung aller Wetteinsätze bei Löschung eines Events durch einen Admin.\n- **Admin-Dashboard Polish**: Vereinheitlichtes Design der API-Cache-Sektionen und farblich standardisierte Flush-Buttons.\n- **Stability Fix**: Korrektur der Preis-Abfrage für allgemeine Polymarket-Wetten durch intelligenten Market-Fallback."
+    "changes": "- **Polymarket Multi-Choice Support**: Automatisierte Aggregation komplexer Märkte (z.B. Turniersieger, Wahlen) in eine übersichtliche Auswahlliste.\n- **Transparenz-Upgrade**: Live-Rechner im Wett-Fenster zeigt sofort erwartete Anteile (Shares) and den potenziellen Gewinn in KC an.\n- **Cascade Refund System**: Vollautomatisierte Rückerstattung aller Wetteinsätze bei Löschung eines Events durch einen Admin.\n- **Admin-Dashboard Polish**: Vereinheitlichtes Design der API-Cache-Sektionen and farblich standardisierte Flush-Buttons.\n- **Stability Fix**: Korrektur der Preis-Abfrage für allgemeine Polymarket-Wetten durch intelligenten Market-Fallback."
   },
   {
     "id": 22,
     "version": "2.16.0",
     "date": "2026-04-10",
-    "changes": "- **Tetris Engine Optimization**: Refactor der Statistik-Speicherung von zeilenbasierter Aggregation auf ein effizientes KV-System (UserGameStats).\n- **Performance Refactor**: Implementierung von atomaren UPSERT-Updates für Highscore und Lifetime-Lines zur Reduzierung von Datenbank-Bloat.\n- **Data Migration**: Automatisierte Überführung bestehender Tetris-Lines aus GameScores in das neue optimierte SQL-Schema."
+    "changes": "- **Tetris Engine Optimization**: Refactor der Statistik-Speicherung von zeilenbasierter Aggregation on ein effizientes KV-System (UserGameStats).\n- **Performance Refactor**: Implementierung von atomaren UPSERT-Updates für Highscore and Lifetime-Lines zur Reduzierung von Datenbank-Bloat.\n- **Data Migration**: Automatisierte Überführung bestehender Tetris-Lines aus GameScores in das neue optimierte SQL-Schema."
   },
   {
     "id": 21,
     "version": "2.15.0",
     "date": "2026-04-10",
-    "changes": "- **Tetris Minigame**: Vollwertiges Tetris-Erlebnis mit Endless- und Sprint-Modus (40 Lines) hinzugefügt.\n- **Tetris Stats & Leaderboards**: Aufzeichnung von Highscores und Lifetime-Lines; Anzeige beider Metriken in den globalen Game Leaderboards.\n- **Tetris UI/UX Refinement**: Neues klares Layout mit Ghost-Piece Mechanik, Next/Hold-Views, Partikeleffekten und integriertem \"Best Score\" im Header.\n- **Bugfixes**: Behebung von Layout-Verschiebungen und Overlaps im Tetris Game-Over-Screen."
+    "changes": "- **Tetris Minigame**: Vollwertiges Tetris-Erlebnis with Endless- and Sprint-Modus (40 Lines) hinzugefügt.\n- **Tetris Stats & Leaderboards**: Aufzeichnung von Highscores and Lifetime-Lines; Anzeige beider Metriken in den globalen Game Leaderboards.\n- **Tetris UI/UX Refinement**: Neues klares Layout with Ghost-Piece Mechanik, Next/Hold-Views, Partikeleffekten and integriertem \"Best Score\" im Header.\n- **Bugfixes**: Behebung von Layout-Verschiebungen and Overlaps im Tetris Game-Over-Screen."
   },
   {
     "id": 20,
     "version": "2.14.1",
     "date": "2026-04-02",
-    "changes": "- **Local Badge Tracking**: Umstellung der Sidebar-Badges auf browser-loses Tracking via localStorage zur Performance-Optimierung.\n- **Daily Reset**: Zuverlässiger Reset aller täglichen Badges (Achievements, Games, etc.) um exakt 0:00 Uhr UTC.\n- **CSS Guard**: Globaler Fix für den Recharts 'cssRules' TypeError in Chrome/Edge, der zu Browser-Abstürzen führen konnte."
+    "changes": "- **Local Badge Tracking**: Umstellung der Sidebar-Badges on browser-loses Tracking via localStorage zur Performance-Optimierung.\n- **Daily Reset**: Zuverlässiger Reset aller täglichen Badges (Achievements, Games, etc.) um exakt 0:00 Uhr UTC.\n- **CSS Guard**: Globaler Fix für den Recharts 'cssRules' TypeError in Chrome/Edge, der zu Browser-Abstürzen führen konnte."
   },
   {
     "id": 19,
@@ -267,114 +279,114 @@
     "id": 18,
     "version": "2.13.0",
     "date": "2026-04-02",
-    "changes": "- **MMO Tracker: Gold Integration**: Einführung eines separaten Gold-Tracking-Modus mit eigener Historie und präzisen Ertrags-Prognosen (Gold pro h/m/d).\n- **Persistent Milestones**: Automatische Speicherung von Level-Fortschritten in der Datenbank; inklusive Logik zur Erfassung von übersprungenen Meilensteinen.\n- **Dynamic Navigation Badges**: Kleine rote Benachrichtigungs-Badges in der Sidebar weisen nun visuell auf offene tägliche Belohnungen (Achievements & ColorSync) hin.\n- **QoL-Shortcuts 2.0**: Erweiterte Steuerung via ArrowUp/ArrowDown in allen XP-Feldern sowie ein dedizierter '+1' Button für eine schnellere Level-Anpassung."
+    "changes": "- **MMO Tracker: Gold Integration**: Einführung eines separaten Gold-Tracking-Modus with eigener Historie and präzisen Ertrags-Prognosen (Gold pro h/m/d).\n- **Persistent Milestones**: Automatische Speicherung von Level-Fortschritten in der Datenbank; inklusive Logik zur Erfassung von übersprungenen Meilensteinen.\n- **Dynamic Navigation Badges**: Kleine rote Benachrichtigungs-Badges in der Sidebar weisen nun visuell on offene tägliche Belohnungen (Achievements & ColorSync) hin.\n- **QoL-Shortcuts 2.0**: Erweiterte Steuerung via ArrowUp/ArrowDown in allen XP-Feldern sowie ein dedizierter '+1' Button für eine schnellere Level-Anpassung."
   },
   {
     "id": 17,
     "version": "2.12.0",
     "date": "2026-04-01",
-    "changes": "- **MMO Leveling Tracker**: Neues Tool zur XP-Überwachung und Vorhersage (Flyff-Stil).\n- **XP/h & Predictions**: Live-Berechnung von XP-Raten (h/m/d) und geschätzte Level-Up Zeiten via Last-Tick oder Session-Schnitt.\n- **FWC 2026 Countdown**: Integrierter Event-Countdown für die Flyff World Championship oberhalb des Trackers.\n- **Performance & QoL**: 100-Einträge Historie-Limit, Enter-Taste Support und Session-Reset-Button für schnelles Löschen des Verlaufs."
+    "changes": "- **MMO Leveling Tracker**: Neues Tool zur XP-Überwachung and Vorhersage (Flyff-Stil).\n- **XP/h & Predictions**: Live-Berechnung von XP-Raten (h/m/d) and geschätzte Level-Up Zeiten via Last-Tick oder Session-Schnitt.\n- **FWC 2026 Countdown**: Integrierter Event-Countdown für die Flyff World Championship oberhalb des Trackers.\n- **Performance & QoL**: 100-Einträge Historie-Limit, Enter-Taste Support and Session-Reset-Button für schnelles Löschen des Verlaufs."
   },
   {
     "id": 16,
     "version": "2.11.0",
     "date": "2026-04-01",
-    "changes": "- **Color Sync Minigame**: Einführung des neuen Farb-Guessing-Spiels mit 3 Schwierigkeitsstufen.\n- **Daily Challenge**: Einzigartige tägliche Herausforderung mit globalem Leaderboard und 10 Koala Coin (KC) Belohnung.\n- **Lobby-System**: Private Räume für den Echtzeit-Wettbewerb mit Freunden.\n- **UI Refinement**: Side-by-Side Farbanzeige mit \"Touching Blocks\" UX und soliden Hintergründen für maximalen Kontrast.\n- **Interactive Leaderboard**: Klickbare Zeilen zum detaillierten Vergleich von Target- und Guess-Farben."
+    "changes": "- **Color Sync Minigame**: Einführung des neuen Farb-Guessing-Spiels with 3 Schwierigkeitsstufen.\n- **Daily Challenge**: Einzigartige tägliche Herausforderung with globalem Leaderboard and 10 Koala Coin (KC) Belohnung.\n- **Lobby-System**: Private Räume für den Echtzeit-Wettbewerb with Freunden.\n- **UI Refinement**: Side-by-Side Farbanzeige with \"Touching Blocks\" UX and soliden Hintergründen für maximalen Kontrast.\n- **Interactive Leaderboard**: Klickbare Zeilen zum detaillierten Vergleich von Target- and Guess-Farben."
   },
   {
     "id": 15,
     "version": "2.10.0",
     "date": "2026-03-26",
-    "changes": "- **Security Refactor**: Admin-Passwort-Prüfung ins Backend mit JWT-Authentifizierung verschoben.\n- **Performance Caching**: 15-Minuten-Cache für Tagesschau-News und persistenter Memory-Cache für Pokémon-Daten zur Reduzierung von Disk-I/O.\n- **Database Optimization**: Hinzufügen von SQLite-Indizes für schnellere Abfragen bei User-Balance und Wetten.\n- **PWA Integration**: App ist nun als Progressive Web App installierbar inkl. Service Worker."
+    "changes": "- **Security Refactor**: Admin-Passwort-Prüfung ins Backend with JWT-Authentifizierung verschoben.\n- **Performance Caching**: 15-Minuten-Cache für Tagesschau-News and persistenter Memory-Cache für Pokémon-Daten zur Reduzierung von Disk-I/O.\n- **Database Optimization**: Hinzufügen von SQLite-Indizes für schnellere Abfragen bei User-Balance and Wetten.\n- **PWA Integration**: App ist nun als Progressive Web App installierbar inkl. Service Worker."
   },
   {
     "id": 14,
     "version": "2.9.0",
     "date": "2026-03-26",
-    "changes": "- **Pokémon Themes**: Über 1000+ neue Pokémon-Hintergründe inklusive Typ-basierter Akzentfarben und automatischer Rotation.\n- **Mega-Accordions**: Komplette Restrukturierung der Einstellungen in vier übersichtliche Hauptkategorien.\n- **Sicherheits-Audit**: Entfernung sensibler Debug-Logs im Backend und Optimierung der Admin-Authentifizierung."
+    "changes": "- **Pokémon Themes**: Über 1000+ neue Pokémon-Hintergründe inklusive Typ-basierter Akzentfarben and automatischer Rotation.\n- **Mega-Accordions**: Komplette Restrukturierung der Einstellungen in vier übersichtliche Hauptkategorien.\n- **Sicherheits-Audit**: Entfernung sensibler Debug-Logs im Backend and Optimierung der Admin-Authentifizierung."
   },
   {
     "id": 13,
     "version": "2.8.0",
     "date": "2026-03-26",
-    "changes": "- **Pokémon System Optimierung**: Implementierung eines globalen Backend-Caches für Pokémon-Daten zur massiven Reduzierung der API-Latenz.\n- **Frontend DRY Refactoring**: Zentralisierung der Pokémon-Auswahllogik in einer neuen Utility-Klasse (`pokemonUtils.js`) zur Code-Bereinigung.\n- **Settings UI Overhaul**: Vollständige Umstellung der Einstellungen auf ein modernes Accordion-Layout für bessere Übersichtlichkeit.\n- **UX Verbesserungen**: Hinzufügen von Priorisierungs-Hinweisen für Favoriten-Teams und Vereinheitlichung der Speicher-Aktionen.\n- **Stabilitäts-Fixes**: Behebung von JSX-Syntaxfehlern im Einstellungsmenü."
+    "changes": "- **Pokémon System Optimierung**: Implementierung eines globalen Backend-Caches für Pokémon-Daten zur massiven Reduzierung der API-Latenz.\n- **Frontend DRY Refactoring**: Zentralisierung der Pokémon-Auswahllogik in einer neuen Utility-Klasse (`pokemonUtils.js`) zur Code-Bereinigung.\n- **Settings UI Overhaul**: Vollständige Umstellung der Einstellungen on ein modernes Accordion-Layout für bessere Übersichtlichkeit.\n- **UX Verbesserungen**: Hinzufügen von Priorisierungs-Hinweisen für Favoriten-Teams and Vereinheitlichung der Speicher-Aktionen.\n- **Stabilitäts-Fixes**: Behebung von JSX-Syntaxfehlern im Einstellungsmenü."
   },
   {
     "id": 12,
     "version": "2.7.0",
     "date": "2026-03-26",
-    "changes": "- **Shared Countdowns**: Einführung von zustandslosen, teilbaren Fullscreen-Timern via URL-Parameter (Zeitzonen-sicher).\n- **Monochrome Theme**: Ein neues, radikal minimalistisches Dark-Theme für maximale Konzentration.\n- **Kiosk-Mode & Theme Sync**: Überarbeitete Fullscreen-Logik mit nativem CSS-Inheritance und Scroll-Lock für ein immersives Erlebnis.\n- **Backend Optimierung**: Reduzierung von Log-Spam in der Countdown-API zur Steigerung der Stabilität.\n- **UI Polish**: Verbesserte Navigation und 404-Fehlerseite Integration."
+    "changes": "- **Shared Countdowns**: Einführung von zustandslosen, teilbaren Fullscreen-Timern via URL-Parameter (Zeitzonen-sicher).\n- **Monochrome Theme**: Ein neues, radikal minimalistisches Dark-Theme für maximale Konzentration.\n- **Kiosk-Mode & Theme Sync**: Überarbeitete Fullscreen-Logik with nativem CSS-Inheritance and Scroll-Lock für ein immersives Erlebnis.\n- **Backend Optimierung**: Reduzierung von Log-Spam in der Countdown-API zur Steigerung der Stabilität.\n- **UI Polish**: Verbesserte Navigation and 404-Fehlerseite Integration."
   },
   {
     "id": 11,
     "version": "2.6.0",
     "date": "2026-03-26",
-    "changes": "- **System-Logging 2.0**: Einführung einer dedizierten SystemLogs Datenbank mit 24h-Retention-Policy und Admin-UI Integration.\n- **Noise Reduction**: Entfernung hochfrequenter Terminal-Logs (Auth & Sockets) zur Steigerung der I/O-Performance.\n- **Bet-Resolver Stabilität**: Fix für \"Premature Refunds\" durch intelligente Oracle-Warteschleife; Synchronisation mit Frontend \"BEENDET\"-Status.\n- **Performance & Crash-Protection**: SQLite RAM-Optimierung (WAL, Normal Sync), Volatile Socket-Ticks und Circular-JSON Schutz in Fehler-Logs.\n- **UI-Speedup**: Implementierung von Image Lazy-Loading für Avatare und Match-Logos."
+    "changes": "- **System-Logging 2.0**: Einführung einer dedizierten SystemLogs Datenbank with 24h-Retention-Policy and Admin-UI Integration.\n- **Noise Reduction**: Entfernung hochfrequenter Terminal-Logs (Auth & Sockets) zur Steigerung der I/O-Performance.\n- **Bet-Resolver Stabilität**: Fix für \"Premature Refunds\" durch intelligente Oracle-Warteschleife; Synchronisation with Frontend \"BEENDET\"-Status.\n- **Performance & Crash-Protection**: SQLite RAM-Optimierung (WAL, Normal Sync), Volatile Socket-Ticks and Circular-JSON Schutz in Fehler-Logs.\n- **UI-Speedup**: Implementierung von Image Lazy-Loading für Avatare and Match-Logos."
   },
   {
     "id": 10,
     "version": "2.5.0",
     "date": "2026-03-25",
-    "changes": "- **Navigation Admin 2.0**: Neugestaltung der Navigations-Einstellungen mit kategorisierter Block-Struktur (Glass-Cards) und smarter In-Block-Sortierung.\n- **Admin Panel Integration**: Das Admin-Panel ist nun fester Bestandteil der System-Kategorie und kann flexibel sortiert werden; Sichtbarkeit bleibt superadmin-geschützt.\n- **System Cleanup**: Nicht funktionale \"Friends\" Links entfernt; Routen-Audit durchgeführt und fehlerhafte Pfade (Features) korrigiert.\n- **Polymarket Trigger**: Wettauswertung auf Echtzeit-Events via Polymarket umgestellt für maximale Zuverlässigkeit."
+    "changes": "- **Navigation Admin 2.0**: Neugestaltung der Navigations-Einstellungen with kategorisierter Block-Struktur (Glass-Cards) and smarter In-Block-Sortierung.\n- **Admin Panel Integration**: Das Admin-Panel ist nun fester Bestandteil der System-Kategorie and kann flexibel sortiert werden; Sichtbarkeit bleibt superadmin-geschützt.\n- **System Cleanup**: Nicht funktionale \"Friends\" Links entfernt; Routen-Audit durchgeführt and fehlerhafte Pfade (Features) korrigiert.\n- **Polymarket Trigger**: Wettauswertung on Echtzeit-Events via Polymarket umgestellt für maximale Zuverlässigkeit."
   },
   {
     "id": 9,
     "version": "2.4.0",
     "date": "2026-03-23",
-    "changes": "- **Scratchcards 3.0**: Einführung von \"Special\" Tickets (pinkes Design), Umstellung auf die biquadratische 20x-Jackpot-Kurve und Integration von Info-Modals für Quoten & Multiplikatoren.\n- **Game Leaderboards 3.0**: Einzelsortierbare Tabellen pro Spiel. KoalaFlap zeigt nun Streak & Ingame-Coins; Scratch & Win zeigt Gesamtgewinn & gewonnene Lose.\n- **Feature Roadmap 3.0**: Trennung nach Typen (Bug vs. Feature) inkl. Filter-Optionen, Status-Badges und überarbeitetem Einreichungs-Formular.\n- **UI & Economy Refinement**: Kategorien in \"Classic\" und \"Premium\" umbenannt; Maximale Auszahlungsgrenzen auf 160x (Blackout) für gewichtete Lose angehoben."
+    "changes": "- **Scratchcards 3.0**: Einführung von \"Special\" Tickets (pinkes Design), Umstellung on die biquadratische 20x-Jackpot-Kurve and Integration von Info-Modals für Quoten & Multiplikatoren.\n- **Game Leaderboards 3.0**: Einzelsortierbare Tabellen pro Spiel. KoalaFlap zeigt nun Streak & Ingame-Coins; Scratch & Win zeigt Gesamtgewinn & gewonnene Lose.\n- **Feature Roadmap 3.0**: Trennung nach Typen (Bug vs. Feature) inkl. Filter-Optionen, Status-Badges and überarbeitetem Einreichungs-Formular.\n- **UI & Economy Refinement**: Kategorien in \"Classic\" and \"Premium\" umbenannt; Maximale Auszahlungsgrenzen on 160x (Blackout) für gewichtete Lose angehoben."
   },
   {
     "id": 8,
     "version": "2.3.2",
     "date": "2026-03-23",
-    "changes": "- **Scratchcard Shop 2.0**: Aufteilung in \"Classic\" und \"Premium\" Kategorien für bessere Übersicht.\n- **Game-Economy Fix**: Das \"Hotstreak-Multiplier\" Upgrade in KoalaFlap wurde entfernt, um die Spielwirtschaft zu schützen.\n- **Game Leaderboards 2.0**: Vollständig überarbeitetes Layout mit getrennten Reihen für KoalaFlap und ScratchCards inkl. KC-Währungsformat.\n- **Globaler Mute-Fix**: Rubbellose respektieren nun zuverlässig die globale Stummschaltung.\n- **Winner UI Refined**: Erweiterte Live-Listen mit Avataren, Top-Gewinnen und Most-Won-Leaderboard."
+    "changes": "- **Scratchcard Shop 2.0**: Aufteilung in \"Classic\" and \"Premium\" Kategorien für bessere Übersicht.\n- **Game-Economy Fix**: Das \"Hotstreak-Multiplier\" Upgrade in KoalaFlap wurde entfernt, um die Spielwirtschaft zu schützen.\n- **Game Leaderboards 2.0**: Vollständig überarbeitetes Layout with getrennten Reihen für KoalaFlap and ScratchCards inkl. KC-Währungsformat.\n- **Globaler Mute-Fix**: Rubbellose respektieren nun zuverlässig die globale Stummschaltung.\n- **Winner UI Refined**: Erweiterte Live-Listen with Avataren, Top-Gewinnen and Most-Won-Leaderboard."
   },
   {
     "id": 7,
     "version": "2.3.1",
     "date": "2026-03-23",
-    "changes": "- **Scratchcard Minigame**: Das neue Rubbellos-System ist da! Inklusive Multi-Line Wins (bis zu 8 Gewinnlinien gleichzeitig), visuellem Gewinner-Archiv, dynamischen Gewinnchancen und \"EPISCHEN\" Jackpot-Animationen."
+    "changes": "- **Scratchcard Minigame**: Das neue Rubbellos-System ist da! Inklusive Multi-Line Wins (bis zu 8 Gewinnlinien gleichzeitig), visuellem Gewinner-Archiv, dynamischen Gewinnchancen and \"EPISCHEN\" Jackpot-Animationen."
   },
   {
     "id": 6,
     "version": "2.2.4",
     "date": "2026-03-22",
-    "changes": "- **Achievements 2.0**: Komplettes Refactoring mit sequenziellen Ketten für Timer, Esports und KoalaFlap.\n- **Spezial-Erfolge**: 8 neue kreative Meilensteine wie \"Frühaufsteher\", \"Nachteule\" und \"Weekend Warrior\".\n- **Sicherheit & Fixes**: Crash beim Abholen des Daily Bonus behoben; Implementierung von DB-Level Schutz gegen Double-Claim Exploits.\n- **Admin & UI**: Sidebar erlaubt nun direkten Superadmin-Zugriff auf das Admin Panel; Vereinheitlichung der Avatar-Größen in globalen Statistiken."
+    "changes": "- **Achievements 2.0**: Komplettes Refactoring with sequenziellen Ketten für Timer, Esports and KoalaFlap.\n- **Spezial-Erfolge**: 8 neue kreative Meilensteine wie \"Frühaufsteher\", \"Nachteule\" and \"Weekend Warrior\".\n- **Sicherheit & Fixes**: Crash beim Abholen des Daily Bonus behoben; Implementierung von DB-Level Schutz gegen Double-Claim Exploits.\n- **Admin & UI**: Sidebar erlaubt nun direkten Superadmin-Zugriff on das Admin Panel; Vereinheitlichung der Avatar-Größen in globalen Statistiken."
   },
   {
     "id": 5,
     "version": "2.2.3",
     "date": "2026-03-22",
-    "changes": "- **Erfolge & Boni**: Neues Belohnungssystem unter `/achievements` mit täglichem Login-Bonus und Meilenstein-Trophäen.\n- **Statistik-Avatare**: Fehler behoben, bei dem Avatare in den globalen Bestenlisten nicht angezeigt wurden.\n- **SQL-Optimierung**: Erweiterung der Highscore-Abfragen um User-Präferenzen für eine konsistente visuelle Darstellung."
+    "changes": "- **Erfolge & Boni**: Neues Belohnungssystem unter `/achievements` with täglichem Login-Bonus and Meilenstein-Trophäen.\n- **Statistik-Avatare**: Fehler behoben, bei dem Avatare in den globalen Bestenlisten nicht angezeigt wurden.\n- **SQL-Optimierung**: Erweiterung der Highscore-Abfragen um User-Präferenzen für eine konsistente visuelle Darstellung."
   },
   {
     "id": 4,
     "version": "2.2.2",
     "date": "2026-03-22",
-    "changes": "- **Roadmap-Archiv**: Abgeschlossene und abgelehnte Tickets werden nun in einem einklappbaren Bereich am Ende der Liste gesammelt.\n- **AI-Prompt Export**: Die \"Export für AI\" Funktion kopiert nun zusätzlich einen fertigen Arbeits-Prompt für KI-Agenten in die Zwischenablage.\n- **Sidebar-Gedächtnis**: Der Status (ein-/ausgeklappt) der Seitenleisten-Kategorien wird nun dauerhaft im Browser gespeichert.\n- **Speedcube Averages**: Anzeige von Ao5, Ao10 und Ao100 Durchschnitten nach offiziellen WCA-Regeln.\n- **KoalaFlap FPS-Fix**: Die Spielphysik wurde auf 60 FPS normalisiert, um eine konsistente Geschwindigkeit auf allen Monitoren (60Hz bis 240Hz+) zu garantieren.\n- **UX & Fixes**: Diverse Korrekturen an Profil-Verlinkungen und Integration von Avataren in allen globalen Bestenlisten."
+    "changes": "- **Roadmap-Archiv**: Abgeschlossene and abgelehnte Tickets werden nun in einem einklappbaren Bereich am Ende der Liste gesammelt.\n- **AI-Prompt Export**: Die \"Export für AI\" Funktion kopiert nun zusätzlich einen fertigen Arbeits-Prompt für KI-Agenten in die Zwischenablage.\n- **Sidebar-Gedächtnis**: Der Status (ein-/ausgeklappt) der Seitenleisten-Kategorien wird nun dauerhaft im Browser gespeichert.\n- **Speedcube Averages**: Anzeige von Ao5, Ao10 and Ao100 Durchschnitten nach offiziellen WCA-Regeln.\n- **KoalaFlap FPS-Fix**: Die Spielphysik wurde on 60 FPS normalisiert, um eine konsistente Geschwindigkeit on allen Monitoren (60Hz bis 240Hz+) zu garantieren.\n- **UX & Fixes**: Diverse Korrekturen an Profil-Verlinkungen and Integration von Avataren in allen globalen Bestenlisten."
   },
   {
     "id": 3,
     "version": "2.2.1",
     "date": "2026-03-22",
-    "changes": "- **UX Updates**: Alle ungenutzten Navigationselemente sind nun eingeklappt eingefahren, um ein cleaneres UI zu erzeugen.\n- **Roadmap 2.0**: Tickets haben jetzt fest zugeordnete Typen (Feature/Bug) und werden nach Abschluss am Ende sortiert.\n- **Timer Persistenz**: Raumeinstellungen wie Dauer, Sichtbarkeit und Rolle werden ab jetzt im Browser gespeichert.\n- **Bugfixes**: Der Tab-Coin-Exploit wurde vollständig behoben; Die Flappy-Auszahlungsraten-Beschreibungen wurden in KoalaFlap korrigiert."
+    "changes": "- **UX Updates**: Alle ungenutzten Navigationselemente sind nun eingeklappt eingefahren, um ein cleaneres UI zu erzeugen.\n- **Roadmap 2.0**: Tickets haben jetzt fest zugeordnete Typen (Feature/Bug) and werden nach Abschluss am Ende sortiert.\n- **Timer Persistenz**: Raumeinstellungen wie Dauer, Sichtbarkeit and Rolle werden ab jetzt im Browser gespeichert.\n- **Bugfixes**: Der Tab-Coin-Exploit wurde vollständig behoben; Die Flappy-Auszahlungsraten-Beschreibungen wurden in KoalaFlap korrigiert."
   },
   {
     "id": 2,
     "version": "2.2.0",
     "date": "2026-03-19",
-    "changes": "- **Speedcube Timer**: Ein mechanischer Timer für Speedcubing ist nun verfügbar! Nutze die Leertaste zum Halten, Starten und Stoppen deiner Solves.\n- **Statistiken & Bests**: Die Seite zeigt dir nun direkt dein Personal Best (All-time) sowie deinen besten Wert des heutigen Tages an.\n\n- **Data Sync**: Zeiten werden für Mitglieder in der DB gespeichert, Gäste nutzen automatisch den LocalStorage."
+    "changes": "- **Speedcube Timer**: Ein mechanischer Timer für Speedcubing ist nun verfügbar! Nutze die Leertaste zum Halten, Starten and Stoppen deiner Solves.\n- **Statistiken & Bests**: Die Seite zeigt dir nun direkt dein Personal Best (All-time) sowie deinen besten Wert des heutigen Tages an.\n\n- **Data Sync**: Zeiten werden für Mitglieder in der DB gespeichert, Gäste nutzen automatisch den LocalStorage."
   },
   {
     "id": 1,
     "version": "2.1.1",
     "date": "2026-03-19",
-    "changes": "- **KoalaFlap Minigame**: Unser erstes Arcade-Spiel ist live! Inklusive Upgrade-Shop (Leben, Crits, Multiplier), Fullscreen-Modus und perfekt abgestimmter Physik.\n- **System-Changelog**: Patchnotes werden nun automatisiert über das neue Backend-Modul ausgespielt."
+    "changes": "- **KoalaFlap Minigame**: Unser erstes Arcade-Spiel ist live! Inklusive Upgrade-Shop (Leben, Crits, Multiplier), Fullscreen-Modus and perfekt abgestimmter Physik.\n- **System-Changelog**: Patchnotes werden nun automatisiert über das neue Backend-Modul ausgespielt."
   },
   {
     "id": 0,
     "version": "2.1.0",
     "date": "2026-03-19",
-    "changes": "- **Feature Roadmap**: Neues Modul für geplante Features inkl. Superadmin AI-Export.\n- **UI Polish**: Optimierung der Room-Sidebar und Integration des Weather-Widgets.\n- **KoalaCoin Header**: Erste Integration der globalen Währung in das App-Layout."
+    "changes": "- **Feature Roadmap**: Neues Modul für geplante Features inkl. Superadmin AI-Export.\n- **UI Polish**: Optimierung der Room-Sidebar and Integration des Weather-Widgets.\n- **KoalaCoin Header**: Erste Integration der globalen Währung in das App-Layout."
   }
 ]
