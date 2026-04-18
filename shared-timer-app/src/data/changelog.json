@@ -1,5 +1,11 @@
 [
   {
+    "id": 59,
+    "version": "2.36.1",
+    "date": "2026-04-18",
+    "changes": "- **Architektur-Dokumentation**: Vollständige Überarbeitung der `README.md` mit Fokus auf System-Design, Echtzeit-Statusverwaltung via `roomManager.js` und Richtlinien für zukünftige Coding-Agenten.\n- **Projekt-Übersicht**: Detaillierte Auflistung der Tech-Stack Komponenten (React 19, Socket.io, Express, SQLite) und der Verzeichnisstruktur."
+  },
+  {
     "id": 58,
     "version": "2.36.0",
     "date": "2026-04-18",
