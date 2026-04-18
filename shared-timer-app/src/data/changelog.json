@@ -1,5 +1,11 @@
 [
   {
+    "id": 48,
+    "version": "2.31.0",
+    "date": "2026-04-18",
+    "changes": "- **Granular Error Handling**: Implementierung eines robusten Error-Boundary-Systems zur Isolation von Unterseiten-Abstürzen.\n- **SPA-Resilienz**: Sidebar und globale Layout-Elemente bleiben bei Fehlern in Sub-Routes (z.B. /lotto) voll funktionsfähig.\n- **Auto-Recovery**: Automatischer Reset des Fehlerzustands bei Navigation zu einer neuen Route sowie manuelle Wiederherstellungs-Optionen.\n- **Premium Fallback-UI**: Glassmorphes Design mit Fehler-Details und direkten Recovery-Aktionen (Home/Reload) für ein nahtloses Nutzererlebnis."
+  },
+  {
     "id": 47,
     "version": "2.30.0",
     "date": "2026-04-18",

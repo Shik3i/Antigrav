@@ -42,6 +42,7 @@ const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
 const LiveStreamWidget = React.lazy(() => import('./components/LiveStreamWidget'));
 const Friends = React.lazy(() => import('./pages/Friends'));
+import RouteErrorBoundary from './components/ErrorBoundary';
 import ClockWidget from './components/ClockWidget';
 import KoalaCoinWidget from './components/KoalaCoinWidget';
 import useEsportsNotifications from './hooks/useEsportsNotifications';
@@ -667,42 +668,44 @@ function InnerApp() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           <main className="main-content" style={{ flex: 1, overflowY: 'auto', padding: isZenMode ? '0' : '2rem', position: 'relative' }}>
             <React.Suspense fallback={<ViewLoader />}>
-              <Routes>
-                <Route path="/" element={<Home user={user} globalSocket={globalSocket} />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/room/:id" element={<Room user={user} socket={globalSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} />} />
-                <Route path="/highscores" element={<Highscores />} />
-                <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={globalSocket} />} />
-                <Route path="/koala-dashboard" element={<KoalaDashboard />} />
-                <Route path="/achievements" element={<Achievements />} />
-                <Route path="/countdowns" element={<Countdowns user={user} />} />
-                <Route path="/global-bets" element={<GlobalBets />} />
-                <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={globalSocket} />} />
-                <Route path="/api-docs" element={<ApiDocs />} />
-                <Route path="/extension-info" element={<ExtensionInfo />} />
-                <Route path="/admin" element={<Admin socket={globalSocket} />} />
-                <Route path="/admin/achievements" element={<AdminAchievements />} />
-                <Route path="/features" element={<FeatureRequests />} />
-                <Route path="/changelog" element={<Changelog />} />
-                <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
-                <Route path="/games/leaderboard" element={<GameLeaderboards />} />
-                <Route path="/speedcube" element={<SpeedcubeTimer />} />
-                <Route path="/leveling" element={<LevelingTracker user={user} token={token} />} />
-                <Route path="/scratchcards" element={<Scratchcards />} />
-                <Route path="/games/rift-defense" element={<RiftDefense />} />
-                <Route path="/games/lol-idle" element={<LoLIdleGame user={user} token={token} />} />
-                <Route path="/color-sync" element={<ColorSyncGame user={user} token={token} />} />
-                <Route path="/color-sync/lobby/:uuid" element={<ColorSyncGame user={user} token={token} />} />
-                <Route path="/profile/:username" element={<UserProfile />} />
-                <Route path="/tetris" element={<Tetris />} />
-                <Route path="/polymarket-general" element={<PolymarketGeneral />} />
-                <Route path="/wordle" element={<Wordle user={user} token={token} />} />
-                <Route path="/games/tower-climb" element={<TowerClimb />} />
-                <Route path="/lotto" element={<LottoImitat />} />
-                <Route path="/c" element={<SharedCountdown />} />
-                <Route path="*" element={<div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-main)' }}><h2>404 - Seite nicht gefunden</h2><p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Die gesuchte Seite existiert nicht.</p><a href="/" style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-card)', borderRadius: '8px', color: 'var(--text-main)', textDecoration: 'none', border: '1px solid var(--border-color)' }}>Zurück zur Startseite</a></div>} />
-              </Routes>
+              <RouteErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Home user={user} globalSocket={globalSocket} />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/room/:id" element={<Room user={user} socket={globalSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} />} />
+                  <Route path="/highscores" element={<Highscores />} />
+                  <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={globalSocket} />} />
+                  <Route path="/koala-dashboard" element={<KoalaDashboard />} />
+                  <Route path="/achievements" element={<Achievements />} />
+                  <Route path="/countdowns" element={<Countdowns user={user} />} />
+                  <Route path="/global-bets" element={<GlobalBets />} />
+                  <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={globalSocket} />} />
+                  <Route path="/api-docs" element={<ApiDocs />} />
+                  <Route path="/extension-info" element={<ExtensionInfo />} />
+                  <Route path="/admin" element={<Admin socket={globalSocket} />} />
+                  <Route path="/admin/achievements" element={<AdminAchievements />} />
+                  <Route path="/features" element={<FeatureRequests />} />
+                  <Route path="/changelog" element={<Changelog />} />
+                  <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
+                  <Route path="/games/leaderboard" element={<GameLeaderboards />} />
+                  <Route path="/speedcube" element={<SpeedcubeTimer />} />
+                  <Route path="/leveling" element={<LevelingTracker user={user} token={token} />} />
+                  <Route path="/scratchcards" element={<Scratchcards />} />
+                  <Route path="/games/rift-defense" element={<RiftDefense />} />
+                  <Route path="/games/lol-idle" element={<LoLIdleGame user={user} token={token} />} />
+                  <Route path="/color-sync" element={<ColorSyncGame user={user} token={token} />} />
+                  <Route path="/color-sync/lobby/:uuid" element={<ColorSyncGame user={user} token={token} />} />
+                  <Route path="/profile/:username" element={<UserProfile />} />
+                  <Route path="/tetris" element={<Tetris />} />
+                  <Route path="/polymarket-general" element={<PolymarketGeneral />} />
+                  <Route path="/wordle" element={<Wordle user={user} token={token} />} />
+                  <Route path="/games/tower-climb" element={<TowerClimb />} />
+                  <Route path="/lotto" element={<LottoImitat />} />
+                  <Route path="/c" element={<SharedCountdown />} />
+                  <Route path="*" element={<div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-main)' }}><h2>404 - Seite nicht gefunden</h2><p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Die gesuchte Seite existiert nicht.</p><a href="/" style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-card)', borderRadius: '8px', color: 'var(--text-main)', textDecoration: 'none', border: '1px solid var(--border-color)' }}>Zurück zur Startseite</a></div>} />
+                </Routes>
+              </RouteErrorBoundary>
             </React.Suspense>
           </main>
           {(!isZenMode && deferredFeaturesReady && (user.preferences?.showNewsTicker ?? (window.innerWidth > 768))) && (
