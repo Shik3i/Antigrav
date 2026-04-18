@@ -6,6 +6,7 @@ const {
 } = require('../config/lotto');
 
 let ioInstance = null;
+let isDrawing = false;
 
 /**
  * Initializes and starts the lotto draw cron job.
@@ -26,6 +27,9 @@ function startLottoCron(io) {
  * Checks if a draw is due and executes it if necessary.
  */
 async function checkAndExecuteDraw() {
+  if (isDrawing) return;
+  isDrawing = true;
+
   try {
     const now = new Date();
     const currentHourUTC = now.getUTCHours();
@@ -63,11 +67,21 @@ async function checkAndExecuteDraw() {
       });
     }
 
-    await dbLayer.logSystemEvent('info', 'LottoDraw', `Ziehung für ${today} erfolgreich: ${numbers.join(',')} SZ:${superzahl}. Gewinner: ${result.totalWinners}`);
+    try {
+      await dbLayer.logSystemEvent('info', 'LottoDraw', `Ziehung für ${today} erfolgreich: ${numbers.join(',')} SZ:${superzahl}. Gewinner: ${result.totalWinners}`);
+    } catch (logErr) {
+      console.error('[LottoCron] Critical: Failed to log success event to DB:', logErr);
+    }
 
   } catch (error) {
     console.error('[LottoCron] Error during draw execution:', error);
-    await dbLayer.logSystemEvent('error', 'LottoDraw', `Fehler bei Ziehung: ${error.message}`);
+    try {
+      await dbLayer.logSystemEvent('error', 'LottoDraw', `Fehler bei Ziehung: ${error.message}`);
+    } catch (logErr) {
+      console.error('[LottoCron] Critical: Failed to log error event to DB:', logErr);
+    }
+  } finally {
+    isDrawing = false;
   }
 }
 

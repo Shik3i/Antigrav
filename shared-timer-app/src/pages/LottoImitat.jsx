@@ -23,17 +23,18 @@ import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import '../index.css';
 
-const LottoImitat = () => {
-    const { token, user } = useAuth();
-    const { lottoData, loadingLotto, loadLottoData } = usePersistentData();
-    const { showToast } = useToast();
-    const navigate = useNavigate();
+    const LottoImitat = () => {
+        const { token, user } = useAuth();
+        const { lottoData, loadingLotto, loadLottoData } = usePersistentData();
+        const { showToast } = useToast();
+        const navigate = useNavigate();
 
     const [selectedNumbers, setSelectedNumbers] = useState([]);
     const [selectedSuper, setSelectedSuper] = useState(0);
     const [cart, setCart] = useState([]);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [countdown, setCountdown] = useState('');
+    const [cutoffCountdown, setCutoffCountdown] = useState('');
 
     // Load data on mount
     useEffect(() => {
@@ -43,30 +44,42 @@ const LottoImitat = () => {
     // Countdown logic
     useEffect(() => {
         const updateCountdown = () => {
-            if (!lottoData.today) return;
-            // Target is 16:00 UTC
-            const targetStr = lottoData.today.split('T')[0] + 'T16:00:00Z';
-            const drawTime = new Date(targetStr);
-            const now = new Date();
-            let diff = drawTime - now;
-
-            if (diff <= 0) {
-                // If draw time for today passed, target tomorrow
-                const tomorrow = new Date(drawTime);
-                tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-                diff = tomorrow - now;
+            if (!lottoData.nextDrawTime || !lottoData.nextCutoffTime) {
+                setCountdown('--:--:--');
+                setCutoffCountdown('--:--:--');
+                return;
             }
 
-            const h = Math.floor(diff / (1000 * 60 * 60));
-            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const s = Math.floor((diff % (1000 * 60)) / 1000);
-            setCountdown(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+            const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
+
+            // 1. Draw Countdown
+            const drawDiff = lottoData.nextDrawTime - adjustedNow;
+            if (drawDiff <= 0) {
+                setCountdown('00:00:00');
+            } else {
+                const h = Math.floor(drawDiff / 3600000);
+                const m = Math.floor((drawDiff % 3600000) / 60000);
+                const s = Math.floor((drawDiff % 60000) / 1000);
+                setCountdown(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+            }
+
+            // 2. Cutoff Countdown
+            const cutoffDiff = lottoData.nextCutoffTime - adjustedNow;
+            if (cutoffDiff <= 0) {
+                setCutoffCountdown('Beendet');
+                /* setCutoffCountdown('Beendet'); // DEMO MODE */
+            } else {
+                const h = Math.floor(cutoffDiff / 3600000);
+                const m = Math.floor((cutoffDiff % 3600000) / 60000);
+                const s = Math.floor((cutoffDiff % 60000) / 1000);
+                setCutoffCountdown(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+            }
         };
 
         const timer = setInterval(updateCountdown, 1000);
         updateCountdown();
         return () => clearInterval(timer);
-    }, [lottoData.today]);
+    }, [lottoData.nextDrawTime, lottoData.nextCutoffTime, lottoData.clockOffset]);
 
     // Number interaction
     const quickTipp = () => {
@@ -94,12 +107,14 @@ const LottoImitat = () => {
         const currentTotal = cart.length + lottoData.userTicketsToday;
         const maxAllowed = lottoData.config?.maxTicketsPerDay || 100;
         
-        if (currentTotal >= maxAllowed) {
+        const remaining = maxAllowed - currentTotal;
+        const actualToAdd = Math.min(count, remaining);
+        
+        if (actualToAdd <= 0) {
             showToast('Tägliches Ticket-Limit bereits erreicht!', 'error');
             return;
         }
 
-        const actualToAdd = Math.min(count, maxAllowed - currentTotal);
         if (actualToAdd < count) {
             showToast(`Nur ${actualToAdd} Tickets hinzugefügt (Limit erreicht).`, 'info');
         }
@@ -235,6 +250,26 @@ const LottoImitat = () => {
         } catch (e) {
             return [];
         }
+    };
+
+    const parseDrawDate = (str) => {
+        if (!str) return null;
+        const [y, m, d] = str.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    };
+
+    const isCutoffActive = () => {
+        /* return true; // DEMO MODE: ALWAYS TRUE */
+        if (!lottoData.nextCutoffTime || !lottoData.nextDrawTime) return false;
+        const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
+        return adjustedNow >= lottoData.nextCutoffTime && adjustedNow < lottoData.nextDrawTime;
+    };
+
+    const willBuyForTomorrow = () => {
+        /* return true; // DEMO MODE: ALWAYS TRUE */
+        if (!lottoData.nextCutoffTime) return false;
+        const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
+        return adjustedNow >= lottoData.nextCutoffTime;
     };
 
     // --- Memoized Components ---
@@ -604,12 +639,38 @@ const LottoImitat = () => {
                     <h1>Lotto Imitat</h1>
                     <p>Wähle 6 aus 49 Zahlen und knacke den täglichen Jackpot.</p>
                 </div>
-                <div className="glass-card countdown-box">
-                    <div style={{ textAlign: 'right' }}>
-                        <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Nächste Ziehung</span>
-                        <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'monospace', color: '#f59e0b' }}>{countdown}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                    <div className="glass-card countdown-box" style={{ gap: '24px' }}>
+                        <div style={{ textAlign: 'right', paddingRight: '16px', borderRight: '1px solid var(--border-color)' }}>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: '#f59e0b', textTransform: 'uppercase', fontWeight: 800 }}>Annahmeschluss</span>
+                            <span style={{ fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', color: cutoffCountdown === 'Beendet' ? '#ef4444' : '#f59e0b' }}>
+                                {cutoffCountdown}
+                            </span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Nächste Ziehung</span>
+                            <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'monospace', color: 'var(--accent-primary)' }}>{countdown}</span>
+                        </div>
+                        <Clock size={28} color="var(--accent-primary)" />
                     </div>
-                    <Clock size={28} color="#f59e0b" />
+                    {isCutoffActive() && (
+                        <div style={{ 
+                            background: 'rgba(245, 158, 11, 0.1)', 
+                            border: '1px solid rgba(245, 158, 11, 0.2)', 
+                            padding: '10px 16px', 
+                            borderRadius: '10px',
+                            color: '#f59e0b',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            animation: 'fadeInIn 0.4s ease-out'
+                        }}>
+                            <Zap size={14} />
+                            Ziehung läuft. Die Ticket-Annahme ist bis 16:00 UTC gesperrt.
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -631,8 +692,8 @@ const LottoImitat = () => {
                 <div className="glass-card stat-card">
                     <div className="stat-icon"><CheckCircle2 size={24}/></div>
                     <div className="stat-info">
-                        <span className="stat-value">{lottoData.userTicketsToday} / {lottoData.config?.maxTicketsPerDay || 100}</span>
-                        <span className="stat-label">Tickets heute</span>
+                        <span className="stat-value">{lottoData.userTicketsToday}{lottoData.userTicketsTomorrow > 0 ? ` (+${lottoData.userTicketsTomorrow})` : ''} / {lottoData.config?.maxTicketsPerDay || 100}</span>
+                        <span className="stat-label">Tickets {lottoData.userTicketsTomorrow > 0 ? 'Heute + Morgen' : 'Heute'}</span>
                     </div>
                 </div>
             </div>
@@ -668,11 +729,18 @@ const LottoImitat = () => {
 
                         <button 
                             className="btn-primary" 
-                            style={{ width: '100%', marginTop: '32px', height: '56px', fontSize: '1.1rem' }}
+                            style={{ 
+                                width: '100%', 
+                                marginTop: '32px', 
+                                height: '56px', 
+                                fontSize: '1.1rem',
+                                opacity: isCutoffActive() ? 0.5 : 1,
+                                cursor: isCutoffActive() ? 'not-allowed' : 'pointer'
+                            }}
                             onClick={addToCart}
-                            disabled={selectedNumbers.length < 6}
+                            disabled={selectedNumbers.length < 6 || isCutoffActive()}
                         >
-                            <Ticket size={22}/> Ticket zum Warenkorb ({(lottoData.config?.ticketPrice || 100) / 100} KC)
+                            <Ticket size={22}/> {isCutoffActive() ? 'Annahme gesperrt' : (willBuyForTomorrow() ? 'Für morgen einreihen' : 'Ticket zum Warenkorb')} ({(lottoData.config?.ticketPrice || 100) / 100} KC)
                         </button>
                     </div>
 
@@ -685,10 +753,10 @@ const LottoImitat = () => {
                             Füge sofort mehrere zufällig generierte Tickets zu deinem Warenkorb hinzu.
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(5)} style={{ height: '48px' }}>+5 Zufall</button>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(10)} style={{ height: '48px' }}>+10 Zufall</button>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(25)} style={{ height: '48px' }}>+25 Zufall</button>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(50)} style={{ height: '48px' }}>+50 Zufall</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(5)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+5 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(10)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+10 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(25)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+25 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(50)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+50 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
                         </div>
                     </div>
 
@@ -704,30 +772,115 @@ const LottoImitat = () => {
                             </div>
                         ) : (
                             <div className="history-list">
-                                {lottoData.userHistory.map((draw) => (
-                                    <div key={draw.draw_date} className="draw-history-item">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Calendar size={14} className="text-muted" />
-                                                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{new Date(draw.draw_date).toLocaleDateString('de-DE')}</span>
-                                            </div>
-                                            <div style={{ 
-                                                color: draw.payout > 0 ? '#10b981' : 'var(--text-muted)', 
-                                                fontWeight: 800, 
-                                                background: draw.payout > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.03)',
-                                                padding: '4px 12px',
-                                                borderRadius: '20px',
-                                                fontSize: '0.85rem'
-                                            }}>
-                                                {draw.payout > 0 ? `+${(draw.payout / 100).toLocaleString('de-DE')} KC` : 'Niete'}
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            {safeParseNumbers(draw.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
-                                            <span className="ball-mini super">{draw.super_number}</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                {(() => {
+                                    // lottoData.userHistory is an array of Draw Groups: { drawDate, drawNumbers, tickets: [] }
+                                    const pending = lottoData.userHistory.filter(d => d.status === 'pending' || !d.drawNumbers);
+                                    const completed = lottoData.userHistory.filter(d => d.status !== 'pending' && d.drawNumbers);
+                                    
+                                    return (
+                                        <>
+                                            {pending.length > 0 && (
+                                                <div style={{ padding: '20px 32px 10px', background: 'rgba(245, 158, 11, 0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase' }}>Ausstehende Tickets</span>
+                                                </div>
+                                            )}
+                                            {pending.map((group) => (
+                                                <div key={group.drawDate} className="draw-history-item" style={{ borderLeft: '4px solid #f59e0b', width: 'auto', maxWidth: 'fit-content', minWidth: '350px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center', gap: '20px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                                                            <Calendar size={14} className="text-muted" />
+                                                            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
+                                                        </div>
+                                                        <div style={{ 
+                                                            color: '#f59e0b', 
+                                                            fontWeight: 800, 
+                                                            background: 'rgba(245, 158, 11, 0.1)',
+                                                            padding: '4px 12px',
+                                                            borderRadius: '20px',
+                                                            fontSize: '0.85rem',
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {group.tickets.length} Ticket{group.tickets.length > 1 ? 's' : ''} ausstehend
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                        {group.tickets.map((ticket, idx) => (
+                                                            <div key={ticket.id} style={{ 
+                                                                display: 'flex', 
+                                                                alignItems: 'center',
+                                                                gap: '6px', 
+                                                                background: 'rgba(255,255,255,0.03)', 
+                                                                border: '1px solid var(--border-color)',
+                                                                borderRadius: '10px', 
+                                                                padding: '8px 12px',
+                                                                flex: '0 0 auto'
+                                                            }}>
+                                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: '16px' }}>
+                                                                        #{idx + 1}
+                                                                    </span>
+                                                                    {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
+                                                                    <span className="ball-mini super">{ticket.superzahl}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {completed.length > 0 && (
+                                                <div style={{ padding: '30px 32px 10px', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Abgeschlossene Ziehungen</span>
+                                                </div>
+                                            )}
+                                            {completed.map((group) => (
+                                                <div key={group.drawDate} className="draw-history-item" style={{ width: 'auto', maxWidth: 'fit-content', minWidth: '450px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center', gap: '40px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                                                            <Calendar size={14} className="text-muted" />
+                                                            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                                            {group.drawNumbers && safeParseNumbers(group.drawNumbers).map((n, i) => (
+                                                                <span key={i} className="ball-mini" style={{ background: 'var(--accent-primary)', width: '18px', height: '18px', fontSize: '0.6rem' }}>{n}</span>
+                                                            ))}
+                                                            {group.drawSuperzahl !== undefined && (
+                                                                <span className="ball-mini super" style={{ width: '18px', height: '18px', fontSize: '0.6rem' }}>{group.drawSuperzahl}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                                                        {group.tickets.map(ticket => (
+                                                            <div key={ticket.id} style={{ 
+                                                                display: 'flex', 
+                                                                justifyContent: 'space-between', 
+                                                                alignItems: 'center', 
+                                                                background: 'rgba(255,255,255,0.02)', 
+                                                                padding: '8px 12px', 
+                                                                borderRadius: '8px',
+                                                                gap: '12px',
+                                                                flex: '0 0 auto'
+                                                            }}>
+                                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                    {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
+                                                                    <span className="ball-mini super">{ticket.superzahl}</span>
+                                                                </div>
+                                                                <div style={{ 
+                                                                    color: ticket.winAmount > 0 ? '#10b981' : 'var(--text-muted)', 
+                                                                    fontWeight: 800, 
+                                                                    fontSize: '0.8rem',
+                                                                    whiteSpace: 'nowrap'
+                                                                }}>
+                                                                    {ticket.winAmount > 0 ? `+${(ticket.winAmount / 100).toLocaleString('de-DE')} KC` : 'Niete'}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>

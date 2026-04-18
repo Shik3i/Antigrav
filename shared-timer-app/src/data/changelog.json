@@ -1,5 +1,23 @@
 [
   {
+    "id": 52,
+    "version": "2.35.0",
+    "date": "2026-04-18",
+    "changes": "- **Server-Authoritative Time Sync**: Die Lotto-Logik (Cutoff & Ziehung) basiert nun vollständig auf Server-Zeitstempeln. Dies eliminiert Probleme durch lokale Zeitzonen oder Uhren-Ungenauigkeiten.\n- **Clock Drift Kalibrierung**: Das Frontend synchronisiert sich beim Laden mit der Serverzeit, um Point-Perfect-Countdowns und Banner-Einblendungen zu garantieren.\n- **Zentralisierte Timing-Logik**: Nutzung einer einheitlichen Server-Konstante für den Annahmeschluss sowohl im Backend als auch im Frontend."
+  },
+  {
+    "id": 51,
+    "version": "2.34.0",
+    "date": "2026-04-18",
+    "changes": "- **Lotto-Annahmeschluss**: Implementierung eines 15-minütigen Buffers vor der Ziehung (16:00 UTC). Tickets in diesem Fenster werden automatisch für den nächsten Tag gewertet.\n- **Adaptive History-Ansicht**: Die Gewinn-Historie unterstützt nun den Zeilenumbruch (Multi-Row) pro Ziehung, was die Lesbarkeit bei vielen Tickets verbessert.\n- **UX-Optimierung**: Neue Warn-Banner und dynamische Button-Beschriftungen informieren Nutzer proaktiv über den Annahmeschluss.\n- **Layout-Refinement**: Reduzierung der Hintergrundbreite in der Historie für eine kompaktere und modernere Darstellung."
+  },
+  {
+    "id": 50,
+    "version": "2.33.0",
+    "date": "2026-04-18",
+    "changes": "- **Lotto-Stabilität**: Implementierung eines sicheren Datums-Parsers (parseDrawDate) zur Behebung von Timezone-Shifts und \"Invalid Date\" Fehlern.\n- **Ausstehende Tickets**: Einführung einer dedizierten Ansicht für ausstehende Ziehungen (Tickets nach 16:00 UTC).\n- **Verbesserte Ticketzähler**: Der Ticket-Counter berücksichtigt nun sowohl heutige als auch zukünftige Tickets für das tägliche Limit.\n- **UI/UX Polishing**: Neue Status-Badges (\"Ausstehend\" / \"Niete\" / \"Gewinn\") für eine klare Differenzierung der Los-Zustände.\n- **Backend-Sicherung**: Native Integer-Validierung für alle eingereichten Lottozahlen und Superzahlen."
+  },
+  {
     "id": 49,
     "version": "2.32.0",
     "date": "2026-04-18",

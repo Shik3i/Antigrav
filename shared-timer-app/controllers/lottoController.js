@@ -1,9 +1,24 @@
 const dbLayer = require('../database');
 const { 
   getTodayDrawDate, 
+  getTomorrowDrawDate,
   getLottoConfigPayload, 
+  getNextDrawTimestamps,
   LOTTO_CONFIG 
 } = require('../config/lotto');
+
+/**
+ * Helper to safely parse numbers from DB JSON
+ */
+const safeParse = (str, fallback = []) => {
+  if (!str) return fallback;
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    console.error('[LottoController] Parse Error:', e, str);
+    return fallback;
+  }
+};
 
 /**
  * GET /api/lotto/config
@@ -16,9 +31,14 @@ exports.getConfig = async (req, res) => {
     
     // Check if user is logged in to get their ticket count
     let userTicketsToday = 0;
+    let userTicketsTomorrow = 0;
     if (req.user && req.user.id) {
+      const tomorrow = getTomorrowDrawDate();
       userTicketsToday = await dbLayer.getUserLottoTicketCount(req.user.id, today);
+      userTicketsTomorrow = await dbLayer.getUserLottoTicketCount(req.user.id, tomorrow);
     }
+
+    const { drawTime, cutoffTime } = getNextDrawTimestamps();
 
     res.json({
       success: true,
@@ -26,7 +46,11 @@ exports.getConfig = async (req, res) => {
       stats: result.stats || { totalPayout: 0, totalWins: 0, totalPlayed: 0 },
       lastDraw: result.lastDraw,
       userTicketsToday,
-      today
+      userTicketsTomorrow,
+      today,
+      serverTime: Date.now(),
+      nextDrawTime: drawTime,
+      nextCutoffTime: cutoffTime
     });
   } catch (error) {
     console.error('Lotto getConfig error:', error);
@@ -50,7 +74,23 @@ exports.buyTicket = async (req, res) => {
       return res.status(400).json({ success: false, message: `Max ${LOTTO_CONFIG.maxDailyTickets} tickets per purchase.` });
     }
 
-    const today = getTodayDrawDate();
+    // Rollover Logic: Server-authoritative timing.
+    const nowTs = now.getTime();
+    const { drawTime, cutoffTime } = getNextDrawTimestamps();
+    
+    // Hard Lockout: During the 15min draw window, no tickets can be sold.
+    if (nowTs >= cutoffTime && nowTs < drawTime) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Annahmeschluss erreicht. Während der Ziehung (15:45 - 16:00 UTC) ist der Ticket-Kauf gesperrt. Bitte versuche es nach 16:00 UTC erneut.' 
+      });
+    }
+
+    let drawDate = getTodayDrawDate();
+    
+    if (nowTs >= cutoffTime) {
+      drawDate = getTomorrowDrawDate();
+    }
 
     // Validate each ticket
     for (const ticket of tickets) {
@@ -63,20 +103,22 @@ exports.buyTicket = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Numbers must be unique.' });
       }
 
-      if (uniqueNumbers.some(n => n < 1 || n > 49)) {
-        return res.status(400).json({ success: false, message: 'Numbers must be between 1 and 49.' });
+      // Check Integer and Range
+      if (uniqueNumbers.some(n => !Number.isInteger(n) || n < 1 || n > 49)) {
+        return res.status(400).json({ success: false, message: 'Numbers must be integers between 1 and 49.' });
       }
 
-      if (typeof ticket.superzahl !== 'number' || ticket.superzahl < 0 || ticket.superzahl > 9) {
-        return res.status(400).json({ success: false, message: 'Superzahl must be between 0 and 9.' });
+      // Check Superzahl Integer and Range
+      if (!Number.isInteger(ticket.superzahl) || ticket.superzahl < 0 || ticket.superzahl > 9) {
+        return res.status(400).json({ success: false, message: 'Superzahl must be an integer between 0 and 9.' });
       }
     }
 
-    const { newBalance } = await dbLayer.purchaseLottoTickets(userId, tickets, today);
+    const { newBalance } = await dbLayer.purchaseLottoTickets(userId, tickets, drawDate);
 
     res.json({
       success: true,
-      message: `${tickets.length} Ticket(s) erfolgreich eingereicht!`,
+      message: `${tickets.length} Ticket(s) erfolgreich für den ${drawDate} eingereicht!`,
       newBalance
     });
   } catch (error) {
@@ -99,7 +141,7 @@ exports.getHistory = async (req, res) => {
       if (!grouped[t.drawDate]) {
         grouped[t.drawDate] = {
           drawDate: t.drawDate,
-          drawNumbers: t.drawNumbers ? JSON.parse(t.drawNumbers) : null,
+          drawNumbers: safeParse(t.drawNumbers, null),
           drawSuperzahl: t.drawSuperzahl,
           drawTotalPayout: t.drawTotalPayout,
           tickets: []
@@ -107,7 +149,7 @@ exports.getHistory = async (req, res) => {
       }
       grouped[t.drawDate].tickets.push({
         id: t.id,
-        numbers: JSON.parse(t.numbers),
+        numbers: safeParse(t.numbers),
         superzahl: t.superzahl,
         matchCount: t.matchCount,
         superzahlMatch: !!t.superzahlMatch,
@@ -138,7 +180,7 @@ exports.getDrawHistory = async (req, res) => {
     const draws = await dbLayer.getLottoDrawHistory();
     const parsedDraws = draws.map(d => ({
       ...d,
-      numbers: JSON.parse(d.numbers)
+      numbers: safeParse(d.numbers)
     }));
     res.json({
       success: true,

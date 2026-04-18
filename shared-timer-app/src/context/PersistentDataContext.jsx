@@ -26,7 +26,12 @@ export const PersistentDataProvider = ({ children, socket }) => {
         lastDraw: null,
         userHistory: [],
         userTicketsToday: 0,
-        today: null
+        userTicketsTomorrow: 0,
+        today: null,
+        serverTime: null,
+        nextDrawTime: null,
+        nextCutoffTime: null,
+        clockOffset: 0
     });
     const [lottoLoaded, setLottoLoaded] = useState(false);
     const [loadingLotto, setLoadingLotto] = useState(false);
@@ -126,9 +131,14 @@ export const PersistentDataProvider = ({ children, socket }) => {
                 },
                 stats: configRes.data.stats,
                 lastDraw: configRes.data.lastDraw,
-                userHistory: historyRes.data.draws,
+                userHistory: historyRes.data.draws || [],
                 userTicketsToday: configRes.data.userTicketsToday || 0,
-                today: configRes.data.today || new Date().toISOString().split('T')[0]
+                userTicketsTomorrow: configRes.data.userTicketsTomorrow || 0,
+                today: configRes.data.today || new Date().toISOString().split('T')[0],
+                serverTime: configRes.data.serverTime,
+                nextDrawTime: configRes.data.nextDrawTime,
+                nextCutoffTime: configRes.data.nextCutoffTime,
+                clockOffset: configRes.data.serverTime ? (configRes.data.serverTime - Date.now()) : 0
             });
             setLottoLoaded(true);
         } catch (err) {
@@ -208,8 +218,11 @@ export const PersistentDataProvider = ({ children, socket }) => {
                     ...prev,
                     stats: payload.stats || prev.stats,
                     lastDraw: newLastDraw,
-                    // We reset userTicketsToday to 0 since the draw just happened for "today"
-                    userTicketsToday: 0
+                    // We reset userTicketsToday because the draw happened.
+                    // We flip userTicketsTomorrow to userTicketsToday if we want, 
+                    // but it's simpler to just force a full refresh on draw for accuracy.
+                    userTicketsToday: 0,
+                    userTicketsTomorrow: 0
                 };
             });
             

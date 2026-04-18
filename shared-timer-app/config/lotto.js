@@ -13,7 +13,8 @@ const LOTTO_CONFIG = {
   superzahlRange: 10,      // Superzahl 0–9
   ticketPriceCents: 100,   // 1 KC
   maxDailyTickets: 100,    // maximal 100 pro User pro Tag
-  drawHourUTC: 16           // Ziehung um 16:00 UTC
+  drawHourUTC: 16,          // Ziehung um 16:00 UTC
+  cutoffMinutesBeforeDraw: 15 // Ticket-Annahme endet 15 Min vor Ziehung
 };
 
 // ─── Gewinnklassen ────────────────────────────────────────────
@@ -106,6 +107,18 @@ function getTodayDrawDate() {
 }
 
 /**
+ * Returns the draw date string (YYYY-MM-DD) for the next draw.
+ */
+function getTomorrowDrawDate() {
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const year = tomorrow.getUTCFullYear();
+  const month = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(tomorrow.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Returns the config payload for the frontend.
  */
 function getLottoConfigPayload() {
@@ -122,6 +135,35 @@ function getLottoConfigPayload() {
   };
 }
 
+/**
+ * Implementation of server-authoritative draw timing.
+ * Returns { drawTime, cutoffTime } as UTC timestamps (ms).
+ */
+function getNextDrawTimestamps() {
+  const now = new Date();
+  
+  // Set to today 16:00 UTC
+  const drawTime = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    LOTTO_CONFIG.drawHourUTC, 0, 0, 0
+  ));
+
+  const cutoffTime = new Date(drawTime.getTime() - (LOTTO_CONFIG.cutoffMinutesBeforeDraw || 15) * 60 * 1000);
+
+  // If we are past today's draw, move to tomorrow
+  if (now.getTime() >= drawTime.getTime()) {
+    drawTime.setUTCDate(drawTime.getUTCDate() + 1);
+    cutoffTime.setUTCDate(cutoffTime.getUTCDate() + 1);
+  }
+
+  return {
+    drawTime: drawTime.getTime(),
+    cutoffTime: cutoffTime.getTime()
+  };
+}
+
 module.exports = {
   LOTTO_CONFIG,
   WIN_CLASSES,
@@ -129,5 +171,7 @@ module.exports = {
   getPayoutForClass,
   generateDrawNumbers,
   getTodayDrawDate,
+  getTomorrowDrawDate,
+  getNextDrawTimestamps,
   getLottoConfigPayload
 };
