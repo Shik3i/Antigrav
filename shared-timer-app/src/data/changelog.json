@@ -1,5 +1,11 @@
 [
   {
+    "id": 54,
+    "version": "2.35.2",
+    "date": "2026-04-18",
+    "changes": "- **Lotto Hotfix**: Behebung des `now is not defined` Fehlers im Lotto-Controller, der den Ticket-Kauf verhinderte.\n- **Refactoring**: Konsolidierung der Zeitstempel-Berechnung im Backend zur Vermeidung von Referenzfehlern."
+  },
+  {
     "id": 53,
     "version": "2.35.1",
     "date": "2026-04-18",

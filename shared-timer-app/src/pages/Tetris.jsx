@@ -133,12 +133,35 @@ const Tetris = () => {
 
     // Scaling Logic
     const [gameScale, setGameScale] = useState(1);
+    const [hoverMode, setHoverMode] = useState(null);
+
     const updateScale = useCallback(() => {
-        const availableH = window.innerHeight - 150; // Account for header and padding
-        const baseH = 700; // The intrinsic height of our game cluster
-        const newScale = Math.max(0.5, Math.min(2.5, availableH / baseH));
+        if (!containerRef.current) return;
+        const parent = containerRef.current.parentElement;
+        if (!parent) return;
+
+        const rect = parent.getBoundingClientRect();
+        const availableH = rect.height;
+        const headerH = 60; 
+        const targetH = 610; // Tighter target to maximize board size
+        
+        // Scale factor: fill height aggressively
+        const newScale = Math.max(0.6, Math.min(3.2, (availableH - headerH) / targetH));
         setGameScale(newScale);
     }, []);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        
+        // Add a class to parent to kill padding if necessary
+        const parent = containerRef.current.parentElement;
+        if (parent) {
+            parent.style.padding = '0'; // Force remove parent padding
+            const observer = new ResizeObserver(() => updateScale());
+            observer.observe(parent);
+            return () => observer.disconnect();
+        }
+    }, [updateScale]);
 
     useEffect(() => {
         updateScale();
@@ -810,16 +833,14 @@ const Tetris = () => {
                 flexDirection: 'column', 
                 height: '100%', 
                 outline: 'none',
-                position: 'relative',
-                overflow: 'hidden' // Kill any scrollbars from scaling
+                position: 'relative', // Relative for children, but parent padding is killed
+                overflow: 'hidden',
+                background: 'var(--bg-color)' // Ensure it covers the background
             }}
             tabIndex="0"
         >
             {/* Header stays static */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <button className="btn-ghost" onClick={() => navigate(-1)} style={{ padding: '8px' }}>
-                    <ArrowLeft size={20} />
-                </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <h1 style={{ margin: 0, fontSize: '1.6rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Gamepad2 color="var(--accent-primary)" size={28} />
                     Tetris
@@ -830,14 +851,14 @@ const Tetris = () => {
                 </div>
             </div>
 
-            {/* Content area that handles the scale */}
             <div style={{ 
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 width: '100%',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                justifyContent: 'flex-start'
             }}>
                 <div style={{ 
                     display: 'flex', 
@@ -846,14 +867,14 @@ const Tetris = () => {
                     alignItems: 'flex-start',
                     transform: `scale(${gameScale})`,
                     transformOrigin: 'top center',
-                    transition: 'transform 0.2s ease-out',
+                    transition: 'transform 0.1s ease-out',
                     // This height fix is necessary for document flow
-                    height: `${700 * gameScale}px`,
+                    height: `${650 * gameScale}px`,
                     width: '100%',
                     minWidth: 0
                 }}>
                 {/* ── LEFT COLUMN: Hold + Actions + Toggles ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100px', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100px', flexShrink: 0, position: 'relative', zIndex: 50 }}>
                     {/* Hold */}
                     <div className="glass-card" style={{ padding: '8px' }}>
                         <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '4px', textAlign: 'center' }}>Hold</div>
@@ -875,26 +896,60 @@ const Tetris = () => {
                         </button>
                     </div>
 
-                    {/* Speed + Chill Toggles */}
-                    <div className="glass-card" style={{ padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', padding: '3px 2px' }} onClick={() => setSpeedMode(v => !v)}>
+                    {/* Speed + Chill Toggles (Compact, Hover Explanation) */}
+                    <div className="glass-card" style={{ padding: '5px', display: 'flex', flexDirection: 'column', gap: '2px', position: 'relative' }}>
+                        <div 
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', padding: '2px' }} 
+                            onClick={() => setSpeedMode(v => !v)}
+                            onMouseEnter={() => setHoverMode('speed')}
+                            onMouseLeave={() => setHoverMode(null)}
+                        >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Zap size={12} color={speedMode ? '#f59e0b' : 'var(--text-muted)'} fill={speedMode ? '#f59e0b' : 'none'} />
-                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: speedMode ? 'var(--text-main)' : 'var(--text-muted)' }}>Speed</span>
+                                <Zap size={11} color={speedMode ? '#f59e0b' : 'var(--text-muted)'} fill={speedMode ? '#f59e0b' : 'none'} />
+                                <span style={{ fontSize: '0.65rem', fontWeight: 600, color: speedMode ? 'var(--text-main)' : 'var(--text-muted)' }}>Speed</span>
                             </div>
-                            <div style={{ width: '28px', height: '14px', borderRadius: '7px', background: speedMode ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)', position: 'relative', transition: 'background 0.2s', border: '1px solid var(--border-color)' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: speedMode ? '17px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
+                            <div style={{ width: '22px', height: '11px', borderRadius: '6px', background: speedMode ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)', position: 'relative', transition: 'background 0.2s', border: '1px solid var(--border-color)' }}>
+                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '1px', left: speedMode ? '13px' : '1px', transition: 'left 0.2s' }} />
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', padding: '3px 2px' }} onClick={() => setChillMode(v => !v)}>
+
+                        <div 
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', padding: '2px' }} 
+                            onClick={() => setChillMode(v => !v)}
+                            onMouseEnter={() => setHoverMode('chill')}
+                            onMouseLeave={() => setHoverMode(null)}
+                        >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Coffee size={12} color={chillMode ? '#22c55e' : 'var(--text-muted)'} />
-                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: chillMode ? 'var(--text-main)' : 'var(--text-muted)' }}>Chill</span>
+                                <Coffee size={11} color={chillMode ? '#22c55e' : 'var(--text-muted)'} />
+                                <span style={{ fontSize: '0.65rem', fontWeight: 600, color: chillMode ? 'var(--text-main)' : 'var(--text-muted)' }}>Chill</span>
                             </div>
-                            <div style={{ width: '28px', height: '14px', borderRadius: '7px', background: chillMode ? '#22c55e' : 'rgba(255,255,255,0.1)', position: 'relative', transition: 'background 0.2s', border: '1px solid var(--border-color)' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: chillMode ? '17px' : '2px', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
+                            <div style={{ width: '22px', height: '11px', borderRadius: '6px', background: chillMode ? '#22c55e' : 'rgba(255,255,255,0.1)', position: 'relative', transition: 'background 0.2s', border: '1px solid var(--border-color)' }}>
+                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '1px', left: chillMode ? '13px' : '1px', transition: 'left 0.2s' }} />
                             </div>
                         </div>
+
+                        {/* Floating Tooltip for Mode Info */}
+                        {hoverMode && (
+                            <div style={{ 
+                                position: 'absolute', 
+                                left: '105%', 
+                                top: '50%', 
+                                transform: 'translateY(-50%)',
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border-color)',
+                                padding: '4px 8px',
+                                borderRadius: 'var(--radius-sm)',
+                                width: '120px',
+                                fontSize: '0.55rem',
+                                color: 'var(--text-main)',
+                                zIndex: 100,
+                                pointerEvents: 'none',
+                                boxShadow: 'var(--shadow-lg)',
+                                animation: 'tabIn 0.2s ease-out'
+                            }}>
+                                {hoverMode === 'speed' ? 'Down = instant Hard Drop' : '4x slower pieces'}
+                            </div>
+                        )}
                     </div>
 
                     {/* Controls (collapsible) */}

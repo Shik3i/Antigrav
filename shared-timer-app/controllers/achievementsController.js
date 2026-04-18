@@ -51,7 +51,7 @@ exports.getStatus = async (req, res) => {
 
         // 3. Daily bonus status
         const today = new Date().toISOString().split('T')[0];
-        const lastDailyDate = lastDailyClaim ? new Date(lastDailyClaim).toISOString().split('T')[0] : null;
+        const lastDailyDate = lastDailyClaim ? lastDailyClaim.split(' ')[0] : null;
         const dailyAvailable = lastDailyDate !== today;
 
         // 4. Build milestones with chain logic
@@ -121,7 +121,7 @@ exports.claimAchievement = async (req, res) => {
         if (id === 'daily') {
             const lastDailyClaim = await dbLayer.getUserDailyClaim(userId);
             const today = new Date().toISOString().split('T')[0];
-            const lastDailyDate = lastDailyClaim ? new Date(lastDailyClaim).toISOString().split('T')[0] : null;
+            const lastDailyDate = lastDailyClaim ? lastDailyClaim.split(' ')[0] : null;
 
             if (lastDailyDate === today) {
                 return res.status(400).json({ error: 'Daily bonus already claimed today' });
