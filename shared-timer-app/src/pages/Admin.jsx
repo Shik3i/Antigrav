@@ -2686,6 +2686,11 @@ const Admin = ({ socket }) => {
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Category</th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Path</th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Badge</th>
+                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                                            <LucideIcons.Lock size={12} /> Lock
+                                                        </div>
+                                                    </th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Visible</th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Order</th>
                                                 </tr>
@@ -2765,6 +2770,19 @@ const Admin = ({ socket }) => {
                                                                         const newSettings = [...navbarSettings];
                                                                         const idx = newSettings.findIndex(n => n.key === item.key);
                                                                         newSettings[idx].has_daily_badge = e.target.checked ? 1 : 0;
+                                                                        setNavbarSettings(newSettings);
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={!!item.isLocked} 
+                                                                    style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                                                                    onChange={(e) => {
+                                                                        const newSettings = [...navbarSettings];
+                                                                        const idx = newSettings.findIndex(n => n.key === item.key);
+                                                                        newSettings[idx].isLocked = e.target.checked ? 1 : 0;
                                                                         setNavbarSettings(newSettings);
                                                                     }}
                                                                 />

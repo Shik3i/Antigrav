@@ -18,6 +18,9 @@ export const PersistentDataProvider = ({ children, socket }) => {
     const [esportsMatches, setEsportsMatches] = useState([]);
     const [esportsOdds, setEsportsOdds] = useState([]);
     const [generalBets, setGeneralBets] = useState([]);
+    const [navbarSettings, setNavbarSettings] = useState([]);
+    const [navbarLoaded, setNavbarLoaded] = useState(false);
+    const [loadingNavbar, setLoadingNavbar] = useState(false);
     
     // Lotto Data
     const [lottoData, setLottoData] = useState({
@@ -148,6 +151,26 @@ export const PersistentDataProvider = ({ children, socket }) => {
         }
     }, [lottoLoaded, token, isGuest]);
 
+    // Navbar Settings (via REST)
+    const loadNavbarSettings = useCallback(async (force = false) => {
+        if (navbarLoaded && !force) return;
+        setLoadingNavbar(true);
+        try {
+            const res = await axios.get('/api/navbar-settings');
+            setNavbarSettings(Array.isArray(res.data) ? res.data : []);
+            setNavbarLoaded(true);
+        } catch (err) {
+            console.error('[PersistentData] Failed to fetch navbar settings:', err);
+        } finally {
+            setLoadingNavbar(false);
+        }
+    }, [navbarLoaded]);
+
+    // Initial Load
+    useEffect(() => {
+        loadNavbarSettings();
+    }, [loadNavbarSettings]);
+
     // Re-fetch lotto history when user logs in
     useEffect(() => {
         if (lottoLoaded) {
@@ -276,7 +299,13 @@ export const PersistentDataProvider = ({ children, socket }) => {
         lottoLoaded,
         loadingLotto,
         loadLottoData,
-        setLottoData
+        setLottoData,
+        // Navbar
+        navbarSettings,
+        navbarLoaded,
+        loadingNavbar,
+        loadNavbarSettings,
+        setNavbarSettings
     };
 
     return (

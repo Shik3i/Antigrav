@@ -249,6 +249,7 @@ function initializeDatabaseSchema() {
     path TEXT NOT NULL,
     category TEXT DEFAULT 'Other',
     isVisible BOOLEAN DEFAULT 1,
+    isLocked BOOLEAN DEFAULT 0,
     sortOrder INTEGER DEFAULT 0,
     has_daily_badge BOOLEAN DEFAULT 0,
     icon TEXT
@@ -257,6 +258,7 @@ function initializeDatabaseSchema() {
     db.serialize(() => {
       // Safely add missing columns if they don't exist
       db.run("ALTER TABLE NavbarSettings ADD COLUMN has_daily_badge BOOLEAN DEFAULT 0", (err) => {});
+      db.run("ALTER TABLE NavbarSettings ADD COLUMN isLocked BOOLEAN DEFAULT 0", (err) => {});
       db.run("ALTER TABLE NavbarSettings ADD COLUMN icon TEXT", (err) => {
         // Now it's safe to run inserts/updates that use the icon column
         
@@ -4174,13 +4176,14 @@ module.exports = {
 
           // 3. Upsert all provided settings
           const stmt = db.prepare(`
-            INSERT INTO NavbarSettings (key, label, path, category, isVisible, sortOrder, has_daily_badge, icon) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           INSERT INTO NavbarSettings (key, label, path, category, isVisible, isLocked, sortOrder, has_daily_badge, icon) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(key) DO UPDATE SET 
               label = excluded.label,
               path = excluded.path,
               category = excluded.category,
               isVisible = excluded.isVisible,
+              isLocked = excluded.isLocked,
               sortOrder = excluded.sortOrder,
               has_daily_badge = excluded.has_daily_badge,
               icon = excluded.icon
@@ -4193,6 +4196,7 @@ module.exports = {
               item.path, 
               item.category, 
               item.isVisible ? 1 : 0, 
+              item.isLocked ? 1 : 0,
               item.sortOrder || 0, 
               item.has_daily_badge ? 1 : 0,
               item.icon || null
