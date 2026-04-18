@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Trophy, Coins, TrendingUp, ShieldCheck, ArrowUp, ArrowDown, Map } from 'lucide-react';
+import { Trophy, Coins, TrendingUp, ShieldCheck, ArrowUp, ArrowDown, Map, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import UserContextMenu from '../components/UserContextMenu';
+import { useAuth } from '../context/AuthContext';
 
 const formatSprintTime = (ms) => {
     if (!ms || ms === 0) return '--:--.--';
@@ -14,7 +15,10 @@ const formatSprintTime = (ms) => {
 };
 
 const GameLeaderboards = () => {
+    const { user, token } = useAuth();
     const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], blackjack: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [], tower: [] });
+    const [settings, setSettings] = useState({});
+    const [updatingGames, setUpdatingGames] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [koalaSortField, setKoalaSortField] = useState('highscore');
@@ -37,13 +41,14 @@ const GameLeaderboards = () => {
     useEffect(() => {
         const fetchLeaderboards = async () => {
             try {
-                const [lbRes, scratchRes, blackjackRes, riftRes, tetrisRes, towerRes] = await Promise.all([
+                const [lbRes, scratchRes, blackjackRes, riftRes, tetrisRes, towerRes, settingsRes] = await Promise.all([
                     axios.get('/api/games/leaderboard?gameId=koala_flap'),
                     axios.get('/api/scratchcards/stats'),
                     axios.get('/api/blackjack/leaderboard?sortBy=totalWon').catch(() => ({ data: { leaderboard: [] } })),
                     axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } })),
                     axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [], cumulative: [] } })),
-                    axios.get('/api/games/leaderboard?gameId=tower_climb').catch(() => ({ data: { highscores: [], cumulative: [] } }))
+                    axios.get('/api/games/leaderboard?gameId=tower_climb').catch(() => ({ data: { highscores: [], cumulative: [] } })),
+                    axios.get('/api/leaderboards/settings').catch(() => ({ data: [] }))
                 ]);
 
                 const scratchList = (scratchRes.data.leaderboard || []).map(row => ({
@@ -107,6 +112,13 @@ const GameLeaderboards = () => {
                     tetris: Object.values(tetrisMap),
                     tower: Object.values(towerMap)
                 });
+
+                const settingsMap = {};
+                (settingsRes.data || []).forEach(s => {
+                    settingsMap[s.game_id] = s.is_hidden === 1;
+                });
+                setSettings(settingsMap);
+
                 setLoading(false);
             } catch (err) {
                 console.error('Failed to fetch leaderboards:', err);
@@ -127,6 +139,69 @@ const GameLeaderboards = () => {
 
     const sortData = (data, field, dir) =>
         [...data].sort((a, b) => dir === 'desc' ? (b[field] || 0) - (a[field] || 0) : (a[field] || 0) - (b[field] || 0));
+
+    const toggleVisibility = async (gameId) => {
+        if (updatingGames[gameId]) return;
+
+        const currentHidden = settings[gameId] || false;
+        const newHidden = !currentHidden;
+
+        // Start loading state
+        setUpdatingGames(prev => ({ ...prev, [gameId]: true }));
+        // Optimistic UI
+        setSettings(prev => ({ ...prev, [gameId]: newHidden }));
+
+        try {
+            await axios.post('/api/leaderboards/settings', 
+                { game_id: gameId, is_hidden: newHidden },
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+        } catch (err) {
+            console.error('Failed to update leaderboard visibility:', err);
+            // Rollback
+            setSettings(prev => ({ ...prev, [gameId]: currentHidden }));
+        } finally {
+            // End loading state
+            setUpdatingGames(prev => ({ ...prev, [gameId]: false }));
+        }
+    };
+
+    const renderVisibilityControls = (gameId) => {
+        if (!user?.is_superadmin) return null;
+        
+        const isHidden = settings[gameId];
+        const isUpdating = updatingGames[gameId];
+
+        return (
+            <>
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleVisibility(gameId);
+                    }}
+                    className="btn-ghost"
+                    style={{ 
+                        padding: '4px', 
+                        borderRadius: '6px', 
+                        opacity: isUpdating ? 0.7 : 1,
+                        cursor: isUpdating ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                    disabled={isUpdating}
+                    title={isUpdating ? "Wird gespeichert..." : (isHidden ? "Einblenden" : "Ausblenden")}
+                >
+                    {isUpdating ? <Loader2 size={18} className="animate-spin" /> : (isHidden ? <EyeOff size={18} /> : <Eye size={18} />)}
+                </button>
+                {isHidden && (
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                        Versteckt für User
+                    </span>
+                )}
+            </>
+        );
+    };
 
     const SortIcon = ({ field, activeField, activeDir }) => {
         const active = activeField === field;
@@ -249,197 +324,242 @@ const GameLeaderboards = () => {
             </div>
 
             {/* KoalaFlap */}
-            <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <TrendingUp size={18} color="#fff" />
+            {(!settings['koala_flap'] || user?.is_superadmin) && (
+                <section style={{ 
+                    opacity: settings['koala_flap'] ? 0.6 : 1, 
+                    filter: settings['koala_flap'] ? 'grayscale(0.5)' : 'none',
+                    transition: 'opacity 0.3s ease, filter 0.3s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <TrendingUp size={18} color="#fff" />
+                        </div>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>KOALAFLAP</h2>
+                        {renderVisibilityControls('koala_flap')}
                     </div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>KOALAFLAP</h2>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <TrendingUp size={18} color="#3b82f6" />
-                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <TrendingUp size={18} color="#3b82f6" />
+                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                        </div>
+                        {renderTable({
+                            data: sortedKoala,
+                            accentColor: '#3b82f6',
+                            sortField: koalaSortField,
+                            sortDir: koalaSortDir,
+                            onSort: (f) => handleSort(koalaSortField, setKoalaSortField, koalaSortDir, setKoalaSortDir, f),
+                            columns: [
+                                { field: 'highscore', label: 'Streak', width: '90px' },
+                                { field: 'totalEarned', label: 'Total Coins', width: '110px', format: v => v.toLocaleString() }
+                            ]
+                        })}
                     </div>
-                    {renderTable({
-                        data: sortedKoala,
-                        accentColor: '#3b82f6',
-                        sortField: koalaSortField,
-                        sortDir: koalaSortDir,
-                        onSort: (f) => handleSort(koalaSortField, setKoalaSortField, koalaSortDir, setKoalaSortDir, f),
-                        columns: [
-                            { field: 'highscore', label: 'Streak', width: '90px' },
-                            { field: 'totalEarned', label: 'Total Coins', width: '110px', format: v => v.toLocaleString() }
-                        ]
-                    })}
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* Scratch & Win */}
-            <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Trophy size={18} color="#fff" />
+            {(!settings['scratch_cards'] || user?.is_superadmin) && (
+                <section style={{ 
+                    opacity: settings['scratch_cards'] ? 0.6 : 1, 
+                    filter: settings['scratch_cards'] ? 'grayscale(0.5)' : 'none',
+                    transition: 'opacity 0.3s ease, filter 0.3s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trophy size={18} color="#fff" />
+                        </div>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>SCRATCH & WIN</h2>
+                        {renderVisibilityControls('scratch_cards')}
                     </div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>SCRATCH & WIN</h2>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <Coins size={18} color="#f59e0b" />
-                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <Coins size={18} color="#f59e0b" />
+                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                        </div>
+                        {renderTable({
+                            data: sortedScratch,
+                            accentColor: '#f59e0b',
+                            sortField: scratchSortField,
+                            sortDir: scratchSortDir,
+                            onSort: (f) => handleSort(scratchSortField, setScratchSortField, scratchSortDir, setScratchSortDir, f),
+                            columns: [
+                                { field: 'totalEarned', label: 'Gewinn', width: '100px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' },
+                                { field: 'ticketsWon', label: 'Tickets Won', width: '110px', suffix: 'Lose' },
+                                { field: 'totalBought', label: 'Total Bought', width: '115px', suffix: 'Lose' }
+                            ]
+                        })}
                     </div>
-                    {renderTable({
-                        data: sortedScratch,
-                        accentColor: '#f59e0b',
-                        sortField: scratchSortField,
-                        sortDir: scratchSortDir,
-                        onSort: (f) => handleSort(scratchSortField, setScratchSortField, scratchSortDir, setScratchSortDir, f),
-                        columns: [
-                            { field: 'totalEarned', label: 'Gewinn', width: '100px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' },
-                            { field: 'ticketsWon', label: 'Tickets Won', width: '110px', suffix: 'Lose' },
-                            { field: 'totalBought', label: 'Total Bought', width: '115px', suffix: 'Lose' }
-                        ]
-                    })}
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* Blackjack */}
-            <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Trophy size={18} color="#fff" />
+            {(!settings['blackjack'] || user?.is_superadmin) && (
+                <section style={{ 
+                    opacity: settings['blackjack'] ? 0.6 : 1, 
+                    filter: settings['blackjack'] ? 'grayscale(0.5)' : 'none',
+                    transition: 'opacity 0.3s ease, filter 0.3s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trophy size={18} color="#fff" />
+                        </div>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>BLACKJACK</h2>
+                        {renderVisibilityControls('blackjack')}
                     </div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>BLACKJACK</h2>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <Coins size={18} color="#22c55e" />
-                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <Coins size={18} color="#22c55e" />
+                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                        </div>
+                        {renderTable({
+                            data: sortedBlackjack,
+                            accentColor: '#22c55e',
+                            sortField: blackjackSortField,
+                            sortDir: blackjackSortDir,
+                            onSort: (f) => handleSort(blackjackSortField, setBlackjackSortField, blackjackSortDir, setBlackjackSortDir, f),
+                            columns: [
+                                { field: 'totalWon', label: 'Net Profit', width: '110px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' },
+                                { field: 'gamesPlayed', label: 'Games', width: '80px', format: v => v.toLocaleString() },
+                                { field: 'blackjacksHit', label: 'Blackjacks', width: '100px', format: v => v.toLocaleString() },
+                                { field: 'totalWagered', label: 'Gesetzt', width: '110px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
+                            ]
+                        })}
                     </div>
-                    {renderTable({
-                        data: sortedBlackjack,
-                        accentColor: '#22c55e',
-                        sortField: blackjackSortField,
-                        sortDir: blackjackSortDir,
-                        onSort: (f) => handleSort(blackjackSortField, setBlackjackSortField, blackjackSortDir, setBlackjackSortDir, f),
-                        columns: [
-                            { field: 'totalWon', label: 'Net Profit', width: '110px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' },
-                            { field: 'gamesPlayed', label: 'Games', width: '80px', format: v => v.toLocaleString() },
-                            { field: 'blackjacksHit', label: 'Blackjacks', width: '100px', format: v => v.toLocaleString() },
-                            { field: 'totalWagered', label: 'Gesetzt', width: '110px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
-                        ]
-                    })}
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* Rift Defense */}
-            <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Map size={18} color="#fff" />
-                    </div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>LEC RIFT DEFENSE</h2>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '1rem', color: '#10b981' }}>Höchste Welle</span>
+            {(!settings['rift_defense'] || user?.is_superadmin) && (
+                <section style={{ 
+                    opacity: settings['rift_defense'] ? 0.6 : 1, 
+                    filter: settings['rift_defense'] ? 'grayscale(0.5)' : 'none',
+                    transition: 'opacity 0.3s ease, filter 0.3s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Map size={18} color="#fff" />
                         </div>
-                        {renderTable({
-                            data: sortedRiftWave,
-                            accentColor: '#10b981',
-                            sortField: riftWaveSortField,
-                            sortDir: riftWaveSortDir,
-                            onSort: (f) => handleSort(riftWaveSortField, setRiftWaveSortField, riftWaveSortDir, setRiftWaveSortDir, f),
-                            columns: [{ field: 'value', label: 'Welle', width: '80px', format: v => v.toLocaleString() }]
-                        })}
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>LEC RIFT DEFENSE</h2>
+                        {renderVisibilityControls('rift_defense')}
                     </div>
-                    
-                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '1rem', color: '#8b5cf6' }}>Minion Kills</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                        {/* Highest Wave */}
+                        <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#10b981' }}>Höchste Welle</span>
+                            </div>
+                            {renderTable({
+                                data: sortedRiftWave,
+                                accentColor: '#10b981',
+                                sortField: riftWaveSortField,
+                                sortDir: riftWaveSortDir,
+                                onSort: (f) => handleSort(riftWaveSortField, setRiftWaveSortField, riftWaveSortDir, setRiftWaveSortDir, f),
+                                columns: [{ field: 'value', label: 'Welle', width: '80px', format: v => v.toLocaleString() }]
+                            })}
                         </div>
-                        {renderTable({
-                            data: sortedRiftMinions,
-                            accentColor: '#8b5cf6',
-                            sortField: riftMinionsSortField,
-                            sortDir: riftMinionsSortDir,
-                            onSort: (f) => handleSort(riftMinionsSortField, setRiftMinionsSortField, riftMinionsSortDir, setRiftMinionsSortDir, f),
-                            columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
-                        })}
-                    </div>
+                        
+                        {/* Minion Kills */}
+                        <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#8b5cf6' }}>Minion Kills</span>
+                            </div>
+                            {renderTable({
+                                data: sortedRiftMinions,
+                                accentColor: '#8b5cf6',
+                                sortField: riftMinionsSortField,
+                                sortDir: riftMinionsSortDir,
+                                onSort: (f) => handleSort(riftMinionsSortField, setRiftMinionsSortField, riftMinionsSortDir, setRiftMinionsSortDir, f),
+                                columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
+                            })}
+                        </div>
 
-                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '1rem', color: '#ef4444' }}>Boss Kills</span>
+                        {/* Boss Kills */}
+                        <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#ef4444' }}>Boss Kills</span>
+                            </div>
+                            {renderTable({
+                                data: sortedRiftBosses,
+                                accentColor: '#ef4444',
+                                sortField: riftBossesSortField,
+                                sortDir: riftBossesSortDir,
+                                onSort: (f) => handleSort(riftBossesSortField, setRiftBossesSortField, riftBossesSortDir, setRiftBossesSortDir, f),
+                                columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
+                            })}
                         </div>
-                        {renderTable({
-                            data: sortedRiftBosses,
-                            accentColor: '#ef4444',
-                            sortField: riftBossesSortField,
-                            sortDir: riftBossesSortDir,
-                            onSort: (f) => handleSort(riftBossesSortField, setRiftBossesSortField, riftBossesSortDir, setRiftBossesSortDir, f),
-                            columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
-                        })}
                     </div>
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* Tetris */}
-            <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Trophy size={18} color="#fff" />
+            {(!settings['tetris'] || user?.is_superadmin) && (
+                <section style={{ 
+                    opacity: settings['tetris'] ? 0.6 : 1, 
+                    filter: settings['tetris'] ? 'grayscale(0.5)' : 'none',
+                    transition: 'opacity 0.3s ease, filter 0.3s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trophy size={18} color="#fff" />
+                        </div>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TETRIS</h2>
+                        {renderVisibilityControls('tetris')}
                     </div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TETRIS</h2>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <TrendingUp size={18} color="#ec4899" />
-                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <TrendingUp size={18} color="#ec4899" />
+                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                        </div>
+                        {renderTable({
+                            data: sortedTetris,
+                            accentColor: '#ec4899',
+                            sortField: tetrisSortField,
+                            sortDir: tetrisSortDir,
+                            onSort: (f) => handleSort(tetrisSortField, setTetrisSortField, tetrisSortDir, setTetrisSortDir, f),
+                            columns: [
+                                { field: 'highscore', label: 'Highscore', width: '100px', format: v => v.toLocaleString() },
+                                { field: 'sprintHighscore', label: 'Sprint (40L)', width: '120px', format: v => formatSprintTime(v) },
+                                { field: 'maxLevel', label: 'Max Level', width: '90px' },
+                                { field: 'totalLines', label: 'Total Lines (Lifetime)', width: '150px', format: v => v.toLocaleString() }
+                            ]
+                        })}
                     </div>
-                    {renderTable({
-                        data: sortedTetris,
-                        accentColor: '#ec4899',
-                        sortField: tetrisSortField,
-                        sortDir: tetrisSortDir,
-                        onSort: (f) => handleSort(tetrisSortField, setTetrisSortField, tetrisSortDir, setTetrisSortDir, f),
-                        columns: [
-                            { field: 'highscore', label: 'Highscore', width: '100px', format: v => v.toLocaleString() },
-                            { field: 'sprintHighscore', label: 'Sprint (40L)', width: '120px', format: v => formatSprintTime(v) },
-                            { field: 'maxLevel', label: 'Max Level', width: '90px' },
-                            { field: 'totalLines', label: 'Total Lines (Lifetime)', width: '150px', format: v => v.toLocaleString() }
-                        ]
-                    })}
-                </div>
-            </section>
+                </section>
+            )}
 
             {/* Tower Climb */}
-            <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ShieldCheck size={18} color="#fff" />
+            {(!settings['tower_climb'] || user?.is_superadmin) && (
+                <section style={{ 
+                    opacity: settings['tower_climb'] ? 0.6 : 1, 
+                    filter: settings['tower_climb'] ? 'grayscale(0.5)' : 'none',
+                    transition: 'opacity 0.3s ease, filter 0.3s ease'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ShieldCheck size={18} color="#fff" />
+                        </div>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TOWER CLIMB</h2>
+                        {renderVisibilityControls('tower_climb')}
                     </div>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TOWER CLIMB</h2>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <ShieldCheck size={18} color="#8b5cf6" />
-                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                    <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <ShieldCheck size={18} color="#8b5cf6" />
+                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                        </div>
+                        {renderTable({
+                            data: sortedTower,
+                            accentColor: '#8b5cf6',
+                            sortField: towerSortField,
+                            sortDir: towerSortDir,
+                            onSort: (f) => handleSort(towerSortField, setTowerSortField, towerSortDir, setTowerSortDir, f),
+                            columns: [
+                                { field: 'highscore', label: 'Best Level', width: '100px', format: v => v.toLocaleString() },
+                                { field: 'totalEarned', label: 'Total Cashout', width: '120px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
+                            ]
+                        })}
                     </div>
-                    {renderTable({
-                        data: sortedTower,
-                        accentColor: '#8b5cf6',
-                        sortField: towerSortField,
-                        sortDir: towerSortDir,
-                        onSort: (f) => handleSort(towerSortField, setTowerSortField, towerSortDir, setTowerSortDir, f),
-                        columns: [
-                            { field: 'highscore', label: 'Best Level', width: '100px', format: v => v.toLocaleString() },
-                            { field: 'totalEarned', label: 'Total Cashout', width: '120px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
-                        ]
-                    })}
-                </div>
-            </section>
+                </section>
+            )}
 
             <div className="glass-panel" style={{ padding: '20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid rgba(16, 185, 129, 0.2)', background: 'rgba(16, 185, 129, 0.05)' }}>
                 <ShieldCheck size={24} color="#10b981" />

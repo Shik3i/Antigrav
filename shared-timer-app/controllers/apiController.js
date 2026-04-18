@@ -941,6 +941,30 @@ exports.getGameLeaderboards = async (req, res, next) => {
     }
 };
 
+exports.getLeaderboardSettings = async (req, res) => {
+    try {
+        const settings = await dbLayer.getLeaderboardSettings();
+        res.json(settings);
+    } catch (err) {
+        console.error('[Leaderboard Settings] Error fetching:', err);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
+
+exports.updateLeaderboardSettings = async (req, res) => {
+    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { game_id, is_hidden } = req.body;
+        if (!game_id) return res.status(400).json({ error: 'game_id is required' });
+        
+        await dbLayer.updateLeaderboardSetting(game_id, is_hidden);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Leaderboard Settings] Error updating:', err);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
+
 exports.getGameUpgrades = async (req, res) => {
     try {
         const userId = req.user?.id || req.user?.userId;

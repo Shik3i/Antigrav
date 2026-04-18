@@ -1,5 +1,11 @@
 [
   {
+    "id": 65,
+    "version": "2.40.0",
+    "date": "2026-04-19",
+    "changes": "- **Leaderboard-Sichtbarkeit**: Implementierung einer granularen Steuerung für Spiel-Bestenlisten.\n- **Admin-Toggle**: Neue \"Auge\"-Buttons im Header für Superadmins zum schnellen Aus-/Einblenden von Sektionen (Optimistic UI).\n- **UX-Refinement**: Visuelle Hervorhebung versteckter Bereiche für Admins durch Deckkraft- und Graustufen-Effekte; vollständige Ausblendung für normale User.\n- **Backend-Sicherheit**: Strikte Absicherung des Speicher-Endpoints gegen unbefugte Zugriffe via Superadmin-Verifizierung.\n- **Infrastruktur**: Einführung der `LeaderboardSettings` Tabelle zur persistenten Speicherung der Einstellungen."
+  },
+  {
     "id": 64,
     "version": "2.39.0",
     "date": "2026-04-19",
