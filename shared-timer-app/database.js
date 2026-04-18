@@ -57,6 +57,13 @@ function initializeDatabaseSchema() {
   db.run("ALTER TABLE Users ADD COLUMN lastActive DATETIME", () => { });
   db.run("ALTER TABLE Users ADD COLUMN koala_balance INTEGER DEFAULT 0", () => { });
   db.run("ALTER TABLE Users ADD COLUMN last_daily_claim DATETIME", () => { });
+  db.run("ALTER TABLE Users ADD COLUMN lastActive DATETIME", () => { });
+
+  // LeaderboardSettings: visibility toggle for games
+  db.run(`CREATE TABLE IF NOT EXISTS LeaderboardSettings (
+    game_id TEXT PRIMARY KEY,
+    is_hidden BOOLEAN DEFAULT 0
+  )`);
 
   // ServerSettings: stores global app configurations
   db.run(`CREATE TABLE IF NOT EXISTS ServerSettings (
@@ -4931,6 +4938,29 @@ module.exports = {
     return new Promise((resolve, reject) => {
       const query = `DELETE FROM RssArticles_Cache WHERE cachedAt < datetime('now', '-' || ? || ' hours')`;
       db.run(query, [hoursThreshold], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  getLeaderboardSettings: () => {
+    return new Promise((resolve, reject) => {
+      db.all('SELECT * FROM LeaderboardSettings', [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  updateLeaderboardSetting: (gameId, isHidden) => {
+    return new Promise((resolve, reject) => {
+      const query = `
+        INSERT INTO LeaderboardSettings (game_id, is_hidden)
+        VALUES (?, ?)
+        ON CONFLICT(game_id) DO UPDATE SET is_hidden = excluded.is_hidden
+      `;
+      db.run(query, [gameId, isHidden ? 1 : 0], function (err) {
         if (err) reject(err);
         else resolve(this.changes);
       });

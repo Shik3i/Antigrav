@@ -38,6 +38,8 @@ router.get('/esports/bets/recent', authController.optionalAuthenticateToken, api
 router.get('/koala/transactions', authController.authenticateToken, apiController.getKoalaTransactions);
 router.post('/games/koalaflap/submit', authController.authenticateToken, apiController.submitKoalaFlapScore);
 router.get('/games/leaderboard', apiController.getGameLeaderboards);
+router.get('/leaderboards/settings', apiController.getLeaderboardSettings);
+router.post('/leaderboards/settings', authController.authenticateToken, apiController.updateLeaderboardSettings);
 router.get('/games/upgrades', authController.optionalAuthenticateToken, apiController.getGameUpgrades);
 router.post('/games/upgrades/purchase', authController.authenticateToken, apiController.purchaseGameUpgrade);
 router.get('/games/koalaflap/config', authController.optionalAuthenticateToken, apiController.getKoalaFlapConfig);
