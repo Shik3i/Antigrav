@@ -1,5 +1,11 @@
 [
   {
+    "id": 53,
+    "version": "2.35.1",
+    "date": "2026-04-18",
+    "changes": "- **Socket Rollback**: Kritischer Rollback von `useRef` auf `useState` für das globale Socket-Objekt in der `App.jsx`, um aggressives Tab-Throttling durch den Browser im Hintergrund zu verhindern und die Verbindungsstabilität zu gewährleisten."
+  },
+  {
     "id": 52,
     "version": "2.35.0",
     "date": "2026-04-18",

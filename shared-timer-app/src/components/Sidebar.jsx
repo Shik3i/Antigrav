@@ -123,7 +123,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
 
     const handleAction = (e, action) => {
         e.stopPropagation();
-        const socketInstance = (socket && 'current' in socket) ? socket.current : socket;
+        const socketInstance = socket;
         if (roomState?.id && socketInstance?.connected) {
             socketInstance.emit(EVENTS.TIMER_ACTION, { roomId: roomState.id, action });
         }

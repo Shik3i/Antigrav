@@ -75,6 +75,7 @@ exports.buyTicket = async (req, res) => {
     }
 
     // Rollover Logic: Server-authoritative timing.
+    const now = new Date();
     const nowTs = now.getTime();
     const { drawTime, cutoffTime } = getNextDrawTimestamps();
     

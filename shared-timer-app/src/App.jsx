@@ -134,7 +134,7 @@ function InnerApp() {
   const [deferredFeaturesReady, setDeferredFeaturesReady] = useState(false);
 
   // Global Sync Hooks Reference
-  const globalSocket = useRef(null);
+  const [globalSocket, setGlobalSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -173,7 +173,7 @@ function InnerApp() {
   useEffect(() => {
     setHasInstance(false);
     const newSocket = io('/', { transports: ['websocket'], autoConnect: true, auth: { token } });
-    globalSocket.current = newSocket;
+    setGlobalSocket(newSocket);
     setHasInstance(true);
 
     const onConnect = () => setIsConnected(true);
@@ -209,14 +209,14 @@ function InnerApp() {
       newSocket.off(EVENTS.GLOBAL_ANNOUNCEMENT, onAnnouncement);
       newSocket.off(EVENTS.COIN_BALANCE_UPDATE, onCoinUpdate);
       newSocket.disconnect();
-      globalSocket.current = null;
+      setGlobalSocket(null);
       setHasInstance(false);
     };
   }, [token, setUser, showToast]);
 
   // --- Room Join & Synchronization Lifecycle ---
   useEffect(() => {
-    const socket = globalSocket.current;
+    const socket = globalSocket;
     if (!activeRoomId || !user?.id || !socket) {
       if (!activeRoomId) { setRoomState(null); setRoomError(null); setRoomTokens(EMPTY_ROOM_TOKENS); }
       return undefined;
@@ -257,7 +257,7 @@ function InnerApp() {
       socket.off(EVENTS.ROOM_INVITE, setPendingInvite);
       socket.off(EVENTS.INVITE_TOKENS, setRoomTokens);
     };
-  }, [activeRoomId, activeToken, user?.id, isConnected, location.pathname]);
+  }, [activeRoomId, activeToken, user?.id, isConnected, location.pathname, globalSocket]);
 
   // --- Invite UX: 30s Auto-Dismiss ---
   useEffect(() => {
@@ -293,7 +293,7 @@ function InnerApp() {
   }, [user?.preferences?.pokemonTheme?.active, pokemonConfigs]);
 
   useEffect(() => {
-    const socket = globalSocket.current;
+    const socket = globalSocket;
     if (!socket || !isConnected) return undefined;
     const handlePong = ({ clientTime, serverTime }) => {
       const now = Date.now();
@@ -305,7 +305,7 @@ function InnerApp() {
     socket.on(EVENTS.PONG, handlePong);
     const interval = setInterval(() => { if (socket.connected) socket.emit(EVENTS.PING, { clientTime: Date.now() }); }, isVisible ? 5000 : 30000);
     return () => { socket.off(EVENTS.PONG, handlePong); clearInterval(interval); };
-  }, [isConnected, isVisible]);
+  }, [isConnected, isVisible, globalSocket]);
 
   // --- Tab Title Maintenance ---
   useEffect(() => {
@@ -324,11 +324,11 @@ function InnerApp() {
   useEffect(() => { return scheduleDeferred(() => setDeferredFeaturesReady(true), 1200); }, []);
 
   const leaveActiveRoom = useCallback(({ navigateTo = '/' } = {}) => {
-    const s = globalSocket.current;
+    const s = globalSocket;
     if (s?.connected && activeRoomId) s.emit(EVENTS.LEAVE_ROOM);
     setActiveRoomId(null); setActiveToken(null); setRoomState(null); setPendingInvite(null); setIsZenMode(false);
     if (navigateTo) navigate(navigateTo);
-  }, [activeRoomId, navigate]);
+  }, [activeRoomId, navigate, globalSocket]);
 
   const selectedLeagues = useMemo(() => user?.preferences?.esportsLeagues || DEFAULT_LEAGUES, [user?.preferences?.esportsLeagues]);
   const esportsEnabled = deferredFeaturesReady && selectedLeagues.length > 0;
@@ -337,7 +337,7 @@ function InnerApp() {
   // --- THE INITIALIZATION GUARD ---
   if (!hasInstance || (!isConnected && !user?.id)) return <ViewLoader />;
   
-  const activeSocket = globalSocket.current;
+  const activeSocket = globalSocket;
 
   return (
     <>
