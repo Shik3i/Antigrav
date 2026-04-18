@@ -69,6 +69,7 @@ const Tetris = React.lazy(() => import('./pages/Tetris'));
 const PolymarketGeneral = React.lazy(() => import('./pages/PolymarketGeneral'));
 const Wordle = React.lazy(() => import('./pages/Wordle'));
 const TowerClimb = React.lazy(() => import('./pages/TowerClimb'));
+const Blackjack = React.lazy(() => import('./pages/Blackjack'));
 const LottoImitat = React.lazy(() => import('./pages/LottoImitat'));
 const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
@@ -474,6 +475,7 @@ function InnerApp() {
                     <Route path="/polymarket-general" element={<PolymarketGeneral />} />
                     <Route path="/wordle" element={<Wordle user={user} token={token} />} />
                     <Route path="/games/tower-climb" element={<TowerClimb />} />
+                    <Route path="/games/blackjack" element={<Blackjack socket={activeSocket} />} />
                     <Route path="/lotto" element={<LottoImitat />} />
                     <Route path="/news" element={<News socket={activeSocket} />} />
                     <Route path="/c" element={<SharedCountdown />} />
