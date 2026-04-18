@@ -1,5 +1,11 @@
 [
   {
+    "id": 62,
+    "version": "2.38.0",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Multiplayer**: Neues Live-Blackjack mit mehreren Raeumen, Socket-Updates, Dealer-Logik, Settlement und Auto-Stand nach 90 Sekunden umgesetzt.\n- **Blackjack Tisch-UX**: Tischlayout, Kartenanimationen, Auto-Bet, Gewinner-Markierung und spielerrelative Sitzpositionen fuer ein klareres Casino-Gefuehl verbessert.\n- **Leaderboards**: Blackjack-Rangliste in die zentrale `GameLeaderboards`-Seite uebernommen und die dedizierte Ranglistenansicht vereinheitlicht.\n- **Live Testing**: Restart-Workflow, Raumtests und Multiplayer-Bot fuer lokale Verifikation des Blackjack-Flows integriert."
+  },
+  {
     "id": 61,
     "version": "2.37.0",
     "date": "2026-04-18",

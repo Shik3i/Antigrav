@@ -9,6 +9,7 @@ const colorSyncController = require('../controllers/colorSyncController');
 const polymarketController = require('../controllers/polymarketController');
 const wordleController = require('../controllers/wordleController');
 const towerController = require('../controllers/towerController');
+const blackjackController = require('../controllers/blackjackController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -185,6 +186,14 @@ router.get('/tower/history', authController.authenticateToken, towerController.g
 router.post('/tower/start', authController.authenticateToken, towerController.startRound);
 router.post('/tower/pick', authController.authenticateToken, towerController.pickTile);
 router.post('/tower/cashout', authController.authenticateToken, towerController.cashoutRound);
+
+// ─── Blackjack ──────────────────────────────────────────────
+router.get('/blackjack/config', blackjackController.getConfig);
+router.get('/blackjack/rooms', blackjackController.getRooms);
+router.get('/blackjack/state', authController.authenticateToken, blackjackController.getState);
+router.get('/blackjack/leaderboard', authController.optionalAuthenticateToken, blackjackController.getLeaderboard);
+router.post('/blackjack/table/join', authController.authenticateToken, blackjackController.joinTable);
+router.post('/blackjack/table/leave', authController.authenticateToken, blackjackController.leaveTable);
 
 // ─── Polymarket General ───────────────────────────────────
 router.get('/polymarket/settings', polymarketController.getSettings);

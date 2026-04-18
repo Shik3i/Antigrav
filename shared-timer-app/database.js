@@ -370,6 +370,21 @@ function initializeDatabaseSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_tower_rounds_user_status ON TowerClimbRounds(userId, status)');
   db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_tower_rounds_user_running ON TowerClimbRounds(userId) WHERE status = 'running'");
 
+  db.run(`CREATE TABLE IF NOT EXISTS BlackjackStats (
+    userId TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    gamesPlayed INTEGER NOT NULL DEFAULT 0,
+    blackjacksHit INTEGER NOT NULL DEFAULT 0,
+    totalWagered INTEGER NOT NULL DEFAULT 0,
+    totalWon INTEGER NOT NULL DEFAULT 0,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_blackjack_stats_totalWon ON BlackjackStats(totalWon DESC)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_blackjack_stats_gamesPlayed ON BlackjackStats(gamesPlayed DESC)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_blackjack_stats_blackjacksHit ON BlackjackStats(blackjacksHit DESC)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_blackjack_stats_totalWagered ON BlackjackStats(totalWagered DESC)');
+
   // PolymarketGeneralBets: for user-submitted custom bets
   db.run(`CREATE TABLE IF NOT EXISTS PolymarketGeneralBets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -777,6 +792,10 @@ function initializeDatabaseSchema() {
     // Lotto Imitat Link
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder)
             VALUES ('lotto', 'Lotto Imitat', '/lotto', 'Games', 1, 10)`);
+
+    // Blackjack Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder)
+            VALUES ('blackjack', 'Blackjack', '/games/blackjack', 'Games', 1, 11)`);
 
 
     // ─── Leveling Milestones Table ───────────────────────────────
@@ -2815,6 +2834,200 @@ const getGlobalGameStats = (gameId) => {
   });
 };
 
+const getBlackjackLeaderboard = (sortBy = 'totalWon', limit = 50) => {
+  return new Promise((resolve, reject) => {
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+    const allowedSorts = {
+      totalWon: 'bs.totalWon DESC, bs.gamesPlayed DESC',
+      gamesPlayed: 'bs.gamesPlayed DESC, bs.totalWon DESC',
+      blackjacksHit: 'bs.blackjacksHit DESC, bs.totalWon DESC',
+      totalWagered: 'bs.totalWagered DESC, bs.totalWon DESC'
+    };
+    const orderBy = allowedSorts[sortBy] || allowedSorts.totalWon;
+
+    db.all(
+      `SELECT
+         bs.userId,
+         bs.username,
+         COALESCE(u.displayName, bs.username) AS displayName,
+         u.preferences,
+         bs.gamesPlayed,
+         bs.blackjacksHit,
+         bs.totalWagered,
+         bs.totalWon,
+         bs.updatedAt
+       FROM BlackjackStats bs
+       LEFT JOIN Users u ON u.id = bs.userId
+       ORDER BY ${orderBy}
+       LIMIT ?`,
+      [safeLimit],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      }
+    );
+  });
+};
+
+const upsertBlackjackStats = (userId, username, statDelta = {}) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO BlackjackStats (
+         userId, username, gamesPlayed, blackjacksHit, totalWagered, totalWon, updatedAt
+       ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(userId) DO UPDATE SET
+         username = excluded.username,
+         gamesPlayed = gamesPlayed + excluded.gamesPlayed,
+         blackjacksHit = blackjacksHit + excluded.blackjacksHit,
+         totalWagered = totalWagered + excluded.totalWagered,
+         totalWon = totalWon + excluded.totalWon,
+         updatedAt = CURRENT_TIMESTAMP`,
+      [
+        userId,
+        username,
+        Number(statDelta.gamesPlayed || 0),
+        Number(statDelta.blackjacksHit || 0),
+        Number(statDelta.totalWagered || 0),
+        Number(statDelta.totalWon || 0)
+      ],
+      function upsertBlackjackStatsCallback(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      }
+    );
+  });
+};
+
+const applyBlackjackSettlement = (results = []) => {
+  return new Promise((resolve, reject) => {
+    const participants = (results || []).filter((entry) => entry?.userId);
+    if (participants.length === 0) {
+      resolve([]);
+      return;
+    }
+
+    db.serialize(() => {
+      db.run('BEGIN IMMEDIATE TRANSACTION');
+
+      let index = 0;
+      const updatedBalances = [];
+
+      const rollback = (err) => {
+        db.run('ROLLBACK', () => reject(err));
+      };
+
+      const commit = () => {
+        db.run('COMMIT', (commitErr) => {
+          if (commitErr) {
+            reject(commitErr);
+            return;
+          }
+          resolve(updatedBalances);
+        });
+      };
+
+      const processNext = () => {
+        if (index >= participants.length) {
+          commit();
+          return;
+        }
+
+        const entry = participants[index];
+        index += 1;
+
+        db.get(
+          'SELECT CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id = ?',
+          [entry.userId],
+          (userErr, userRow) => {
+            if (userErr) {
+              rollback(userErr);
+              return;
+            }
+
+            if (!userRow) {
+              rollback(new Error(`Blackjack settlement user not found: ${entry.userId}`));
+              return;
+            }
+
+            const netProfit = Number(entry.netProfit || 0);
+            const currentBalance = Number(userRow.koala_balance || 0);
+            const nextBalance = currentBalance + netProfit;
+            const txReason = `Blackjack ${entry.result} (${(Number(entry.bet || 0) / 100).toFixed(2)} KC bet)`;
+
+            db.run(
+              'UPDATE Users SET koala_balance = ? WHERE id = ?',
+              [nextBalance, entry.userId],
+              (updateErr) => {
+                if (updateErr) {
+                  rollback(updateErr);
+                  return;
+                }
+
+                const writeTransaction = () => {
+                  if (netProfit === 0) {
+                    return writeStats();
+                  }
+
+                  db.run(
+                    'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+                    [entry.userId, netProfit, txReason],
+                    (txErr) => {
+                      if (txErr) {
+                        rollback(txErr);
+                        return;
+                      }
+                      writeStats();
+                    }
+                  );
+                };
+
+                const writeStats = () => {
+                  db.run(
+                    `INSERT INTO BlackjackStats (
+                       userId, username, gamesPlayed, blackjacksHit, totalWagered, totalWon, updatedAt
+                     ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     ON CONFLICT(userId) DO UPDATE SET
+                       username = excluded.username,
+                       gamesPlayed = gamesPlayed + excluded.gamesPlayed,
+                       blackjacksHit = blackjacksHit + excluded.blackjacksHit,
+                       totalWagered = totalWagered + excluded.totalWagered,
+                       totalWon = totalWon + excluded.totalWon,
+                       updatedAt = CURRENT_TIMESTAMP`,
+                    [
+                      entry.userId,
+                      entry.displayName || entry.username || 'Unknown',
+                      1,
+                      entry.blackjack ? 1 : 0,
+                      Number(entry.bet || 0),
+                      netProfit
+                    ],
+                    (statsErr) => {
+                      if (statsErr) {
+                        rollback(statsErr);
+                        return;
+                      }
+
+                      updatedBalances.push({
+                        userId: entry.userId,
+                        balance: nextBalance
+                      });
+                      processNext();
+                    }
+                  );
+                };
+
+                writeTransaction();
+              }
+            );
+          }
+        );
+      };
+
+      processNext();
+    });
+  });
+};
+
 const addPolymarketGeneralBet = (userId, title, slug, url, outcomes) => {
   return new Promise((resolve, reject) => {
     db.run(
@@ -3948,6 +4161,9 @@ module.exports = {
   getBettingAccuracyLeaderboard,
   recordGameScore,
   getGameLeaderboards,
+  getBlackjackLeaderboard,
+  upsertBlackjackStats,
+  applyBlackjackSettlement,
   getActiveTowerRound,
   getLatestTowerRound,
   getTowerHistory,
