@@ -25,6 +25,8 @@ const TowerClimb = () => {
   const [activeRound, setActiveRound] = useState(null);
   const [latestRound, setLatestRound] = useState(null);
   const [history, setHistory] = useState([]);
+  const [isShaking, setIsShaking] = useState(false);
+  const [visualEffects, setVisualEffects] = useState([]); // { id, type, tileIndex, levelIndex }
   const [bet, setBet] = useState(() => {
     const saved = localStorage.getItem('tower_climb_bet');
     return saved ? parseInt(saved, 10) : 500;
@@ -62,10 +64,15 @@ const TowerClimb = () => {
   const loadConfig = useCallback(async () => {
     const configData = await fetchJson('/api/tower/config', { token: '' });
     setConfig(configData);
-    setTilesPerLevel((prev) => configData.allowedTilesPerLevel?.includes(prev)
-      ? prev
-      : (configData.allowedTilesPerLevel?.[1] || configData.allowedTilesPerLevel?.[0] || 3));
-    setBet((prev) => Math.max(configData.minBet || 100, prev));
+    setTilesPerLevel((prev) => {
+      if (configData.allowedTilesPerLevel?.includes(prev)) return prev;
+      return configData.allowedTilesPerLevel?.[1] || configData.allowedTilesPerLevel?.[0] || 3;
+    });
+    setBet((prev) => {
+      const min = configData.minBet || 100;
+      const max = configData.maxBet || 1000000;
+      return Math.min(max, Math.max(min, prev));
+    });
     return configData;
   }, []);
 
@@ -83,7 +90,8 @@ const TowerClimb = () => {
     ]);
 
     setActiveRound(stateData.activeRound || null);
-    setLatestRound(stateData.activeRound ? null : (stateData.latestRound || null));
+    // Only update latestRound if we don't already have one set locally (e.g. from a recent loss)
+    setLatestRound(prev => stateData.activeRound ? null : (stateData.latestRound || prev || null));
     setHistory(historyData.history || []);
   }, [isGuest]);
 
@@ -119,10 +127,8 @@ const TowerClimb = () => {
     if (!config) return null;
     if (activeRound) return activeRound;
     
-    // Fallback to the latest completed round if it matches the current configuration
-    if (latestRound && 
-        latestRound.tilesPerLevel === tilesPerLevel && 
-        ['lost', 'cashed_out'].includes(latestRound.status)) {
+    // Show the latest completed round if available
+    if (latestRound && ['lost', 'cashed_out'].includes(latestRound.status)) {
       return latestRound;
     }
 
@@ -210,9 +216,21 @@ const TowerClimb = () => {
 
       if (result.round.status === 'running') {
         setActiveRound(result.round);
+        // Subtle aura for success
+        const effectId = Date.now();
+        setVisualEffects(prev => [...prev, { id: effectId, type: 'safe', tileIndex, levelIndex: activeRound.currentLevel }]);
+        setTimeout(() => setVisualEffects(prev => prev.filter(e => e.id !== effectId)), 800);
       } else {
         setActiveRound(null);
         setLatestRound(result.round);
+        if (result.round.status === 'lost') {
+          // Subtle shake and shards for loss
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 400);
+          const effectId = Date.now();
+          setVisualEffects(prev => [...prev, { id: effectId, type: 'trap', tileIndex, levelIndex: activeRound.currentLevel }]);
+          setTimeout(() => setVisualEffects(prev => prev.filter(e => e.id !== effectId)), 1000);
+        }
         await refreshHistory();
       }
 
@@ -259,6 +277,45 @@ const TowerClimb = () => {
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '64px' }}>
+      <style>
+        {`
+          @keyframes subtle-shake {
+            0% { transform: translate(1px, 1px); }
+            20% { transform: translate(-1px, -2px); }
+            40% { transform: translate(-2px, 0px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(-1px, -1px); }
+            100% { transform: translate(0px, 0px); }
+          }
+          .subtle-shake {
+            animation: subtle-shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+          }
+          @keyframes safe-aura {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+          }
+          .tile-safe-aura {
+            animation: safe-aura 0.7s ease-out both;
+          }
+          @keyframes trap-shards {
+            0% { opacity: 0; transform: scale(1); }
+            20% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0; transform: scale(1.4) translateY(10px); }
+          }
+          .tile-trap-shards {
+            animation: trap-shards 0.8s ease-out both !important;
+          }
+          @keyframes row-spotlight {
+            0%, 100% { border-color: rgba(59, 130, 246, 0.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.05); }
+            50% { border-color: rgba(59, 130, 246, 0.5); box-shadow: 0 0 25px rgba(59, 130, 246, 0.15); }
+          }
+          .active-row-spotlight {
+            animation: row-spotlight 3s infinite ease-in-out;
+            background: rgba(59, 130, 246, 0.12) !important;
+          }
+        `}
+      </style>
       {/* Header Panel */}
       <div className="glass-panel" style={{ padding: '32px', borderRadius: '28px', display: 'flex', flexDirection: 'column', gap: '18px', background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(59,130,246,0.05) 100%)', border: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -269,7 +326,7 @@ const TowerClimb = () => {
             <div>
               <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 900, letterSpacing: '-0.02em', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Tower Climb</h1>
               <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: '800px' }}>
-                Steige den Turm hinauf und vervielfache deinen Einsatz. Aber Vorsicht: Jede Ebene birgt Gefahren!
+                Steige den Turm hinauf und vervielfache deinen Einsatz. Jede Ebene enthält genau <b>EINE</b> gefährliche Falle – wähle weise!
               </p>
             </div>
           </div>
@@ -326,7 +383,7 @@ const TowerClimb = () => {
         {/* Main Game Area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          <div className="glass-panel" style={{ padding: '0', borderRadius: '32px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className={`glass-panel ${isShaking ? 'subtle-shake' : ''}`} style={{ padding: '0', borderRadius: '32px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ padding: '24px 32px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>Tower Board</h2>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -372,6 +429,7 @@ const TowerClimb = () => {
                   return (
                     <div
                       key={levelIndex}
+                      className={isCurrentLevel ? 'active-row-spotlight' : ''}
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '120px minmax(0, 1fr)',
@@ -379,7 +437,7 @@ const TowerClimb = () => {
                         alignItems: 'stretch',
                         padding: '16px',
                         borderRadius: '24px',
-                        background: isCurrentLevel ? 'rgba(59,130,246,0.08)' : (isFinalLevel ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)'),
+                        background: isCurrentLevel ? 'rgba(59,130,246,0.1)' : (isFinalLevel ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)'),
                         border: isCurrentLevel ? '2px solid rgba(59,130,246,0.3)' : (isFinalLevel ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.05)'),
                         boxShadow: isCurrentLevel ? '0 0 30px rgba(59,130,246,0.1)' : (isFinalLevel ? '0 0 20px rgba(245,158,11,0.1)' : 'none'),
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -405,6 +463,9 @@ const TowerClimb = () => {
 
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${previewRound?.tilesPerLevel || tilesPerLevel}, minmax(0, 1fr))`, gap: '14px' }}>
                         {Array.from({ length: previewRound?.tilesPerLevel || tilesPerLevel }, (_, tileIndex) => {
+                          const activeEffect = visualEffects.find(e => e.levelIndex === levelIndex && e.tileIndex === tileIndex);
+                          const effectClass = activeEffect ? (activeEffect.type === 'safe' ? 'tile-safe-aura' : 'tile-trap-shards') : '';
+                          
                           let background = 'rgba(255,255,255,0.035)';
                           let border = '1px solid rgba(255,255,255,0.08)';
                           let color = 'var(--text-main)';
@@ -448,7 +509,7 @@ const TowerClimb = () => {
                             color = '#bfdbfe';
                           }
 
-                          const isRevealing = revealingTile?.level === levelIndex && revealingTile?.index === tileIndex;
+                          const isRevealing = !!activeRound && revealingTile?.level === levelIndex && revealingTile?.index === tileIndex;
                           const isClickable = isCurrentLevel && !resolvedSelection && !actionBusy;
 
                           let animClass = '';
@@ -462,7 +523,7 @@ const TowerClimb = () => {
                               key={tileIndex}
                               onClick={() => isClickable && handlePick(tileIndex)}
                               disabled={!isClickable || isRevealing}
-                              className={`tower-tile ${isClickable ? 'clickable' : ''} ${animClass}`}
+                              className={`tower-tile ${isClickable ? 'clickable' : ''} ${animClass} ${effectClass}`}
                               style={{
                                 minHeight: '80px',
                                 borderRadius: '20px',

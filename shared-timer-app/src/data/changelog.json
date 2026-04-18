@@ -1,7 +1,13 @@
 [
   {
+    "id": 46,
+    "version": "2.29.0",
+    "date": "2026-04-18",
+    "changes": "- **Tower Climb Persistence**: Automatisches Speichern und Wiederherstellen von Einsatz- und Tile-Einstellungen.\n- **Visuelles Feedback**: Implementierung von subtilem Screen-Shake, Glas-Partikeln und Erfolgs-Auren im Tower Climb.\n- **UX Optimierung**: Der Pfad bleibt nach einem Verlust sichtbar und der Header erklärt nun die Spielmechanik präzise.\n- **Performance & Stabilität**: Optimierte State-Transitions zur Vermeidung von Layout-Flickern auf der Tower-Seite."
+  },
+  {
     "id": 45,
-    "version": "2.28.1",
+    "version": "2.29.0",
     "date": "2026-04-18",
     "changes": "- **Mixed Content Fix**: Alle LoL Esports Teamlogos werden nun systemweit via HTTPS erzwungen.\n- **Backend Sanitization**: Proaktive Konvertierung von Bild-URLs direkt beim Abruf von der LoL Esports API.\n- **Frontend Fallback**: Implementierung von HTTPS-Fallbacks in den Rubbellos-, Esports- und Wett-Dashboard Komponenten zur Behebung von Browser-Sicherheitswarnungen."
   },
