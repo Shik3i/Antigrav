@@ -59,6 +59,20 @@ import '../index.css';
         return [...lottoData.config.winClasses].sort((a, b) => a.class - b.class);
     }, [lottoData.config?.winClasses]);
 
+    const calculateTierRTP = (wc) => {
+        if (!wc.probability || !wc.probability.includes(':')) return 0;
+        // Parse probability (handle dots as thousand separators like 1:1.032)
+        const denominator = parseInt(wc.probability.split(':')[1].replace(/\./g, ''), 10);
+        if (!denominator) return 0;
+        // Ticket price is usually 100 cents. EV contribution = (1/prob) * payout
+        // Since we want RTP in %, and price is 100, (payout / denominator) is already the %
+        return (wc.payoutCents / denominator);
+    };
+
+    const totalRTP = useMemo(() => {
+        return sortedWinClasses.reduce((sum, wc) => sum + calculateTierRTP(wc), 0);
+    }, [sortedWinClasses]);
+
     const activeWinClasses = useMemo(() => {
         const classes = new Set();
         lottoData.userHistory.forEach(group => {
@@ -900,7 +914,8 @@ import '../index.css';
                                         <th>Klasse</th>
                                         <th>Treffer</th>
                                         <th>Chance</th>
-                                        <th>Gewinn</th>
+                                        <th style={{ textAlign: 'right' }}>RTP (EV)</th>
+                                        <th style={{ textAlign: 'right' }}>Gewinn</th>
                                         <th style={{ textAlign: 'right' }}>Letzte Ziehung</th>
                                     </tr>
                                 </thead>
@@ -935,6 +950,9 @@ import '../index.css';
                                                     </div>
                                                 </td>
                                                 <td style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: isHighlighted ? '#10b981' : 'inherit' }}>{wc.probability}</td>
+                                                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '0.85rem', color: isHighlighted ? '#10b981' : 'var(--text-muted)' }}>
+                                                    {calculateTierRTP(wc).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                                                </td>
                                                 <td style={{ 
                                                     textAlign: 'right', 
                                                     fontWeight: 800, 
@@ -969,6 +987,17 @@ import '../index.css';
                                         );
                                     })}
                                 </tbody>
+                                <tfoot>
+                                    <tr style={{ background: 'rgba(99, 102, 241, 0.05)', borderTop: '2px solid var(--border-color)' }}>
+                                        <td colSpan={3} style={{ fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', fontSize: '0.75rem' }}>Theoretischer Return to Player (Gesamt)</td>
+                                        <td style={{ textAlign: 'right', fontWeight: 900, color: totalRTP >= 100 ? '#10b981' : 'var(--accent-primary)', fontSize: '1.05rem' }}>
+                                            {totalRTP.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                                        </td>
+                                        <td colSpan={2} style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                            Basierend auf mathematischer Wahrscheinlichkeit
+                                        </td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
