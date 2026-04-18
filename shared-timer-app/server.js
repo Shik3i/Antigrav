@@ -59,6 +59,7 @@ const apiController = require('./controllers/apiController');
 const setupSocketHandlers = require('./sockets/socketHandler');
 const { startCron } = require('./cron/betResolver');
 const { startLottoCron } = require('./cron/lottoDrawCron');
+const { startRssCron } = require('./cron/rssCron');
 
 const app = express();
 app.disable('x-powered-by');
@@ -170,4 +171,5 @@ server.listen(PORT, () => {
     apiController.initializeEsportsDb();
     startCron();
     startLottoCron(io);
+    startRssCron();
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Database, Plus, Trash2, Save, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2, TrendingUp, LayoutDashboard, ChevronUp, ChevronDown } from 'lucide-react';
+import { Database, Plus, Trash2, Save, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2, TrendingUp, LayoutDashboard, ChevronUp, ChevronDown, Rss } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EVENTS from '../../socketEvents.json';
@@ -54,6 +55,11 @@ const Admin = ({ socket }) => {
     const [systemLogs, setSystemLogs] = useState([]); // [NEW]
     const [pokemonConfigs, setPokemonConfigs] = useState({ settings: { contrast_threshold: '0.6' }, colors: {} });
     const [polymarketSettings, setPolymarketSettings] = useState({ allowUsersToAdd: false });
+    const [rssFeeds, setRssFeeds] = useState([]);
+    const [rssArticles, setRssArticles] = useState([]);
+    const [rssStats, setRssStats] = useState([]);
+    const [refreshingRss, setRefreshingRss] = useState(false);
+    const [newNavbarItem, setNewNavbarItem] = useState({ key: '', label: '', path: '', category: 'Tools', icon: '' });
 
     const handleFetchNavbarSettings = async () => {
     
@@ -225,6 +231,125 @@ const Admin = ({ socket }) => {
                 data: err.response?.data,
                 message: err.message
             });
+        }
+    };
+
+    const handleFetchRssFeeds = async () => {
+        try {
+            const res = await axios.get('/api/admin/rss/feeds', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setRssFeeds(Array.isArray(res.data) ? res.data : []);
+            
+            // Trigger fetch for stats and articles as well
+            handleFetchRssStats();
+            handleFetchRssArticles();
+        } catch (err) {
+            console.error('[Admin RSS] Fetch failed:', err);
+        }
+    };
+
+    const handleFetchRssStats = async () => {
+        try {
+            const res = await axios.get('/api/admin/rss/stats', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setRssStats(res.data);
+        } catch (err) {
+            console.error('[Admin RSS] Failed to fetch stats:', err);
+        }
+    };
+
+    const handleFetchRssArticles = async () => {
+        try {
+            const res = await axios.get('/api/admin/rss/articles?limit=50', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setRssArticles(res.data);
+        } catch (err) {
+            console.error('[Admin RSS] Failed to fetch articles:', err);
+        }
+    };
+
+    const handleDeleteRssArticle = async (id) => {
+        try {
+            await axios.delete(`/api/admin/rss/articles/${id}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            handleFetchRssArticles();
+            handleFetchRssStats();
+        } catch (err) {
+            addLog('Error', 'Failed to delete article.', 'error');
+        }
+    };
+
+    const handlePurgeRssCache = async (hours = 0) => {
+        const msg = hours > 0 ? `Wirklich alle Artikel löschen, die älter als ${hours} Stunden sind?` : "Wirklich den gesamten RSS-Artikel-Cache leeren?";
+        if (!window.confirm(msg)) return;
+        
+        try {
+            await axios.post('/api/admin/rss/purge', { hours }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'RSS Cache gepurged.', 'success');
+            handleFetchRssArticles();
+            handleFetchRssStats();
+        } catch (err) {
+            addLog('Error', 'Purge failed.', 'error');
+        }
+    };
+
+    const handleManualRssRefresh = async () => {
+        setRefreshingRss(true);
+        try {
+            const res = await axios.post('/api/admin/rss/refresh', {}, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            const { stats } = res.data;
+            addLog('Success', `RSS Refresh abgeschlossen: ${stats.success} erfolgreich, ${stats.failed} fehlgeschlagen.`, 'success');
+            handleFetchRssArticles();
+            handleFetchRssStats();
+        } catch (err) {
+            addLog('Error', 'Manual refresh failed.', 'error');
+        } finally {
+            setRefreshingRss(false);
+        }
+    };
+
+    const handleAddRssFeed = async (name, url, icon) => {
+        try {
+            await axios.post('/api/admin/rss/feeds', { name, url, icon }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', `RSS Feed "${name}" hinzugefügt.`, 'success');
+            handleFetchRssFeeds();
+        } catch (err) {
+            addLog('Error', 'Fehler beim Hinzufügen des Feeds.', 'error');
+        }
+    };
+
+    const handleUpdateRssFeed = async (id, name, url, icon) => {
+        try {
+            await axios.put(`/api/admin/rss/feeds/${id}`, { name, url, icon }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', `RSS Feed updated.`, 'success');
+            handleFetchRssFeeds();
+        } catch (err) {
+            addLog('Error', 'Fehler beim Updaten des Feeds.', 'error');
+        }
+    };
+
+    const handleDeleteRssFeed = async (id) => {
+        if (!window.confirm("Feed wirklich löschen?")) return;
+        try {
+            await axios.delete(`/api/admin/rss/feeds/${id}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'RSS Feed gelöscht.', 'success');
+            handleFetchRssFeeds();
+        } catch (err) {
+            addLog('Error', 'Fehler beim Löschen des Feeds.', 'error');
         }
     };
 
@@ -521,6 +646,9 @@ const Admin = ({ socket }) => {
         }
         if (activeTab === 'mappings') {
             handleFetchPolymarketSettings();
+        }
+        if (activeTab === 'rss') {
+            handleFetchRssFeeds();
         }
     }, [activeTab]);
 
@@ -976,6 +1104,8 @@ const Admin = ({ socket }) => {
         }
     };
 
+
+
     const handleDeleteGameScore = async (id) => {
         if (!window.confirm("Are you sure you want to delete this highscore entry?")) return;
         try {
@@ -1151,6 +1281,12 @@ const Admin = ({ socket }) => {
                     onClick={() => setActiveTab('pokemon')}
                     style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <Dices size={16} /> Pokémon Config
+                </button>
+                <button
+                    className={activeTab === 'rss' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => { setActiveTab('rss'); handleFetchRssFeeds(); }}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <LucideIcons.Rss size={16} /> RSS Feeds
                 </button>
             </div>
 
@@ -1396,7 +1532,124 @@ const Admin = ({ socket }) => {
                         <button className="btn-secondary" onClick={() => handleFlushCache('polymarket')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Polymarket (General) Cache leeren</button>
                     </div>
 
+
+
                     <button className="btn-primary" onClick={() => handleFlushCache('all')} style={{ gridColumn: '1 / -1', background: 'rgba(239,68,68,0.2)', color: '#ef4444', borderColor: '#ef4444' }}>Purge All Server Caches</button>
+                </div>
+            )}
+
+            {/* TAB: RSS FEEDS MANAGEMENT */}
+            {activeTab === 'rss' && (
+                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                        <div>
+                            <h3 style={{ margin: 0 }}>RSS Feed Quellen</h3>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>Verwalte die globalen News-Quellen für alle User.</p>
+                        </div>
+                        <button className="btn-primary" onClick={() => {
+                            const name = prompt("Name des Feeds (z.B. BBC News):");
+                            const url = prompt("RSS URL:");
+                            const icon = prompt("Icon URL (optional):");
+                            if (name && url) handleAddRssFeed(name, url, icon);
+                        }}>
+                           <Plus size={18} /> Feed hinzufügen
+                        </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '48px' }}>
+                        {!Array.isArray(rssFeeds) || rssFeeds.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Keine RSS-Feeds konfiguriert oder Fehler beim Laden.</div>
+                        ) : (
+                            rssFeeds.map(feed => (
+                                <div key={feed?.id || Math.random()} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                        <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                            {feed?.icon ? <img src={feed.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <LucideIcons.Rss size={24} color="var(--text-muted)" />}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{feed?.name || 'Unbenannter Feed'} {feed?.is_default ? <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>DEFAULT</span> : null}</div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '4px' }}>{feed?.url || 'Keine URL'}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '4px' }}>
+                                                {rssStats.find(s => s.id === feed.id)?.articleCount || 0} Artikel im Cache
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button className="btn-secondary" style={{ padding: '8px 16px' }} onClick={() => {
+                                            const name = prompt("Name:", feed?.name || '');
+                                            const url = prompt("URL:", feed?.url || '');
+                                            const icon = prompt("Icon URL:", feed?.icon || '');
+                                            if (name && url) handleUpdateRssFeed(feed?.id, name, url, icon);
+                                        }}>Edit</button>
+                                        {!feed?.is_default && (
+                                            <button className="btn-ghost" style={{ padding: '8px 16px', color: '#ef4444' }} onClick={() => handleDeleteRssFeed(feed?.id)}>
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* NEW SECTION: RSS ARTICLE DATABASE */}
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '48px', marginTop: '48px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h3 style={{ margin: 0 }}>News Artikel-Datenbank</h3>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
+                                    Hier werden alle geladenen Artikel persistiert. Automatischer Cleanup erfolgt alle 7 Tage.
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button className="btn-secondary" onClick={handleManualRssRefresh} disabled={refreshingRss}>
+                                    <LucideIcons.RefreshCw className={refreshingRss ? "spinning" : ""} size={16} style={{ marginRight: '8px' }} />
+                                    {refreshingRss ? "Aktualisiere..." : "Vollständiger Feed-Refresh"}
+                                </button>
+                                <button className="btn-ghost" style={{ color: '#ef4444', border: '1px solid #ef444420' }} onClick={handlePurgeRssCache}>
+                                    Alles leeren (Purge)
+                                </button>
+                                <button className="btn-ghost" style={{ color: '#f59e0b', border: '1px solid #f59e0b20' }} onClick={() => handlePurgeRssCache(24)}>
+                                    Alles &gt; 24h löschen
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.1)', borderRadius: '12px', padding: '4px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                        <th style={{ padding: '16px', color: 'var(--text-muted)' }}>Quelle</th>
+                                        <th style={{ padding: '16px', color: 'var(--text-muted)' }}>Titel</th>
+                                        <th style={{ padding: '16px', color: 'var(--text-muted)' }}>Cached am</th>
+                                        <th style={{ padding: '16px', textAlign: 'right', color: 'var(--text-muted)' }}>Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rssArticles.length === 0 ? (
+                                        <tr><td colSpan="4" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>Keine Artikel in der Datenbank.</td></tr>
+                                    ) : (
+                                        rssArticles.map(art => (
+                                            <tr key={art.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>{art.feedName}</span>
+                                                </td>
+                                                <td style={{ padding: '16px', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <a href={art.link} target="_blank" rel="noreferrer" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>{art.title}</a>
+                                                </td>
+                                                <td style={{ padding: '16px', color: 'var(--text-muted)' }}>{new Date(art.cachedAt).toLocaleString()}</td>
+                                                <td style={{ padding: '16px', textAlign: 'right' }}>
+                                                    <button className="btn-ghost" style={{ color: '#ef4444', padding: '4px' }} onClick={() => handleDeleteRssArticle(art.id)}>
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -2151,7 +2404,7 @@ const Admin = ({ socket }) => {
                             setPackTeams([]);
                             setIsEditingPack('new');
                         }}>
-                            <Plus size={18} style={{ marginRight: '8px' }} /> Create New Pack
+                            <LucideIcons.Plus size={18} style={{ marginRight: '8px' }} /> Create New Pack
                         </button>
                     </div>
 
@@ -2287,7 +2540,7 @@ const Admin = ({ socket }) => {
                                                         <button className="btn-ghost" style={{ padding: '4px' }} disabled={idx === 0} onClick={() => moveTeam(idx, -1)}>↑</button>
                                                         <button className="btn-ghost" style={{ padding: '4px' }} disabled={idx === packTeams.length - 1} onClick={() => moveTeam(idx, 1)}>↓</button>
                                                         <button className="btn-ghost" style={{ padding: '4px', color: '#ef4444' }} onClick={() => setPackTeams(packTeams.filter(c => c !== code))}>
-                                                            <Trash2 size={16} />
+                                                            <LucideIcons.Trash2 size={16} />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -2299,7 +2552,7 @@ const Admin = ({ socket }) => {
 
                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                     <h5 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TrendingUp size={18} color="var(--accent-primary)" />
+                                        <LucideIcons.TrendingUp size={18} color="var(--accent-primary)" />
                                         Economy Balancing Tool
                                     </h5>
                                     
@@ -2336,7 +2589,7 @@ const Admin = ({ socket }) => {
 
                                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                                         <button className="btn-primary" style={{ padding: '12px 32px' }} onClick={handleSavePack}>
-                                            <Save size={18} style={{ marginRight: '8px' }} /> {isEditingPack === 'new' ? 'Create' : 'Save Changes'}
+                                            <LucideIcons.Save size={18} style={{ marginRight: '8px' }} /> {isEditingPack === 'new' ? 'Create' : 'Save Changes'}
                                         </button>
                                     </div>
                                 </div>
@@ -2354,10 +2607,10 @@ const Admin = ({ socket }) => {
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                         <button className="btn-ghost" style={{ padding: '6px' }} onClick={() => handleEditPack(pack.id)} title="Edit Pack">
-                                            <Monitor size={16} />
+                                            <LucideIcons.Monitor size={16} />
                                         </button>
                                         <button className="btn-ghost" style={{ padding: '6px', color: '#ef4444' }} onClick={() => handleDeletePack(pack.id)} title="Delete Pack">
-                                            <Trash2 size={16} />
+                                            <LucideIcons.Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -2392,12 +2645,14 @@ const Admin = ({ socket }) => {
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Steuere die Sichtbarkeit und Reihenfolge der Links in der Sidebar.</p>
                         </div>
                         <button className="btn-primary" onClick={handleSaveNavbarSettings} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <Save size={18} /> Save Changes
+                            <LucideIcons.Save size={18} /> Save Changes
                         </button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        {['Timers', 'Esports', 'Games', 'System', 'Other', ...new Set(navbarSettings.map(n => n.category).filter(c => !['Timers', 'Esports', 'Games', 'System', 'Other'].includes(c)))].map(category => {
+                        {/* Navigation List organized by Categories */}
+
+                        {['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System', 'Other', ...new Set(navbarSettings.map(n => n.category).filter(c => !['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System', 'Other'].includes(c)))].map(category => {
                             const categoryItems = navbarSettings.filter(item => item.category === category);
                             if (categoryItems.length === 0) return null;
 
@@ -2414,6 +2669,7 @@ const Admin = ({ socket }) => {
                                             <thead>
                                                 <tr style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</th>
+                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Icon</th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Category</th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Path</th>
                                                     <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Badge</th>
@@ -2442,10 +2698,33 @@ const Admin = ({ socket }) => {
                                                                     }}
                                                                 />
                                                             </td>
+                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                                    <div style={{ padding: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex' }}>
+                                                                        {(() => {
+                                                                            const IconComp = LucideIcons[item.icon];
+                                                                            return IconComp ? <IconComp size={16} /> : <LucideIcons.HelpCircle size={16} opacity={0.3} />;
+                                                                        })()}
+                                                                    </div>
+                                                                    <input 
+                                                                        type="text"
+                                                                        value={item.icon || ''}
+                                                                        placeholder="Icon Name"
+                                                                        style={{ width: '80px', fontSize: '0.7rem', padding: '2px 4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'inherit', borderRadius: '4px' }}
+                                                                        onChange={(e) => {
+                                                                            const newSettings = [...navbarSettings];
+                                                                            const idx = newSettings.findIndex(n => n.key === item.key);
+                                                                            newSettings[idx].icon = e.target.value;
+                                                                            setNavbarSettings(newSettings);
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </td>
                                                             <td style={{ padding: '14px 24px' }}>
                                                                 <select 
                                                                     value={item.category || 'Other'} 
-                                                                    style={{ width: '110px', padding: '4px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'inherit', borderRadius: '4px' }}
+                                                                    className="input-primary"
+                                                                    style={{ width: '130px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer' }}
                                                                     onChange={(e) => {
                                                                         const newSettings = [...navbarSettings];
                                                                         const idx = newSettings.findIndex(n => n.key === item.key);
@@ -2457,6 +2736,8 @@ const Admin = ({ socket }) => {
                                                                     <option value="Timers">Timers</option>
                                                                     <option value="Esports">Esports</option>
                                                                     <option value="Games">Games</option>
+                                                                    <option value="Social">Social</option>
+                                                                    <option value="Tools">Tools</option>
                                                                     <option value="System">System</option>
                                                                     <option value="Other">Other</option>
                                                                 </select>
@@ -2507,7 +2788,7 @@ const Admin = ({ socket }) => {
                                                                         style={{ padding: '6px', opacity: isFirst ? 0.2 : 1 }}
                                                                         disabled={isFirst}
                                                                         title="Move Up"
-                                                                         onClick={() => {
+                                                                        onClick={() => {
                                                                             setNavbarSettings(prev => {
                                                                                 const newSettings = [...prev];
                                                                                 const currentCategoryItems = newSettings.filter(n => n.category === category);
@@ -2520,8 +2801,6 @@ const Admin = ({ socket }) => {
                                                                                 
                                                                                 if (idxSelf === -1 || idxNeighbor === -1) return prev;
 
-                                                                                console.log(`[Navbar] Moving ${item.key} UP. Swapping sortOrder ${newSettings[idxSelf].sortOrder} with ${newSettings[idxNeighbor].sortOrder}`);
-
                                                                                 const tempOrder = newSettings[idxSelf].sortOrder;
                                                                                 newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
                                                                                 newSettings[idxNeighbor].sortOrder = tempOrder;
@@ -2530,8 +2809,9 @@ const Admin = ({ socket }) => {
                                                                             });
                                                                         }}
                                                                     >
-                                                                        <ChevronUp size={16} />
+                                                                        <LucideIcons.ChevronUp size={16} />
                                                                     </button>
+
                                                                     <button 
                                                                         className="btn-ghost" 
                                                                         style={{ padding: '6px', opacity: isLast ? 0.2 : 1 }}
@@ -2550,8 +2830,6 @@ const Admin = ({ socket }) => {
                                                                                 
                                                                                 if (idxSelf === -1 || idxNeighbor === -1) return prev;
 
-                                                                                console.log(`[Navbar] Moving ${item.key} DOWN. Swapping sortOrder ${newSettings[idxSelf].sortOrder} with ${newSettings[idxNeighbor].sortOrder}`);
-
                                                                                 const tempOrder = newSettings[idxSelf].sortOrder;
                                                                                 newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
                                                                                 newSettings[idxNeighbor].sortOrder = tempOrder;
@@ -2560,8 +2838,9 @@ const Admin = ({ socket }) => {
                                                                             });
                                                                         }}
                                                                     >
-                                                                        <ChevronDown size={16} />
+                                                                        <LucideIcons.ChevronDown size={16} />
                                                                     </button>
+
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -2583,7 +2862,7 @@ const Admin = ({ socket }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <h3 style={{ margin: 0 }}>Pokémon System Configuration</h3>
                         <button className="btn-primary" onClick={handleSavePokemonConfigs} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Save size={18} /> Save Changes
+                            <LucideIcons.Save size={18} /> Save Changes
                         </button>
                     </div>
 

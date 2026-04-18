@@ -368,7 +368,7 @@ const GlobalBets = () => {
                 <div className="glass-card" style={{ padding: '16px', textAlign: 'center', borderBottom: '2px solid #3b82f6' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Open</div>
                     <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#3b82f6' }}>
-                        {upcomingBets.length}
+                        {upcomingBets.length + awaitingBets.length}
                     </div>
                 </div>
                 <div className="glass-card" style={{ padding: '16px', textAlign: 'center', borderBottom: '2px solid #8b5cf6' }}>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History, Grid3X3, Shield } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
 import Avatar from './Avatar';
@@ -11,31 +11,32 @@ const SharedTodo = React.lazy(() => import('./SharedTodo'));
 const SharedCanvas = React.lazy(() => import('./SharedCanvas'));
 
 const iconMap = {
-    'dashboard': <LayoutDashboard size={18} />,
-    'countdowns': <Timer size={18} />,
-    'speedcube': <Grid3X3 size={18} />,
-    'statistics': <BarChart3 size={18} />,
-    'esports': <Trophy size={18} color="#3b82f6" />,
-    'esports-bets': <Target size={18} color="#f59e0b" />,
-    'polymarket-general': <TrendingUp size={18} color="#3b82f6" />,
-    'financial-dashboard': <TrendingUp size={18} color="#10b981" />,
-    'achievements': <Trophy size={18} color="#facc15" />,
-    'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
-    'scratch-cards': <Grid3X3 size={18} color="#fbbf24" />,
-    'rift-defense': <Shield size={18} color="#10b981" />,
-    'lol-idle': <Trophy size={18} color="#6366f1" />,
-    'colorsync': <Palette size={18} color="var(--accent-primary)" />,
-    'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
-    'tower-climb': <Shield size={18} color="#3b82f6" />,
-    'settings': <Settings size={18} />,
-    'roadmap': <Lightbulb size={18} color="#fbbf24" />,
-    'changelog': <History size={18} color="#94a3b8" />,
-    'admin': <Shield size={18} color="var(--accent-primary)" />,
-    'tetris': <Gamepad2 size={18} color="#ec4899" />,
-    'wordle': <Maximize2 size={18} color="#10b981" />,
+    'dashboard': <LucideIcons.LayoutDashboard size={18} />,
+    'countdowns': <LucideIcons.Timer size={18} />,
+    'speedcube': <LucideIcons.Grid3X3 size={18} />,
+    'statistics': <LucideIcons.BarChart3 size={18} />,
+    'esports': <LucideIcons.Trophy size={18} color="#3b82f6" />,
+    'esports-bets': <LucideIcons.Target size={18} color="#f59e0b" />,
+    'polymarket-general': <LucideIcons.TrendingUp size={18} color="#3b82f6" />,
+    'financial-dashboard': <LucideIcons.TrendingUp size={18} color="#10b981" />,
+    'achievements': <LucideIcons.Trophy size={18} color="#facc15" />,
+    'koala-flap': <LucideIcons.Gamepad2 size={18} color="#ec4899" />,
+    'scratch-cards': <LucideIcons.Grid3X3 size={18} color="#fbbf24" />,
+    'rift-defense': <LucideIcons.Shield size={18} color="#10b981" />,
+    'lol-idle': <LucideIcons.Trophy size={18} color="#6366f1" />,
+    'colorsync': <LucideIcons.Palette size={18} color="var(--accent-primary)" />,
+    'game-leaderboards': <LucideIcons.Trophy size={18} color="#f59e0b" />,
+    'tower-climb': <LucideIcons.Shield size={18} color="#3b82f6" />,
+    'settings': <LucideIcons.Settings size={18} />,
+    'roadmap': <LucideIcons.Lightbulb size={18} color="#fbbf24" />,
+    'changelog': <LucideIcons.History size={18} color="#94a3b8" />,
+    'admin': <LucideIcons.Shield size={18} color="var(--accent-primary)" />,
+    'tetris': <LucideIcons.Gamepad2 size={18} color="#ec4899" />,
+    'wordle': <LucideIcons.Maximize2 size={18} color="#10b981" />,
+    'news': <LucideIcons.Rss size={18} color="var(--accent-primary)" />,
 };
 
-const CATEGORIES = ['Timers', 'Esports', 'Games', 'System'];
+const CATEGORIES = ['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System'];
 
 const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const location = useLocation();
@@ -199,7 +200,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     return (
         <aside className={`glass-panel sidebar-drawer ${isOpen ? 'open' : ''}`} style={containerStyle}>
             <Link to="/" onClick={onClose} style={{ padding: '0 8px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}>
-                <Clock className="animate-glow" color="var(--accent-primary)" size={28} />
+                <LucideIcons.Clock className="animate-glow" color="var(--accent-primary)" size={28} />
                 <h2 style={{ fontSize: '1.25rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     KoalaSync
                 </h2>
@@ -242,13 +243,24 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                         }} title="Neuigkeiten verfuegbar"></span>
                                     )}
                                 </span>
-                                {openGroup === sectionKey ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                {openGroup === sectionKey ? <LucideIcons.ChevronDown size={14} /> : <LucideIcons.ChevronRight size={14} />}
                             </button>
                             {openGroup === sectionKey && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
                                     {items.map(item => {
                                         if (item.key === 'admin' && !user?.is_superadmin) return null;
                                         const showBadge = isBadgeVisible(item.key);
+                                        
+                                        let icon = iconMap[item.key];
+                                        if (!icon && item.icon) {
+                                            const IconComponent = LucideIcons[item.icon];
+                                            if (IconComponent) {
+                                                icon = <IconComponent size={18} />;
+                                            }
+                                        }
+                                        if (!icon) {
+                                            icon = <LucideIcons.ListTodo size={18} />;
+                                        }
 
                                         return (
                                             <NavLink 
@@ -263,7 +275,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                                 className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 
                                                 style={{ justifyContent: 'flex-start', position: 'relative' }}
                                             >
-                                                {iconMap[item.key] || <ListTodo size={18} />}
+                                                {icon}
                                                 {item.label}
                                                 {showBadge && (
                                                     <span style={{
@@ -314,7 +326,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>Active Session</span>
-                        <Maximize2 size={14} color="var(--text-muted)" />
+                        <LucideIcons.Maximize2 size={14} color="var(--text-muted)" />
                     </div>
                     <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '8px' }}>
                         {formatTime(localRemainingMs)}
@@ -333,11 +345,11 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         <div style={{ display: 'flex', gap: '8px' }}>
                             {!roomState.state.isRunning ? (
                                 <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px' }} onClick={(e) => handleAction(e, 'START')}>
-                                    <Play size={14} /> Start
+                                    <LucideIcons.Play size={14} /> Start
                                 </button>
                             ) : (
                                 <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
-                                    <Pause size={14} /> Pause
+                                    <LucideIcons.Pause size={14} /> Pause
                                 </button>
                             )}
                         </div>
@@ -355,7 +367,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <Link to="/login" onClick={onClose} className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.8rem', textAlign: 'center', borderRadius: '6px' }}><LogIn size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Login</Link>
+                        <Link to="/login" onClick={onClose} className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.8rem', textAlign: 'center', borderRadius: '6px' }}><LucideIcons.LogIn size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Login</Link>
                     </div>
                 </div>
             ) : (
@@ -370,7 +382,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         </div>
                     </NavLink>
                     <button onClick={() => { logout(); navigate('/'); }} className="btn-ghost" style={{ padding: '6px', fontSize: '0.8rem', borderRadius: '6px', background: 'rgba(255,0,0,0.1)', color: '#ef4444' }}>
-                        <LogOut size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Logout
+                        <LucideIcons.LogOut size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Logout
                     </button>
                 </div>
             )}

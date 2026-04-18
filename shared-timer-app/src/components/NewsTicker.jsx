@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Rss } from 'lucide-react';
 import { usePageVisibility } from '../hooks/usePageVisibility';
+import RssNewsModal from './RssNewsModal';
 
 const NewsTicker = ({ socket }) => {
     const [news, setNews] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const isVisible = usePageVisibility();
-
-
 
     useEffect(() => {
         if (!socket) return;
@@ -40,28 +40,40 @@ const NewsTicker = ({ socket }) => {
     if (loading || news.length === 0) return null;
 
     return (
-        <div className="news-ticker-wrapper">
-            <div className="news-ticker-label">
-                <Rss size={14} /> Tagesschau
-            </div>
+        <>
+            <div className="news-ticker-wrapper">
+                <div 
+                    className="news-ticker-label clickable" 
+                    onClick={() => setIsModalOpen(true)}
+                    title="Quick-News öffnen"
+                >
+                    <Rss size={14} /> Tagesschau
+                </div>
 
-            <div className="news-ticker-content">
-                <div className="news-ticker-track">
-                    {/* Double the array for seamless infinite scrolling */}
-                    {[...news, ...news].map((item, i) => (
-                        <a
-                            key={i}
-                            href={item.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="news-item"
-                        >
-                            {item.title}
-                        </a>
-                    ))}
+                <div className="news-ticker-content">
+                    <div className="news-ticker-track">
+                        {/* Double the array for seamless infinite scrolling */}
+                        {[...news, ...news].map((item, i) => (
+                            <a
+                                key={i}
+                                href={item.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="news-item"
+                            >
+                                {item.title}
+                            </a>
+                        ))}
+                    </div>
                 </div>
             </div>
-        </div>
+
+            <RssNewsModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                news={news} 
+            />
+        </>
     );
 };
 

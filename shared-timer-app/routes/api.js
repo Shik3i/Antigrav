@@ -237,6 +237,22 @@ router.get('/admin/market/deleted', authController.authenticateToken, marketCont
 router.patch('/admin/market/:id/restore', authController.authenticateToken, marketController.restoreItem);
 router.delete('/admin/market/:id/hard', authController.authenticateToken, marketController.hardDeleteItem);
 
+// ─── RSS News ─────────────────────────────────────────────────
+router.get('/rss/feeds', apiController.getRssFeeds);
+router.get('/rss/articles', authController.optionalAuthenticateToken, apiController.getRssArticles);
+router.post('/rss/preferences', authController.authenticateToken, apiController.updateRssPreference);
+
+// RSS Admin
+router.get('/admin/rss/feeds', authController.authenticateToken, apiController.getAdminRssFeeds);
+router.post('/admin/rss/feeds', authController.authenticateToken, apiController.addAdminRssFeed);
+router.put('/admin/rss/feeds/:id', authController.authenticateToken, apiController.updateAdminRssFeed);
+router.delete('/admin/rss/feeds/:id', authController.authenticateToken, apiController.deleteAdminRssFeed);
+router.get('/admin/rss/articles', authController.authenticateToken, apiController.getAdminRssArticles);
+router.get('/admin/rss/stats', authController.authenticateToken, apiController.getAdminRssStats);
+router.delete('/admin/rss/articles/:id', authController.authenticateToken, apiController.deleteAdminRssArticle);
+router.post('/admin/rss/purge', authController.authenticateToken, apiController.purgeAdminRssArticles);
+router.post('/admin/rss/refresh', authController.authenticateToken, apiController.manualRefreshAllRss);
+
 // ─── Daily Status Aggregation ─────────────────────────────────
 router.get('/daily-status', authController.authenticateToken, apiController.getDailyStatus);
 

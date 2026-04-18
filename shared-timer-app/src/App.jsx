@@ -74,6 +74,7 @@ const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
 const LiveStreamWidget = React.lazy(() => import('./components/LiveStreamWidget'));
 const Friends = React.lazy(() => import('./pages/Friends'));
+const News = React.lazy(() => import('./pages/News'));
 
 // Constants
 const DEFAULT_LEAGUES = ['LEC', 'LCS', 'LCK', 'LPL', 'VCT_LOCK_IN', 'VCT_EMEA', 'VCT_AMERICAS', 'VCT_PACIFIC'];
@@ -474,6 +475,7 @@ function InnerApp() {
                     <Route path="/wordle" element={<Wordle user={user} token={token} />} />
                     <Route path="/games/tower-climb" element={<TowerClimb />} />
                     <Route path="/lotto" element={<LottoImitat />} />
+                    <Route path="/news" element={<News socket={activeSocket} />} />
                     <Route path="/c" element={<SharedCountdown />} />
                     <Route path="*" element={<ProtectedNotFound />} />
                   </Routes>
@@ -481,9 +483,11 @@ function InnerApp() {
               </React.Suspense>
             </main>
             {(!isZenMode && deferredFeaturesReady && (user?.preferences?.showNewsTicker ?? isDesktop)) && (
-              <React.Suspense fallback={<div style={{ padding: '0 16px 16px' }}><WidgetPillSkeleton width={220} /></div>}>
-                <NewsTicker socket={activeSocket} />
-              </React.Suspense>
+              <RouteErrorBoundary>
+                <React.Suspense fallback={<div style={{ padding: '0 16px 16px' }}><WidgetPillSkeleton width={220} /></div>}>
+                  <NewsTicker socket={activeSocket} />
+                </React.Suspense>
+              </RouteErrorBoundary>
             )}
           </div>
         </div>
