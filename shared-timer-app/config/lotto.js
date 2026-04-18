@@ -164,6 +164,17 @@ function getNextDrawTimestamps() {
   };
 }
 
+/**
+ * Returns a YYYY-MM-DD string for a given UTC timestamp.
+ */
+function getDrawDateString(ts) {
+    const d = new Date(ts);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
 module.exports = {
   LOTTO_CONFIG,
   WIN_CLASSES,
@@ -173,5 +184,6 @@ module.exports = {
   getTodayDrawDate,
   getTomorrowDrawDate,
   getNextDrawTimestamps,
-  getLottoConfigPayload
+  getLottoConfigPayload,
+  getDrawDateString
 };

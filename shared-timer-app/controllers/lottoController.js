@@ -4,6 +4,7 @@ const {
   getTomorrowDrawDate,
   getLottoConfigPayload, 
   getNextDrawTimestamps,
+  getDrawDateString,
   LOTTO_CONFIG 
 } = require('../config/lotto');
 
@@ -25,20 +26,22 @@ const safeParse = (str, fallback = []) => {
  */
 exports.getConfig = async (req, res) => {
   try {
-    const today = getTodayDrawDate();
+    // Determine Draw Dates based on the NEXT available draw
+    const { drawTime, cutoffTime } = getNextDrawTimestamps();
+    const nextDrawDate = getDrawDateString(drawTime);
+    const followingDrawDate = getDrawDateString(drawTime + 24 * 60 * 60 * 1000);
+    
+    // Fetch Global Config and Stats
     const result = await dbLayer.getLottoConfig();
     const configPayload = getLottoConfigPayload();
-    
+
     // Check if user is logged in to get their ticket count
     let userTicketsToday = 0;
     let userTicketsTomorrow = 0;
     if (req.user && req.user.id) {
-      const tomorrow = getTomorrowDrawDate();
-      userTicketsToday = await dbLayer.getUserLottoTicketCount(req.user.id, today);
-      userTicketsTomorrow = await dbLayer.getUserLottoTicketCount(req.user.id, tomorrow);
+      userTicketsToday = await dbLayer.getUserLottoTicketCount(req.user.id, nextDrawDate);
+      userTicketsTomorrow = await dbLayer.getUserLottoTicketCount(req.user.id, followingDrawDate);
     }
-
-    const { drawTime, cutoffTime } = getNextDrawTimestamps();
 
     res.json({
       success: true,
@@ -47,7 +50,8 @@ exports.getConfig = async (req, res) => {
       lastDraw: result.lastDraw,
       userTicketsToday,
       userTicketsTomorrow,
-      today,
+      today: nextDrawDate,
+      tomorrow: followingDrawDate,
       serverTime: Date.now(),
       nextDrawTime: drawTime,
       nextCutoffTime: cutoffTime
@@ -87,11 +91,8 @@ exports.buyTicket = async (req, res) => {
       });
     }
 
-    let drawDate = getTodayDrawDate();
-    
-    if (nowTs >= cutoffTime) {
-      drawDate = getTomorrowDrawDate();
-    }
+    // The drawDate is ALWAYS the date component of the target drawTime.
+    const drawDate = getDrawDateString(drawTime);
 
     // Validate each ticket
     for (const ticket of tickets) {
@@ -113,6 +114,15 @@ exports.buyTicket = async (req, res) => {
       if (!Number.isInteger(ticket.superzahl) || ticket.superzahl < 0 || ticket.superzahl > 9) {
         return res.status(400).json({ success: false, message: 'Superzahl must be an integer between 0 and 9.' });
       }
+    }
+
+    // Server-side validation of the 100-ticket-per-draw limit
+    const existingCount = await dbLayer.getUserLottoTicketCount(userId, drawDate);
+    if (existingCount + tickets.length > LOTTO_CONFIG.maxDailyTickets) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Limit von ${LOTTO_CONFIG.maxDailyTickets} Tickets pro Ziehung erreicht. Du hast bereits ${existingCount} Tickets für den ${drawDate}.` 
+      });
     }
 
     const { newBalance } = await dbLayer.purchaseLottoTickets(userId, tickets, drawDate);

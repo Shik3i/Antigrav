@@ -1,5 +1,11 @@
 [
   {
+    "id": 58,
+    "version": "2.36.0",
+    "date": "2026-04-18",
+    "changes": "- **Lotto: Ziehungs-Fokus**: Vollständige Umstellung der Ticket-Logik auf den Zeitpunkt der nächsten verfügbaren Ziehung statt auf das Kalenderdatum.\n- **Lotto: Dynamische Stat-Cards**: Die Ticket-Zähler zeigen nun das explizite Datum der Ziel-Ziehung an, um Verwirrung nach dem 16:00 UTC Cutoff zu vermeiden.\n- **Lotto: Kategorisierte Historie**: Einführung von einklappbaren Akkordeon-Sektionen für \"Gewinnerlose\", \"Knapp daneben\" und \"Nieten\" mit intelligenter Priorisierung.\n- **Lotto: Gewinn-Transparenz**: Das Sidebar-Modul zeigt nun zusätzlich zum Gesamt-Jackpot den individuellen Gewinn (\"Dein Gewinn\") der letzten Ziehung an.\n- **Lotto: Erweiterte Quoten**: Die Odds-Tabelle enthält nun eine neue Spalte mit der Anzahl der Gewinner pro Klasse aus der letzten Ziehung."
+  },
+  {
     "id": 57,
     "version": "2.35.5",
     "date": "2026-04-18",

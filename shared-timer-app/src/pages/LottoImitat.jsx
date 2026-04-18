@@ -37,12 +37,56 @@ import '../index.css';
     const [countdown, setCountdown] = useState('');
     const [cutoffCountdown, setCutoffCountdown] = useState('');
     const [expandedGroups, setExpandedGroups] = useState({});
+    const [showOdds, setShowOdds] = useState(false);
+    const [expandedSubCategories, setExpandedSubCategories] = useState({}); // Key: `${drawDate}-${type}`
+    const [extraGains, setExtraGains] = useState(null); // Local state for sidebar logic if needed
+
+    // --- Memoized State & Derived Logic (Must be defined before use in functions) ---
+    const isCutoffActiveMemo = useMemo(() => {
+        if (!lottoData.nextCutoffTime || !lottoData.nextDrawTime) return false;
+        const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
+        return adjustedNow >= lottoData.nextCutoffTime && adjustedNow < lottoData.nextDrawTime;
+    }, [lottoData.nextCutoffTime, lottoData.nextDrawTime, lottoData.clockOffset, countdown]);
+
+    const willBuyForTomorrowMemo = useMemo(() => {
+        if (!lottoData.nextCutoffTime) return false;
+        const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
+        return adjustedNow >= lottoData.nextCutoffTime;
+    }, [lottoData.nextCutoffTime, lottoData.clockOffset, countdown]);
+
+    const sortedWinClasses = useMemo(() => {
+        if (!lottoData.config?.winClasses) return [];
+        return [...lottoData.config.winClasses].sort((a, b) => a.class - b.class);
+    }, [lottoData.config?.winClasses]);
+
+    const activeWinClasses = useMemo(() => {
+        const classes = new Set();
+        lottoData.userHistory.forEach(group => {
+            if (expandedGroups[group.drawDate]) {
+                group.tickets.forEach(ticket => {
+                    if (ticket.winClass > 0) classes.add(ticket.winClass);
+                });
+            }
+        });
+        return classes;
+    }, [lottoData.userHistory, expandedGroups]);
 
     const toggleGroup = (drawDate) => {
         setExpandedGroups(prev => ({
             ...prev,
             [drawDate]: !prev[drawDate]
         }));
+    };
+
+    const toggleSubCategory = (drawDate, type) => {
+        setExpandedSubCategories(prev => {
+            const key = `${drawDate}-${type}`;
+            // If it doesn't exist yet, we need to know the default to flip it
+            return {
+                ...prev,
+                [key]: prev[key] === undefined ? false : !prev[key] // Note: This logic assumes we handle defaults in the render
+            };
+        });
     };
 
     // Load data on mount
@@ -111,16 +155,18 @@ import '../index.css';
             superzahl: Math.floor(Math.random() * 10)
         };
     };
-
     const addBulkRandom = (count) => {
-        const currentTotal = cart.length + lottoData.userTicketsToday;
+        const relevantTicketCount = willBuyForTomorrowMemo 
+            ? lottoData.userTicketsTomorrow 
+            : lottoData.userTicketsToday;
+        const currentTotal = cart.length + relevantTicketCount;
         const maxAllowed = lottoData.config?.maxTicketsPerDay || 100;
         
         const remaining = maxAllowed - currentTotal;
         const actualToAdd = Math.min(count, remaining);
         
         if (actualToAdd <= 0) {
-            showToast('Tägliches Ticket-Limit bereits erreicht!', 'error');
+            showToast('Ticket-Limit für diese Ziehung erreicht!', 'error');
             return;
         }
 
@@ -128,18 +174,16 @@ import '../index.css';
             showToast(`Nur ${actualToAdd} Tickets hinzugefügt (Limit erreicht).`, 'info');
         }
 
+        const relevantDrawDate = willBuyForTomorrowMemo ? lottoData.tomorrow : lottoData.today;
+
         // Create a set of existing combinations for duplicate checking
-        // Format: "1,2,3,4,5,6_SZ"
         const existingCombis = new Set();
-        // Add purchased tickets to set
-        lottoData.userHistory.forEach(draw => {
-             // We only care about tickets for the CURRENT draw, but for safety 
-             // we could check the draw_date if we had it more clearly.
-             // Looking at loadLottoData, it fetches history.
-             // Let's check draw_date.
-             if (draw.draw_date === lottoData.today) {
-                const nums = safeParseNumbers(draw.numbers).sort((a,b) => a-b).join(',');
-                existingCombis.add(`${nums}_${draw.super_number}`);
+        lottoData.userHistory.forEach(group => {
+             if (group.drawDate === relevantDrawDate) {
+                group.tickets.forEach(ticket => {
+                    const nums = safeParseNumbers(ticket.numbers).sort((a,b) => a-b).join(',');
+                    existingCombis.add(`${nums}_${ticket.superzahl}`);
+                });
              }
         });
         // Add current cart to set
@@ -179,8 +223,11 @@ import '../index.css';
             showToast('Bitte wähle 6 Zahlen aus!', 'error');
             return;
         }
-        if (cart.length + lottoData.userTicketsToday >= (lottoData.config?.maxTicketsPerDay || 100)) {
-            showToast('Tägliches Ticket-Limit erreicht!', 'error');
+        const relevantTicketCount = willBuyForTomorrowMemo 
+            ? lottoData.userTicketsTomorrow 
+            : lottoData.userTicketsToday;
+        if (cart.length + relevantTicketCount >= (lottoData.config?.maxTicketsPerDay || 100)) {
+            showToast('Ticket-Limit für diese Ziehung erreicht!', 'error');
             return;
         }
 
@@ -198,17 +245,21 @@ import '../index.css';
             return;
         }
 
-        // Check duplicates in already purchased (if we have draw_date info)
-        const isAlreadyPurchased = lottoData.userHistory.some(draw => {
-            if (draw.draw_date === lottoData.today) {
-                const s = safeParseNumbers(draw.numbers).sort((a,b) => a-b).join(',');
-                return `${s}_${draw.super_number}` === selectionKey;
+        const relevantDrawDate = willBuyForTomorrowMemo ? lottoData.tomorrow : lottoData.today;
+
+        // Check duplicates in already purchased
+        const isAlreadyPurchased = lottoData.userHistory.some(group => {
+            if (group.drawDate === relevantDrawDate) {
+                return group.tickets.some(ticket => {
+                    const s = safeParseNumbers(ticket.numbers).sort((a,b) => a-b).join(',');
+                    return `${s}_${ticket.superzahl}` === selectionKey;
+                });
             }
             return false;
         });
 
         if (isAlreadyPurchased) {
-            showToast('Dieses Ticket hast du für heute bereits gekauft!', 'error');
+            showToast(`Dieses Ticket hast du für den ${relevantDrawDate === lottoData.today ? 'heutigen' : 'morgigen'} Tag bereits gekauft!`, 'error');
             return;
         }
 
@@ -220,7 +271,7 @@ import '../index.css';
         }]);
         setSelectedNumbers([]);
         showToast('Ticket zum Warenkorb hinzugefügt', 'success');
-    }, [selectedNumbers, selectedSuper, cart, lottoData.userTicketsToday, lottoData.today, lottoData.userHistory, lottoData.config?.maxTicketsPerDay, showToast]);
+    }, [selectedNumbers, selectedSuper, cart, lottoData.userTicketsToday, lottoData.userTicketsTomorrow, lottoData.today, lottoData.tomorrow, lottoData.userHistory, lottoData.config?.maxTicketsPerDay, showToast, willBuyForTomorrowMemo]);
 
     const buyTickets = useCallback(async () => {
         if (cart.length === 0) return;
@@ -267,18 +318,78 @@ import '../index.css';
         return new Date(y, m - 1, d);
     };
 
-    const isCutoffActive = () => {
-        /* return true; // DEMO MODE: ALWAYS TRUE */
-        if (!lottoData.nextCutoffTime || !lottoData.nextDrawTime) return false;
-        const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
-        return adjustedNow >= lottoData.nextCutoffTime && adjustedNow < lottoData.nextDrawTime;
-    };
 
-    const willBuyForTomorrow = () => {
-        /* return true; // DEMO MODE: ALWAYS TRUE */
-        if (!lottoData.nextCutoffTime) return false;
-        const adjustedNow = Date.now() + (lottoData.clockOffset || 0);
-        return adjustedNow >= lottoData.nextCutoffTime;
+
+    // --- History Rendering Helper ---
+    const renderHistoryTicket = (ticket, group, outcomeType) => {
+        const ticketNums = safeParseNumbers(ticket.numbers);
+        const drawnNums = safeParseNumbers(group.drawNumbers);
+        const isSuperMatch = Number(ticket.superzahl) === Number(group.drawSuperzahl);
+        const matchCount = ticket.matchCount ?? 0;
+        const winAmount = ticket.winAmount ?? 0;
+
+        let borderStyle = '1px solid var(--border-color)';
+        let opacity = 1;
+        if (outcomeType === 'winner') borderStyle = '1px solid #10b981';
+        else if (outcomeType === 'near') borderStyle = '1px solid #f59e0b';
+        else if (outcomeType === 'lose') opacity = 0.6;
+
+        return (
+            <div key={ticket.id} style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                background: 'rgba(255,255,255,0.02)', 
+                padding: '12px', 
+                borderRadius: '12px',
+                gap: '8px',
+                flex: '0 0 auto',
+                border: borderStyle,
+                borderLeft: (outcomeType === 'winner' || outcomeType === 'near') ? `4px solid ${outcomeType === 'winner' ? '#10b981' : '#f59e0b'}` : borderStyle.split(' ')[2],
+                opacity: opacity,
+                transition: 'all 0.2s ease'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {ticketNums.map((n, i) => {
+                            const isMatch = drawnNums.includes(n);
+                            return (
+                                <span key={i} className="ball-mini" style={{ 
+                                    background: isMatch ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                                    color: isMatch ? 'white' : 'var(--text-muted)',
+                                    boxShadow: isMatch ? '0 0 8px rgba(99,102,241,0.5)' : 'none',
+                                    border: isMatch ? 'none' : '1px solid var(--border-color)'
+                                }}>{n}</span>
+                            );
+                        })}
+                        <span className="ball-mini super" style={{ 
+                            background: isSuperMatch ? '#ef4444' : 'rgba(245, 158, 11, 0.1)',
+                            color: isSuperMatch ? 'white' : '#f59e0b',
+                            boxShadow: isSuperMatch ? '0 0 8px rgba(239, 68, 68, 0.5)' : 'none',
+                            border: isSuperMatch ? 'none' : '1px solid rgba(245, 158, 11, 0.2)'
+                        }}>{ticket.superzahl}</span>
+                    </div>
+                    <div style={{ 
+                        color: winAmount > 0 ? '#10b981' : 'var(--text-muted)', 
+                        fontWeight: 800, 
+                        fontSize: '0.8rem',
+                        whiteSpace: 'nowrap'
+                    }}>
+                        {winAmount > 0 ? `+${(winAmount / 100).toLocaleString('de-DE')} KC` : 'Niete'}
+                    </div>
+                </div>
+                <div style={{ 
+                    fontSize: '0.7rem', 
+                    fontWeight: 700, 
+                    color: matchCount >= 1 ? (outcomeType === 'winner' ? '#10b981' : (outcomeType === 'near' ? '#f59e0b' : 'var(--accent-primary)')) : 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                }}>
+                    <CheckCircle2 size={12} />
+                    {matchCount} Treffer{ticket.superzahlMatch ? ' + SZ ✓' : ''}
+                </div>
+            </div>
+        );
     };
 
     // --- Memoized Components ---
@@ -414,7 +525,7 @@ import '../index.css';
                 /* Stats Row */
                 .lotto-stats-row {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                     gap: 20px;
                 }
 
@@ -641,6 +752,41 @@ import '../index.css';
                     display: flex;
                     gap: 12px;
                 }
+
+                .odds-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    text-align: left;
+                    font-size: 0.9rem;
+                }
+
+                .odds-table th {
+                    padding: 12px 20px;
+                    background: rgba(255,255,255,0.03);
+                    color: var(--text-muted);
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    font-weight: 800;
+                }
+
+                .odds-table td {
+                    padding: 14px 20px;
+                    border-bottom: 1px solid rgba(255,255,255,0.03);
+                }
+
+                .odds-table tr:last-child td {
+                    border-bottom: none;
+                }
+
+                @media (max-width: 600px) {
+                    .odds-table {
+                        font-size: 0.8rem;
+                    }
+                    .odds-table th, .odds-table td {
+                        padding: 10px 12px;
+                    }
+                }
             `}</style>
 
             <header className="lotto-header animate-in">
@@ -662,7 +808,7 @@ import '../index.css';
                         </div>
                         <Clock size={28} color="var(--accent-primary)" />
                     </div>
-                    {isCutoffActive() && (
+                    {isCutoffActiveMemo && (
                         <div style={{ 
                             background: 'rgba(245, 158, 11, 0.1)', 
                             border: '1px solid rgba(245, 158, 11, 0.2)', 
@@ -695,16 +841,138 @@ import '../index.css';
                     <div className="stat-icon"><ShoppingBag size={24}/></div>
                     <div className="stat-info">
                         <span className="stat-value">{lottoData.stats.totalPlayed.toLocaleString('de-DE')}</span>
-                        <span className="stat-label">Lose im Umlauf</span>
+                        <span className="stat-label">Verkaufte Lose (gesamt)</span>
+                    </div>
+                </div>
+                <div className="glass-card stat-card">
+                    <div className="stat-icon"><Ticket size={24}/></div>
+                    <div className="stat-info">
+                        <span className="stat-value">{lottoData.stats.totalPending?.toLocaleString('de-DE') || 0}</span>
+                        <span className="stat-label">Lose nächste Ziehung</span>
                     </div>
                 </div>
                 <div className="glass-card stat-card">
                     <div className="stat-icon"><CheckCircle2 size={24}/></div>
-                    <div className="stat-info">
-                        <span className="stat-value">{lottoData.userTicketsToday}{lottoData.userTicketsTomorrow > 0 ? ` (+${lottoData.userTicketsTomorrow})` : ''} / {lottoData.config?.maxTicketsPerDay || 100}</span>
-                        <span className="stat-label">Tickets {lottoData.userTicketsTomorrow > 0 ? 'Heute + Morgen' : 'Heute'}</span>
+                    {(() => {
+                        const relevantUserTickets = willBuyForTomorrowMemo ? lottoData.userTicketsTomorrow : lottoData.userTicketsToday;
+                        const targetDate = willBuyForTomorrowMemo ? lottoData.tomorrow : lottoData.today;
+                        const formattedDate = parseDrawDate(targetDate)?.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) || targetDate;
+                        
+                        return (
+                            <div className="stat-info">
+                                <span className="stat-value">{relevantUserTickets} / {lottoData.config?.maxTicketsPerDay || 100}</span>
+                                <span className="stat-label">Tickets ({formattedDate})</span>
+                            </div>
+                        );
+                    })()}
+                </div>
+            </div>
+            <div className="lotto-odds-section animate-in" style={{ animationDelay: '0.15s' }}>
+                <div 
+                    className="glass-card" 
+                    style={{ 
+                        padding: '16px 24px', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        border: showOdds ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                        background: showOdds ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.03)'
+                    }}
+                    onClick={() => setShowOdds(!showOdds)}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 700 }}>
+                        {showOdds ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                        <Trophy size={18} className="text-muted" />
+                        <span>Gewinnquoten & Auszahlungen</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {showOdds ? 'Einklappen' : 'Details anzeigen'}
                     </div>
                 </div>
+
+                {showOdds && lottoData.config?.winClasses && (
+                    <div className="glass-card" style={{ marginTop: '12px', overflow: 'hidden', animation: 'fadeInIn 0.3s ease-out' }}>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="odds-table">
+                                <thead>
+                                    <tr>
+                                        <th>Klasse</th>
+                                        <th>Treffer</th>
+                                        <th>Chance</th>
+                                        <th>Gewinn</th>
+                                        <th style={{ textAlign: 'right' }}>Letzte Ziehung</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sortedWinClasses.map((wc, idx) => {
+                                        const isHighlighted = activeWinClasses.has(wc.class);
+                                        return (
+                                            <tr 
+                                                key={wc.class} 
+                                                style={{ 
+                                                    background: isHighlighted 
+                                                        ? 'rgba(16, 185, 129, 0.1)' 
+                                                        : (idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'),
+                                                    borderLeft: isHighlighted ? '4px solid #10b981' : 'none',
+                                                    transition: 'all 0.3s ease'
+                                                }}
+                                            >
+                                                <td style={{ fontWeight: 800, color: isHighlighted ? '#10b981' : 'var(--text-muted)' }}>Kl. {wc.class}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        {wc.label.split('+').map((part, i) => (
+                                                            <React.Fragment key={i}>
+                                                                {i > 0 && <span>+</span>}
+                                                                <span style={{ 
+                                                                    color: part.includes('Superzahl') ? '#ef4444' : (isHighlighted ? '#10b981' : 'inherit'), 
+                                                                    fontWeight: (part.includes('Superzahl') || isHighlighted) ? 700 : 400 
+                                                                }}>
+                                                                    {part.trim()}
+                                                                </span>
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: isHighlighted ? '#10b981' : 'inherit' }}>{wc.probability}</td>
+                                                <td style={{ 
+                                                    textAlign: 'right', 
+                                                    fontWeight: 800, 
+                                                    color: (wc.class === 1 || wc.class === 2) ? '#f59e0b' : (isHighlighted ? '#10b981' : 'var(--accent-primary)'),
+                                                    fontSize: '1rem'
+                                                }}>
+                                                    {(wc.payoutCents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KC
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    {(() => {
+                                                        const winCount = lottoData.lastDraw?.winnersByClass?.[wc.class];
+                                                        if (winCount > 0) {
+                                                            return (
+                                                                <span style={{ 
+                                                                    background: 'rgba(16, 185, 129, 0.15)', 
+                                                                    color: '#10b981', 
+                                                                    padding: '4px 10px', 
+                                                                    borderRadius: '20px', 
+                                                                    fontSize: '0.75rem', 
+                                                                    fontWeight: 800,
+                                                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                                                    whiteSpace: 'nowrap'
+                                                                }}>
+                                                                    {winCount.toLocaleString('de-DE')} Gewinner
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return <span style={{ color: 'var(--text-muted)' }}>–</span>;
+                                                    })()}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <main className="lotto-content-grid">
@@ -743,13 +1011,13 @@ import '../index.css';
                                 marginTop: '32px', 
                                 height: '56px', 
                                 fontSize: '1.1rem',
-                                opacity: isCutoffActive() ? 0.5 : 1,
-                                cursor: isCutoffActive() ? 'not-allowed' : 'pointer'
+                                opacity: isCutoffActiveMemo ? 0.5 : 1,
+                                cursor: isCutoffActiveMemo ? 'not-allowed' : 'pointer'
                             }}
                             onClick={addToCart}
-                            disabled={selectedNumbers.length < 6 || isCutoffActive()}
+                            disabled={selectedNumbers.length < 6 || isCutoffActiveMemo}
                         >
-                            <Ticket size={22}/> {isCutoffActive() ? 'Annahme gesperrt' : (willBuyForTomorrow() ? 'Für morgen einreihen' : 'Ticket zum Warenkorb')} ({(lottoData.config?.ticketPrice || 100) / 100} KC)
+                            <Ticket size={22}/> {isCutoffActiveMemo ? 'Annahme gesperrt' : (willBuyForTomorrowMemo ? 'Für morgen einreihen' : 'Ticket zum Warenkorb')} ({(lottoData.config?.ticketPrice || 100) / 100} KC)
                         </button>
                     </div>
 
@@ -762,10 +1030,10 @@ import '../index.css';
                             Füge sofort mehrere zufällig generierte Tickets zu deinem Warenkorb hinzu.
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(5)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+5 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(10)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+10 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(25)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+25 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
-                            <button className="btn-secondary" onClick={() => addBulkRandom(50)} disabled={isCutoffActive()} style={{ height: '48px', opacity: isCutoffActive() ? 0.5 : 1 }}>+50 {willBuyForTomorrow() ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(5)} disabled={isCutoffActiveMemo} style={{ height: '48px', opacity: isCutoffActiveMemo ? 0.5 : 1 }}>+5 {willBuyForTomorrowMemo ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(10)} disabled={isCutoffActiveMemo} style={{ height: '48px', opacity: isCutoffActiveMemo ? 0.5 : 1 }}>+10 {willBuyForTomorrowMemo ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(25)} disabled={isCutoffActiveMemo} style={{ height: '48px', opacity: isCutoffActiveMemo ? 0.5 : 1 }}>+25 {willBuyForTomorrowMemo ? 'morgen' : 'heute'}</button>
+                            <button className="btn-secondary" onClick={() => addBulkRandom(50)} disabled={isCutoffActiveMemo} style={{ height: '48px', opacity: isCutoffActiveMemo ? 0.5 : 1 }}>+50 {willBuyForTomorrowMemo ? 'morgen' : 'heute'}</button>
                         </div>
                     </div>
 
@@ -853,16 +1121,38 @@ import '../index.css';
                                             )}
                                             {completed.map((group) => {
                                                 const isExpanded = !!expandedGroups[group.drawDate]; // Default to collapsed for completed
+                                                const groupWinTotal = group.tickets.reduce((sum, t) => sum + (t.winAmount ?? 0), 0);
+                                                
                                                 return (
                                                     <div key={group.drawDate} className="draw-history-item" style={{ width: 'auto', minWidth: '450px' }}>
                                                         <div 
                                                             style={{ display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? '20px' : '0', alignItems: 'center', gap: '40px', cursor: 'pointer' }}
                                                             onClick={() => toggleGroup(group.drawDate)}
                                                         >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                                                                {isExpanded ? <ChevronDown size={16} className="text-muted" /> : <ChevronRight size={16} className="text-muted" />}
-                                                                <Calendar size={14} className="text-muted" />
-                                                                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    {isExpanded ? <ChevronDown size={16} className="text-muted" /> : <ChevronRight size={16} className="text-muted" />}
+                                                                    <Calendar size={14} className="text-muted" />
+                                                                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
+                                                                </div>
+                                                                {groupWinTotal > 0 && (
+                                                                    <div style={{ 
+                                                                        background: 'rgba(16, 185, 129, 0.15)', 
+                                                                        color: '#10b981', 
+                                                                        padding: '2px 10px', 
+                                                                        borderRadius: '20px', 
+                                                                        fontSize: '0.75rem', 
+                                                                        fontWeight: 800,
+                                                                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px',
+                                                                        animation: 'fadeInIn 0.3s ease-out'
+                                                                    }}>
+                                                                        <Trophy size={12} />
+                                                                        {(groupWinTotal / 100).toLocaleString('de-DE')} KC gewonnen
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                                                                 {group.drawNumbers && safeParseNumbers(group.drawNumbers).map((n, i) => (
@@ -874,32 +1164,79 @@ import '../index.css';
                                                             </div>
                                                         </div>
                                                         {isExpanded && (
-                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' }}>
-                                                                {group.tickets.map(ticket => (
-                                                                    <div key={ticket.id} style={{ 
-                                                                        display: 'flex', 
-                                                                        justifyContent: 'space-between', 
-                                                                        alignItems: 'center', 
-                                                                        background: 'rgba(255,255,255,0.02)', 
-                                                                        padding: '8px 12px', 
-                                                                        borderRadius: '8px',
-                                                                        gap: '12px',
-                                                                        flex: '0 0 auto'
-                                                                    }}>
-                                                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                                            {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
-                                                                            <span className="ball-mini super">{ticket.superzahl}</span>
-                                                                        </div>
-                                                                        <div style={{ 
-                                                                            color: ticket.winAmount > 0 ? '#10b981' : 'var(--text-muted)', 
-                                                                            fontWeight: 800, 
-                                                                            fontSize: '0.8rem',
-                                                                            whiteSpace: 'nowrap'
-                                                                        }}>
-                                                                            {ticket.winAmount > 0 ? `+${(ticket.winAmount / 100).toLocaleString('de-DE')} KC` : 'Niete'}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
+                                                                {(() => {
+                                                                    const winners = group.tickets.filter(t => (t.winAmount ?? 0) > 0 || (t.winClass ?? 0) > 0);
+                                                                    const nearMisses = group.tickets.filter(t => ((t.winAmount ?? 0) === 0 && (t.winClass ?? 0) === 0) && (t.matchCount ?? 0) >= 1);
+                                                                    const lose = group.tickets.filter(t => ((t.winAmount ?? 0) === 0 && (t.winClass ?? 0) === 0) && (t.matchCount ?? 0) === 0);
+                                                                    
+                                                                    // Helper to get effective expanded state
+                                                                    const isSubExpanded = (type) => {
+                                                                        const key = `${group.drawDate}-${type}`;
+                                                                        const manual = expandedSubCategories[key];
+                                                                        if (manual !== undefined) return manual;
+                                                                        // Defaults
+                                                                        if (type === 'winners') return true;
+                                                                        if (type === 'near') return winners.length === 0;
+                                                                        return false; // lose
+                                                                    };
+
+                                                                    return (
+                                                                        <>
+                                                                            {winners.length > 0 && (
+                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                                                    <div 
+                                                                                        onClick={() => toggleSubCategory(group.drawDate, 'winners')}
+                                                                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content' }}
+                                                                                    >
+                                                                                        {isSubExpanded('winners') ? <ChevronDown size={14} color="#10b981" /> : <ChevronRight size={14} color="#10b981" />}
+                                                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏆 Gewinnerlose</span>
+                                                                                        <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '1px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>{winners.length} Gewinner</span>
+                                                                                    </div>
+                                                                                    {isSubExpanded('winners') && (
+                                                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', animation: 'fadeInIn 0.2s ease-out' }}>
+                                                                                            {winners.map(ticket => renderHistoryTicket(ticket, group, 'winner'))}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                            {nearMisses.length > 0 && (
+                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                                                    <div 
+                                                                                        onClick={() => toggleSubCategory(group.drawDate, 'near')}
+                                                                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content' }}
+                                                                                    >
+                                                                                        {isSubExpanded('near') ? <ChevronDown size={14} color="#f59e0b" /> : <ChevronRight size={14} color="#f59e0b" />}
+                                                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎯 Knapp daneben</span>
+                                                                                        <span style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '1px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>{nearMisses.length} knapp</span>
+                                                                                    </div>
+                                                                                    {isSubExpanded('near') && (
+                                                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', animation: 'fadeInIn 0.2s ease-out' }}>
+                                                                                            {nearMisses.map(ticket => renderHistoryTicket(ticket, group, 'near'))}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                            {lose.length > 0 && (
+                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                                                    <div 
+                                                                                        onClick={() => toggleSubCategory(group.drawDate, 'lose')}
+                                                                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: 'fit-content' }}
+                                                                                    >
+                                                                                        {isSubExpanded('lose') ? <ChevronDown size={14} color="var(--text-muted)" /> : <ChevronRight size={14} color="var(--text-muted)" />}
+                                                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💀 Nieten</span>
+                                                                                        <span style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)', padding: '1px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>{lose.length} Nieten</span>
+                                                                                    </div>
+                                                                                    {isSubExpanded('lose') && (
+                                                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', animation: 'fadeInIn 0.2s ease-out' }}>
+                                                                                            {lose.map(ticket => renderHistoryTicket(ticket, group, 'lose'))}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         )}
                                                     </div>
@@ -971,8 +1308,24 @@ import '../index.css';
                                         {lottoData.lastDraw.superzahl || lottoData.lastDraw.super_number}
                                     </div>
                                 </div>
-                                <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px' }}>
-                                    Gewinnausschüttung: <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{(lottoData.lastDraw.total_payout / 100).toLocaleString()} KC</span>
+                                <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div>Gewinnausschüttung: <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{((lottoData.lastDraw?.drawTotalPayout ?? lottoData.lastDraw?.total_payout ?? 0) / 100).toLocaleString('de-DE')} KC</span></div>
+                                    {(() => {
+                                        const lastDrawGroup = lottoData.userHistory.find(g => g.drawDate === lottoData.lastDraw?.drawDate);
+                                        if (lastDrawGroup) {
+                                            const myWin = lastDrawGroup.tickets.reduce((sum, t) => sum + (t.winAmount ?? 0), 0);
+                                            return (
+                                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                                                    Dein Gewinn: {myWin > 0 ? (
+                                                        <span style={{ color: '#10b981', fontWeight: 800 }}>{(myWin / 100).toLocaleString('de-DE')} KC</span>
+                                                    ) : (
+                                                        <span style={{ color: 'var(--text-muted)' }}>– (Niete)</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                             </div>
                         ) : (
