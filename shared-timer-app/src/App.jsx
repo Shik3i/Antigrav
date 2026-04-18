@@ -13,6 +13,7 @@ import './index.css';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { PersistentDataProvider } from './context/PersistentDataContext';
+import { NewsProvider } from './context/NewsContext';
 import ToastContainer from './components/ToastContainer';
 
 // Hooks
@@ -379,6 +380,7 @@ function InnerApp() {
     <>
       <ToastContainer />
       <PersistentDataProvider socket={activeSocket}>
+        <NewsProvider>
         <EsportsNotificationHandler selectedLeagues={selectedLeagues} socket={activeSocket} enabled={esportsEnabled} />
         <GlobalAudioController socket={activeSocket} roomState={roomState} />
 
@@ -491,6 +493,7 @@ function InnerApp() {
             )}
           </div>
         </div>
+      </NewsProvider>
       </PersistentDataProvider>
     </>
   );

@@ -18,7 +18,7 @@ const RssNewsModal = ({ isOpen, onClose, news }) => {
                 <div className="rss-modal-header">
                     <h3>
                         <Rss size={20} style={{ color: 'var(--accent-primary)' }} />
-                        Aktuelle News (Tagesschau)
+                        Aktuelle News
                     </h3>
                     <button className="rss-modal-close" onClick={onClose}>
                         <X size={20} />

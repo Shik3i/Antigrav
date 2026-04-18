@@ -1,79 +1,73 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Rss, Filter, Settings, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Circle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Rss, Filter, Settings, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Circle, Layout, Zap, ChevronDown, ChevronRight, Monitor, X } from 'lucide-react';
 import { fetchJson } from '../utils/apiClient';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useNews } from '../context/NewsContext';
 
 const News = () => {
     const { token } = useAuth();
     const { showToast } = useToast();
-    const [feeds, setFeeds] = useState([]);
+    const { feeds, rssPrefs, updateRssPreference, isSidebarCollapsed, toggleSidebar } = useNews();
+    
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, [token]);
-
-    const loadData = async () => {
-        setLoading(true);
+    const loadArticles = useCallback(async (isSilent = false) => {
+        if (!isSilent) setLoading(true);
         try {
-            const [feedsData, articlesData] = await Promise.all([
-                fetchJson('/api/rss/feeds'),
-                fetchJson('/api/rss/articles', { token })
-            ]);
-            
-            setFeeds(feedsData);
+            const articlesData = await fetchJson('/api/rss/articles', { token });
             setArticles(articlesData);
         } catch (err) {
-            console.error('Failed to load news:', err);
-            showToast('Fehler beim Laden der Nachrichten', 'error');
+            console.error('Failed to load news articles:', err);
+            if (!isSilent) showToast('Fehler beim Laden der Nachrichten', 'error');
         } finally {
-            setLoading(false);
+            if (!isSilent) setLoading(false);
         }
-    };
+    }, [token, showToast]);
+
+    useEffect(() => {
+        loadArticles();
+    }, [loadArticles]);
 
     const handleManualRefresh = async () => {
         setIsRefreshing(true);
         try {
-            await loadData();
+            await loadArticles();
             showToast('Nachrichten aktualisiert', 'success');
         } finally {
             setIsRefreshing(false);
         }
     };
 
-    const toggleFeed = async (feedId) => {
-        if (!token) {
-            showToast('Bitte einloggen, um Filter zu speichern', 'info');
-            return;
+    const handleToggle = async (feedId, type, currentValue) => {
+        const newValue = !currentValue;
+        
+        // Optimistic Update in Context
+        updateRssPreference(feedId, type, newValue);
+
+        // If we toggled 'site' to TRUE, we should re-fetch articles to get the new ones
+        if (type === 'site' && newValue === true) {
+            loadArticles(true); // silent refresh
         }
-
-        const isCurrentlyVisible = articles.some(a => a.feedId === feedId);
-        const newIsHidden = isCurrentlyVisible;
-
-        try {
-            await fetchJson('/api/rss/preferences', {
-                method: 'POST',
-                token,
-                body: JSON.stringify({ feedId, isHidden: newIsHidden })
-            });
-
-            const updatedArticles = await fetchJson('/api/rss/articles', { token });
-            setArticles(updatedArticles);
-            
-            showToast(newIsHidden ? 'Feed ausgeblendet' : 'Feed eingeblendet', 'success');
-        } catch (err) {
-            showToast('Fehler beim Speichern der Präferenz', 'error');
-        }
+        
+        showToast(newValue ? 'Feed aktiviert' : 'Feed deaktiviert', 'success');
     };
 
-    // Performance Optimization: Memoize the grouping and sorting logic
-    const groupedArticles = useMemo(() => {
+    // Performance Optimization: Memoize the grouping and sorting logic 
+    // AND filter by showOnSite (for true optimistic feel)
+    const filteredArticles = useMemo(() => {
         if (!Array.isArray(articles)) return [];
-        
-        const grouped = articles.reduce((groups, art) => {
+        return articles.filter(art => {
+            const pref = rssPrefs[String(art.feedId)];
+            if (pref) return pref.showOnSite;
+            return true; // Default to visible
+        });
+    }, [articles, rssPrefs]);
+
+    const groupedArticles = useMemo(() => {
+        const grouped = filteredArticles.reduce((groups, art) => {
             const date = new Date(art.pubDate || art.cachedAt);
             const dateStr = date.toDateString();
             if (!groups[dateStr]) groups[dateStr] = [];
@@ -99,71 +93,45 @@ const News = () => {
                     articles: groupArticles
                 };
             });
-    }, [articles]);
+    }, [filteredArticles]);
 
     return (
         <div className="news-page-container">
             <header className="news-header">
                 <div className="news-header-title">
                     <div className="rss-icon-glow">
-                        <Rss size={32} />
+                        <Rss size={28} />
                     </div>
                     <div>
-                        <h1>Global News Reader</h1>
-                        <p>Bleibe auf dem Laufenden mit deinen favorisierten Quellen</p>
+                        <h1>NEWS READER</h1>
+                        <p>Deine personalisierten News-Feeds auf einen Blick</p>
                     </div>
                 </div>
-                <div className="news-header-actions">
-                    <button 
-                        className={`refresh-btn ${isRefreshing ? 'spinning' : ''}`}
-                        onClick={handleManualRefresh}
-                        disabled={loading}
-                        title="Neu laden"
-                    >
-                        <RefreshCw size={20} />
-                    </button>
+
+                <div className="news-header-meta">
+                    <div className="news-header-actions">
+                        <button 
+                            className={`manage-feeds-btn ${!isSidebarCollapsed ? 'active' : ''}`}
+                            onClick={toggleSidebar}
+                            title="Feeds verwalten"
+                        >
+                            <Settings size={20} />
+                            <span>Feeds</span>
+                        </button>
+
+                        <button 
+                            className={`refresh-btn ${isRefreshing || loading ? 'spinning' : ''}`}
+                            onClick={handleManualRefresh}
+                            disabled={loading || isRefreshing}
+                            title="Neu laden"
+                        >
+                            <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            <div className="news-layout-main">
-                <aside className="news-filters-sidebar glass-card">
-                    <div className="sidebar-group">
-                        <h3 className="flex-between">
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Filter size={18} /> Feed Quellen
-                            </span>
-                        </h3>
-                        <div className="feeds-list">
-                            {Array.isArray(feeds) && feeds.map(feed => {
-                                const isVisible = Array.isArray(articles) && articles.some(a => a?.feedId === feed?.id);
-                                return (
-                                    <div 
-                                        key={feed.id} 
-                                        className={`feed-source-item ${isVisible ? 'active' : 'hidden'}`}
-                                        onClick={() => toggleFeed(feed.id)}
-                                    >
-                                        <div className="feed-source-icon">
-                                            {feed.icon ? (
-                                                <img src={feed.icon} alt="" />
-                                            ) : (
-                                                <Rss size={16} />
-                                            )}
-                                        </div>
-                                        <span className="feed-source-name">{feed.name}</span>
-                                        <div className="feed-source-toggle">
-                                            {isVisible ? <CheckCircle2 size={16} color="var(--accent-primary)" /> : <Circle size={16} color="var(--text-muted)" />}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    <div className="sidebar-hint">
-                        <AlertCircle size={14} />
-                        Klicke auf eine Quelle, um sie ein- oder auszublenden.
-                    </div>
-                </aside>
-
+            <div className={`news-layout-standard ${!isSidebarCollapsed ? 'sidebar-open' : ''}`}>
                 <main className="news-articles-wall">
                     {loading ? (
                         <div className="news-loading-state">
@@ -174,8 +142,8 @@ const News = () => {
                         <div className="news-empty-state glass-card">
                             <Rss size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
                             <h3>Keine Nachrichten gefunden</h3>
-                            <p>Entweder sind alle Feeds ausgeblendet oder es gibt derzeit keine neuen Meldungen für deine Auswahl.</p>
-                            <button className="btn-primary" onClick={loadData} style={{ marginTop: '24px' }}>
+                            <p>Entweder sind alle Feeds deaktiviert oder es gibt derzeit keine neuen Meldungen für deine Auswahl.</p>
+                            <button className="btn-primary" onClick={() => loadArticles()} style={{ marginTop: '24px' }}>
                                 Erneut versuchen
                             </button>
                         </div>
@@ -213,10 +181,6 @@ const News = () => {
                                                     </div>
                                                     <h2 className="article-title">{art?.title || 'Kein Titel'}</h2>
                                                     <p className="article-snippet">{art?.snippet || ''}</p>
-                                                    <div className="article-footer-info">
-                                                        <span className="read-more">Bericht lesen</span>
-                                                        <ExternalLink size={14} />
-                                                    </div>
                                                 </div>
                                             </a>
                                         ))}
@@ -226,9 +190,75 @@ const News = () => {
                         </div>
                     )}
                 </main>
+
+                <aside className={`news-sidebar-drawer glass-card ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+                    <div className="drawer-header">
+                        <h3><Filter size={18} /> Quellen</h3>
+                        <button className="close-drawer" onClick={toggleSidebar}><X size={18} /></button>
+                    </div>
+                    
+                    <div className="drawer-content">
+                        <div className="feeds-list-vertical">
+                            {Array.isArray(feeds) && feeds.map(feed => {
+                                const pref = rssPrefs[String(feed.id)] || { showOnSite: true, showInTicker: feed.is_default };
+                                const { showOnSite, showInTicker } = pref;
+                                
+                                return (
+                                    <div key={feed.id} className={`feed-item-vertical ${showOnSite ? 'active' : ''}`}>
+                                        <div className="feed-info-box" onClick={() => handleToggle(feed.id, 'site', showOnSite)}>
+                                            <div className="feed-icon-small">
+                                                {(() => {
+                                                    const iconUrl = feed.icon || (feed.url ? `https://www.google.com/s2/favicons?domain=${new URL(feed.url).hostname}&sz=64` : null);
+                                                    return iconUrl ? (
+                                                        <img src={iconUrl} alt="" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+                                                    ) : (
+                                                        <Rss size={14} />
+                                                    );
+                                                })()}
+                                                <Rss size={14} style={{ display: 'none' }} />
+                                            </div>
+                                            <span className="feed-name-text">{feed.name}</span>
+                                        </div>
+                                        <div className="feed-actions-vertical">
+                                            <button 
+                                                className={`toggle-action site ${showOnSite ? 'active' : ''}`}
+                                                onClick={() => handleToggle(feed.id, 'site', showOnSite)}
+                                                title="Auf Seite"
+                                            >
+                                                <Layout size={14} />
+                                            </button>
+                                            <button 
+                                                className={`toggle-action ticker ${showInTicker ? 'active' : ''}`}
+                                                onClick={() => handleToggle(feed.id, 'ticker', showInTicker)}
+                                                title="Im Ticker"
+                                            >
+                                                <Zap size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="sidebar-hint" style={{ marginTop: '32px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-main)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                <AlertCircle size={14} /> Hilfe & Symbole
+                            </div>
+                            <p style={{ margin: '4px 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                                <Layout size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> 
+                                <b>Blau:</b> Feed auf dieser Seite anzeigen.
+                            </p>
+                            <p style={{ margin: '4px 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                                <Zap size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> 
+                                <b>Gelb:</b> Feed in den unteren News-Ticker einspeisen.
+                            </p>
+                        </div>
+                    </div>
+                </aside>
             </div>
+
         </div>
     );
 };
 
 export default News;
+

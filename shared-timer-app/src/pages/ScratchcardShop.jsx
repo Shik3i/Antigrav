@@ -216,7 +216,7 @@ const ScratchcardShop = () => {
             width: '100%',
             maxWidth: '1200px',
             margin: '0 auto',
-            padding: '40px 24px',
+            padding: '80px 24px 40px 24px', // Increased top padding to clear floating widgets
             flex: 1
             // Removed overflowY: auto to fix double scrollbar bug - page scrolls naturally
         },
@@ -228,7 +228,7 @@ const ScratchcardShop = () => {
             flexWrap: 'wrap',
             gap: '24px',
             position: 'relative',
-            zIndex: 100 // Ensure header content stays above the info banner
+            zIndex: 40 // Reduced to stay below floating widgets (z-index 50)
         },
         titleSection: {
             display: 'flex',

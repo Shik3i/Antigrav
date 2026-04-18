@@ -1564,7 +1564,20 @@ const Admin = ({ socket }) => {
                                 <div key={feed?.id || Math.random()} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                         <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                                            {feed?.icon ? <img src={feed.icon} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <LucideIcons.Rss size={24} color="var(--text-muted)" />}
+                                            {(() => {
+                                                const iconUrl = feed?.icon || (feed?.url ? `https://www.google.com/s2/favicons?domain=${new URL(feed.url).hostname}&sz=64` : null);
+                                                return iconUrl ? (
+                                                    <img 
+                                                        src={iconUrl} 
+                                                        alt="" 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                        onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.querySelector('.fallback-rss-icon').style.display = 'block'; }}
+                                                    />
+                                                ) : null;
+                                            })()}
+                                            <div className="fallback-rss-icon" style={{ display: feed?.icon || feed?.url ? 'none' : 'block' }}>
+                                                <LucideIcons.Rss size={24} color="var(--text-muted)" />
+                                            </div>
                                         </div>
                                         <div>
                                             <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{feed?.name || 'Unbenannter Feed'} {feed?.is_default ? <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>DEFAULT</span> : null}</div>

@@ -940,11 +940,33 @@ function initializeDatabaseSchema() {
   db.run(`CREATE TABLE IF NOT EXISTS UserRssPreferences (
     userId TEXT NOT NULL,
     feedId INTEGER NOT NULL,
-    isHidden BOOLEAN DEFAULT 0,
+    showOnSite BOOLEAN DEFAULT 1,
+    showInTicker BOOLEAN DEFAULT 0,
     PRIMARY KEY (userId, feedId),
     FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE,
     FOREIGN KEY(feedId) REFERENCES RssFeeds(id) ON DELETE CASCADE
   )`);
+
+  // Migration for UserRssPreferences
+  db.run("ALTER TABLE UserRssPreferences ADD COLUMN showOnSite BOOLEAN DEFAULT 1", () => {
+    // If we just added it, we want to migrate from isHidden if it existed
+    db.all("PRAGMA table_info(UserRssPreferences)", (err, columns) => {
+        if (!err && columns.some(c => c.name === 'isHidden')) {
+            db.run("UPDATE UserRssPreferences SET showOnSite = 0 WHERE isHidden = 1");
+        }
+    });
+  });
+  db.run("ALTER TABLE UserRssPreferences ADD COLUMN showInTicker BOOLEAN DEFAULT 0", () => {
+      // Default feeds (Tagesschau etc) should have showInTicker = 1 by default in preferences
+      db.run(`
+          INSERT OR IGNORE INTO UserRssPreferences (userId, feedId, showOnSite, showInTicker)
+          SELECT u.id, f.id, 1, 1
+          FROM Users u, RssFeeds f
+          WHERE f.is_default = 1
+      `);
+      // Also update existing preferences for default feeds
+      db.run("UPDATE UserRssPreferences SET showInTicker = 1 WHERE feedId IN (SELECT id FROM RssFeeds WHERE is_default = 1)");
+  });
 
   // Signal database is ready and mirror initial logs
   db.run("SELECT 1", () => {
@@ -4559,13 +4581,62 @@ module.exports = {
     });
   },
 
-  updateUserRssPreference: (userId, feedId, isHidden) => {
+  /**
+   * Optimized fetch for the News Ticker.
+   * Joins Artikel with Preferences to filter by showInTicker in a single query.
+   */
+  getTickerNews: (userId = null, limit = 50) => {
+      return new Promise((resolve, reject) => {
+          let query = `
+              SELECT a.*, f.name as feedName, f.icon as feedIcon
+              FROM RssArticles_Cache a
+              JOIN RssFeeds f ON a.feedId = f.id
+          `;
+          const params = [];
+
+          if (userId) {
+              // Get articles from feeds where user opted-in for Ticker
+              // OR default feeds if no specific preference entry exists for that feed yet
+              query += `
+                  LEFT JOIN UserRssPreferences p ON a.feedId = p.feedId AND p.userId = ?
+                  WHERE (p.showInTicker = 1) 
+                     OR (p.feedId IS NULL AND f.is_default = 1)
+              `;
+              params.push(userId);
+          } else {
+              // Guest: Just default feeds
+              query += ` WHERE f.is_default = 1 `;
+          }
+
+          query += ` ORDER BY a.pubDate DESC LIMIT ? `;
+          params.push(limit);
+
+          db.all(query, params, (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows || []);
+          });
+      });
+  },
+
+  updateUserRssPreference: (userId, feedId, showOnSite, showInTicker) => {
     return new Promise((resolve, reject) => {
-      db.run(`
-        INSERT INTO UserRssPreferences (userId, feedId, isHidden)
-        VALUES (?, ?, ?)
-        ON CONFLICT(userId, feedId) DO UPDATE SET isHidden = excluded.isHidden
-      `, [userId, feedId, isHidden ? 1 : 0], function (err) {
+      // Use COALESCE in the UPDATE part to preserve existing values if NULL is passed
+      const query = `
+        INSERT INTO UserRssPreferences (userId, feedId, showOnSite, showInTicker)
+        VALUES (?, ?, COALESCE(?, 1), COALESCE(?, 0))
+        ON CONFLICT(userId, feedId) DO UPDATE SET 
+          showOnSite = CASE WHEN excluded.showOnSite IS NOT NULL THEN excluded.showOnSite ELSE UserRssPreferences.showOnSite END,
+          showInTicker = CASE WHEN excluded.showInTicker IS NOT NULL THEN excluded.showInTicker ELSE UserRssPreferences.showInTicker END
+      `;
+      
+      const params = [
+          userId, 
+          feedId, 
+          showOnSite === undefined ? null : (showOnSite ? 1 : 0), 
+          showInTicker === undefined ? null : (showInTicker ? 1 : 0)
+      ];
+
+      db.run(query, params, function (err) {
         if (err) reject(err);
         else resolve(this.changes);
       });
@@ -4574,7 +4645,7 @@ module.exports = {
 
   getUserRssPreferences: (userId) => {
     return new Promise((resolve, reject) => {
-      db.all('SELECT feedId, isHidden FROM UserRssPreferences WHERE userId = ?', [userId], (err, rows) => {
+      db.all('SELECT feedId, showOnSite, showInTicker FROM UserRssPreferences WHERE userId = ?', [userId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
