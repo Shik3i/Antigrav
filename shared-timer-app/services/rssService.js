@@ -64,11 +64,18 @@ async function refreshFeed(feedId, url) {
         // Limit to last 100 articles to prevent DB bloat
         const limitedArticles = articles.slice(0, 100);
 
-        await dbLayer.updateRssArticlesCache(feedId, limitedArticles);
-        return limitedArticles.length;
+        // [Audit Fix] Only update cache if we actually found items. 
+        // This prevents flushing the cache if a feed temporarily returns empty XML or an error page.
+        if (limitedArticles.length > 0) {
+            await dbLayer.updateRssArticlesCache(feedId, limitedArticles);
+            return limitedArticles.length;
+        } else {
+            console.warn(`[RSS Service] Sync for feed ${feedId} returned no items. Keeping existing cache.`);
+            return 0;
+        }
     } catch (err) {
         console.error(`[RSS Service] Failed to refresh feed ${feedId} (${url}):`, err.message);
-        throw err; // Re-throw to allow caller to handle/log
+        throw err;
     }
 }
 

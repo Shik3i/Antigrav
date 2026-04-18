@@ -94,7 +94,8 @@ module.exports = function (io) {
         // Global Data Fetchers (Bypasses Express HTTP Rate Limiting)
         socket.on(EVENTS.GET_API_NEWS, async () => {
             try {
-                const data = await apiController.fetchNewsData();
+                const userId = socket.user?.userId || null;
+                const data = await apiController.fetchNewsData(userId);
                 safeEmit(socket, EVENTS.API_NEWS_DATA, data);
             } catch (err) {
                 console.error('Socket fetchNewsData error:', err.message);

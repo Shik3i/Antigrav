@@ -276,7 +276,7 @@ const TowerClimb = () => {
   }
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '64px' }}>
+    <div className="animate-fade-in" style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '64px', paddingTop: '80px' }}>
       <style>
         {`
           @keyframes subtle-shake {

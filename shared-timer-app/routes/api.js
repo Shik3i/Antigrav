@@ -240,6 +240,7 @@ router.delete('/admin/market/:id/hard', authController.authenticateToken, market
 // ─── RSS News ─────────────────────────────────────────────────
 router.get('/rss/feeds', apiController.getRssFeeds);
 router.get('/rss/articles', authController.optionalAuthenticateToken, apiController.getRssArticles);
+router.get('/rss/preferences', authController.authenticateToken, apiController.getUserRssPreferences);
 router.post('/rss/preferences', authController.authenticateToken, apiController.updateRssPreference);
 
 // RSS Admin

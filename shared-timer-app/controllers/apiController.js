@@ -45,23 +45,23 @@ exports.getActivityHistory = async (req, res, next) => {
     }
 };
 
-exports.fetchNewsData = async () => {
+exports.fetchNewsData = async (userId = null) => {
     try {
-        // Return Tagesschau articles from cache
-        const feeds = await dbLayer.getRssFeeds();
-        const tagesschau = feeds.find(f => f.is_default || f.name.toLowerCase().includes('tagesschau'));
-        if (!tagesschau) return [];
+        // [Audit Fix] Using optimized JOIN method to reduce DB trips and simplify logic
+        const articles = await dbLayer.getTickerNews(userId, 50);
         
-        const articles = await dbLayer.getCachedArticles([tagesschau.id], 15);
         return articles.map(a => ({
             title: a.title,
             link: a.link,
             imageUrl: a.imageUrl,
             snippet: a.snippet,
-            pubDate: a.pubDate
+            pubDate: a.pubDate,
+            feedId: a.feedId,
+            feedName: a.feedName,
+            feedIcon: a.feedIcon
         }));
     } catch (err) {
-        console.error('fetchNewsData error:', err);
+        console.error('[API Controller] fetchNewsData error:', err);
         return [];
     }
 };
@@ -1680,20 +1680,25 @@ exports.getRssFeeds = async (req, res, next) => {
 exports.getRssArticles = async (req, res, next) => {
     try {
         const userId = req.user?.userId || req.user?.id;
-        let hiddenFeedIds = [];
+        
+        // [Audit Fix] Move filtering logic to SQL level for better performance
+        let visibleFeedIds = null;
+
         if (userId) {
             const prefs = await dbLayer.getUserRssPreferences(userId);
-            hiddenFeedIds = prefs.filter(p => p.isHidden).map(p => p.feedId);
+            const allFeeds = await dbLayer.getRssFeeds();
+            
+            visibleFeedIds = allFeeds
+                .filter(f => {
+                    const pref = prefs.find(p => p.feedId === f.id);
+                    // Default to shown (1) if no preference entry exists yet
+                    return pref ? !!pref.showOnSite : true;
+                })
+                .map(f => f.id);
+            
+            if (visibleFeedIds.length === 0) return res.json([]);
         }
 
-        const allFeeds = await dbLayer.getRssFeeds();
-        const visibleFeedIds = allFeeds
-            .filter(f => !hiddenFeedIds.includes(f.id))
-            .map(f => f.id);
-
-        if (visibleFeedIds.length === 0) return res.json([]);
-
-        // Get up to 100 articles from cache
         const articles = await dbLayer.getCachedArticles(visibleFeedIds, 100);
         res.json(articles);
     } catch (err) {
@@ -1701,13 +1706,25 @@ exports.getRssArticles = async (req, res, next) => {
     }
 };
 
-exports.updateRssPreference = async (req, res, next) => {
+exports.getUserRssPreferences = async (req, res, next) => {
     try {
-        const { feedId, isHidden } = req.body;
         const userId = req.user?.userId || req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
         
-        await dbLayer.updateUserRssPreference(userId, feedId, isHidden);
+        const prefs = await dbLayer.getUserRssPreferences(userId);
+        res.json(prefs);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.updateRssPreference = async (req, res, next) => {
+    try {
+        const { feedId, showOnSite, showInTicker } = req.body;
+        const userId = req.user?.userId || req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        
+        await dbLayer.updateUserRssPreference(userId, feedId, showOnSite, showInTicker);
         res.json({ success: true });
     } catch (err) {
         next(err);
