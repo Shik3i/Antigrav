@@ -1,5 +1,11 @@
 [
   {
+    "id": 45,
+    "version": "2.28.1",
+    "date": "2026-04-18",
+    "changes": "- **Mixed Content Fix**: Alle LoL Esports Teamlogos werden nun systemweit via HTTPS erzwungen.\n- **Backend Sanitization**: Proaktive Konvertierung von Bild-URLs direkt beim Abruf von der LoL Esports API.\n- **Frontend Fallback**: Implementierung von HTTPS-Fallbacks in den Rubbellos-, Esports- und Wett-Dashboard Komponenten zur Behebung von Browser-Sicherheitswarnungen."
+  },
+  {
     "id": 44,
     "version": "2.28.0",
     "date": "2026-04-18",
