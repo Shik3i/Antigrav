@@ -194,13 +194,13 @@ async function getEsportsSchedule(options = {}) {
                     name: event.match?.teams?.[0]?.name || 'TBD',
                     code: team1Code,
                     polymarketCode: getMappedCode(team1Code),
-                    image: event.match?.teams?.[0]?.image || null
+                    image: (event.match?.teams?.[0]?.image || '').replace('http://', 'https://') || null
                 },
                 team2: {
                     name: event.match?.teams?.[1]?.name || 'TBD',
                     code: team2Code,
                     polymarketCode: getMappedCode(team2Code),
-                    image: event.match?.teams?.[1]?.image || null
+                    image: (event.match?.teams?.[1]?.image || '').replace('http://', 'https://') || null
                 }
             };
         });
@@ -223,7 +223,7 @@ async function syncEsportsTeams(options = {}) {
                     code: team.code,
                     name: team.name,
                     league: team.homeLeague?.name || 'Unknown',
-                    image: team.image
+                    image: team.image ? team.image.replace('http://', 'https://') : null
                 });
             });
 

@@ -164,7 +164,8 @@ const ScratchcardShop = () => {
 
     const findTeamImage = (code) => {
         const team = teams.find(t => t.code === code);
-        return team ? team.image : null;
+        if (!team || !team.image) return null;
+        return team.image.replace('http://', 'https://');
     };
 
     const findWinningLines = (grid) => {
@@ -1040,7 +1041,7 @@ const ScratchcardShop = () => {
                                             background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)'
                                         }}>
                                             <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', width: '20px' }}>#{rank}</span>
-                                            {teamInfo?.image && <img src={teamInfo.image} alt="" width="24" height="24" loading="lazy" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
+                                            {teamInfo?.image && <img src={teamInfo.image.replace('http://', 'https://')} alt="" width="24" height="24" loading="lazy" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />}
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white' }}>{teamInfo?.name || t.team_code}</div>
                                             </div>

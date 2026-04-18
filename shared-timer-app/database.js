@@ -845,6 +845,12 @@ function initializeDatabaseSchema() {
   });
   
 
+  // Force HTTPS for LoL Esports team logos to prevent mixed content warnings
+  console.log('[Migration] Ensuring HTTPS for LoL Esports team logos...');
+  db.run("UPDATE EsportsTeams SET image = REPLACE(image, 'http://', 'https://') WHERE image LIKE 'http://static.lolesports.com/%'");
+  db.run("UPDATE Bets SET team1Logo = REPLACE(team1Logo, 'http://', 'https://') WHERE team1Logo LIKE 'http://static.lolesports.com/%'");
+  db.run("UPDATE Bets SET team2Logo = REPLACE(team2Logo, 'http://', 'https://') WHERE team2Logo LIKE 'http://static.lolesports.com/%'");
+
   // Signal database is ready and mirror initial logs
   db.run("SELECT 1", () => {
     console.log('Database initialized and ready for system logging');

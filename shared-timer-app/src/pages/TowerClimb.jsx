@@ -25,13 +25,34 @@ const TowerClimb = () => {
   const [activeRound, setActiveRound] = useState(null);
   const [latestRound, setLatestRound] = useState(null);
   const [history, setHistory] = useState([]);
-  const [bet, setBet] = useState(500);
-  const [tilesPerLevel, setTilesPerLevel] = useState(3);
-  const [autoStartRounds, setAutoStartRounds] = useState(false);
+  const [bet, setBet] = useState(() => {
+    const saved = localStorage.getItem('tower_climb_bet');
+    return saved ? parseInt(saved, 10) : 500;
+  });
+  const [tilesPerLevel, setTilesPerLevel] = useState(() => {
+    const saved = localStorage.getItem('tower_climb_tiles');
+    return saved ? parseInt(saved, 10) : 3;
+  });
+  const [autoStartRounds, setAutoStartRounds] = useState(() => {
+    return localStorage.getItem('tower_climb_autostart') === 'true';
+  });
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(false);
   const [revealingTile, setRevealingTile] = useState(null); // { level: number, index: number }
   const [error, setError] = useState('');
+
+  // Persist settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('tower_climb_bet', bet);
+  }, [bet]);
+
+  useEffect(() => {
+    localStorage.setItem('tower_climb_tiles', tilesPerLevel);
+  }, [tilesPerLevel]);
+
+  useEffect(() => {
+    localStorage.setItem('tower_climb_autostart', autoStartRounds);
+  }, [autoStartRounds]);
 
   const syncBalance = useCallback((newBalance) => {
     if (!Number.isFinite(newBalance)) return;
