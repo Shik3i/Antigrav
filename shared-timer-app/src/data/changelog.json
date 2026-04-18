@@ -1,5 +1,11 @@
 [
   {
+    "id": 57,
+    "version": "2.35.5",
+    "date": "2026-04-18",
+    "changes": "- **Deathroll UI Refresh**: Neue 4-stellige Anzeige mit gedimmten führenden Nullen, abgestuftem Glow und klarerem Danger-Look bei niedrigen Werten.\n- **Deathroll Animation**: Roll-Animation verlängert und auf ein saubereres Einrasten abgestimmt, damit Werte lesbar bleiben.\n- **Deathroll Typography Polish**: Ziffern optisch nachgeschärft und vertikal feiner ausgerichtet für ein zentrierteres Gesamtbild."
+  },
+  {
     "id": 56,
     "version": "2.35.4",
     "date": "2026-04-18",
