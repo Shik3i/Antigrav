@@ -1,33 +1,314 @@
-# 🐨 Antigravity Room & Casino
+# 🚀 Antigrav
 
-Eine Echtzeit-Webanwendung für kollaborative Fokus-Sitzungen, kombiniert mit sozialen Minigames und einem Belohnungssystem.
+Antigrav ist eine Echtzeit-Webanwendung mit sozialem Fokus. Das Projekt kombiniert synchronisierte Räume, Fortschritts- und Belohnungssysteme, Browser-Games, Countdowns, Wettbewerbe sowie datengetriebene Bereiche wie Esports, Märkte und API-Integrationen in einer gemeinsamen Plattform.
 
-## 🚀 Features
+---
 
-### ⏱️ Room Timer & Management
-- **Synchronisierte Timer:** Alle Nutzer im Raum sehen denselben Countdown.
-- **Admin-Controls:** Raum-Admins können den Timer starten, pausieren oder vorzeitig beenden.
-- **Intelligenter Notaus:** Beim vorzeitigen Beenden werden Belohnungen (KoalaCoins) anteilig basierend auf der abgelaufenen Zeit ausgeschüttet.
-- **Auto-Restart:** Optionale Funktion für automatische Fokus-Zyklen.
+## ✨ Überblick
 
-### 🎮 Social Minigames (PvP)
-- **Visual Coinflip:** Ein synchronisierter 3D-Münzwurf für alle Nutzer im Raum mit Echtzeit-Ergebnisanzeige.
-- **Interactive Deathroll:** Ein Würfel-Duell-System mit abnehmendem Max-Wert, bis jemand die "1" würfelt.
-- **Echtzeit-Updates:** Alle Interaktionen werden via WebSockets ohne Verzögerung an alle Raummitglieder übertragen.
+Die Anwendung besteht aus:
 
-### 💰 Economy System
-- **KoalaCoins (KC):** Belohnungssystem für absolvierte Zeit im Timer.
-- **Leveling:** Fortschrittssystem basierend auf der Aktivität in den Räumen.
+- **React + Vite** im Frontend
+- **Node.js + Express** im Backend
+- **Socket.io** für Echtzeitfunktionen
+- **SQLite** als persistente Datenbank
+- einer optionalen **Browser-Erweiterung** in `SyncExtension/`
 
-## 🛠️ Tech Stack
+Antigrav ist damit deutlich mehr als nur ein geteilter Timer oder ein kleines Casino-Modul. Die Plattform bündelt mehrere soziale, spielerische und datenbasierte Features in einer Anwendung.
 
-- **Frontend:** React, Vite, Lucide-React (Icons), CSS3 Animations
-- **Backend:** Node.js, Express
-- **Echtzeit:** Socket.io (WebSockets)
-- **Datenbank:** SQLite / JSON-Store (je nach Konfiguration)
+---
 
-## 📦 Installation & Start
+## 🧩 Hauptfunktionen
 
-1. **Abhängigkeiten installieren:**
-   ```bash
-   npm install
+### 🏠 Räume und Echtzeitfunktionen
+- synchronisierte Räume mit gemeinsamem State
+- Echtzeit-Updates über Socket.io
+- geteilte Timer- und Countdown-Funktionen
+- soziale Interaktionen in Lobby- und Raumkontexten
+
+### 👤 Nutzerkonto und Social Features
+- Registrierung und Login
+- Profile und Einstellungen
+- Freundesfunktionen
+- Achievements und Fortschrittssysteme
+- Highscores und Leaderboards
+- Admin-Bereich für Verwaltung und Monitoring
+
+### 🎮 Spiele und interaktive Module
+- Speedcube Timer
+- Wordle
+- Tower Climb
+- Lotto
+- Scratchcards / Scratchcard Shop
+- Rift Defense
+- Koala Flap
+- Color Sync
+- Tetris
+- LoL Idle / Road to Worlds
+
+### 📊 Daten- und Eventbereiche
+- Esports-Ansichten
+- Polymarket- / Marktbereiche
+- globale Wetten / Betting-Funktionen
+- Changelog
+- Feature Requests
+- gemeinsame Countdowns
+
+### 🔌 Erweiterbarkeit
+- REST-API über Express
+- Browser-Erweiterung im Projekt enthalten
+- externe Integrationen, z. B. Twitch oder Odds API
+
+---
+
+## 🛠️ Tech-Stack
+
+### Frontend
+- React
+- Vite
+- React Router
+- Recharts
+- Lucide React
+
+### Backend
+- Node.js
+- Express
+- Socket.io
+- SQLite
+- JSON Web Tokens
+
+### Infrastruktur
+- Docker / Docker Compose
+- Umgebungsvariablen für Konfiguration und externe APIs
+
+---
+
+## 🗂️ Projektstruktur
+
+```text
+Antigrav-main/
+├── README.md
+├── SyncExtension/          # Browser-Erweiterung
+└── shared-timer-app/
+    ├── src/                # React-Frontend
+    ├── controllers/        # API- und Business-Logik
+    ├── routes/             # Express-Routen
+    ├── sockets/            # Socket.io-Handler
+    ├── services/           # Externe Dienste / Integrationen
+    ├── cron/               # Hintergrundjobs
+    ├── public/             # Öffentliche Assets
+    ├── config/
+    ├── utils/
+    ├── server.js           # Express- und Socket-Server
+    ├── database.js         # SQLite-Anbindung
+    ├── restart_server.sh   # Neustart-Skript Linux/macOS
+    ├── restart_server.bat  # Neustart-Skript Windows
+    ├── package.json
+    └── docker-compose.yml
+```
+
+---
+
+## 🚀 Lokales Setup
+
+### Voraussetzungen
+- Node.js
+- npm
+- optional: Docker und Docker Compose
+
+### Installation
+
+```bash
+cd shared-timer-app
+npm install
+```
+
+### Entwicklung starten
+
+```bash
+npm run dev
+```
+
+Hinweis: `npm run dev` startet die Vite-Entwicklungsumgebung für das Frontend.
+
+### Produktionsbuild erstellen
+
+```bash
+npm run build
+```
+
+### Anwendung im Produktionsmodus starten
+
+```bash
+npm start
+```
+
+Standardmäßig läuft der Server auf Port `3001`, sofern kein anderer Port per Umgebungsvariable gesetzt wird.
+
+---
+
+## ⚙️ Konfiguration per Umgebungsvariablen
+
+Im Projekt werden aktuell unter anderem diese Variablen verwendet:
+
+- `PORT` – Port des Backends
+- `DB_PATH` – Pfad zur SQLite-Datenbank
+- `JWT_SECRET` – Secret für Token / Authentifizierung
+- `ADMIN_PASSWORD` – Passwort für Admin-Funktionen
+- `THE_ODDS_API_KEY` – API-Key für Odds-/Betting-Daten
+- `TWITCH_CLIENT_ID` – Twitch Client ID
+- `TWITCH_CLIENT_SECRET` – Twitch Client Secret
+
+Beispiel:
+
+```env
+PORT=3001
+DB_PATH=./data/timer.db
+JWT_SECRET=change-me
+ADMIN_PASSWORD=change-me
+THE_ODDS_API_KEY=
+TWITCH_CLIENT_ID=
+TWITCH_CLIENT_SECRET=
+```
+
+---
+
+## 🐳 Docker
+
+Im Ordner `shared-timer-app/` liegt eine `docker-compose.yml` für den Containerbetrieb.
+
+Typischer Ablauf:
+
+```bash
+cd shared-timer-app
+docker compose up --build
+```
+
+Wichtig:
+- das Datenverzeichnis wird als Volume eingebunden
+- die SQLite-Datenbank kann so persistent gespeichert werden
+- produktive Secrets und API-Keys sollten **nicht fest in Compose-Dateien** gepflegt werden
+
+
+---
+
+## 🔁 DevOps-Routine im Alltag
+
+Für kleine und größere Änderungen ist eine einfache DevOps-Routine sinnvoll, damit der Stand im Projekt sauber bleibt.
+
+Empfohlener Ablauf:
+
+1. **Git-Status prüfen**
+2. **Änderungen sinnvoll zusammenfassen**
+3. **Build / Funktion kurz prüfen**
+4. **sauber committen**
+5. **pushen oder PR erstellen**
+
+Typische Befehle:
+
+```bash
+git status
+git diff --stat
+git add .
+git commit -m "feat: describe your change"
+git push
+```
+
+Warum das hilfreich ist:
+
+- kleine Änderungen bleiben nachvollziehbar
+- Fehlerquellen werden früher sichtbar
+- Commits und PRs werden für andere Entwickler leichter prüfbar
+- Refactorings, Hotfixes und Feature-Arbeit lassen sich sauber trennen
+
+Gerade in einem Projekt mit mehreren Modulen, Echtzeitlogik, API-Routen und Frontend-Komponenten lohnt sich diese Routine auch bei kleineren Anpassungen.
+
+---
+
+## 🔄 Nutzung von `restart_server.sh` und `restart_server.bat`
+
+Im Projekt liegen zwei Hilfsskripte für den Neustart im produktionsnahen lokalen Betrieb:
+
+- `restart_server.sh` für **Linux / macOS**
+- `restart_server.bat` für **Windows**
+
+### Was die Skripte tun
+
+#### `restart_server.sh`
+- wechselt in das Projektverzeichnis
+- beendet einen laufenden Prozess auf dem konfigurierten Port
+- erstellt den Frontend-Build neu
+- startet anschließend den Server
+
+Aufruf:
+
+```bash
+./restart_server.sh
+```
+
+Optional mit anderem Port:
+
+```bash
+PORT=3001 ./restart_server.sh
+```
+
+#### `restart_server.bat`
+- beendet laufende `node.exe`-Prozesse
+- baut das Frontend neu
+- startet den Server erneut
+
+Aufruf unter Windows:
+
+```bat
+restart_server.bat
+```
+
+### Wann die Skripte sinnvoll sind
+
+Diese Skripte sind nützlich, wenn du:
+
+- nach Änderungen schnell einen frischen Produktionsstart brauchst
+- lokal ohne Prozessmanager testest
+- Build + Start mit einem Schritt ausführen willst
+
+### Wichtiger Hinweis
+
+`restart_server.bat` beendet aktuell **alle** laufenden `node.exe`-Prozesse. Das ist praktisch, kann aber problematisch sein, wenn auf dem System noch andere Node-Anwendungen laufen.
+
+Für lokale Entwicklung mit Hot Reload bleibt meist weiterhin besser geeignet:
+
+```bash
+npm run dev
+```
+
+---
+
+## 🌐 API und Echtzeit
+
+- REST-Endpunkte laufen unter `/api`
+- Echtzeitkommunikation wird über Socket.io umgesetzt
+- das Backend übernimmt zusätzlich Cronjobs und Hintergrundverarbeitung
+
+---
+
+## 🧩 Browser-Erweiterung
+
+Im Projekt ist mit `SyncExtension/` eine Browser-Erweiterung enthalten. Wenn die Erweiterung Teil des Deployments sein soll, sollte sie separat dokumentiert, gebaut und versioniert werden.
+
+---
+
+## 📝 Dokumentationsstatus
+
+Diese README beschreibt das Projekt auf Basis der aktuellen Struktur deutlich passender als die frühere Timer-/Casino-Beschreibung. Für ein späteres Feintuning wären zusätzlich sinnvoll:
+
+- genaue Startanleitung für den kombinierten Frontend-/Backend-Workflow
+- Beschreibung der wichtigsten API-Endpunkte
+- Dokumentation der Admin-Funktionen
+- separate README für `SyncExtension/`
+- `.env.example` für einfacheres Setup
+
+---
+
+## 📄 Lizenz
+
+Derzeit ist im Projekt keine weiter ausgearbeitete öffentliche Projektdokumentation zur Lizenz enthalten. Falls das Projekt geteilt oder veröffentlicht wird, sollte die Lizenz explizit ergänzt werden.
