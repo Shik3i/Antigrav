@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Maximize2, ChevronDown, Settings, Coins, Swords, Dices } from 'lucide-react';
+import { Maximize2, ChevronDown, Settings } from 'lucide-react';
 import Timer from '../components/Timer';
 import ReactionBar from '../components/ReactionBar';
 import MemberPanel from '../components/MemberPanel';
 import PersonalCounter from '../components/PersonalCounter';
+import DeathrollWidget from '../components/DeathrollWidget';
 import EVENTS from '../../socketEvents.json';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import ClockWidget from '../components/ClockWidget';
@@ -404,49 +405,13 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
 
                 {/* Minigames: Deathroll Widget */}
                 {roomState.state.activeDeathroll && !isZenMode && (
-                    <div className="glass-card animate-fade-in" style={{
-                        marginTop: '24px', padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-                        border: '1px solid rgba(239, 68, 68, 0.4)', background: 'rgba(20, 24, 30, 0.8)', boxShadow: '0 10px 30px rgba(239, 68, 68, 0.15)',
-                        maxWidth: '400px', width: '100%', position: 'relative', overflow: 'hidden'
-                    }}>
-                        {/* Background subtle pulse */}
-                        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at center, rgba(239, 68, 68, 0.1) 0%, transparent 70%)', zIndex: 0 }} />
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
-                            <Swords size={28} color="#ef4444" />
-                            <h3 style={{ fontSize: '1.4rem', color: 'var(--text-main)', margin: 0 }}>Deathroll</h3>
-                        </div>
-                        
-                        <div style={{ textAlign: 'center', zIndex: 1 }}>
-                            <div style={{ fontSize: '1.1rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                                <strong style={{ color: 'var(--accent-primary)' }}>{roomState.state.activeDeathroll.lastRoller}</strong> hat gewürfelt:
-                            </div>
-                            <div className="dice-shake" style={{ fontSize: '3rem', fontWeight: 900, color: roomState.state.activeDeathroll.isComplete ? '#ef4444' : '#fff', textShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>
-                                {roomState.state.activeDeathroll.currentMax}
-                            </div>
-                        </div>
-
-                        {roomState.state.activeDeathroll.isComplete ? (
-                            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ef4444', textAlign: 'center', marginTop: '8px', zIndex: 1, padding: '8px 16px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
-                                {roomState.state.activeDeathroll.lastRoller} hat verloren!
-                            </div>
-                        ) : (
-                            <button 
-                                type="button"
-                                className="btn-primary" 
-                                style={{ width: '100%', justifyContent: 'center', fontSize: '1.1rem', padding: '16px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-main)', zIndex: 1 }}
-                                disabled={(roomState.state.activeDeathroll.lastRoller === user.displayName || roomState.state.activeDeathroll.lastRoller === user.username)}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const cleanRoomId = String(id);
-                                    socket.emit(EVENTS.ROLL_DEATHROLL, { roomId: cleanRoomId });
-                                }}
-                            >
-                                <Dices size={20} /> {(roomState.state.activeDeathroll.lastRoller === user.displayName || roomState.state.activeDeathroll.lastRoller === user.username) ? 'Warten auf andere...' : `Antworten (1 - ${roomState.state.activeDeathroll.currentMax})`}
-                            </button>
-                        )}
-                    </div>
+                    <DeathrollWidget
+                        deathroll={roomState.state.activeDeathroll}
+                        user={user}
+                        roomId={id}
+                        socket={socket}
+                        rollEvent={EVENTS.ROLL_DEATHROLL}
+                    />
                 )}
 
                 {/* Statistics display */}

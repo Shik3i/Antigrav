@@ -886,8 +886,54 @@ body.zen-mode .news-ticker-wrapper {
   animation: coin-flip 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
 }
 
-.dice-shake {
-  animation: diceShake 0.4s ease-in-out infinite;
+@keyframes deathrollRoll {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  14% {
+    transform: translateY(-6px) scale(1.025) rotate(-0.7deg);
+    filter: brightness(1.05);
+  }
+  30% {
+    transform: translateY(5px) scale(0.985) rotate(0.8deg);
+    filter: brightness(0.98);
+  }
+  48% {
+    transform: translateY(-4px) scale(1.02) rotate(-0.6deg);
+    filter: brightness(1.04);
+  }
+  66% {
+    transform: translateY(3px) scale(0.992) rotate(0.45deg);
+    filter: brightness(0.99);
+  }
+  82% {
+    transform: translateY(-1px) scale(1.01);
+    filter: brightness(1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes deathrollDigitReveal {
+  0% {
+    transform: translateY(12px) scale(0.94);
+    opacity: 0.38;
+  }
+  58% {
+    transform: translateY(-3px) scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-2px) scale(1);
+    opacity: 1;
+  }
+}
+
+.deathroll-roll {
+  animation: deathrollRoll 1180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ─── Pokémon Light Mode (Force Light Theme) ─── */
