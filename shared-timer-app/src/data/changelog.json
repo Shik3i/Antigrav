@@ -1,5 +1,11 @@
 [
   {
+    "id": 63,
+    "version": "2.38.1",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Status-UX**: Die doppelte Anzeige fuer Zugstatus und Countdown wurde entfernt und in einem einzigen Statusblock oben rechts zusammengefuehrt.\n- **Blackjack Layout-Tuning**: Der mittige Tischbereich zeigt nun nur noch die ruhige Tischmarke statt redundanter Timer-Informationen."
+  },
+  {
     "id": 62,
     "version": "2.38.0",
     "date": "2026-04-19",

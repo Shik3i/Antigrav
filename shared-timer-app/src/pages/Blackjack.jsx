@@ -964,10 +964,10 @@ const Blackjack = ({ socket }) => {
                 KoalaSync Casino
               </div>
               <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#f8fafc', marginBottom: '6px' }}>
-                {STATUS_LABELS[roomState?.status] || 'Bereit'}
+                Blackjack Table
               </div>
               <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.86rem' }}>
-                {roomState?.currentPlayerTurn ? `Aktiver Zug läuft. Auto-Stand in ${turnCountdownSeconds}s.` : autoStartSeconds !== null ? `Nächste Runde startet automatisch in ${autoStartSeconds}s.` : 'Neue Einsätze können gesetzt werden.'}
+                6-Deck-Shoe, Live-Raum und Settlement am Tisch.
               </div>
             </div>
 
