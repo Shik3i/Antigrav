@@ -74,5 +74,6 @@
     "START_DEATHROLL": "start_deathroll",
     "ROLL_DEATHROLL": "roll_deathroll",
     "DEATHROLL_UPDATE": "deathroll_update",
-    "LOTTO_DRAW_RESULT": "lotto_draw_result"
+    "LOTTO_DRAW_RESULT": "lotto_draw_result",
+    "UPDATE_PREFERENCES": "update_preferences"
 }

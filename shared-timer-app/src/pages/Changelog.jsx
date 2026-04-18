@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, Calendar } from 'lucide-react';
+import { History, Calendar, Github, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Changelog = () => {
@@ -48,6 +48,38 @@ const Changelog = () => {
                     <History size={32} color="var(--accent-primary)" />
                     <h1 style={{ margin: 0, fontSize: '2.5rem' }}>System Changelog</h1>
                 </div>
+                <a 
+                    href="https://github.com/Shik3i/Antigrav" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="glass-card"
+                    style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        padding: '8px 16px',
+                        color: 'var(--text-muted)', 
+                        textDecoration: 'none',
+                        fontSize: '0.85rem',
+                        transition: 'all 0.2s ease',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'var(--accent-primary)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                >
+                    <Github size={16} />
+                    <span>Private Repository</span>
+                    <ExternalLink size={12} style={{ opacity: 0.5 }} />
+                </a>
             </div>
 
             <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>

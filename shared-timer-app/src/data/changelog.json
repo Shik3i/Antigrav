@@ -1,5 +1,11 @@
 [
   {
+    "id": 49,
+    "version": "2.32.0",
+    "date": "2026-04-18",
+    "changes": "- **Stabilitäts-Refactoring**: Umstellung des Sockets auf useRef zur Vermeidung unnötiger Re-Renders.\n- **Initialisierungs-Sicherung**: Implementierung eines robusten hasInstance-Guards in App.jsx zur Vermeidung von Ladefehlern.\n- **Performance-Optimierung**: Memoization der Navigations-Groups und täglichen Badges in der Sidebar für maximale Effizienz.\n- **UX-Polishing**: Automatischer 30-Sekunden-Timeout für Raumeinladungen und resilientes Re-Join-Verhalten.\n- **Code-Hygiene**: Bereinigung der Import-Struktur und Konsolidierung der Socket-Cleanup-Routinen."
+  },
+  {
     "id": 48,
     "version": "2.31.0",
     "date": "2026-04-18",

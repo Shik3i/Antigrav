@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Clock, Users, Trophy, Settings, LayoutDashboard, Play, Pause, Maximize2, LogIn, LogOut, BarChart3, Timer, TrendingUp, Target, ChevronDown, ChevronRight, ListTodo, Palette, Lightbulb, Gamepad2, History, Grid3X3, Shield } from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
@@ -10,6 +10,33 @@ import { prefetchRoute } from '../utils/prefetchRoutes';
 const SharedTodo = React.lazy(() => import('./SharedTodo'));
 const SharedCanvas = React.lazy(() => import('./SharedCanvas'));
 
+const iconMap = {
+    'dashboard': <LayoutDashboard size={18} />,
+    'countdowns': <Timer size={18} />,
+    'speedcube': <Grid3X3 size={18} />,
+    'statistics': <BarChart3 size={18} />,
+    'esports': <Trophy size={18} color="#3b82f6" />,
+    'esports-bets': <Target size={18} color="#f59e0b" />,
+    'polymarket-general': <TrendingUp size={18} color="#3b82f6" />,
+    'financial-dashboard': <TrendingUp size={18} color="#10b981" />,
+    'achievements': <Trophy size={18} color="#facc15" />,
+    'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
+    'scratch-cards': <Grid3X3 size={18} color="#fbbf24" />,
+    'rift-defense': <Shield size={18} color="#10b981" />,
+    'lol-idle': <Trophy size={18} color="#6366f1" />,
+    'colorsync': <Palette size={18} color="var(--accent-primary)" />,
+    'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
+    'tower-climb': <Shield size={18} color="#3b82f6" />,
+    'settings': <Settings size={18} />,
+    'roadmap': <Lightbulb size={18} color="#fbbf24" />,
+    'changelog': <History size={18} color="#94a3b8" />,
+    'admin': <Shield size={18} color="var(--accent-primary)" />,
+    'tetris': <Gamepad2 size={18} color="#ec4899" />,
+    'wordle': <Maximize2 size={18} color="#10b981" />,
+};
+
+const CATEGORIES = ['Timers', 'Esports', 'Games', 'System'];
+
 const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -19,7 +46,6 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         try {
             const saved = localStorage.getItem('sidebar_open_group');
             if (saved) {
-                // If it looks like legacy JSON (object or array), ignore it
                 if (saved.startsWith('{') || saved.startsWith('[')) {
                     return null;
                 }
@@ -61,29 +87,17 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         border: '1px solid var(--border-color)',
     };
 
-    const AvatarStyle = {
-        width: '36px',
-        height: '36px',
-        borderRadius: '50%',
-        background: 'var(--accent-gradient)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontWeight: 'bold',
-        color: '#fff',
-    };
-
     // Mini timer logic
     const [localRemainingMs, setLocalRemainingMs] = useState(0);
     const animationRef = useRef(null);
 
     useEffect(() => {
-        if (!roomState) return;
-        setLocalRemainingMs(roomState.state.remainingMs);
-    }, [roomState?.state.remainingMs, roomState?.config.durationMs]);
+        if (!roomState?.state) return;
+        setLocalRemainingMs(roomState.state.remainingMs || 0);
+    }, [roomState?.state?.remainingMs, roomState?.config?.durationMs]);
 
     useEffect(() => {
-        if (!roomState) return;
+        if (!roomState?.state) return;
         if (roomState.state.isRunning) {
             let lastTime = performance.now();
             const updateTimer = (currentTime) => {
@@ -94,14 +108,14 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
             };
             animationRef.current = requestAnimationFrame(updateTimer);
         } else {
-            setLocalRemainingMs(roomState.state.remainingMs);
+            setLocalRemainingMs(roomState.state.remainingMs || 0);
             if (animationRef.current) cancelAnimationFrame(animationRef.current);
         }
         return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-    }, [roomState?.state.isRunning, roomState?.state.remainingMs]);
+    }, [roomState?.state?.isRunning, roomState?.state?.remainingMs]);
 
     const formatTime = (ms) => {
-        const totalSeconds = Math.ceil(ms / 1000);
+        const totalSeconds = Math.ceil(Math.max(0, ms) / 1000);
         const m = Math.floor(totalSeconds / 60);
         const s = totalSeconds % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
@@ -109,18 +123,18 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
 
     const handleAction = (e, action) => {
         e.stopPropagation();
-        if (roomState) {
-            socket.emit(EVENTS.TIMER_ACTION, { roomId: roomState.id, action });
+        const socketInstance = (socket && 'current' in socket) ? socket.current : socket;
+        if (roomState?.id && socketInstance?.connected) {
+            socketInstance.emit(EVENTS.TIMER_ACTION, { roomId: roomState.id, action });
         }
     };
 
-    const myUser = roomState?.users?.find(u => u.userId === user.id);
+    const myUser = roomState?.users?.find(u => u.userId === user?.id);
     const isWrite = myUser?.role === 'write';
 
     const [navSettings, setNavSettings] = useState([]);
     const [loadingNav, setLoadingNav] = useState(true);
 
-    // --- Tägliche Badges (Pure LocalStorage Logik) ---
     const [lastVisits, setLastVisits] = useState({});
     
     useEffect(() => {
@@ -154,48 +168,33 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         setLastVisits(prev => ({ ...prev, [key]: now }));
     };
 
-    const isBadgeVisible = (key) => {
-        const item = navSettings.find(n => n.key === key);
-        if (!item || !item.has_daily_badge) return false;
-        
+    // Memoized Visibility Map for Badges
+    const badgeVisibilityMap = useMemo(() => {
         const startOfToday = new Date();
         startOfToday.setUTCHours(0, 0, 0, 0);
-        const lastVisit = lastVisits[key];
-        
-        return !lastVisit || lastVisit < startOfToday.getTime();
-    };
+        const todayThreshold = startOfToday.getTime();
 
-    const iconMap = {
-        'dashboard': <LayoutDashboard size={18} />,
-        'countdowns': <Timer size={18} />,
-        'speedcube': <Grid3X3 size={18} />,
-        'statistics': <BarChart3 size={18} />,
-        'esports': <Trophy size={18} color="#3b82f6" />,
-        'esports-bets': <Target size={18} color="#f59e0b" />,
-        'polymarket-general': <TrendingUp size={18} color="#3b82f6" />,
-        'financial-dashboard': <TrendingUp size={18} color="#10b981" />,
-        'achievements': <Trophy size={18} color="#facc15" />,
-        'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
-        'scratch-cards': <Grid3X3 size={18} color="#fbbf24" />,
-        'rift-defense': <Shield size={18} color="#10b981" />,
-        'lol-idle': <Trophy size={18} color="#6366f1" />,
-        'colorsync': <Palette size={18} color="var(--accent-primary)" />,
-        'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
-        'tower-climb': <Shield size={18} color="#3b82f6" />,
-        'settings': <Settings size={18} />,
-        'roadmap': <Lightbulb size={18} color="#fbbf24" />,
-        'changelog': <History size={18} color="#94a3b8" />,
-        'admin': <Shield size={18} color="var(--accent-primary)" />,
-        'tetris': <Gamepad2 size={18} color="#ec4899" />,
-        'wordle': <Maximize2 size={18} color="#10b981" />,
-    };
+        const visibilityMap = new Map();
+        navSettings.forEach(item => {
+            if (item.has_daily_badge) {
+                const lastVisit = lastVisits[item.key];
+                visibilityMap.set(item.key, !lastVisit || lastVisit < todayThreshold);
+            } else {
+                visibilityMap.set(item.key, false);
+            }
+        });
+        return visibilityMap;
+    }, [navSettings, lastVisits]);
 
-    const categories = ['Timers', 'Esports', 'Games', 'System'];
-    const groupedNav = navSettings.reduce((acc, curr) => {
-        if (!acc[curr.category]) acc[curr.category] = [];
-        acc[curr.category].push(curr);
-        return acc;
-    }, {});
+    const isBadgeVisible = (key) => badgeVisibilityMap.get(key) || false;
+
+    const groupedNav = useMemo(() => {
+        return navSettings.reduce((acc, curr) => {
+            if (!acc[curr.category]) acc[curr.category] = [];
+            acc[curr.category].push(curr);
+            return acc;
+        }, {});
+    }, [navSettings]);
 
     return (
         <aside className={`glass-panel sidebar-drawer ${isOpen ? 'open' : ''}`} style={containerStyle}>
@@ -207,7 +206,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
             </Link>
 
             <nav style={navStyle}>
-                {categories.map((cat) => {
+                {CATEGORIES.map((cat) => {
                     const items = groupedNav[cat] || [];
                     const sectionKey = cat.toLowerCase();
                     if (items.length === 0) return null;
@@ -240,7 +239,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                             background: '#ef4444',
                                             borderRadius: '50%',
                                             boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
-                                        }}></span>
+                                        }} title="Neuigkeiten verfuegbar"></span>
                                     )}
                                 </span>
                                 {openGroup === sectionKey ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -248,9 +247,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                             {openGroup === sectionKey && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
                                     {items.map(item => {
-                                        // Safety check: only superadmins can see the Admin Panel link
                                         if (item.key === 'admin' && !user?.is_superadmin) return null;
-                                        
                                         const showBadge = isBadgeVisible(item.key);
 
                                         return (
@@ -308,7 +305,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 )}
             </div>
 
-            {roomState && !isRoomRoute && (
+            {roomState?.state && !isRoomRoute && (
                 <div
                     className="glass-panel"
                     style={{ padding: '16px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', cursor: 'pointer', marginBottom: '16px' }}
@@ -322,11 +319,11 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '8px' }}>
                         {formatTime(localRemainingMs)}
                     </div>
-                    {user.preferences?.timerVisual === 'bar' && (
+                    {user?.preferences?.timerVisual === 'bar' && (
                         <div style={{ height: '4px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '12px' }}>
                             <div style={{
                                 height: '100%',
-                                width: `${(localRemainingMs / (roomState.config.durationMs || 1)) * 100}%`,
+                                width: `${(localRemainingMs / (roomState.config?.durationMs || 1)) * 100}%`,
                                 background: 'var(--accent-primary)',
                                 transition: roomState.state.isRunning ? 'none' : 'width 0.3s ease'
                             }}></div>
@@ -339,7 +336,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                     <Play size={14} /> Start
                                 </button>
                             ) : (
-                                <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(255,255,255,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
+                                <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
                                     <Pause size={14} /> Pause
                                 </button>
                             )}
@@ -353,7 +350,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
                         <Avatar user={user} size={36} />
                         <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName} (Guest)</div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.displayName} (Guest)</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Progress not saved</div>
                         </div>
                     </div>
@@ -367,7 +364,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         <Avatar user={user} size={36} />
                         <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                {user.displayName}
+                                {user?.displayName}
                             </span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logged In</span>
                         </div>

@@ -19,7 +19,7 @@ export async function fetchJson(url, options = {}) {
     headers
   });
 
-  const data = await response.json().catch(() => null);
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     // If a stored session is no longer valid, clear it once so the client
     // stops replaying the same broken token on every authenticated request.

@@ -89,10 +89,10 @@ const TowerClimb = () => {
       fetchJson('/api/tower/history')
     ]);
 
-    setActiveRound(stateData.activeRound || null);
+    setActiveRound(stateData?.activeRound || null);
     // Only update latestRound if we don't already have one set locally (e.g. from a recent loss)
-    setLatestRound(prev => stateData.activeRound ? null : (stateData.latestRound || prev || null));
-    setHistory(historyData.history || []);
+    setLatestRound(prev => stateData?.activeRound ? null : (stateData?.latestRound || prev || null));
+    setHistory(historyData?.history || []);
   }, [isGuest]);
 
   const loadPage = useCallback(async () => {
