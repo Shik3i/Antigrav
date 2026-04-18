@@ -479,10 +479,15 @@ const ScratchcardShop = () => {
                             <span style={styles.statLabel}>LOSE VERKAUFT</span>
                             <span style={styles.statValue}>{stats.total_sold ? Number(stats.total_sold).toLocaleString() : 0}</span>
                         </div>
-                        <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', alignSelf: 'center' }}></div>
+                        <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '16px', alignSelf: 'center' }}></div>
+                        <div style={styles.statItem}>
+                            <span style={styles.statLabel}>GEWONNENE LOSE</span>
+                            <span style={{ ...styles.statValue, color: 'var(--accent-primary)' }}>{stats.total_wins ? Number(stats.total_wins).toLocaleString() : 0}</span>
+                        </div>
+                        <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '16px', alignSelf: 'center' }}></div>
                         <div style={styles.statItem}>
                             <span style={styles.statLabel}>GEWINNAUSSCHÜTTUNG</span>
-                            <span style={{ ...styles.statValue, color: '#f59e0b' }}>{stats.total_won ? (stats.total_won / 100).toLocaleString('de-DE') : '0'} KC</span>
+                            <span style={{ ...styles.statValue, color: '#fbbf24' }}>{stats.total_won ? (stats.total_won / 100).toLocaleString('de-DE') : '0'} KC</span>
                         </div>
 
                         {/* Winners Popover */}

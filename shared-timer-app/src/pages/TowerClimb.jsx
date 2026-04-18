@@ -97,6 +97,14 @@ const TowerClimb = () => {
   const previewRound = useMemo(() => {
     if (!config) return null;
     if (activeRound) return activeRound;
+    
+    // Fallback to the latest completed round if it matches the current configuration
+    if (latestRound && 
+        latestRound.tilesPerLevel === tilesPerLevel && 
+        ['lost', 'cashed_out'].includes(latestRound.status)) {
+      return latestRound;
+    }
+
     return {
       status: 'idle',
       bet,
@@ -108,11 +116,12 @@ const TowerClimb = () => {
       selectedTiles: [],
       multiplierTable: config.multiplierPreviews?.[tilesPerLevel] || [1]
     };
-  }, [activeRound, bet, config, tilesPerLevel]);
+  }, [activeRound, latestRound, bet, config, tilesPerLevel]);
 
   const visibleTowerLevels = useMemo(() => {
     if (!previewRound?.levelCount) return [];
-    const current = activeRound?.currentLevel ?? 0;
+    // Use the level from the preview (active or last round)
+    const current = previewRound.currentLevel || 0;
     const maxAhead = 2;
     const topLimit = Math.min(previewRound.levelCount - 1, current + maxAhead);
     
@@ -122,7 +131,7 @@ const TowerClimb = () => {
       levels.push(i);
     }
     return levels;
-  }, [activeRound, previewRound]);
+  }, [previewRound]);
 
   const handleStart = useCallback(async () => {
     if (isGuest) {
@@ -243,7 +252,37 @@ const TowerClimb = () => {
               </p>
             </div>
           </div>
-          
+          <div style={{ display: 'flex', gap: '32px', padding: '16px 24px', borderRadius: '20px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Gesamte Gewinne</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#fbbf24', textShadow: '0 0 20px rgba(251,191,36,0.4)', fontFamily: 'Outfit, sans-serif' }}>
+                  {Number((config.globalTotalPayout || 0) / 100).toLocaleString('de-DE')}
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', opacity: 0.8 }}>KC</span>
+              </div>
+            </div>
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Erfolgreiche Runs</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <span style={{ fontSize: '1.4rem', fontWeight: 950, color: 'var(--accent-primary)', textShadow: '0 0 20px rgba(59,130,246,0.4)', fontFamily: 'Outfit, sans-serif' }}>
+                  {Number(config.globalTotalWins || 0).toLocaleString()}
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', opacity: 0.8 }}>x</span>
+              </div>
+            </div>
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Gespielte Runs</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#94a3b8', textShadow: '0 0 20px rgba(148,163,184,0.4)', fontFamily: 'Outfit, sans-serif' }}>
+                  {Number(config.globalTotalPlayed || 0).toLocaleString()}
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', opacity: 0.8 }}>x</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {isGuest && (
@@ -366,7 +405,7 @@ const TowerClimb = () => {
                               background = 'linear-gradient(135deg, rgba(239,68,68,0.4) 0%, rgba(220,38,38,0.4) 100%)';
                               border = '2px solid #ef4444';
                               color = '#fff';
-                              icon = <AlertCircle size={20} />;
+                              icon = <User size={20} strokeWidth={3} />;
                               text = 'Falle';
                             } else if (isTrap) {
                               background = 'rgba(239,68,68,0.1)';

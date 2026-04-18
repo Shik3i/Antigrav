@@ -805,6 +805,45 @@ function initializeDatabaseSchema() {
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_market_deleted_name ON MMO_MarketPrices(isDeleted, itemName);`);
   
+  // GlobalGameStats: for fast global tracking of game winnings
+  db.run(`CREATE TABLE IF NOT EXISTS GlobalGameStats (
+    gameId TEXT PRIMARY KEY,
+    totalPayout INTEGER DEFAULT 0,
+    totalWins INTEGER DEFAULT 0,
+    totalPlayed INTEGER DEFAULT 0
+  )`, () => {
+    // Migration: Add totalPlayed column if it doesn't exist (Phase 27)
+    db.run("ALTER TABLE GlobalGameStats ADD COLUMN totalPlayed INTEGER DEFAULT 0", () => {
+      // 1. Migration for Tower Climb
+      db.get("SELECT COUNT(*) as count FROM GlobalGameStats WHERE gameId = 'tower-climb'", (err, row) => {
+        if (!err && row?.count === 0) {
+          db.get("SELECT COUNT(*) as played, SUM(CASE WHEN status = 'cashed_out' THEN 1 ELSE 0 END) as wins, SUM(payout) as payout FROM TowerClimbRounds", (err, stats) => {
+            if (!err && stats) {
+              db.run("INSERT OR IGNORE INTO GlobalGameStats (gameId, totalPayout, totalWins, totalPlayed) VALUES (?, ?, ?, ?)", 
+                     ['tower-climb', stats.payout || 0, stats.wins || 0, stats.played || 0], () => {
+                       logSystemEvent('info', 'Migration', `GlobalGameStats: Initial seed for tower-climb completed (${stats.wins} wins, ${stats.payout} payout, ${stats.played} played)`);
+                     });
+            }
+          });
+        }
+      });
+
+      // 2. Migration for Scratchcards
+      db.get("SELECT COUNT(*) as count FROM GlobalGameStats WHERE gameId = 'scratchcards'", (err, row) => {
+        if (!err && row?.count === 0) {
+          db.get("SELECT COUNT(*) as played, SUM(winAmount) as payout, SUM(CASE WHEN winAmount > 0 THEN 1 ELSE 0 END) as wins FROM Scratchcards", (statsErr, stats) => {
+            if (!statsErr && stats) {
+              db.run("INSERT OR IGNORE INTO GlobalGameStats (gameId, totalPayout, totalWins, totalPlayed) VALUES (?, ?, ?, ?)", 
+                     ['scratchcards', stats.payout || 0, stats.wins || 0, stats.played || 0], () => {
+                       logSystemEvent('info', 'Migration', `GlobalGameStats: Initial seed for scratchcards completed (${stats.wins} wins, ${stats.payout} payout, ${stats.played} played)`);
+                     });
+            }
+          });
+        }
+      });
+    });
+  });
+  
 
   // Signal database is ready and mirror initial logs
   db.run("SELECT 1", () => {
@@ -1344,6 +1383,9 @@ const purchaseScratchcardTransaction = (userId, packId, packName, price, grid, w
             return reject(updErr);
           }
 
+          // [Global Stats] Increment total sold tickets
+          db.run('UPDATE GlobalGameStats SET totalPlayed = totalPlayed + 1 WHERE gameId = ?', ['scratchcards']);
+
           // 2. Create Scratchcard (This atomic insert effectively records the "buy" for the daily limit count)
           db.run(
             'INSERT INTO Scratchcards (userId, type, grid, winAmount, status, price) VALUES (?, ?, ?, ?, ?, ?)',
@@ -1414,6 +1456,10 @@ const claimScratchcard = (id, userId) => {
               // Log transaction
               db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, card.winAmount, `Scratchcard Win (ID: ${id})`], (txErr) => {
                 if (txErr) return reject(txErr);
+
+                // [Global Stats] Increment total winnings and success count
+                db.run('UPDATE GlobalGameStats SET totalPayout = totalPayout + ?, totalWins = totalWins + 1 WHERE gameId = ?', [card.winAmount, 'scratchcards']);
+
                 resolve({ success: true, winAmount: card.winAmount, price: card.price });
               });
             });
@@ -2390,6 +2436,9 @@ const startTowerRound = (userId, bet, tilesPerLevel) => {
                 }
 
                 const roundId = this.lastID;
+
+                // [Global Stats] Increment total played runs
+                db.run('UPDATE GlobalGameStats SET totalPlayed = totalPlayed + 1 WHERE gameId = ?', ['tower-climb']);
                 db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [bet, userId], (balanceErr) => {
                   if (balanceErr) {
                     db.run('ROLLBACK');
@@ -2610,6 +2659,9 @@ const cashoutTowerRound = (userId) => {
                       return reject(txErr);
                     }
 
+                    // Increment Global Game Stats
+                    db.run('UPDATE GlobalGameStats SET totalPayout = totalPayout + ?, totalWins = totalWins + 1 WHERE gameId = ?', [payout, 'tower-climb']);
+
                     db.run(
                       'INSERT INTO GameScores (userId, gameId, score, coinsEarned) VALUES (?, ?, ?, ?)',
                       [userId, TOWER_CLIMB_CONFIG.gameId, row.currentLevel, payout],
@@ -2645,6 +2697,19 @@ const cashoutTowerRound = (userId) => {
           );
         }
       );
+    });
+  });
+};
+
+const getGlobalGameStats = (gameId) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT totalPayout as total_won, totalWins as total_count, totalPlayed as total_played FROM GlobalGameStats WHERE gameId = ?', [gameId], (err, row) => {
+      if (err) reject(err);
+      else resolve({
+        total_won: row?.total_won || 0,
+        total_count: row?.total_count || 0,
+        total_played: row?.total_played || 0
+      });
     });
   });
 };
@@ -3288,16 +3353,18 @@ const updateAchievementSetting = (achievementId, multiplier) => {
   });
 };
 
-const getGlobalScratchcardStats = () => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT COUNT(*) as total_sold, SUM(winAmount) as total_won FROM Scratchcards', [], (err, row) => {
-      if (err) reject(err);
-      else resolve({
-        total_sold: row?.total_sold || 0,
-        total_won: row?.total_won || 0
-      });
-    });
-  });
+const getGlobalScratchcardStats = async () => {
+  try {
+    const stats = await getGlobalGameStats('scratchcards');
+    return {
+      total_sold: stats.total_played,
+      total_won: stats.total_won,
+      total_wins: stats.total_count
+    };
+  } catch (err) {
+    console.error('[Database] Error fetching global scratchcard stats:', err);
+    return { total_sold: 0, total_won: 0, total_wins: 0 };
+  }
 };
 
 const getLatestScratchcardWinners = (limit = 10) => {
@@ -4064,6 +4131,7 @@ module.exports = {
   getWordleDailyLeaderboard,
   updateUserGameStats,
   updateUserBalance,
+  getGlobalGameStats,
   logSystemEvent, // [NEW]
   getSystemLogs,  // [NEW]
   clearSystemLogs, // [NEW]

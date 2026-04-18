@@ -18,8 +18,19 @@ const parseInteger = (value) => {
   return Number.isFinite(parsed) ? parsed : NaN;
 };
 
-exports.getConfig = (req, res) => {
-  res.json(getTowerConfigPayload());
+exports.getConfig = async (req, res) => {
+  try {
+    const globalStats = await dbLayer.getGlobalGameStats('tower-climb');
+    res.json({
+      ...getTowerConfigPayload(),
+      globalTotalPayout: globalStats.total_won,
+      globalTotalWins: globalStats.total_count,
+      globalTotalPlayed: globalStats.total_played
+    });
+  } catch (err) {
+    console.error('[TowerClimb] Error fetching config:', err);
+    res.status(500).json({ error: 'Failed to fetch tower config' });
+  }
 };
 
 exports.getState = async (req, res) => {

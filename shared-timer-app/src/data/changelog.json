@@ -1,5 +1,11 @@
 [
   {
+    "id": 44,
+    "version": "2.28.0",
+    "date": "2026-04-18",
+    "changes": "- **Unified Game Stats**: Zentralisiertes Tracking-System (GlobalGameStats) für Tower Climb und Scratchcards zur massiven Performance-Steigerung.\n- **Statistik-Erweiterung**: Echtzeit-Erfassung von 'Gespielten Runs' (Tower) und 'Verkauften Losen' (Scratchcards) inklusive historischer Migration.\n- **UI Upgrade**: Beide Game-Header zeigen nun ein konsistentes Drei-Spalten-Layout für Community-Gewinne, Erfolgsraten und Aktivität.\n- **Precision Patch**: Korrekte KC-Einheiten-Anzeige durch automatisierte Cent-zu-KC Konvertierung im gesamten Statistik-Modul.\n- **System Logging**: Implementierung von Migrations-Logs zur Überwachung der einmaligen Daten-Initialisierung online."
+  },
+  {
     "id": 43,
     "version": "2.27.0",
     "date": "2026-04-18",
