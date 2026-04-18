@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import * as LucideIcons from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
+import { usePersistentData } from '../context/PersistentDataContext';
 import Avatar from './Avatar';
 import { fetchJson } from '../utils/apiClient';
 import { prefetchRoute } from '../utils/prefetchRoutes';
@@ -133,24 +134,9 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
     const myUser = roomState?.users?.find(u => u.userId === user?.id);
     const isWrite = myUser?.role === 'write';
 
-    const [navSettings, setNavSettings] = useState([]);
-    const [loadingNav, setLoadingNav] = useState(true);
+    const { navbarSettings: navSettings, navbarLoaded, loadNavbarSettings } = usePersistentData();
 
     const [lastVisits, setLastVisits] = useState({});
-    
-    useEffect(() => {
-        const fetchNav = async () => {
-            try {
-                const data = await fetchJson('/api/navbar-settings', { token: '' });
-                setNavSettings(Array.isArray(data) ? data : []);
-            } catch (err) {
-                console.error('Failed to fetch navbar settings:', err);
-            } finally {
-                setLoadingNav(false);
-            }
-        };
-        fetchNav();
-    }, []);
 
     useEffect(() => {
         const visits = {};

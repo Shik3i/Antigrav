@@ -24,6 +24,7 @@ import useEsportsNotifications from './hooks/useEsportsNotifications';
 // Static Components (Always needed or part of early layout)
 import Sidebar from './components/Sidebar';
 import RouteErrorBoundary from './components/ErrorBoundary';
+import MaintenanceGuard from './components/MaintenanceGuard';
 import ClockWidget from './components/ClockWidget';
 import KoalaCoinWidget from './components/KoalaCoinWidget';
 import GlobalAudioController from './components/GlobalAudioController';
@@ -444,43 +445,45 @@ function InnerApp() {
             <main className="main-content" style={{ flex: 1, overflowY: 'auto', padding: isZenMode ? '0' : '2rem', position: 'relative' }}>
               <React.Suspense fallback={<ViewLoader />}>
                 <RouteErrorBoundary>
-                  <Routes>
-                    <Route path="/" element={<Home user={user} globalSocket={activeSocket} />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/room/:id" element={<Room user={user} socket={activeSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} roomConnectionState={roomConnectionState} />} />
-                    <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={activeSocket} />} />
-                    <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={activeSocket} />} />
-                    <Route path="/admin" element={<Admin socket={activeSocket} />} />
-                    {/* Catch all other routes */}
-                    <Route path="/highscores" element={<Highscores />} />
-                    <Route path="/koala-dashboard" element={<KoalaDashboard />} />
-                    <Route path="/achievements" element={<Achievements />} />
-                    <Route path="/countdowns" element={<Countdowns user={user} />} />
-                    <Route path="/global-bets" element={<GlobalBets />} />
-                    <Route path="/api-docs" element={<ApiDocs />} />
-                    <Route path="/extension-info" element={<ExtensionInfo />} />
-                    <Route path="/admin/achievements" element={<AdminAchievements />} />
-                    <Route path="/features" element={<FeatureRequests />} />
-                    <Route path="/changelog" element={<Changelog />} />
-                    <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
-                    <Route path="/games/leaderboard" element={<GameLeaderboards />} />
-                    <Route path="/speedcube" element={<SpeedcubeTimer />} />
-                    <Route path="/leveling" element={<LevelingTracker user={user} token={token} />} />
-                    <Route path="/scratchcards" element={<Scratchcards />} />
-                    <Route path="/games/rift-defense" element={<RiftDefense />} />
-                    <Route path="/games/lol-idle" element={<LoLIdleGame user={user} token={token} />} />
-                    <Route path="/color-sync" element={<ColorSyncGame user={user} token={token} />} />
-                    <Route path="/profile/:username" element={<UserProfile />} />
-                    <Route path="/tetris" element={<Tetris />} />
-                    <Route path="/polymarket-general" element={<PolymarketGeneral />} />
-                    <Route path="/wordle" element={<Wordle user={user} token={token} />} />
-                    <Route path="/games/tower-climb" element={<TowerClimb />} />
-                    <Route path="/lotto" element={<LottoImitat />} />
-                    <Route path="/news" element={<News socket={activeSocket} />} />
-                    <Route path="/c" element={<SharedCountdown />} />
-                    <Route path="*" element={<ProtectedNotFound />} />
-                  </Routes>
+                  <MaintenanceGuard>
+                    <Routes>
+                      <Route path="/" element={<Home user={user} globalSocket={activeSocket} />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/register" element={<Register />} />
+                      <Route path="/room/:id" element={<Room user={user} socket={activeSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} roomConnectionState={roomConnectionState} />} />
+                      <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={activeSocket} />} />
+                      <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={activeSocket} />} />
+                      <Route path="/admin" element={<Admin socket={activeSocket} />} />
+                      {/* Catch all other routes */}
+                      <Route path="/highscores" element={<Highscores />} />
+                      <Route path="/koala-dashboard" element={<KoalaDashboard />} />
+                      <Route path="/achievements" element={<Achievements />} />
+                      <Route path="/countdowns" element={<Countdowns user={user} />} />
+                      <Route path="/global-bets" element={<GlobalBets />} />
+                      <Route path="/api-docs" element={<ApiDocs />} />
+                      <Route path="/extension-info" element={<ExtensionInfo />} />
+                      <Route path="/admin/achievements" element={<AdminAchievements />} />
+                      <Route path="/features" element={<FeatureRequests />} />
+                      <Route path="/changelog" element={<Changelog />} />
+                      <Route path="/games/koalaflap" element={<KoalaFlap user={user} token={token} />} />
+                      <Route path="/games/leaderboard" element={<GameLeaderboards />} />
+                      <Route path="/speedcube" element={<SpeedcubeTimer />} />
+                      <Route path="/leveling" element={<LevelingTracker user={user} token={token} />} />
+                      <Route path="/scratchcards" element={<Scratchcards />} />
+                      <Route path="/games/rift-defense" element={<RiftDefense />} />
+                      <Route path="/games/lol-idle" element={<LoLIdleGame user={user} token={token} />} />
+                      <Route path="/color-sync" element={<ColorSyncGame user={user} token={token} />} />
+                      <Route path="/profile/:username" element={<UserProfile />} />
+                      <Route path="/tetris" element={<Tetris />} />
+                      <Route path="/polymarket-general" element={<PolymarketGeneral />} />
+                      <Route path="/wordle" element={<Wordle user={user} token={token} />} />
+                      <Route path="/games/tower-climb" element={<TowerClimb />} />
+                      <Route path="/lotto" element={<LottoImitat />} />
+                      <Route path="/news" element={<News socket={activeSocket} />} />
+                      <Route path="/c" element={<SharedCountdown />} />
+                      <Route path="*" element={<ProtectedNotFound />} />
+                    </Routes>
+                  </MaintenanceGuard>
                 </RouteErrorBoundary>
               </React.Suspense>
             </main>
