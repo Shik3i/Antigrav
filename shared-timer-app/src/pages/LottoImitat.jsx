@@ -9,6 +9,7 @@ import {
     CheckCircle2, 
     AlertCircle, 
     ChevronRight, 
+    ChevronDown,
     Dices, 
     Trash2,
     Calendar,
@@ -35,6 +36,14 @@ import '../index.css';
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [countdown, setCountdown] = useState('');
     const [cutoffCountdown, setCutoffCountdown] = useState('');
+    const [expandedGroups, setExpandedGroups] = useState({});
+
+    const toggleGroup = (drawDate) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [drawDate]: !prev[drawDate]
+        }));
+    };
 
     // Load data on mount
     useEffect(() => {
@@ -784,100 +793,118 @@ import '../index.css';
                                                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase' }}>Ausstehende Tickets</span>
                                                 </div>
                                             )}
-                                            {pending.map((group) => (
-                                                <div key={group.drawDate} className="draw-history-item" style={{ borderLeft: '4px solid #f59e0b', width: 'auto', maxWidth: 'fit-content', minWidth: '350px' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center', gap: '20px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                                                            <Calendar size={14} className="text-muted" />
-                                                            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
-                                                        </div>
-                                                        <div style={{ 
-                                                            color: '#f59e0b', 
-                                                            fontWeight: 800, 
-                                                            background: 'rgba(245, 158, 11, 0.1)',
-                                                            padding: '4px 12px',
-                                                            borderRadius: '20px',
-                                                            fontSize: '0.85rem',
-                                                            whiteSpace: 'nowrap'
-                                                        }}>
-                                                            {group.tickets.length} Ticket{group.tickets.length > 1 ? 's' : ''} ausstehend
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                                        {group.tickets.map((ticket, idx) => (
-                                                            <div key={ticket.id} style={{ 
-                                                                display: 'flex', 
-                                                                alignItems: 'center',
-                                                                gap: '6px', 
-                                                                background: 'rgba(255,255,255,0.03)', 
-                                                                border: '1px solid var(--border-color)',
-                                                                borderRadius: '10px', 
-                                                                padding: '8px 12px',
-                                                                flex: '0 0 auto'
-                                                            }}>
-                                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: '16px' }}>
-                                                                        #{idx + 1}
-                                                                    </span>
-                                                                    {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
-                                                                    <span className="ball-mini super">{ticket.superzahl}</span>
-                                                                </div>
+                                            {pending.map((group) => {
+                                                const isExpanded = expandedGroups[group.drawDate] !== false; // Default to expanded for pending
+                                                return (
+                                                    <div key={group.drawDate} className="draw-history-item" style={{ borderLeft: '4px solid #f59e0b', width: 'auto', minWidth: '350px' }}>
+                                                        <div 
+                                                            style={{ display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? '16px' : '0', alignItems: 'center', gap: '20px', cursor: 'pointer' }}
+                                                            onClick={() => toggleGroup(group.drawDate)}
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                                                                {isExpanded ? <ChevronDown size={16} className="text-muted" /> : <ChevronRight size={16} className="text-muted" />}
+                                                                <Calendar size={14} className="text-muted" />
+                                                                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
                                                             </div>
-                                                        ))}
+                                                            <div style={{ 
+                                                                color: '#f59e0b', 
+                                                                fontWeight: 800, 
+                                                                background: 'rgba(245, 158, 11, 0.1)',
+                                                                padding: '4px 12px',
+                                                                borderRadius: '20px',
+                                                                fontSize: '0.85rem',
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {group.tickets.length} Ticket{group.tickets.length > 1 ? 's' : ''} ausstehend
+                                                            </div>
+                                                        </div>
+                                                        {isExpanded && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                                {group.tickets.map((ticket, idx) => (
+                                                                    <div key={ticket.id} style={{ 
+                                                                        display: 'flex', 
+                                                                        alignItems: 'center',
+                                                                        gap: '6px', 
+                                                                        background: 'rgba(255,255,255,0.03)', 
+                                                                        border: '1px solid var(--border-color)',
+                                                                        borderRadius: '10px', 
+                                                                        padding: '8px 12px',
+                                                                        flex: '0 0 auto'
+                                                                    }}>
+                                                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: '16px' }}>
+                                                                                #{idx + 1}
+                                                                            </span>
+                                                                            {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
+                                                                            <span className="ball-mini super">{ticket.superzahl}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
 
                                             {completed.length > 0 && (
                                                 <div style={{ padding: '30px 32px 10px', borderBottom: '1px solid var(--border-color)' }}>
                                                     <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Abgeschlossene Ziehungen</span>
                                                 </div>
                                             )}
-                                            {completed.map((group) => (
-                                                <div key={group.drawDate} className="draw-history-item" style={{ width: 'auto', maxWidth: 'fit-content', minWidth: '450px' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center', gap: '40px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-                                                            <Calendar size={14} className="text-muted" />
-                                                            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                                                            {group.drawNumbers && safeParseNumbers(group.drawNumbers).map((n, i) => (
-                                                                <span key={i} className="ball-mini" style={{ background: 'var(--accent-primary)', width: '18px', height: '18px', fontSize: '0.6rem' }}>{n}</span>
-                                                            ))}
-                                                            {group.drawSuperzahl !== undefined && (
-                                                                <span className="ball-mini super" style={{ width: '18px', height: '18px', fontSize: '0.6rem' }}>{group.drawSuperzahl}</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                                                        {group.tickets.map(ticket => (
-                                                            <div key={ticket.id} style={{ 
-                                                                display: 'flex', 
-                                                                justifyContent: 'space-between', 
-                                                                alignItems: 'center', 
-                                                                background: 'rgba(255,255,255,0.02)', 
-                                                                padding: '8px 12px', 
-                                                                borderRadius: '8px',
-                                                                gap: '12px',
-                                                                flex: '0 0 auto'
-                                                            }}>
-                                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                                    {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
-                                                                    <span className="ball-mini super">{ticket.superzahl}</span>
-                                                                </div>
-                                                                <div style={{ 
-                                                                    color: ticket.winAmount > 0 ? '#10b981' : 'var(--text-muted)', 
-                                                                    fontWeight: 800, 
-                                                                    fontSize: '0.8rem',
-                                                                    whiteSpace: 'nowrap'
-                                                                }}>
-                                                                    {ticket.winAmount > 0 ? `+${(ticket.winAmount / 100).toLocaleString('de-DE')} KC` : 'Niete'}
-                                                                </div>
+                                            {completed.map((group) => {
+                                                const isExpanded = !!expandedGroups[group.drawDate]; // Default to collapsed for completed
+                                                return (
+                                                    <div key={group.drawDate} className="draw-history-item" style={{ width: 'auto', minWidth: '450px' }}>
+                                                        <div 
+                                                            style={{ display: 'flex', justifyContent: 'space-between', marginBottom: isExpanded ? '20px' : '0', alignItems: 'center', gap: '40px', cursor: 'pointer' }}
+                                                            onClick={() => toggleGroup(group.drawDate)}
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
+                                                                {isExpanded ? <ChevronDown size={16} className="text-muted" /> : <ChevronRight size={16} className="text-muted" />}
+                                                                <Calendar size={14} className="text-muted" />
+                                                                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Ziehung am {parseDrawDate(group.drawDate)?.toLocaleDateString('de-DE') || group.drawDate}</span>
                                                             </div>
-                                                        ))}
+                                                            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                                                {group.drawNumbers && safeParseNumbers(group.drawNumbers).map((n, i) => (
+                                                                    <span key={i} className="ball-mini" style={{ background: 'var(--accent-primary)', width: '18px', height: '18px', fontSize: '0.6rem' }}>{n}</span>
+                                                                ))}
+                                                                {group.drawSuperzahl !== undefined && (
+                                                                    <span className="ball-mini super" style={{ width: '18px', height: '18px', fontSize: '0.6rem' }}>{group.drawSuperzahl}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {isExpanded && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' }}>
+                                                                {group.tickets.map(ticket => (
+                                                                    <div key={ticket.id} style={{ 
+                                                                        display: 'flex', 
+                                                                        justifyContent: 'space-between', 
+                                                                        alignItems: 'center', 
+                                                                        background: 'rgba(255,255,255,0.02)', 
+                                                                        padding: '8px 12px', 
+                                                                        borderRadius: '8px',
+                                                                        gap: '12px',
+                                                                        flex: '0 0 auto'
+                                                                    }}>
+                                                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                            {safeParseNumbers(ticket.numbers).map((n, i) => <span key={i} className="ball-mini">{n}</span>)}
+                                                                            <span className="ball-mini super">{ticket.superzahl}</span>
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            color: ticket.winAmount > 0 ? '#10b981' : 'var(--text-muted)', 
+                                                                            fontWeight: 800, 
+                                                                            fontSize: '0.8rem',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}>
+                                                                            {ticket.winAmount > 0 ? `+${(ticket.winAmount / 100).toLocaleString('de-DE')} KC` : 'Niete'}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </>
                                     );
                                 })()}

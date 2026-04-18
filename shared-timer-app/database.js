@@ -4329,7 +4329,7 @@ module.exports = {
     });
   },
 
-  getUserLottoHistory: (userId, limit = 10) => {
+  getUserLottoHistory: (userId, limit = 999) => {
     return new Promise((resolve, reject) => {
       const query = `
         SELECT t.*, d.numbers as drawNumbers, d.superzahl as drawSuperzahl, d.totalPayout as drawTotalPayout

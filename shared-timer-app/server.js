@@ -108,8 +108,15 @@ app.use('/api', apiLimiter);
 app.use(express.static(path.join(__dirname, 'dist'), {
     maxAge: '1h',
     setHeaders: (res, filePath) => {
+        // Assets are hashed, so they can be cached forever
         if (filePath.includes(`${path.sep}assets${path.sep}`)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+        // index.html should NEVER be cached to ensure users always get the latest build references
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
         }
     }
 }));
@@ -150,6 +157,9 @@ app.use((err, req, res, next) => {
 
 // Catch-all route to serve the React app for any other URL (client-side routing)
 app.get('*catchall', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 

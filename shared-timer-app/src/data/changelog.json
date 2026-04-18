@@ -1,5 +1,11 @@
 [
   {
+    "id": 55,
+    "version": "2.35.3",
+    "date": "2026-04-18",
+    "changes": "- **Lotto Historie**: Aufhebung des Limits von 10 Einträgen; Abfrage nun auf bis zu 999 Tickets erweitert.\n- **Lotto UI**: Implementierung einer Akkordeon-Navigation für die Ticket-Historie zur besseren Übersicht bei vielen Ziehungen.\n- **System-Stabilität**: Optimierung der Server-Konfiguration zur Vermeidung von Caching-Problemen (`Failed to fetch module`) nach neuen Builds."
+  },
+  {
     "id": 54,
     "version": "2.35.2",
     "date": "2026-04-18",
