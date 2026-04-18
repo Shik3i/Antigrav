@@ -1,4 +1,4 @@
-# 🚀 Antigrav
+# 🐨 Antigravity Room & Casino
 
 Antigrav ist eine Echtzeit-Webanwendung mit sozialem Fokus. Das Projekt kombiniert synchronisierte Räume, Fortschritts- und Belohnungssysteme, Browser-Games, Countdowns, Wettbewerbe sowie datengetriebene Bereiche wie Esports, Märkte und API-Integrationen in einer gemeinsamen Plattform.
 
