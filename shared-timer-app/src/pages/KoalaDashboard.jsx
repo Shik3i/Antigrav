@@ -39,113 +39,128 @@ const KoalaDashboard = () => {
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'bets'
     const [showLiquidBalance, setShowLiquidBalance] = useState(false);
 
-    useEffect(() => {
+    const fetchData = React.useCallback(async (isRefresh = false) => {
         if (!token) return;
+        try {
+            if (!isRefresh) setLoading(true);
+            const [txRes, betsRes] = await Promise.all([
+                fetch('/api/koala/transactions', { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch('/api/esports/bets', { headers: { 'Authorization': `Bearer ${token}` } })
+            ]);
+            
+            if (!txRes.ok) throw new Error('Failed to load transactions');
+            if (!betsRes.ok) throw new Error('Failed to load bets');
 
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const [txRes, betsRes] = await Promise.all([
-                    fetch('/api/koala/transactions', { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch('/api/esports/bets', { headers: { 'Authorization': `Bearer ${token}` } })
-                ]);
-                
-                if (!txRes.ok) throw new Error('Failed to load transactions');
-                if (!betsRes.ok) throw new Error('Failed to load bets');
-
-                const txData = await txRes.json();
-                const betsData = await betsRes.json();
-                
-                setTransactions(txData || []);
-                setBets(betsData || []);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+            const txData = await txRes.json();
+            const betsData = await betsRes.json();
+            
+            setTransactions(txData || []);
+            setBets(betsData || []);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     }, [token]);
+
+    useEffect(() => {
+        fetchData(false);
+    }, [fetchData]);
+
+    const handleRefresh = () => fetchData(true);
 
     const chartData = useMemo(() => {
         if (!transactions || transactions.length === 0 || !user) return [];
         
-        // Enhance bets with placement and resolution times for historical risk calculation
+        // 1. Sort transactions by date (safeguard)
+        const sortedTxs = [...transactions].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        // 2. Enhance bets with smarter matching logic
         const enhancedBets = bets.map(bet => {
-            let placementTime = bet.createdAt || bet.created_at ? new Date(bet.createdAt || bet.created_at).getTime() : 0;
-            if (!placementTime) {
-                // Approximate placement time by finding matching transaction
-                const matchTx = transactions.find(t => t.reason?.toLowerCase().includes('bet placed') && t.amount === -bet.stake);
-                placementTime = matchTx ? new Date(matchTx.created_at).getTime() : new Date(bet.eventDate).getTime() - 86400000;
-            }
+            const betCreated = new Date(bet.createdAt || bet.created_at).getTime();
+            const matchDeltaLimit = 300000; // 5 minutes proximity
+
+            // Find placement transaction: match by amount and close time
+            let placementTime = betCreated;
+            const placementTx = sortedTxs.find(t => 
+                t.reason?.toLowerCase().includes('bet placed') && 
+                t.amount === -bet.stake &&
+                Math.abs(new Date(t.created_at).getTime() - betCreated) < matchDeltaLimit
+            );
+            if (placementTx) placementTime = new Date(placementTx.created_at).getTime();
 
             let resolutionTime = Infinity;
             if (bet.status !== 'open') {
+                const eventTime = new Date(bet.eventDate).getTime();
                 if (bet.status === 'lost') {
-                    resolutionTime = new Date(bet.eventDate).getTime() + 7200000; // +2 hours
+                    resolutionTime = eventTime + 7200000; // +2 hours
                 } else {
                     const reasonPrefix = bet.status === 'won' ? 'Bet Won on ' : 'Bet Canceled';
-                    const matchTx = transactions.find(t => t.reason?.startsWith(reasonPrefix) && t.reason?.includes(bet.chosenTeam) && new Date(t.created_at).getTime() >= new Date(bet.eventDate).getTime() - 86400000);
-                    resolutionTime = matchTx ? new Date(matchTx.created_at).getTime() : new Date(bet.eventDate).getTime() + 7200000;
+                    // Find resolution transaction: must be AFTER event date
+                    const matchTx = sortedTxs.find(t => 
+                        t.reason?.startsWith(reasonPrefix) && 
+                        t.reason?.includes(bet.chosenTeam) && 
+                        new Date(t.created_at).getTime() >= eventTime - 60000
+                    );
+                    resolutionTime = matchTx ? new Date(matchTx.created_at).getTime() : eventTime + 7200000;
                 }
             }
             return { ...bet, placementTime, resolutionTime };
         });
 
-        // Function to calculate active risk at a specific point in time
-        const getActiveRiskAtTime = (timestamp) => {
-            return enhancedBets
-                .filter(b => b.placementTime <= timestamp && b.resolutionTime > timestamp)
-                .reduce((sum, b) => sum + b.stake, 0);
+        // 3. Optimized Risk Timeline using Deltas (O(B + T))
+        // Instead of filtering all bets for every transaction, we calculate changes in risk.
+        const riskEvents = [];
+        enhancedBets.forEach(b => {
+            riskEvents.push({ time: b.placementTime, delta: b.stake });
+            if (b.resolutionTime !== Infinity) {
+                riskEvents.push({ time: b.resolutionTime, delta: -b.stake });
+            }
+        });
+        riskEvents.sort((a, b) => a.time - b.time);
+
+        const getRiskAt = (time) => {
+            let r = 0;
+            for (const e of riskEvents) {
+                if (e.time > time) break;
+                r += e.delta;
+            }
+            return r;
         };
 
-        // currentBalance represents the present, accurate balance in CENTS
+        // 4. Reconstruct history backwards
         let currentBalance = user.koala_balance || 0;
         const pts = [];
-        
         const nowMs = Date.now();
-        const currentActiveRisk = getActiveRiskAtTime(nowMs);
         
+        // Push initial point
+        const currentRisk = getRiskAt(nowMs);
         pts.push({
-            date: new Date(nowMs),
             timestamp: nowMs,
             displayDate: 'Now',
             balance: currentBalance / 100,
-            assetValue: (currentBalance + currentActiveRisk) / 100,
-            activeRisk: currentActiveRisk / 100,
+            assetValue: (currentBalance + currentRisk) / 100,
+            activeRisk: currentRisk / 100,
             fullDate: new Date(nowMs).toLocaleString()
         });
 
-        // Transactions are expected to be ordered newest first
-        for (let i = 0; i < transactions.length; i++) {
-            const tx = transactions[i];
+        for (const tx of sortedTxs) {
             const timestamp = new Date(tx.created_at).getTime();
-            
-            // Revert the transaction to step back in time
             currentBalance -= tx.amount;
-            
-            // Active risk exactly BEFORE this transaction processed
-            // Because if it's "Bet placed" the risk didn't exist before this tx.
-            // We subtract 1ms to check the state right before this transaction.
-            const riskBeforeTx = getActiveRiskAtTime(timestamp - 1);
+            const riskBefore = getRiskAt(timestamp - 1);
 
             pts.push({
-                date: new Date(timestamp),
                 timestamp: timestamp,
                 displayDate: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(timestamp)),
                 balance: currentBalance / 100,
-                assetValue: (currentBalance + riskBeforeTx) / 100,
-                activeRisk: riskBeforeTx / 100,
-                fullDate: new Date(timestamp).toLocaleString(),
-                txAmount: tx.amount / 100,
-                txReason: tx.reason
+                assetValue: (currentBalance + riskBefore) / 100,
+                activeRisk: riskBefore / 100,
+                fullDate: new Date(timestamp).toLocaleString()
             });
         }
 
-        // Return chronological order for Recharts (oldest first)
         return pts.reverse();
-    }, [transactions, bets, user]);
+    }, [transactions, bets, user.id, user.koala_balance]);
 
     const activeBets = bets.filter(b => b.status === 'open');
     const pastBets = bets.filter(b => b.status !== 'open');
@@ -158,36 +173,43 @@ const KoalaDashboard = () => {
                 </button>
                 <Trophy size={32} color="var(--accent-primary)" />
                 <h1 style={{ margin: 0, fontSize: '2.5rem' }}>Financial Dashboard</h1>
+                {loading && transactions.length > 0 && (
+                    <div className="animate-spin" style={{ marginLeft: '12px', width: '20px', height: '20px', border: '2px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                )}
             </div>
             {/* Top Stat Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-                <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase' }}>Total Asset Value</div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 700, background: 'linear-gradient(135deg, #10b981, #059669)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                gap: '16px', 
+                marginBottom: '32px' 
+            }}>
+                <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Asset Value</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 800, background: 'linear-gradient(135deg, #10b981, #059669)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         {(((user?.koala_balance || 0) + activeBets.reduce((sum, b) => sum + b.stake, 0)) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KC
                     </div>
                 </div>
 
-                <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase' }}>Liquid Balance</div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Liquid Balance</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-main)' }}>
                         {((user?.koala_balance || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KC
                     </div>
                 </div>
                 
-                <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase' }}>Active Bets Risked</div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Bets Risked</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-muted)' }}>
                         {((activeBets.reduce((sum, b) => sum + b.stake, 0)) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KC
                     </div>
                 </div>
 
-                <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase' }}>Potential Wealth</div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 700, background: 'linear-gradient(135deg, #f59e0b, #d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Potential Wealth</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 800, background: 'linear-gradient(135deg, #f59e0b, #d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         {(((user?.koala_balance || 0) + activeBets.reduce((sum, b) => sum + Math.round(b.stake * b.odds), 0)) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KC
                     </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>If all open bets win</div>
                 </div>
             </div>
 
@@ -230,7 +252,7 @@ const KoalaDashboard = () => {
                             </label>
                         </div>
                         <div style={{ width: '100%', height: '350px' }}>
-                            <ResponsiveContainer>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">

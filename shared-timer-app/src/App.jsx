@@ -37,6 +37,7 @@ const Tetris = React.lazy(() => import('./pages/Tetris'));
 const PolymarketGeneral = React.lazy(() => import('./pages/PolymarketGeneral'));
 const Wordle = React.lazy(() => import('./pages/Wordle'));
 const TowerClimb = React.lazy(() => import('./pages/TowerClimb'));
+const LottoImitat = React.lazy(() => import('./pages/LottoImitat'));
 const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
 const LiveStreamWidget = React.lazy(() => import('./components/LiveStreamWidget'));
@@ -698,6 +699,7 @@ function InnerApp() {
                 <Route path="/polymarket-general" element={<PolymarketGeneral />} />
                 <Route path="/wordle" element={<Wordle user={user} token={token} />} />
                 <Route path="/games/tower-climb" element={<TowerClimb />} />
+                <Route path="/lotto" element={<LottoImitat />} />
                 <Route path="/c" element={<SharedCountdown />} />
                 <Route path="*" element={<div style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-main)' }}><h2>404 - Seite nicht gefunden</h2><p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Die gesuchte Seite existiert nicht.</p><a href="/" style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-card)', borderRadius: '8px', color: 'var(--text-main)', textDecoration: 'none', border: '1px solid var(--border-color)' }}>Zurück zur Startseite</a></div>} />
               </Routes>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import EVENTS from '../../socketEvents.json';
+import { useAuth } from './AuthContext';
 
 const PersistentDataContext = createContext();
 
@@ -13,9 +14,22 @@ export const usePersistentData = () => {
 };
 
 export const PersistentDataProvider = ({ children, socket }) => {
+    const { token, isGuest, user } = useAuth();
     const [esportsMatches, setEsportsMatches] = useState([]);
     const [esportsOdds, setEsportsOdds] = useState([]);
     const [generalBets, setGeneralBets] = useState([]);
+    
+    // Lotto Data
+    const [lottoData, setLottoData] = useState({
+        config: null,
+        stats: { totalPayout: 0, totalWins: 0, totalPlayed: 0 },
+        lastDraw: null,
+        userHistory: [],
+        userTicketsToday: 0,
+        today: null
+    });
+    const [lottoLoaded, setLottoLoaded] = useState(false);
+    const [loadingLotto, setLoadingLotto] = useState(false);
     
     const [esportsScheduleUpdatedAt, setEsportsScheduleUpdatedAt] = useState(null);
     const [esportsOddsUpdatedAt, setEsportsOddsUpdatedAt] = useState(null);
@@ -85,6 +99,51 @@ export const PersistentDataProvider = ({ children, socket }) => {
             setLoadingGeneral(false);
         }
     }, [generalBetsLoaded]);
+    
+    // Lotto Data (via REST)
+    const loadLottoData = useCallback(async (force = false) => {
+        if (lottoLoaded && !force) return;
+
+        setLoadingLotto(true);
+        try {
+            // Config is mostly public or handles guest internally (optionalAuthenticateToken)
+            const configReq = axios.get('/api/lotto/config', {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+
+            // History ONLY if logged in and not guest
+            const historyReq = (token && !isGuest) 
+                ? axios.get('/api/lotto/history', { headers: { 'Authorization': `Bearer ${token}` } })
+                : Promise.resolve({ data: { draws: [] } });
+
+            const [configRes, historyRes] = await Promise.all([configReq, historyReq]);
+
+            setLottoData({
+                config: {
+                    ...configRes.data.config,
+                    ticketPrice: configRes.data.config.ticketPriceCents,
+                    maxTicketsPerDay: configRes.data.config.maxDailyTickets
+                },
+                stats: configRes.data.stats,
+                lastDraw: configRes.data.lastDraw,
+                userHistory: historyRes.data.draws,
+                userTicketsToday: configRes.data.userTicketsToday || 0,
+                today: configRes.data.today || new Date().toISOString().split('T')[0]
+            });
+            setLottoLoaded(true);
+        } catch (err) {
+            console.error('[PersistentData] Failed to fetch lotto data:', err);
+        } finally {
+            setLoadingLotto(false);
+        }
+    }, [lottoLoaded, token, isGuest]);
+
+    // Re-fetch lotto history when user logs in
+    useEffect(() => {
+        if (lottoLoaded) {
+            loadLottoData(true);
+        }
+    }, [token, isGuest]);
 
     const updateEsportsOdds = useCallback((newOdds) => {
         setEsportsOdds(newOdds);
@@ -129,6 +188,43 @@ export const PersistentDataProvider = ({ children, socket }) => {
         socket.on(EVENTS.API_ESPORTS_DATA, handleEsportsData);
         socket.on(EVENTS.API_ODDS_DATA, handleOddsData);
 
+        const handleLottoDrawResult = (payload) => {
+            console.log('[PersistentData] LOTTO_DRAW_RESULT received:', payload);
+            setLottoData(prev => {
+                // Update stats and lastDraw from payload
+                const newLastDraw = {
+                    drawDate: payload.drawDate,
+                    numbers: payload.numbers,
+                    superzahl: payload.superzahl,
+                    totalWinners: payload.totalWinners,
+                    totalPayout: payload.totalPayout
+                };
+                
+                // We don't have the user's updated history here yet (who won what specifically),
+                // but we can at least update the global stats and last draw.
+                // The user's individual win/loss for this specific draw will be visible on next history fetch
+                // OR we could trigger a history fetch now.
+                return {
+                    ...prev,
+                    stats: payload.stats || prev.stats,
+                    lastDraw: newLastDraw,
+                    // We reset userTicketsToday to 0 since the draw just happened for "today"
+                    userTicketsToday: 0
+                };
+            });
+            
+            // Trigger a silent history refresh to get final results for user's tickets (only for logged in users)
+            if (token && !isGuest) {
+                axios.get('/api/lotto/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).then(res => {
+                    setLottoData(prev => ({ ...prev, userHistory: res.data.draws }));
+                }).catch(e => console.error('[PersistentData] Silent lotto history refresh failed:', e));
+            }
+        };
+
+        socket.on(EVENTS.LOTTO_DRAW_RESULT, handleLottoDrawResult);
+
         // Debug: Listen for a generic error
         socket.on(EVENTS.ERROR, (msg) => {
             console.error('[PersistentData] Socket Error:', msg);
@@ -137,6 +233,7 @@ export const PersistentDataProvider = ({ children, socket }) => {
         return () => {
             socket.off(EVENTS.API_ESPORTS_DATA, handleEsportsData);
             socket.off(EVENTS.API_ODDS_DATA, handleOddsData);
+            socket.off(EVENTS.LOTTO_DRAW_RESULT, handleLottoDrawResult);
             socket.off(EVENTS.ERROR);
             
             // Cleanup timeouts
@@ -160,7 +257,13 @@ export const PersistentDataProvider = ({ children, socket }) => {
         loadEsportsData,
         loadGeneralBets,
         updateEsportsOdds,
-        setGeneralBets
+        setGeneralBets,
+        // Lotto
+        lottoData,
+        lottoLoaded,
+        loadingLotto,
+        loadLottoData,
+        setLottoData
     };
 
     return (

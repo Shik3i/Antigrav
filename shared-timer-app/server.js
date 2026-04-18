@@ -58,6 +58,7 @@ const apiRoutes = require('./routes/api');
 const apiController = require('./controllers/apiController');
 const setupSocketHandlers = require('./sockets/socketHandler');
 const { startCron } = require('./cron/betResolver');
+const { startLottoCron } = require('./cron/lottoDrawCron');
 
 const app = express();
 app.disable('x-powered-by');
@@ -158,4 +159,5 @@ server.listen(PORT, () => {
     dbLayer.logSystemEvent('info', 'System', `Server listening on port ${PORT}`);
     apiController.initializeEsportsDb();
     startCron();
+    startLottoCron(io);
 });

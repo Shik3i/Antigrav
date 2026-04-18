@@ -240,4 +240,11 @@ router.delete('/admin/market/:id/hard', authController.authenticateToken, market
 // ─── Daily Status Aggregation ─────────────────────────────────
 router.get('/daily-status', authController.authenticateToken, apiController.getDailyStatus);
 
+// ─── Lotto Imitat ────────────────────────────────────────────
+const lottoController = require('../controllers/lottoController');
+router.get('/lotto/config', authController.optionalAuthenticateToken, lottoController.getConfig);
+router.post('/lotto/buy', authController.authenticateToken, lottoController.buyTicket);
+router.get('/lotto/history', authController.authenticateToken, lottoController.getHistory);
+router.get('/lotto/draws', lottoController.getDrawHistory);
+
 module.exports = router;

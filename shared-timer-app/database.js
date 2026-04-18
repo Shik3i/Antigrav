@@ -753,6 +753,10 @@ function initializeDatabaseSchema() {
     db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder)
             VALUES ('tower-climb', 'Tower Climb', '/games/tower-climb', 'Games', 1, 9)`);
 
+    // Lotto Imitat Link
+    db.run(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder)
+            VALUES ('lotto', 'Lotto Imitat', '/lotto', 'Games', 1, 10)`);
+
 
     // ─── Leveling Milestones Table ───────────────────────────────
     db.run(`CREATE TABLE IF NOT EXISTS LevelingMilestones (
@@ -841,8 +845,47 @@ function initializeDatabaseSchema() {
           });
         }
       });
+
+      // 3. Migration for Lotto
+      db.get("SELECT COUNT(*) as count FROM GlobalGameStats WHERE gameId = 'lotto'", (err, row) => {
+        if (!err && row?.count === 0) {
+          db.run("INSERT OR IGNORE INTO GlobalGameStats (gameId, totalPayout, totalWins, totalPlayed) VALUES (?, ?, ?, ?) ", 
+                 ['lotto', 0, 0, 0]);
+        }
+      });
     });
   });
+
+  // --- Lotto Imitat Tables ---
+  db.run(`CREATE TABLE IF NOT EXISTS LottoDrawings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drawDate TEXT NOT NULL UNIQUE,
+    numbers TEXT NOT NULL,
+    superzahl INTEGER NOT NULL,
+    totalTickets INTEGER DEFAULT 0,
+    totalWinners INTEGER DEFAULT 0,
+    totalPayout INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS LottoTickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    drawDate TEXT NOT NULL,
+    numbers TEXT NOT NULL,
+    superzahl INTEGER NOT NULL,
+    matchCount INTEGER DEFAULT 0,
+    superzahlMatch BOOLEAN DEFAULT 0,
+    winClass INTEGER DEFAULT 0,
+    winAmount INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`);
+
+  db.run('CREATE INDEX IF NOT EXISTS idx_lotto_tickets_user ON LottoTickets(userId)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_lotto_tickets_draw ON LottoTickets(drawDate, status)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_lotto_tickets_user_draw ON LottoTickets(userId, drawDate)');
   
 
   // Signal database is ready and mirror initial logs
@@ -4135,5 +4178,185 @@ module.exports = {
   logSystemEvent, // [NEW]
   getSystemLogs,  // [NEW]
   clearSystemLogs, // [NEW]
+  // --- Lotto Helpers ---
+  getLottoConfig: () => {
+    return new Promise((resolve, reject) => {
+      db.get("SELECT * FROM GlobalGameStats WHERE gameId = 'lotto'", (err, stats) => {
+        if (err) return reject(err);
+        db.get("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT 1", (err, lastDraw) => {
+          if (err) return reject(err);
+          resolve({ stats: stats || { totalPayout: 0, totalWins: 0, totalPlayed: 0 }, lastDraw });
+        });
+      });
+    });
+  },
+
+  getUserLottoTicketCount: (userId, drawDate) => {
+    return new Promise((resolve, reject) => {
+      db.get("SELECT COUNT(*) as count FROM LottoTickets WHERE userId = ? AND drawDate = ?", [userId, drawDate], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.count : 0);
+      });
+    });
+  },
+
+  purchaseLottoTickets: (userId, tickets, drawDate) => {
+    return new Promise((resolve, reject) => {
+      const totalCost = tickets.length * 100; // 100 cents = 1 KC
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (err, user) => {
+          if (err || !user || user.koala_balance < totalCost) {
+            db.run('ROLLBACK');
+            return reject(new Error(user ? 'Not enough KoalaCoins.' : 'User not found.'));
+          }
+
+          // Check daily limit and duplicate tickets
+          db.all("SELECT numbers, superzahl FROM LottoTickets WHERE userId = ? AND drawDate = ?", [userId, drawDate], (err, existingRows) => {
+            if (err) {
+              db.run('ROLLBACK');
+              return reject(err);
+            }
+
+            const currentCount = existingRows ? existingRows.length : 0;
+            if (currentCount + tickets.length > 100) {
+              db.run('ROLLBACK');
+              return reject(new Error(`Tägliches Limit erreicht. Du hast bereits ${currentCount} Tickets für diese Ziehung. (Max 100)`));
+            }
+
+            // Create a set of existing "Numbers_SZ" strings for quick comparison
+            const existingSet = new Set(existingRows.map(r => {
+                const nums = JSON.parse(r.numbers).sort((a,b) => a-b);
+                return `${JSON.stringify(nums)}_${r.superzahl}`;
+            }));
+            
+            // Check incoming batch for internal duplicates and against existing
+            const batchDuplicates = [];
+            const processedInBatch = new Set();
+
+            for (const t of tickets) {
+              const sortedNums = [...t.numbers].sort((a,b) => a-b);
+              const key = `${JSON.stringify(sortedNums)}_${t.superzahl}`;
+              
+              if (existingSet.has(key) || processedInBatch.has(key)) {
+                batchDuplicates.push(`${sortedNums.join(',')} SZ:${t.superzahl}`);
+              } else {
+                processedInBatch.add(key);
+              }
+            }
+
+            if (batchDuplicates.length > 0) {
+              db.run('ROLLBACK');
+              return reject(new Error(`Duplikat-Fehler: Du besitzt bereits Tickets mit diesen Zahlen oder hast sie mehrfach im Warenkorb: ${batchDuplicates.slice(0, 3).join(' | ')}${batchDuplicates.length > 3 ? '...' : ''}`));
+            }
+
+            db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [totalCost, userId]);
+            db.run('UPDATE GlobalGameStats SET totalPlayed = totalPlayed + ? WHERE gameId = ?', [tickets.length, 'lotto']);
+            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', 
+                   [userId, -totalCost, `Lotto Kauf (${tickets.length}x)`]);
+
+            const stmt = db.prepare('INSERT INTO LottoTickets (userId, drawDate, numbers, superzahl) VALUES (?, ?, ?, ?)');
+            tickets.forEach(t => {
+              stmt.run([userId, drawDate, JSON.stringify(t.numbers.sort((a,b) => a-b)), t.superzahl]);
+            });
+            stmt.finalize();
+
+            db.run('COMMIT', (err) => {
+              if (err) reject(err);
+              else resolve({ newBalance: user.koala_balance - totalCost });
+            });
+          });
+        });
+      });
+    });
+  },
+
+  executeLottoDraw: (drawDate, drawnNumbers, drawnSuperzahl) => {
+    const { determineWinClass, getPayoutForClass } = require('./config/lotto.js');
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        // Get all pending tickets for this draw
+        db.all("SELECT * FROM LottoTickets WHERE drawDate = ? AND status = 'pending'", [drawDate], async (err, tickets) => {
+          if (err) {
+            db.run('ROLLBACK');
+            return reject(err);
+          }
+
+          let totalPayout = 0;
+          let totalWinners = 0;
+          const userPayouts = {}; // userId -> amount
+
+          for (const ticket of tickets) {
+            const ticketNumbers = JSON.parse(ticket.numbers);
+            const winClass = determineWinClass(ticketNumbers, ticket.superzahl, drawnNumbers, drawnSuperzahl);
+            const payout = getPayoutForClass(winClass);
+            
+            const matchCount = ticketNumbers.filter(n => drawnNumbers.includes(n)).length;
+            const superzahlMatch = ticket.superzahl === drawnSuperzahl;
+
+            db.run(`UPDATE LottoTickets SET matchCount = ?, superzahlMatch = ?, winClass = ?, winAmount = ?, status = 'drawn' WHERE id = ?`,
+                   [matchCount, superzahlMatch ? 1 : 0, winClass, payout, ticket.id]);
+
+            if (payout > 0) {
+              totalPayout += payout;
+              totalWinners++;
+              userPayouts[ticket.userId] = (userPayouts[ticket.userId] || 0) + payout;
+            }
+          }
+
+          // Apply payouts to users
+          for (const [userId, amount] of Object.entries(userPayouts)) {
+            db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [amount, userId]);
+            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', 
+                   [userId, amount, `Lotto Gewinn (${drawDate})`]);
+          }
+
+          db.run('UPDATE GlobalGameStats SET totalPayout = totalPayout + ?, totalWins = totalWins + ? WHERE gameId = ?', 
+                 [totalPayout, totalWinners, 'lotto']);
+
+          db.run('INSERT INTO LottoDrawings (drawDate, numbers, superzahl, totalTickets, totalWinners, totalPayout) VALUES (?, ?, ?, ?, ?, ?)',
+                 [drawDate, JSON.stringify(drawnNumbers), drawnSuperzahl, tickets.length, totalWinners, totalPayout]);
+
+          db.run('COMMIT', (err) => {
+            if (err) reject(err);
+            else resolve({ drawDate, numbers: drawnNumbers, superzahl: drawnSuperzahl, totalTickets: tickets.length, totalWinners, totalPayout });
+          });
+        });
+      });
+    });
+  },
+
+  getUserLottoHistory: (userId, limit = 10) => {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT t.*, d.numbers as drawNumbers, d.superzahl as drawSuperzahl, d.totalPayout as drawTotalPayout
+        FROM LottoTickets t
+        LEFT JOIN LottoDrawings d ON t.drawDate = d.drawDate
+        WHERE t.userId = ?
+        ORDER BY t.drawDate DESC, t.winAmount DESC, t.matchCount DESC
+        LIMIT ?
+      `;
+      db.all(query, [userId, limit], (err, rows) => { 
+        if (err) reject(err);
+        else {
+          // Flatten grouping if needed on frontend, but keep it roughly sorted
+          resolve(rows || []);
+        }
+      });
+    });
+  },
+
+  getLottoDrawHistory: (limit = 30) => {
+    return new Promise((resolve, reject) => {
+      db.all("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT ?", [limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
   dbLayer: { db } // For direct access if needed
 };

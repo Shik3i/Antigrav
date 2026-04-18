@@ -73,5 +73,6 @@
     "ROOM_COINFLIP_RESULT": "room_coinflip_result",
     "START_DEATHROLL": "start_deathroll",
     "ROLL_DEATHROLL": "roll_deathroll",
-    "DEATHROLL_UPDATE": "deathroll_update"
+    "DEATHROLL_UPDATE": "deathroll_update",
+    "LOTTO_DRAW_RESULT": "lotto_draw_result"
 }

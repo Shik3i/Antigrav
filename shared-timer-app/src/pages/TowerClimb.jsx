@@ -384,37 +384,32 @@ const TowerClimb = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           <div className={`glass-panel ${isShaking ? 'subtle-shake' : ''}`} style={{ padding: '0', borderRadius: '32px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ padding: '24px 32px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>Tower Board</h2>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeRound ? '#10b981' : '#64748b', boxShadow: activeRound ? '0 0 12px #10b981' : 'none' }}></div>
-                <span style={{ fontSize: '0.9rem', color: activeRound ? '#10b981' : 'var(--text-muted)', fontWeight: 600 }}>{activeRound ? 'Live' : 'Bereit'}</span>
+            <div style={{ padding: '20px 32px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', position: 'relative' }}>
+              {/* Multiplier Section */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <TrendingUp size={22} color="#a78bfa" />
+                  <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', borderRadius: '50%', background: activeRound ? '#10b981' : '#64748b', boxShadow: activeRound ? '0 0 10px #10b981' : 'none', border: '2px solid #1a1b1e' }}></div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Multiplikator</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff' }}>x{Number(activeRound?.currentMultiplier || 1).toFixed(2)}</div>
+                </div>
+              </div>
+
+              {/* Potential Payout Section */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'flex-end' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Potentieller Gewinn</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#10b981' }}>{formatKC(activeRound?.currentPayout || 0)} KC</div>
+                </div>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trophy size={22} color="#34d399" />
+                </div>
               </div>
             </div>
 
             <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              
-              {/* Stats Grid Icons */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '24px', padding: '20px', display: 'flex', alignItems: 'center', gap: '20px', transition: 'transform 0.2s ease' }}>
-                   <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(139,92,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <TrendingUp size={24} color="#a78bfa" />
-                   </div>
-                   <div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Multiplikator</div>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 900 }}>x{Number(activeRound?.currentMultiplier || 1).toFixed(2)}</div>
-                   </div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '24px', padding: '20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                   <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Trophy size={24} color="#34d399" />
-                   </div>
-                   <div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Potentieller Gewinn</div>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981' }}>{formatKC(activeRound?.currentPayout || 0)} KC</div>
-                   </div>
-                </div>
-              </div>
 
               {/* Tower Visualization */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative' }}>

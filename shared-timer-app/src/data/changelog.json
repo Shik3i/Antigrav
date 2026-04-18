@@ -1,5 +1,11 @@
 [
   {
+    "id": 47,
+    "version": "2.30.0",
+    "date": "2026-04-18",
+    "changes": "- **Lotto Audit & Fixes**: Korrektur der Gewinnklassen-Logik (Klasse 1-9) zur Gewährleistung mathematisch korrekter Auszahlungen.\n- **Duplikat-Prävention**: Implementierung einer strikten plattformübergreifenden Prüfung zur Vermeidung doppelter Ticket-Einreichungen.\n- **React Stability Patch**: Behebung des Hook-Violation (Error #300) Absturzes durch Refactoring der Memoization-Logik.\n- **Bulk Quick-Tipp**: Schnelles Hinzufügen von 5 bis 50 Zufalls-Tickets inklusive automatischer Einzigartigkeits-Garantie.\n- **Backend Robustness**: Atomare Transaktionssicherung beim Ticketkauf und optimierte Historien-Abfrage in der Datenbank."
+  },
+  {
     "id": 46,
     "version": "2.29.0",
     "date": "2026-04-18",
