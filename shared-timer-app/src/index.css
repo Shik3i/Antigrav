@@ -877,13 +877,13 @@ body.zen-mode .news-ticker-wrapper {
 
 @keyframes coin-flip {
   0% { transform: scale(0.5) rotateY(0); opacity: 0; }
-  15% { transform: scale(1.2) rotateY(720deg); opacity: 1; }
-  85% { transform: scale(1) rotateY(1440deg); opacity: 1; }
-  100% { transform: scale(0.9) rotateY(1800deg); opacity: 0; }
+  18% { transform: scale(1.16) rotateY(720deg); opacity: 1; }
+  72% { transform: scale(0.98) rotateY(1440deg); opacity: 1; }
+  100% { transform: scale(1) rotateY(1800deg); opacity: 1; }
 }
 
 .coin-flip-animation {
-  animation: coin-flip 5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation: coin-flip 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
 }
 
 .dice-shake {
@@ -902,4 +902,4 @@ body.zen-mode .news-ticker-wrapper {
 [data-pokemon-mode="true"].pokemon-light-mode body::after {
   background: rgba(255, 255, 255, 0.4) !important;
 }
-
+

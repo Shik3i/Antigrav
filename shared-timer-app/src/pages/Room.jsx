@@ -12,7 +12,10 @@ import ClockWidget from '../components/ClockWidget';
 import WeatherWidget from '../components/WeatherWidget';
 import { useToast } from '../context/ToastContext';
 
-const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode, serverTimeOffset, setIsRightPanelOpen, onLeaveRoom }) => {
+const COINFLIP_ANIMATION_MS = 1800;
+const COINFLIP_RESULT_VISIBLE_MS = 5000;
+
+const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId, setActiveToken, isZenMode, setIsZenMode, serverTimeOffset, setIsRightPanelOpen, onLeaveRoom, roomConnectionState }) => {
     const { showToast } = useToast();
     const { id } = useParams();
     const [searchParams] = useSearchParams();
@@ -23,6 +26,10 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
     const [eventHistory, setEventHistory] = useState([]);
     const [showCounter, setShowCounter] = useState(() => localStorage.getItem('showPersonalCounter') === 'true');
     const [coinflipResult, setCoinflipResult] = useState(null);
+    const [coinflipCountdown, setCoinflipCountdown] = useState(0);
+    const [coinflipDetailsVisible, setCoinflipDetailsVisible] = useState(false);
+    const coinflipHideTimeoutRef = useRef(null);
+    const coinflipRevealTimeoutRef = useRef(null);
 
     const toggleCounter = () => {
         setShowCounter(prev => {
@@ -102,8 +109,30 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
         };
 
         const handleCoinflipResult = (data) => {
+            if (coinflipHideTimeoutRef.current) {
+                clearTimeout(coinflipHideTimeoutRef.current);
+                coinflipHideTimeoutRef.current = null;
+            }
+            if (coinflipRevealTimeoutRef.current) {
+                clearTimeout(coinflipRevealTimeoutRef.current);
+                coinflipRevealTimeoutRef.current = null;
+            }
             setCoinflipResult(data);
-            setTimeout(() => setCoinflipResult(null), 5000);
+            setCoinflipDetailsVisible(false);
+            setCoinflipCountdown(0);
+
+            coinflipRevealTimeoutRef.current = setTimeout(() => {
+                setCoinflipDetailsVisible(true);
+                setCoinflipCountdown(COINFLIP_RESULT_VISIBLE_MS / 1000);
+                coinflipRevealTimeoutRef.current = null;
+
+                coinflipHideTimeoutRef.current = setTimeout(() => {
+                    setCoinflipResult(null);
+                    setCoinflipCountdown(0);
+                    setCoinflipDetailsVisible(false);
+                    coinflipHideTimeoutRef.current = null;
+                }, COINFLIP_RESULT_VISIBLE_MS);
+            }, COINFLIP_ANIMATION_MS);
         };
 
         socket.on(EVENTS.ROOM_COINFLIP_RESULT, handleCoinflipResult);
@@ -117,6 +146,14 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
         }
 
         return () => {
+            if (coinflipHideTimeoutRef.current) {
+                clearTimeout(coinflipHideTimeoutRef.current);
+                coinflipHideTimeoutRef.current = null;
+            }
+            if (coinflipRevealTimeoutRef.current) {
+                clearTimeout(coinflipRevealTimeoutRef.current);
+                coinflipRevealTimeoutRef.current = null;
+            }
             socket.off(EVENTS.ROOM_COINFLIP_RESULT, handleCoinflipResult);
             socket.off(EVENTS.REACTION, handleReaction);
 
@@ -130,6 +167,22 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
     const roleRef = useRef(userRole);
     useEffect(() => { stateRef.current = roomState; }, [roomState]);
     useEffect(() => { roleRef.current = userRole; }, [userRole]);
+
+    useEffect(() => {
+        if (!coinflipResult || !coinflipDetailsVisible || coinflipCountdown <= 0) return undefined;
+
+        const intervalId = window.setInterval(() => {
+            setCoinflipCountdown(prev => {
+                if (prev <= 1) {
+                    window.clearInterval(intervalId);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => window.clearInterval(intervalId);
+    }, [coinflipResult, coinflipDetailsVisible, coinflipCountdown]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -255,25 +308,98 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
                 </div>
 
                 {/* Minigames: Coinflip Overlay */}
-                {coinflipResult && (
+                {coinflipResult && document.body && createPortal(
                     <div className="coinflip-overlay animate-fade-in" style={{
-                        position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', zIndex: 1000, pointerEvents: 'none'
+                        position: 'fixed',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2000,
+                        pointerEvents: 'none',
+                        background: 'radial-gradient(circle at center, rgba(8, 12, 18, 0.12) 0%, rgba(8, 12, 18, 0.18) 28%, rgba(8, 12, 18, 0.28) 100%)'
                     }}>
-                        <div className="coin-flip-animation" style={{
-                            width: '120px', height: '120px', borderRadius: '50%',
-                            background: coinflipResult.result === 'KOPF' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                            boxShadow: '0 10px 40px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.5)',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center',
-                            fontSize: '2rem', fontWeight: 800, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                            border: '4px solid #fff'
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '14px',
+                            padding: '26px 28px 22px',
+                            borderRadius: '28px',
+                            background: 'linear-gradient(180deg, rgba(18, 24, 34, 0.76) 0%, rgba(12, 17, 25, 0.68) 100%)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            backdropFilter: 'blur(16px)',
+                            boxShadow: '0 24px 80px rgba(0,0,0,0.28)'
                         }}>
-                            {coinflipResult.result === 'KOPF' ? 'KOPF' : 'ZAHL'}
+                            <div style={{
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '188px',
+                                height: '188px'
+                            }}>
+                                <div style={{
+                                    position: 'absolute',
+                                    inset: '18px',
+                                    borderRadius: '999px',
+                                    background: 'radial-gradient(circle, rgba(10, 14, 22, 0.58) 0%, rgba(10, 14, 22, 0.26) 56%, rgba(10, 14, 22, 0) 100%)',
+                                    filter: 'blur(10px)'
+                                }} />
+                                <div className="coin-flip-animation" style={{
+                                    width: '120px',
+                                    height: '120px',
+                                    borderRadius: '50%',
+                                    background: coinflipResult.result === 'KOPF' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                                    boxShadow: '0 14px 40px rgba(0,0,0,0.38), inset 0 0 20px rgba(255,255,255,0.5)',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 800,
+                                    color: '#fff',
+                                    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                                    border: '4px solid rgba(255,255,255,0.95)',
+                                    position: 'relative',
+                                    zIndex: 1
+                                }}>
+                                    {coinflipResult.result === 'KOPF' ? 'KOPF' : 'ZAHL'}
+                                </div>
+                            </div>
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '8px',
+                                opacity: coinflipDetailsVisible ? 1 : 0,
+                                transform: coinflipDetailsVisible ? 'translateY(0)' : 'translateY(8px)',
+                                transition: 'opacity 220ms ease, transform 220ms ease'
+                            }}>
+                                <div style={{
+                                    padding: '10px 18px',
+                                    fontSize: '1.02rem',
+                                    fontWeight: 600,
+                                    color: 'var(--text-main)',
+                                    textAlign: 'center',
+                                    borderRadius: '999px',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid rgba(255,255,255,0.06)',
+                                    maxWidth: 'min(80vw, 420px)'
+                                }}>
+                                    <span style={{ color: 'var(--accent-primary)' }}>{coinflipResult.userName}</span> wirft eine Münze: {coinflipResult.result}
+                                </div>
+                                <div style={{
+                                    fontSize: '0.78rem',
+                                    color: 'var(--text-muted)',
+                                    letterSpacing: '0.04em',
+                                    textTransform: 'uppercase'
+                                }}>
+                                    Schließt in {coinflipCountdown}s
+                                </div>
+                            </div>
                         </div>
-                        <div className="glass-card" style={{ padding: '12px 24px', fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-main)', textAlign: 'center' }}>
-                            <span style={{ color: 'var(--accent-primary)' }}>{coinflipResult.userName}</span> wirft eine Münze: {coinflipResult.result}
-                        </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
 
                 {/* Minigames: Deathroll Widget */}
@@ -406,6 +532,7 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
                         showCounter={showCounter}
                         toggleCounter={toggleCounter}
                         onLeaveRoom={onLeaveRoom}
+                        roomConnectionState={roomConnectionState}
                     />
                 )
             }

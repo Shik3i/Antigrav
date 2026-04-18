@@ -6,6 +6,39 @@ import UserContextMenu from './UserContextMenu';
 import { fetchJson } from '../utils/apiClient';
 import { getTimerToken } from '../utils/clientStorage';
 
+const CONNECTION_STATUS_META = {
+    connected: {
+        label: 'Room connection OK',
+        color: '#10b981',
+        background: 'rgba(16, 185, 129, 0.12)',
+        border: 'rgba(16, 185, 129, 0.24)'
+    },
+    unstable: {
+        label: 'Room connection unstable',
+        color: '#f59e0b',
+        background: 'rgba(245, 158, 11, 0.12)',
+        border: 'rgba(245, 158, 11, 0.24)'
+    },
+    connecting: {
+        label: 'Connecting to room',
+        color: '#60a5fa',
+        background: 'rgba(96, 165, 250, 0.12)',
+        border: 'rgba(96, 165, 250, 0.24)'
+    },
+    offline: {
+        label: 'Room connection lost',
+        color: '#ef4444',
+        background: 'rgba(239, 68, 68, 0.12)',
+        border: 'rgba(239, 68, 68, 0.24)'
+    },
+    idle: {
+        label: 'No active room',
+        color: 'var(--text-muted)',
+        background: 'rgba(148, 163, 184, 0.10)',
+        border: 'rgba(148, 163, 184, 0.18)'
+    }
+};
+
 const InviteFriendsDropdown = ({ socket, roomId, friends, isOpen, setIsOpen }) => {
     const [inviteNotice, setInviteNotice] = useState('');
     if (!getTimerToken()) return null;
@@ -52,7 +85,7 @@ const InviteFriendsDropdown = ({ socket, roomId, friends, isOpen, setIsOpen }) =
     );
 };
 
-const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersCollapsed, togglePomodoro, copyInviteLink, roomTokens, socket, roomId, eventHistory, serverTimeOffset, showCounter, toggleCounter, onLeaveRoom }) => {
+const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersCollapsed, togglePomodoro, copyInviteLink, roomTokens, socket, roomId, eventHistory, serverTimeOffset, showCounter, toggleCounter, onLeaveRoom, roomConnectionState }) => {
     const currentMinutes = roomState.config.durationMs / 60000;
     const [durationInput, setDurationInput] = useState(currentMinutes);
     const [pauseInput, setPauseInput] = useState(roomState?.config?.pomodoro?.pauseMinutes || 5);
@@ -64,6 +97,7 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
     const [friends, setFriends] = useState([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [selectedPvPMemberId, setSelectedPvPMemberId] = useState(null);
+    const connectionMeta = CONNECTION_STATUS_META[roomConnectionState?.level] || CONNECTION_STATUS_META.idle;
 
     useEffect(() => {
         const tk = getTimerToken();
@@ -116,6 +150,36 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                 <button className="btn-ghost" style={{ padding: '6px', width: '30px', height: '30px', justifyContent: 'center', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} onClick={() => setIsMembersCollapsed(true)}>
                     <X size={16} />
                 </button>
+            </div>
+
+            <div
+                title={roomConnectionState?.detail || connectionMeta.label}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: connectionMeta.background,
+                    border: `1px solid ${connectionMeta.border}`
+                }}
+            >
+                <span style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: connectionMeta.color,
+                    boxShadow: `0 0 0 4px ${connectionMeta.background}`
+                }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: connectionMeta.color }}>
+                        {connectionMeta.label}
+                    </span>
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                        {roomConnectionState?.detail || 'Live room sync status unavailable.'}
+                    </span>
+                </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>

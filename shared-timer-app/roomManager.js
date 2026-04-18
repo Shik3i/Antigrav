@@ -5,6 +5,7 @@ class RoomManager {
     constructor() {
         // rooms: { roomId: { config, state, users: Map } }
         this.rooms = new Map();
+        this.pendingDisconnects = new Map();
     }
 
     // Create a new room in memory
@@ -188,8 +189,69 @@ class RoomManager {
             clearTimeout(room.timeoutId);
             room.timeoutId = null;
         }
-        room.users.set(socketId, { ...user, socketId, metrics: { ping: 0, offset: 0 } });
-        return room;
+
+        const existingDisconnectedEntry = Array.from(room.users.entries()).find(([, existingUser]) => {
+            if (!existingUser?.disconnectedAt) return false;
+
+            if (user.userId && existingUser.userId) {
+                return String(existingUser.userId) === String(user.userId);
+            }
+
+            return existingUser.displayName === user.displayName;
+        });
+
+        if (existingDisconnectedEntry) {
+            const [oldSocketId, existingUser] = existingDisconnectedEntry;
+            this.cancelPendingDisconnect(oldSocketId);
+            room.users.delete(oldSocketId);
+            room.users.set(socketId, {
+                ...existingUser,
+                ...user,
+                socketId,
+                disconnectedAt: null,
+                metrics: existingUser.metrics || { ping: 0, offset: 0 }
+            });
+            return { room, replacedSocketId: oldSocketId, resumedSession: true };
+        }
+
+        room.users.set(socketId, { ...user, socketId, disconnectedAt: null, metrics: { ping: 0, offset: 0 } });
+        return { room, replacedSocketId: null, resumedSession: false };
+    }
+
+    scheduleDisconnect(socketId, graceMs = 60000) {
+        for (const [roomId, room] of this.rooms.entries()) {
+            if (!room.users.has(socketId)) continue;
+
+            const user = room.users.get(socketId);
+            if (!user) return null;
+
+            this.cancelPendingDisconnect(socketId);
+            user.disconnectedAt = Date.now();
+
+            const timeoutId = setTimeout(() => {
+                this.pendingDisconnects.delete(socketId);
+                this.leaveRoom(socketId);
+            }, graceMs);
+
+            this.pendingDisconnects.set(socketId, { roomId, timeoutId });
+            return { roomId, user };
+        }
+        return null;
+    }
+
+    cancelPendingDisconnect(socketId) {
+        const pending = this.pendingDisconnects.get(socketId);
+        if (pending?.timeoutId) {
+            clearTimeout(pending.timeoutId);
+        }
+        this.pendingDisconnects.delete(socketId);
+    }
+
+    finalizePendingDisconnect(socketId) {
+        const pending = this.pendingDisconnects.get(socketId);
+        if (!pending) return null;
+        this.cancelPendingDisconnect(socketId);
+        return this.leaveRoom(socketId);
     }
 
     promoteUser(roomId, targetSocketId) {
@@ -208,6 +270,7 @@ class RoomManager {
     }
 
     leaveRoom(socketId) {
+        this.cancelPendingDisconnect(socketId);
         for (const [roomId, room] of this.rooms.entries()) {
             if (room.users.has(socketId)) {
                 room.users.delete(socketId);
@@ -334,7 +397,7 @@ class RoomManager {
             id: room.id,
             config: { ...room.config },
             state: safeState,
-            users: Array.from(room.users.values())
+            users: Array.from(room.users.values()).filter(user => !user.disconnectedAt)
         };
     }
 

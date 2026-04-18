@@ -132,11 +132,13 @@ function InnerApp() {
   const [roomError, setRoomError] = useState(null);
   const [roomTokens, setRoomTokens] = useState(EMPTY_ROOM_TOKENS);
   const [deferredFeaturesReady, setDeferredFeaturesReady] = useState(false);
+  const [lastRoomSyncAt, setLastRoomSyncAt] = useState(null);
 
   // Global Sync Hooks Reference
   const [globalSocket, setGlobalSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
+  const [lastPongAt, setLastPongAt] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [globalAnnouncement, setGlobalAnnouncement] = useState('');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
@@ -176,7 +178,10 @@ function InnerApp() {
     setGlobalSocket(newSocket);
     setHasInstance(true);
 
-    const onConnect = () => setIsConnected(true);
+    const onConnect = () => {
+      setIsConnected(true);
+      setLastPongAt(Date.now());
+    };
     const onDisconnect = () => setIsConnected(false);
     const onAnnouncement = (data) => {
       if (data?.message) {
@@ -218,7 +223,7 @@ function InnerApp() {
   useEffect(() => {
     const socket = globalSocket;
     if (!activeRoomId || !user?.id || !socket) {
-      if (!activeRoomId) { setRoomState(null); setRoomError(null); setRoomTokens(EMPTY_ROOM_TOKENS); }
+      if (!activeRoomId) { setRoomState(null); setRoomError(null); setRoomTokens(EMPTY_ROOM_TOKENS); setLastRoomSyncAt(null); }
       return undefined;
     }
 
@@ -229,6 +234,7 @@ function InnerApp() {
 
     const handleSync = (state) => {
       setRoomState(state);
+      setLastRoomSyncAt(Date.now());
       const myUser = state.users.find(u => u.userId === user.id || u.socketId === socket.id);
       if (myUser?.role === 'write' && socket.connected) {
         socket.emit(EVENTS.GET_INVITE_TOKENS, { roomId: state.id });
@@ -237,7 +243,7 @@ function InnerApp() {
 
     const handleError = (msg) => {
       if (msg.includes('Room not found') && !location.pathname.startsWith('/room/')) {
-        setActiveRoomId(null); setActiveToken(null); setRoomState(null);
+        setActiveRoomId(null); setActiveToken(null); setRoomState(null); setLastRoomSyncAt(null);
         return;
       }
       setRoomError(msg);
@@ -300,6 +306,7 @@ function InnerApp() {
       const ping = Math.round((now - clientTime) / 2);
       const offset = (serverTime + ping) - now;
       setServerTimeOffset(offset);
+      setLastPongAt(now);
       socket.emit(EVENTS.REPORT_METRICS, { ping, offset });
     };
     socket.on(EVENTS.PONG, handlePong);
@@ -333,6 +340,34 @@ function InnerApp() {
   const selectedLeagues = useMemo(() => user?.preferences?.esportsLeagues || DEFAULT_LEAGUES, [user?.preferences?.esportsLeagues]);
   const esportsEnabled = deferredFeaturesReady && selectedLeagues.length > 0;
   const [isZenMode, setIsZenMode] = useState(false);
+  const roomConnectionState = useMemo(() => {
+    if (!activeRoomId) {
+      return { level: 'idle', label: 'No room connection', detail: 'You are currently not in a room.' };
+    }
+
+    if (!isConnected) {
+      return { level: 'offline', label: 'Connection lost', detail: 'Socket connection to the server is currently offline.' };
+    }
+
+    if (!lastRoomSyncAt) {
+      return { level: 'connecting', label: 'Connecting', detail: 'Joining the room and waiting for the first sync.' };
+    }
+
+    const now = Date.now();
+    const syncAgeMs = now - lastRoomSyncAt;
+    const pongAgeMs = lastPongAt ? now - lastPongAt : 0;
+    const maxHealthyPongAgeMs = isVisible ? 20000 : 75000;
+    if (lastPongAt && pongAgeMs > maxHealthyPongAgeMs) {
+      return { level: 'unstable', label: 'Unstable', detail: `No recent socket heartbeat for ${Math.round(pongAgeMs / 1000)}s.` };
+    }
+
+    const amIInRoom = roomState?.users?.some(u => u.userId === user?.id || u.id === user?.id || u.socketId === globalSocket?.id);
+    if (roomState && !amIInRoom && syncAgeMs > 5000) {
+      return { level: 'unstable', label: 'Unstable', detail: 'Room state is active, but this client is missing from the current member list.' };
+    }
+
+    return { level: 'connected', label: 'Connected', detail: 'Room socket and live sync are healthy.' };
+  }, [activeRoomId, globalSocket?.id, isConnected, isVisible, lastPongAt, lastRoomSyncAt, roomState, user?.id]);
 
   // --- THE INITIALIZATION GUARD ---
   if (!hasInstance || (!isConnected && !user?.id)) return <ViewLoader />;
@@ -410,7 +445,7 @@ function InnerApp() {
                     <Route path="/" element={<Home user={user} globalSocket={activeSocket} />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
-                    <Route path="/room/:id" element={<Room user={user} socket={activeSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} />} />
+                    <Route path="/room/:id" element={<Room user={user} socket={activeSocket} roomState={roomState} roomError={roomError} roomTokens={roomTokens} setActiveRoomId={setActiveRoomId} setActiveToken={setActiveToken} isZenMode={isZenMode} setIsZenMode={setIsZenMode} serverTimeOffset={serverTimeOffset} setIsRightPanelOpen={setIsRightPanelOpen} onLeaveRoom={leaveActiveRoom} roomConnectionState={roomConnectionState} />} />
                     <Route path="/esports" element={<Esports selectedLeagues={selectedLeagues} socket={activeSocket} />} />
                     <Route path="/settings" element={<Settings user={user} setUser={setUser} socket={activeSocket} />} />
                     <Route path="/admin" element={<Admin socket={activeSocket} />} />

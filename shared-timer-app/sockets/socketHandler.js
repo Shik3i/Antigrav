@@ -483,7 +483,7 @@ module.exports = function (io) {
 
                 // console.log(`[DEBUG] JOIN_ROOM: socket.id=${socket.id}, role=${role}`);
 
-                roomManager.joinRoom(roomId, socket.id, user);
+                const joinResult = roomManager.joinRoom(roomId, socket.id, user);
                 socket.join(roomId);
 
                 // safeEmit - validates event name + serializability before sending
@@ -517,11 +517,17 @@ module.exports = function (io) {
                 safeEmitToSocket(socket, EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
                 safeEmitToSocket(socket, EVENTS.ROOM_EVENT_SYNC, room.state.eventHistory);
 
-                if (isNewJoin) {
+                if (joinResult?.replacedSocketId) {
+                    io.to(roomId).emit(EVENTS.USER_LEFT, joinResult.replacedSocketId);
+                }
+
+                if (isNewJoin && !joinResult?.resumedSession) {
                     safeEmitRoom(EVENTS.USER_JOINED, user);
                     const ev = roomManager.addEvent(roomId, 'join', `${user.displayName} joined the room`, socket.id);
                     if (ev) safeEmitRoom(EVENTS.ROOM_EVENT, ev);
                 }
+
+                safeEmitRoom(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
 
                 // Update room list for all
                 broadcastActiveRooms(io);
@@ -935,6 +941,7 @@ module.exports = function (io) {
                     const ev = roomManager.addEvent(roomId, 'leave', `${user.displayName} left the room`);
                     if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
                 }
+                io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
                 broadcastActiveRooms(io);
             }
         });
@@ -979,16 +986,20 @@ module.exports = function (io) {
 
 
         socket.on(EVENTS.DISCONNECT, (reason) => {
-            const user = roomManager.getUserBySocket(socket.id);
-            const roomId = roomManager.leaveRoom(socket.id);
-            if (roomId) {
-                io.to(roomId).emit(EVENTS.USER_LEFT, socket.id);
-                if (user) {
-                    const ev = roomManager.addEvent(roomId, 'leave', `${user.displayName} disconnected`);
-                    if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
-                }
-
-                broadcastActiveRooms(io);
+            const pending = roomManager.scheduleDisconnect(socket.id, 90 * 1000);
+            if (pending?.roomId) {
+                setTimeout(() => {
+                    const roomId = roomManager.finalizePendingDisconnect(socket.id);
+                    if (roomId) {
+                        io.to(roomId).emit(EVENTS.USER_LEFT, socket.id);
+                        if (pending.user) {
+                            const ev = roomManager.addEvent(roomId, 'leave', `${pending.user.displayName} disconnected`);
+                            if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
+                        }
+                        io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
+                        broadcastActiveRooms(io);
+                    }
+                }, 90 * 1000);
             }
 
             if (socket.user) {
