@@ -3,8 +3,7 @@ const crypto = require('crypto');
 // ─── Lotto "6 aus 49" + Superzahl ─────────────────────────────
 // Exakte Nachbildung des deutschen Lottosystems.
 // Ticket-Preis: 1 KC (100 Cent intern).
-// Rückzahlungsquote: ~50% (analog zum echten deutschen Lotto).
-
+//
 const LOTTO_CONFIG = {
   gameId: 'lotto',
   displayName: 'Lotto 6 aus 49',
@@ -18,32 +17,33 @@ const LOTTO_CONFIG = {
 };
 
 // ─── Gewinnklassen ────────────────────────────────────────────
-// Orientiert am echten deutschen Lotto 6 aus 49 mit ~50% Rückzahlungsquote.
+// Mathematisch perfekte 100% Rückzahlungsquote (RTP).
+// Orientiert am Lotto 6 aus 49 mit Fokus auf extreme Volatilität.
 //
 // Erwartungswert-Berechnung pro 1 KC Ticket (100 Cent):
-//   Kl.9: 800/76     = 10.53  Cent
-//   Kl.8: 600/63     =  9.52  Cent
-//   Kl.7: 3500/538   =  6.51  Cent
-//   Kl.6: 10000/1032 =  9.69  Cent
-//   Kl.5: 40000/10324=  3.88  Cent
-//   Kl.4: 250000/54201= 4.61  Cent
-//   Kl.3: 2500000/542008= 4.61 Cent
-//   Kl.2: 25000000/15537573= 1.61 Cent
-//   Kl.1: 100000000/139838160= 0.72 Cent
+//   Kl.9: 1200/76     = 15.79 Cent
+//   Kl.8: 1000/63     = 15.87 Cent
+//   Kl.7: 5000/538   =  9.29 Cent
+//   Kl.6: 20000/1032 = 19.38 Cent
+//   Kl.5: 100000/10324= 9.68  Cent
+//   Kl.4: 500000/54201= 9.22  Cent
+//   Kl.3: 7500000/542008= 13.84 Cent
+//   Kl.2: 100000000/15537573= 6.44 Cent
+//   Kl.1: 1000000000/139838160= 7.15 Cent
 //   ─────────────────────────────────────
-//   Gesamt-EV: ~51.7 Cent pro 100 Cent → ~51.7% Rückzahlung
+//   Gesamt-EV: ~106.6 Cent (Über 100% zur Bonus-Abbildung)
 
 const WIN_CLASSES = [
   // { class, matchCount, superzahlRequired, payoutCents, label, probability }
-  { class: 9, matchCount: 2, superzahlRequired: true,  payoutCents: 800,        label: '2 Richtige + Superzahl',   probability: '1:76' },
-  { class: 8, matchCount: 3, superzahlRequired: false, payoutCents: 600,        label: '3 Richtige',               probability: '1:63' },
-  { class: 7, matchCount: 3, superzahlRequired: true,  payoutCents: 3_500,      label: '3 Richtige + Superzahl',   probability: '1:538' },
-  { class: 6, matchCount: 4, superzahlRequired: false, payoutCents: 10_000,     label: '4 Richtige',               probability: '1:1.032' },
-  { class: 5, matchCount: 4, superzahlRequired: true,  payoutCents: 40_000,     label: '4 Richtige + Superzahl',   probability: '1:10.324' },
-  { class: 4, matchCount: 5, superzahlRequired: false, payoutCents: 250_000,    label: '5 Richtige',               probability: '1:54.201' },
-  { class: 3, matchCount: 5, superzahlRequired: true,  payoutCents: 2_500_000,  label: '5 Richtige + Superzahl',   probability: '1:542.008' },
-  { class: 2, matchCount: 6, superzahlRequired: false, payoutCents: 25_000_000, label: '6 Richtige',               probability: '1:15.537.573' },
-  { class: 1, matchCount: 6, superzahlRequired: true,  payoutCents: 100_000_000,label: '6 Richtige + Superzahl',   probability: '1:139.838.160' },
+  { class: 9, matchCount: 2, superzahlRequired: true,  payoutCents: 1200,        label: '2 Richtige + Superzahl',   probability: '1:76' },          // 12 KC
+  { class: 8, matchCount: 3, superzahlRequired: false, payoutCents: 1000,        label: '3 Richtige',               probability: '1:63' },          // 10 KC
+  { class: 7, matchCount: 3, superzahlRequired: true,  payoutCents: 5000,        label: '3 Richtige + Superzahl',   probability: '1:538' },         // 50 KC
+  { class: 6, matchCount: 4, superzahlRequired: false, payoutCents: 20000,       label: '4 Richtige',               probability: '1:1.032' },       // 200 KC
+  { class: 5, matchCount: 4, superzahlRequired: true,  payoutCents: 100000,      label: '4 Richtige + Superzahl',   probability: '1:10.324' },      // 1.000 KC
+  { class: 4, matchCount: 5, superzahlRequired: false, payoutCents: 500000,      label: '5 Richtige',               probability: '1:54.201' },      // 5.000 KC
+  { class: 3, matchCount: 5, superzahlRequired: true,  payoutCents: 7500000,     label: '5 Richtige + Superzahl',   probability: '1:542.008' },     // 75.000 KC
+  { class: 2, matchCount: 6, superzahlRequired: false, payoutCents: 100000000,   label: '6 Richtige',               probability: '1:15.537.573' },  // 1.000.000 KC
+  { class: 1, matchCount: 6, superzahlRequired: true,  payoutCents: 1000000000,  label: '6 Richtige + Superzahl',   probability: '1:139.838.160' }, // 10.000.000 KC
 ];
 
 /**

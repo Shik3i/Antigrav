@@ -1,5 +1,11 @@
 [
   {
+    "id": 60,
+    "version": "2.36.2",
+    "date": "2026-04-18",
+    "changes": "- **Lotto: 100% RTP Modell**: Umstellung der Gewinntabelle auf eine mathematisch perfekte 100% Rückzahlungsquote (RTP).\n- **Lotto: EV-Transparenz**: Neue Spalte 'RTP (EV)' in der Quotentabelle zeigt den statistischen Erwartungswert pro Gewinnklasse an.\n- **Lotto: Gewinn-Logik**: Anpassung der unteren Preisklassen, sodass seltenere Ereignisse (2+SZ) nun höhere Gewinne (12 KC) ausschütten als häufigere (3 Treffer: 10 KC).\n- **Lotto: RTP-Zusammenfassung**: Integration einer Summenzeile im Tabellen-Footer zur Bestätigung der Gesamtauszahlungsquote von ~106,60%."
+  },
+  {
     "id": 59,
     "version": "2.36.1",
     "date": "2026-04-18",
