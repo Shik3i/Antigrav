@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken'); // used for secure invite links
 const dbLayer = require('../database');
 const roomManager = require('../roomManager');
+const blackjackRoomManager = require('../utils/blackjackRoomManager');
 const EVENTS = require('../socketEvents.json');
 const sanitize = require('../sanitize');
 const apiController = require('../controllers/apiController');
@@ -10,6 +11,15 @@ const { safeEmit, safeStringify } = require('../utils/safeSerialization');
 const JWT_SECRET = require('../jwtSecret');
 
 const onlineUsers = new Map(); // userId -> Set of socket.ids
+const BLACKJACK_ROOM_PREFIX = 'blackjack:';
+
+const getBlackjackSocketRoom = (roomId) => `${BLACKJACK_ROOM_PREFIX}${roomId}`;
+
+const sendSocketAck = (ack, payload) => {
+    if (typeof ack === 'function') {
+        ack(payload);
+    }
+};
 
 // Helper to broadcast a user's status to their mutual friends
 async function broadcastFriendStatus(io, userId, isOnline) {
@@ -40,7 +50,33 @@ function broadcastCoinUpdate(io, userId, newBalanceCents) {
     }
 }
 
+function emitBlackjackState(io, roomId) {
+    const state = blackjackRoomManager.getRoomState(roomId);
+    io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
+    return state;
+}
+
 module.exports = function (io) {
+    const persistBlackjackSettlementIfNeeded = async (roomId) => {
+        const room = blackjackRoomManager.rooms.get(roomId);
+        if (!room?.lastSettlement?.length || !room.lastSettlementRoundId) {
+            return [];
+        }
+
+        if (room.lastAppliedSettlementRoundId === room.lastSettlementRoundId) {
+            return [];
+        }
+
+        const balanceUpdates = await dbLayer.applyBlackjackSettlement(room.lastSettlement);
+        room.lastAppliedSettlementRoundId = room.lastSettlementRoundId;
+
+        balanceUpdates.forEach((entry) => {
+            broadcastCoinUpdate(io, entry.userId, entry.balance);
+        });
+
+        return balanceUpdates;
+    };
+
     // Middleware to extract and verify user token
     io.use((socket, next) => {
         const token = socket.handshake.auth?.token;
@@ -538,6 +574,153 @@ module.exports = function (io) {
             }
         });
 
+        socket.on(EVENTS.BLACKJACK_JOIN, async ({ roomId, maxPlayers } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    const payload = { success: false, error: 'Authentication required.' };
+                    socket.emit(EVENTS.BLACKJACK_ERROR, payload.error);
+                    sendSocketAck(ack, payload);
+                    return;
+                }
+
+                const user = await dbLayer.getUser(userId);
+                if (!user) {
+                    const payload = { success: false, error: 'User not found.' };
+                    socket.emit(EVENTS.BLACKJACK_ERROR, payload.error);
+                    sendSocketAck(ack, payload);
+                    return;
+                }
+
+                const safeMaxPlayers = Number(maxPlayers) === 3 ? 3 : 5;
+                const resolvedRoomId = roomId || `blackjack-main-${safeMaxPlayers}`;
+
+                blackjackRoomManager.joinRoom(resolvedRoomId, {
+                    userId,
+                    username: user.username || user.displayName,
+                    displayName: user.displayName || user.username
+                }, safeMaxPlayers);
+
+                socket.join(getBlackjackSocketRoom(resolvedRoomId));
+                await persistBlackjackSettlementIfNeeded(resolvedRoomId);
+                const state = emitBlackjackState(io, resolvedRoomId);
+                sendSocketAck(ack, { success: true, roomId: resolvedRoomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to join blackjack table.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to join blackjack table.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_LEAVE, ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    const payload = { success: false, error: 'Authentication required.' };
+                    socket.emit(EVENTS.BLACKJACK_ERROR, payload.error);
+                    sendSocketAck(ack, payload);
+                    return;
+                }
+
+                if (!roomId) {
+                    const payload = { success: false, error: 'roomId is required.' };
+                    socket.emit(EVENTS.BLACKJACK_ERROR, payload.error);
+                    sendSocketAck(ack, payload);
+                    return;
+                }
+
+                blackjackRoomManager.leaveRoom(roomId, userId);
+                socket.leave(getBlackjackSocketRoom(roomId));
+                const state = blackjackRoomManager.getRoomState(roomId, userId);
+                if (state) {
+                    io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
+                }
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to leave blackjack table.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to leave blackjack table.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_BET, async ({ roomId, amount } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                const userBalance = await dbLayer.getUserBalance(userId);
+                blackjackRoomManager.placeBet(roomId, userId, Number(amount), Number(userBalance || 0));
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to place blackjack bet.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to place blackjack bet.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_START, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.startRound(roomId, userId);
+                await persistBlackjackSettlementIfNeeded(roomId);
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to start blackjack round.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to start blackjack round.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_HIT, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.hit(roomId, userId);
+                await persistBlackjackSettlementIfNeeded(roomId);
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to draw a blackjack card.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to draw a blackjack card.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_STAND, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.stand(roomId, userId);
+                await persistBlackjackSettlementIfNeeded(roomId);
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to stand in blackjack.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to stand in blackjack.' });
+            }
+        });
+
         socket.on('REQUEST_ROOM_EVENT_SYNC', ({ roomId }) => {
             const room = roomManager.getRoom(roomId);
             if (room) {
@@ -1020,6 +1203,7 @@ module.exports = function (io) {
     // Timer Tick Interval (1Hz) for precise calculation sync
     setInterval(() => {
         const completedRooms = roomManager.tick();
+        const blackjackChangedRooms = blackjackRoomManager.tick();
 
         // Emit timer_completed event
         completedRooms.forEach(room => {
@@ -1098,6 +1282,15 @@ module.exports = function (io) {
         roomManager.rooms.forEach((room, roomId) => {
             if (room.state.isRunning) {
                 io.volatile.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
+            }
+        });
+
+        blackjackChangedRooms.forEach(async (roomId) => {
+            try {
+                await persistBlackjackSettlementIfNeeded(roomId);
+                emitBlackjackState(io, roomId);
+            } catch (err) {
+                console.error('Blackjack tick failed:', err);
             }
         });
     }, 1000); // 1Hz sync is enough since clients will animate the visual themselves

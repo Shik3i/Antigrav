@@ -75,5 +75,14 @@
     "ROLL_DEATHROLL": "roll_deathroll",
     "DEATHROLL_UPDATE": "deathroll_update",
     "LOTTO_DRAW_RESULT": "lotto_draw_result",
-    "UPDATE_PREFERENCES": "update_preferences"
+    "UPDATE_PREFERENCES": "update_preferences",
+    "BLACKJACK_JOIN": "blackjack:join",
+    "BLACKJACK_LEAVE": "blackjack:leave",
+    "BLACKJACK_BET": "blackjack:bet",
+    "BLACKJACK_START": "blackjack:start",
+    "BLACKJACK_HIT": "blackjack:hit",
+    "BLACKJACK_STAND": "blackjack:stand",
+    "BLACKJACK_STATE": "blackjack:state",
+    "BLACKJACK_ERROR": "blackjack:error",
+    "BLACKJACK_LEADERBOARD": "blackjack:leaderboard"
 }
