@@ -26,6 +26,9 @@ function applyDatabasePragmas() {
   db.run('PRAGMA synchronous=NORMAL;');
   db.run('PRAGMA temp_store=MEMORY;');
   db.run('PRAGMA foreign_keys=ON;');
+  db.run('PRAGMA busy_timeout = 5000;');
+  db.run('PRAGMA cache_size = -20000;');
+  db.run('PRAGMA mmap_size = 536870912;');
 }
 
 function initializeDatabaseSchema() {
@@ -4181,11 +4184,40 @@ module.exports = {
   // --- Lotto Helpers ---
   getLottoConfig: () => {
     return new Promise((resolve, reject) => {
+      // 1. Get Global Stats
       db.get("SELECT * FROM GlobalGameStats WHERE gameId = 'lotto'", (err, stats) => {
         if (err) return reject(err);
-        db.get("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT 1", (err, lastDraw) => {
+        const finalStats = stats || { totalPayout: 0, totalWins: 0, totalPlayed: 0 };
+
+        // 2. Get Pending Tickets Count
+        db.get("SELECT COUNT(*) as totalPending FROM LottoTickets WHERE status = 'pending'", (err, pendRow) => {
           if (err) return reject(err);
-          resolve({ stats: stats || { totalPayout: 0, totalWins: 0, totalPlayed: 0 }, lastDraw });
+          finalStats.totalPending = pendRow ? pendRow.totalPending : 0;
+
+          // 3. Get Last Draw
+          db.get("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT 1", (err, lastDraw) => {
+            if (err) return reject(err);
+            if (!lastDraw) {
+              return resolve({ stats: finalStats, lastDraw: null });
+            }
+
+            // 4. Get Winners per Class for this last draw
+            db.all(
+              "SELECT winClass, COUNT(*) as winnerCount FROM LottoTickets WHERE drawDate = ? AND winClass > 0 GROUP BY winClass",
+              [lastDraw.drawDate],
+              (err, winnerRows) => {
+                if (err) return reject(err);
+                
+                const winnersByClass = {};
+                winnerRows.forEach(row => {
+                  winnersByClass[row.winClass] = row.winnerCount;
+                });
+                lastDraw.winnersByClass = winnersByClass;
+
+                resolve({ stats: finalStats, lastDraw });
+              }
+            );
+          });
         });
       });
     });
