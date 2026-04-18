@@ -833,9 +833,9 @@ const Tetris = () => {
                 flexDirection: 'column', 
                 height: '100%', 
                 outline: 'none',
-                position: 'relative', // Relative for children, but parent padding is killed
+                position: 'relative', 
                 overflow: 'hidden',
-                background: 'var(--bg-color)' // Ensure it covers the background
+                background: 'transparent'
             }}
             tabIndex="0"
         >
