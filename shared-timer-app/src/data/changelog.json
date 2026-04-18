@@ -1,5 +1,11 @@
 [
   {
+    "id": 56,
+    "version": "2.35.4",
+    "date": "2026-04-18",
+    "changes": "- **SyncExtension Hotfix**: Absicherung des `MutationObserver` gegen frühe Injections ohne `document.body`, wodurch der Fehler in `content.js` beseitigt wird.\n- **SPA Stabilität**: Video-Listener bleiben nun auch nach dynamischen Seitenwechseln aktiv, statt nach dem ersten gefundenen Video abgeschaltet zu werden.\n- **Heartbeat Noise Reduction**: Der Content-Script-Heartbeat läuft nur noch auf Tabs mit echtem Video."
+  },
+  {
     "id": 55,
     "version": "2.35.3",
     "date": "2026-04-18",

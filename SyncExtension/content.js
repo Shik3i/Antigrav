@@ -255,7 +255,7 @@
     });
 
     // HEARTBEAT: Ping background.js every 15 seconds to keep it alive
-    // Only run if we have a video or were active to minimize noise on non-media tabs
+    // Only run when a real video is present to minimize noise on non-media tabs.
     const heartbeatInterval = setInterval(() => {
         try {
             // 1. Extra robust check: id is gone = context dead
@@ -265,7 +265,7 @@
             }
 
             const video = findVideo();
-            if (video || window.koalaSyncInjected) {
+            if (video) {
                 const playbackState = video ? (video.paused ? 'paused' : 'playing') : null;
                 // 2. Double protection with try/catch because sendMessage throws synchronously on invalid context
                 chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content', playbackState })
@@ -317,6 +317,20 @@
         video.dataset.syncAttached = 'true';
     }
 
+    function waitForBody(callback) {
+        if (document.body) {
+            callback();
+            return;
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', callback, { once: true });
+            return;
+        }
+
+        setTimeout(() => waitForBody(callback), 100);
+    }
+
     // Check for videos immediately and periodically
     let observer;
     let fallbackInterval = null;
@@ -325,12 +339,6 @@
         const video = findVideo();
         if (video) {
             attachVideoListeners(video);
-            if (observer) observer.disconnect();
-            // Bug 4 Fix: Clear fallback interval once video is found and attached
-            if (video.dataset.syncAttached === 'true' && fallbackInterval) {
-                clearInterval(fallbackInterval);
-                fallbackInterval = null;
-            }
         }
     };
 
@@ -343,7 +351,11 @@
     });
 
     initSync();
-    fallbackInterval = setInterval(initSync, 5000); // Rare fallback check, cleared once video is attached
-    observer.observe(document.body, { childList: true, subtree: true });
+    fallbackInterval = setInterval(initSync, 5000);
+    waitForBody(() => {
+        if (!observer || !document.body) return;
+        observer.observe(document.body, { childList: true, subtree: true });
+        initSync();
+    });
 
 })();
