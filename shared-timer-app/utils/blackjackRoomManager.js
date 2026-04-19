@@ -744,11 +744,6 @@ function settleRound(roomId) {
       };
     });
 
-  discardCards(room, room.dealerHand);
-  room.players.forEach((player) => {
-    discardCards(room, player.hand);
-  });
-
   room.lastSettlement = results;
   room.lastSettlementRoundId = room.roundId;
   room.currentPlayerTurn = null;
