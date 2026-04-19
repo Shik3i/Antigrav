@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Coins, Crown, Loader2, LogIn, ShieldAlert, Swords, Trophy, UserRound } from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import Avatar from '../components/Avatar';
@@ -253,6 +253,7 @@ const Blackjack = ({ socket }) => {
   const [now, setNow] = useState(() => Date.now());
   const [betAdjustMode, setBetAdjustMode] = useState('add');
   const [autoBetEnabled, setAutoBetEnabled] = useState(() => localStorage.getItem('blackjack_auto_bet') === 'true');
+  const previousRoomIdRef = useRef(null);
 
   const roomId = useMemo(() => currentRoomId || getRoomId(selectedTable), [currentRoomId, selectedTable]);
   const mySeat = useMemo(() => roomState?.players?.find((player) => player.userId === user?.id) || null, [roomState?.players, user?.id]);
@@ -426,11 +427,18 @@ const Blackjack = ({ socket }) => {
       socket.off(EVENTS.BLACKJACK_STATE, handleState);
       socket.off(EVENTS.BLACKJACK_ERROR, handleError);
       socket.off(EVENTS.CONNECT, handleConnect);
-      if (socket.connected) {
-        socket.emit(EVENTS.BLACKJACK_LEAVE, { roomId });
-      }
     };
   }, [isGuest, roomId, runSocketAction, selectedTable, showToast, socket]);
+
+  useEffect(() => {
+    if (isGuest || !socket) return;
+
+    const previousRoomId = previousRoomIdRef.current;
+    if (socket.connected && previousRoomId && previousRoomId !== roomId) {
+      socket.emit(EVENTS.BLACKJACK_LEAVE, { roomId: previousRoomId });
+    }
+    previousRoomIdRef.current = roomId;
+  }, [isGuest, roomId, socket]);
 
   useEffect(() => {
     const handleCoinUpdate = ({ balance }) => syncBalance(balance);
