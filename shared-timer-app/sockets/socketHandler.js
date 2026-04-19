@@ -67,7 +67,7 @@ module.exports = function (io) {
             return [];
         }
 
-        const balanceUpdates = await dbLayer.applyBlackjackSettlement(room.lastSettlement);
+        const balanceUpdates = await dbLayer.applyBlackjackSettlement(room.lastSettlement.filter((entry) => !entry?.isBot));
         room.lastAppliedSettlementRoundId = room.lastSettlementRoundId;
 
         balanceUpdates.forEach((entry) => {

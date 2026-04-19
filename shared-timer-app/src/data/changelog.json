@@ -1,5 +1,11 @@
 [
   {
+    "id": 73,
+    "version": "2.43.1",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Table Polish**: Tischstatus in den Header verschoben, das untere Control-Deck verbreitert und in der Hoehe reduziert, damit Felt und Deck freier sichtbar bleiben.\n- **Blackjack Seat Switching**: Freie Plaetze koennen nun direkt angeklickt werden, um ohne aktive Hand auf einen anderen Seat zu wechseln.\n- **Blackjack Bots**: Lobby-Workflow zum Hinzufuegen serverseitiger Blackjack-Bots fuer lokales Multiplayer-Testing vervollstaendigt."
+  },
+  {
     "id": 72,
     "version": "2.43.0",
     "date": "2026-04-19",
@@ -52,6 +58,12 @@
     "version": "2.39.0",
     "date": "2026-04-19",
     "changes": "- **Wartungsmodus (Maintenance Mode)**: Einführung einer granularen Sperr-Funktion für einzelne Seiten via Admin-Panel.\n- **Admin: Navigation Settings**: Neuer Toggle zum Sperren von Pfaden direkt in der Sidebar-Verwaltung.\n- **Route Guard**: Implementierung des `MaintenanceGuard` zur Zugriffsbeschränkung; inklusive automatischer Pfadprüfung gegen die Datenbank-Einstellungen.\n- **Premium Maintenance UI**: Neues glasmorphisches Interface (`MaintenanceScreen.jsx`) für gesperrte Ansichten.\n- **Superadmin Bypass**: Superadmins behalten vollen Zugriff auf alle Seiten, unterstützt durch einen fixierten Warn-Banner als visuellen Hinweis.\n- **Global State Management**: Migration der Navbar-Settings in den `PersistentDataContext` zur konsistenten Status-Synchronisation im gesamten Frontend."
+=======
+    "id": 64,
+    "version": "2.38.2",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Table Polish**: Tischstatus in den Header verschoben, das untere Control-Deck verbreitert und in der Hoehe reduziert, damit Felt und Deck freier sichtbar bleiben.\n- **Blackjack Seat Switching**: Freie Plaetze koennen nun direkt angeklickt werden, um ohne aktive Hand auf einen anderen Seat zu wechseln.\n- **Blackjack Bots**: Lobby-Workflow zum Hinzufuegen serverseitiger Blackjack-Bots fuer lokales Multiplayer-Testing vervollstaendigt."
+>>>>>>> a9aa859 (Release v2.38.2: Blackjack UI polish and seat switching)
   },
   {
     "id": 63,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Coins, Crown, Loader2, LogIn, ShieldAlert, Swords, Trophy, UserRound } from 'lucide-react';
+import { Coins, Crown, Loader2, LogIn, ShieldAlert, Trophy, UserRound } from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +23,9 @@ const STATUS_LABELS = {
 const RESULT_META = {
   win: { label: 'Win', color: '#22c55e', bg: 'rgba(34,197,94,0.18)' },
   lose: { label: 'Lose', color: '#ef4444', bg: 'rgba(239,68,68,0.18)' },
-  push: { label: 'Push', color: '#facc15', bg: 'rgba(250,204,21,0.18)' }
+  push: { label: 'Push', color: '#facc15', bg: 'rgba(250,204,21,0.18)' },
+  blackjack: { label: 'Blackjack', color: '#fbbf24', bg: 'rgba(245,158,11,0.18)' },
+  bust: { label: 'Bust', color: '#fb7185', bg: 'rgba(244,63,94,0.18)' }
 };
 
 const cardSuitMap = {
@@ -94,6 +96,38 @@ function getVisualSeat(seat, mySeat, maxPlayers) {
   return ((seat - mySeat + maxPlayers) % maxPlayers) + 1;
 }
 
+function getActualSeat(visualSeat, mySeat, maxPlayers) {
+  if (!mySeat || !maxPlayers) return visualSeat;
+  return ((visualSeat + mySeat - 2) % maxPlayers) + 1;
+}
+
+function getTableStatusMeta(roomState, userId, turnCountdownSeconds, autoStartSeconds) {
+  if (roomState?.currentPlayerTurn === userId) {
+    return {
+      label: 'Dein Zugtimer',
+      seconds: turnCountdownSeconds,
+      color: '#fbbf24',
+      copy: 'Zeit fuer Hit oder Stand.'
+    };
+  }
+
+  if (autoStartSeconds !== null) {
+    return {
+      label: 'Naechste Runde',
+      seconds: autoStartSeconds,
+      color: '#f8fafc',
+      copy: 'Der Tisch teilt danach automatisch aus.'
+    };
+  }
+
+  return {
+    label: 'Tischstatus',
+    seconds: 0,
+    color: '#f8fafc',
+    copy: 'Warte auf den naechsten Einsatz.'
+  };
+}
+
 function ChipStack({ amount }) {
   const chips = buildChipBreakdown(amount).slice(0, 9);
 
@@ -134,9 +168,10 @@ function ChipStack({ amount }) {
   );
 }
 
-function PlayingCard({ card, index = 0 }) {
+function PlayingCard({ card, index = 0, compact = false }) {
   return (
     <div
+      className={`blackjack-card${compact ? ' compact' : ''}${card?.visible === false ? ' hidden-card' : ''}`}
       style={{
         ...cardStyle(card),
         animation: `blackjackDealIn 460ms cubic-bezier(0.16, 1, 0.3, 1) both`,
@@ -147,6 +182,248 @@ function PlayingCard({ card, index = 0 }) {
       <span style={{ fontSize: '1rem' }}>{card?.visible === false ? '?' : card?.rank}</span>
       <span style={{ alignSelf: 'center', fontSize: '1.35rem' }}>{cardSuitMap[card?.suit] || '♠'}</span>
       <span style={{ alignSelf: 'flex-end', transform: 'rotate(180deg)', fontSize: '1rem' }}>{card?.visible === false ? '?' : card?.rank}</span>
+    </div>
+  );
+}
+
+function getDealerStatusText(roomState) {
+  if (roomState?.status === 'betting' || roomState?.status === 'waiting') return 'Waiting for bets';
+  if (roomState?.status === 'dealing') return 'Dealing';
+  if (roomState?.status === 'dealer_turn') {
+    if (roomState?.dealerPhase === 'reveal') return 'Dealer reveals hole card';
+    if (roomState?.dealerPhase === 'draw') return 'Dealer draws';
+    if (roomState?.dealerPhase === 'stand') return 'Dealer stands';
+    if (roomState?.dealerPhase === 'bust') return 'Dealer busts';
+    return 'Dealer turn';
+  }
+  if (roomState?.status === 'settlement') {
+    if ((roomState?.dealerHandValue || 0) > 21) return 'Dealer busts';
+    return 'Dealer stands';
+  }
+
+  return 'Waiting for bets';
+}
+
+function getSeatResultMeta(settlement) {
+  if (!settlement) return null;
+  return RESULT_META[settlement.result] || RESULT_META.push;
+}
+
+function getPlayerStatusLabel(player, roomState, settlement, isCurrentTurn, isLocalPlayer) {
+  if (settlement) {
+    return getSeatResultMeta(settlement)?.label || 'Push';
+  }
+  if (!player?.userId) return 'Open seat';
+  if (player.blackjack) return 'Blackjack';
+  if (player.busted) return 'Bust';
+  if (player.stood) return 'Stand';
+  if (isCurrentTurn && isLocalPlayer) return 'Your turn';
+  if (isCurrentTurn) return 'Turn';
+  if (roomState?.status === 'dealing') return 'Dealing';
+  if (['waiting', 'betting'].includes(roomState?.status)) return player.currentBet > 0 ? 'Betting' : 'Waiting';
+  return 'Waiting';
+}
+
+function DealerHand({ roomState }) {
+  return (
+    <div className="blackjack-dealer-zone">
+      <div className="blackjack-dealer-header">
+        <div>
+          <div className="blackjack-area-kicker">Dealer</div>
+          <div className="blackjack-dealer-title">House hand</div>
+          <div className="blackjack-dealer-status">{getDealerStatusText(roomState)}</div>
+        </div>
+        <div className="blackjack-value-badge">Value {roomState?.dealerHandValue ?? 0}</div>
+      </div>
+
+      <div className="blackjack-dealer-cards">
+        {(roomState?.dealerHand || []).map((card, index) => <PlayingCard key={`${card.code}-${index}`} card={card} index={index} />)}
+        {!roomState?.dealerHand?.length && <div className="blackjack-seat-empty-copy">Cards will land here after the deal.</div>}
+      </div>
+    </div>
+  );
+}
+
+function FeltPile({ label, count, side = 'left', accent = '#f8fafc' }) {
+  return (
+    <div className={`blackjack-felt-pile ${side}`}>
+      <div className="blackjack-felt-pile-cards">
+        <div className="blackjack-felt-pile-card shadow" />
+        <div className="blackjack-felt-pile-card top" />
+      </div>
+      <div className="blackjack-felt-pile-meta">
+        <div className="blackjack-felt-pile-label">{label}</div>
+        <div className="blackjack-felt-pile-count" style={{ color: accent }}>{count}</div>
+      </div>
+    </div>
+  );
+}
+
+function PlayerSeat({ player, selectedTable, roomState, settlement, isCurrentTurn, isLocalPlayer, canSelectEmptySeat, onSelectEmptySeat }) {
+  const statusLabel = getPlayerStatusLabel(player, roomState, settlement, isCurrentTurn, isLocalPlayer);
+  const resultMeta = getSeatResultMeta(settlement);
+  const isWinningSeat = settlement && Number(settlement.netProfit || 0) > 0;
+  const seatClassName = `${getSeatClass(roomState?.maxPlayers || selectedTable, player.visualSeat)}${isCurrentTurn ? ' current-turn' : ''}${isWinningSeat ? ' winner-seat' : ''}${isLocalPlayer ? ' local-seat' : ''}`;
+
+  if (!player.userId) {
+    return (
+      <div key={`seat-${player.visualSeat}`} className={`${getSeatClass(roomState?.maxPlayers || selectedTable, player.visualSeat)} blackjack-seat-empty`}>
+        <button
+          type="button"
+          className={`blackjack-seat-empty-shell${canSelectEmptySeat ? ' is-clickable' : ''}`}
+          onClick={() => canSelectEmptySeat && onSelectEmptySeat?.(player)}
+          disabled={!canSelectEmptySeat}
+        >
+          <UserRound size={18} />
+          <div className="blackjack-seat-empty-title">Open seat</div>
+          <div className="blackjack-seat-empty-copy">Seat {player.visualSeat}</div>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div key={player.userId} className={seatClassName}>
+      {isCurrentTurn && <div className="blackjack-turn-arrow">{isLocalPlayer ? 'YOUR TURN' : 'TURN'}</div>}
+      <div className="blackjack-seat-header">
+        <div className="blackjack-seat-user">
+          <Avatar user={{ username: player.username, preferences: {} }} size={34} />
+          <div style={{ minWidth: 0 }}>
+            <div className="blackjack-seat-name">{player.displayName || player.username}</div>
+            <div className="blackjack-seat-subline">Seat {player.seat}{player.isBot ? ' • Bot' : isLocalPlayer ? ' • You' : ''}</div>
+          </div>
+        </div>
+        <div className="blackjack-seat-metrics">
+          <div className="blackjack-value-badge">Value {player.handValue || 0}</div>
+          <div className={`blackjack-seat-status ${resultMeta ? 'is-result' : ''}`}>{statusLabel}</div>
+        </div>
+      </div>
+
+      <div className="blackjack-seat-bet-row">
+        <div className="blackjack-seat-bet-label">Current bet</div>
+        <div className="blackjack-seat-spot">
+          <ChipStack amount={player.currentBet} />
+        </div>
+      </div>
+
+      <div className="blackjack-hand-wrap">
+        {(player.hand || []).map((card, index) => <PlayingCard key={`${card.code}-${index}`} card={card} index={index} compact />)}
+        {!player.hand?.length && <div className="blackjack-seat-empty-copy">Waiting for cards.</div>}
+      </div>
+
+      {resultMeta && (
+        <div style={{ padding: '8px 10px', borderRadius: '14px', background: resultMeta.bg, color: resultMeta.color, display: 'flex', justifyContent: 'space-between', gap: '10px', fontWeight: 800 }}>
+          <span>{resultMeta.label}</span>
+          <span>{formatKC(settlement.netProfit)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlackjackActionBar({
+  isGuest,
+  user,
+  pendingBet,
+  autoBetEnabled,
+  setAutoBetEnabled,
+  actionBusy,
+  betAdjustMode,
+  setBetAdjustMode,
+  config,
+  roomState,
+  setPendingBet,
+  handleBetSubmit,
+  canAct,
+  handleTurnAction,
+  currentTurnIsLocal
+}) {
+  if (isGuest) {
+    return (
+      <div className="blackjack-control-deck">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#fca5a5', textAlign: 'center' }}>
+          <LogIn size={16} />
+          Für Multiplayer-Blackjack brauchst du einen Login.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`blackjack-control-deck${currentTurnIsLocal ? ' is-live' : ''}`}>
+      <div className="blackjack-control-grid">
+        <div className="blackjack-control-panel">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f8fafc', fontWeight: 800 }}>
+            <Coins size={16} color="#fbbf24" />
+            Wallet
+          </div>
+          <div style={{ fontSize: '1.32rem', fontWeight: 900 }}>{formatKC(user?.koala_balance || 0)}</div>
+          <div className="blackjack-pending-chip">
+            <div className="blackjack-toggle-row">
+              <div>
+                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.56)', marginBottom: '4px' }}>
+                  Auto bet
+                </div>
+                <strong style={{ fontSize: '1rem' }}>{formatKC(pendingBet)}</strong>
+              </div>
+              <button
+                type="button"
+                className={`blackjack-toggle${autoBetEnabled ? ' active' : ''}`}
+                onClick={() => setAutoBetEnabled((prev) => !prev)}
+                disabled={actionBusy}
+                aria-label="Automatisch setzen umschalten"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="blackjack-control-panel">
+          <div className="blackjack-controls-caption">Bet controls</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div className="blackjack-chip-mode">
+              <button type="button" className={betAdjustMode === 'add' ? 'active' : ''} onClick={() => setBetAdjustMode('add')} disabled={actionBusy}>+</button>
+              <button type="button" className={betAdjustMode === 'subtract' ? 'active' : ''} onClick={() => setBetAdjustMode('subtract')} disabled={actionBusy}>-</button>
+            </div>
+          </div>
+          <div className="blackjack-chip-row">
+            {(config?.allowedBets || CHIP_VALUES).map((chip) => (
+              <button
+                key={chip}
+                onClick={() => setPendingBet((prev) => (
+                  betAdjustMode === 'add'
+                    ? prev + chip * 100
+                    : Math.max(0, prev - chip * 100)
+                ))}
+                disabled={actionBusy || !['waiting', 'betting'].includes(roomState?.status)}
+                className="blackjack-chip-button"
+              >
+                {betAdjustMode === 'add' ? '+' : '-'}{chip}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="btn-ghost blackjack-control-button" onClick={() => setPendingBet(0)} disabled={actionBusy}>Reset</button>
+            <button className="btn-ghost blackjack-control-button" onClick={handleBetSubmit} disabled={actionBusy || pendingBet <= 0 || !['waiting', 'betting'].includes(roomState?.status)}>
+              {pendingBet > 0 ? `Bet ${formatKC(pendingBet)}` : 'Place bet'}
+            </button>
+          </div>
+        </div>
+
+        <div className={`blackjack-control-panel blackjack-action-panel${canAct ? ' active' : ''}`}>
+          <div className="blackjack-controls-caption">{canAct ? 'In hand actions' : 'Waiting for turn'}</div>
+          <div className="blackjack-action-row">
+            <button className="btn-ghost blackjack-turn-button blackjack-control-button hit" onClick={() => handleTurnAction(EVENTS.BLACKJACK_HIT)} disabled={!canAct}>
+              Hit
+            </button>
+            <button className="btn-ghost blackjack-turn-button blackjack-control-button stand" onClick={() => handleTurnAction(EVENTS.BLACKJACK_STAND)} disabled={!canAct}>
+              Stand
+            </button>
+          </div>
+          <div style={{ color: canAct ? '#fde68a' : 'rgba(255,255,255,0.48)', fontSize: '0.82rem', textAlign: 'center' }}>
+            {canAct ? 'Your hand is live. Choose now.' : 'Action buttons unlock only on your turn.'}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -286,6 +563,16 @@ const Blackjack = ({ socket }) => {
     }
     return Math.max(0, Math.ceil((roomState.autoStartAt - now) / 1000));
   }, [now, roomState?.autoStartAt, roomState?.status]);
+  const tableStatusMeta = useMemo(
+    () => getTableStatusMeta(roomState, user?.id, turnCountdownSeconds, autoStartSeconds),
+    [autoStartSeconds, roomState, turnCountdownSeconds, user?.id]
+  );
+  const canSwitchSeats = Boolean(
+    mySeat
+    && mySeat.currentBet <= 0
+    && (!mySeat.hand || mySeat.hand.length === 0)
+    && !['dealing', 'player_turns', 'dealer_turn', 'settlement'].includes(roomState?.status)
+  );
 
   useEffect(() => {
     localStorage.setItem('blackjack_table_size', String(selectedTable));
@@ -525,6 +812,45 @@ const Blackjack = ({ socket }) => {
     handleSwitchRoom(nextRoomId, selectedTable);
   }, [handleSwitchRoom, roomDraft, selectedTable]);
 
+  const handleAddBot = useCallback(async (targetRoomId, targetMaxPlayers = selectedTable) => {
+    setActionBusy(true);
+    setError('');
+    try {
+      await fetchJson('/api/blackjack/table/add-bot', {
+        method: 'POST',
+        body: JSON.stringify({ roomId: targetRoomId, maxPlayers: targetMaxPlayers })
+      });
+      await loadRooms();
+      await loadFallbackState();
+      showToast('Blackjack-Bot hinzugefuegt.', 'success');
+    } catch (err) {
+      setError(err.message || 'Bot konnte nicht hinzugefuegt werden.');
+    } finally {
+      setActionBusy(false);
+    }
+  }, [loadFallbackState, loadRooms, selectedTable, showToast]);
+
+  const handleSeatSwitch = useCallback(async (seatPlayer) => {
+    if (!canSwitchSeats || !mySeat?.seat) return;
+
+    const actualSeat = getActualSeat(seatPlayer.visualSeat, mySeat.seat, roomState?.maxPlayers || selectedTable);
+    setActionBusy(true);
+    setError('');
+    try {
+      const response = await fetchJson('/api/blackjack/table/switch-seat', {
+        method: 'POST',
+        body: JSON.stringify({ roomId, seat: actualSeat, maxPlayers: roomState?.maxPlayers || selectedTable })
+      });
+      setRoomState(response.state || null);
+      await loadRooms();
+      showToast(`Du sitzt jetzt auf Platz ${actualSeat}.`, 'success');
+    } catch (err) {
+      setError(err.message || 'Platzwechsel fehlgeschlagen.');
+    } finally {
+      setActionBusy(false);
+    }
+  }, [canSwitchSeats, loadRooms, mySeat?.seat, roomId, roomState?.maxPlayers, selectedTable, showToast]);
+
   if (pageLoading) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.72)', gap: '10px' }}>
@@ -567,13 +893,15 @@ const Blackjack = ({ socket }) => {
         }
 
         .blackjack-stage {
+          --stage-side-padding: clamp(20px, 2.2vw, 34px);
+          --seat-width: clamp(190px, 15vw, 250px);
           position: relative;
-          min-height: 820px;
-          border-radius: 38px;
+          min-height: clamp(720px, 62vw, 940px);
+          border-radius: clamp(28px, 2.6vw, 38px);
           overflow: hidden;
           background:
-            radial-gradient(circle at 50% 30%, rgba(255,255,255,0.05), transparent 28%),
-            linear-gradient(180deg, rgba(44, 18, 10, 0.95), rgba(24, 10, 6, 0.98));
+            radial-gradient(circle at 50% 20%, rgba(255,255,255,0.06), transparent 24%),
+            linear-gradient(180deg, rgba(63, 25, 13, 0.96), rgba(31, 12, 7, 0.99));
           border: 1px solid rgba(255,255,255,0.08);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 30px 80px rgba(0,0,0,0.28);
         }
@@ -581,57 +909,190 @@ const Blackjack = ({ socket }) => {
         .blackjack-stage::before {
           content: "";
           position: absolute;
-          inset: 24px;
+          inset: clamp(18px, 1.8vw, 26px);
           border-radius: 999px;
           background:
-            radial-gradient(circle at 50% 35%, rgba(34, 197, 94, 0.12), transparent 40%),
-            linear-gradient(180deg, rgba(14, 86, 52, 0.98), rgba(8, 54, 34, 0.98));
-          border: 14px solid rgba(66, 26, 16, 0.92);
+            radial-gradient(circle at 50% 30%, rgba(34, 197, 94, 0.16), transparent 40%),
+            linear-gradient(180deg, rgba(18, 108, 63, 0.98), rgba(8, 61, 39, 0.98));
+          border: clamp(11px, 1vw, 16px) solid rgba(88, 38, 22, 0.92);
           box-shadow:
-            inset 0 0 0 2px rgba(245,158,11,0.20),
-            inset 0 18px 32px rgba(255,255,255,0.04),
-            inset 0 -22px 44px rgba(0,0,0,0.28);
+            inset 0 0 0 2px rgba(245,158,11,0.18),
+            inset 0 22px 40px rgba(255,255,255,0.04),
+            inset 0 -34px 60px rgba(0,0,0,0.22);
         }
 
         .blackjack-stage::after {
           content: "";
           position: absolute;
-          inset: 58px;
+          inset: clamp(54px, 4vw, 74px);
           border-radius: 999px;
-          border: 1px dashed rgba(245, 158, 11, 0.22);
+          border: 1px dashed rgba(245, 158, 11, 0.18);
           pointer-events: none;
         }
 
         .blackjack-table-center {
           position: absolute;
           left: 50%;
-          top: 35%;
+          top: 34%;
           transform: translate(-50%, -50%);
           z-index: 2;
-          width: min(520px, 72%);
-          padding: 18px 20px;
-          border-radius: 999px;
+          width: min(560px, 62%);
+          padding: 24px 20px 18px;
+          border-radius: 999px 999px 36px 36px;
           text-align: center;
-          background: radial-gradient(circle, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
-          border: 1px solid rgba(255,255,255,0.10);
-          backdrop-filter: blur(8px);
+          background: transparent;
+          border: none;
+          backdrop-filter: none;
+          pointer-events: none;
+        }
+
+        .blackjack-area-kicker {
+          font-size: 0.72rem;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.56);
+          margin-bottom: 4px;
         }
 
         .blackjack-dealer-zone {
           position: absolute;
-          top: 82px;
+          top: clamp(26px, 3.2vw, 44px);
           left: 50%;
           transform: translateX(-50%);
-          width: min(520px, calc(100% - 80px));
+          width: min(420px, calc(100% - 2 * var(--stage-side-padding) - 320px));
           z-index: 3;
+          padding: 8px 10px;
+          border-radius: 22px;
+          background: linear-gradient(180deg, rgba(9, 23, 17, 0.48), rgba(7, 14, 11, 0.28));
+          border: 1px solid rgba(255,255,255,0.05);
+          box-shadow: 0 10px 24px rgba(0,0,0,0.14);
+          backdrop-filter: blur(6px);
         }
 
-        .blackjack-corner-status {
+        .blackjack-felt-pile {
           position: absolute;
-          top: 28px;
-          right: 28px;
-          z-index: 5;
-          min-width: 210px;
+          top: 34px;
+          z-index: 3;
+          display: grid;
+          gap: 8px;
+          align-items: center;
+          justify-items: center;
+        }
+
+        .blackjack-felt-pile.left {
+          left: clamp(34px, 4vw, 64px);
+        }
+
+        .blackjack-felt-pile.right {
+          right: clamp(34px, 4vw, 64px);
+        }
+
+        .blackjack-felt-pile-cards {
+          position: relative;
+          width: 72px;
+          height: 90px;
+        }
+
+        .blackjack-felt-pile-card {
+          position: absolute;
+          inset: 0;
+          border-radius: 14px;
+          border: 1px solid rgba(255,255,255,0.16);
+          background:
+            linear-gradient(135deg, rgba(29,78,216,0.92), rgba(30,41,59,0.95)),
+            repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0 6px, transparent 6px 12px);
+          box-shadow: 0 12px 24px rgba(0,0,0,0.22);
+        }
+
+        .blackjack-felt-pile-card.shadow {
+          transform: translate(8px, 8px) rotate(8deg);
+          opacity: 0.56;
+        }
+
+        .blackjack-felt-pile-card.top {
+          transform: rotate(-2deg);
+        }
+
+        .blackjack-felt-pile-meta {
+          text-align: center;
+          padding: 7px 10px;
+          border-radius: 14px;
+          background: rgba(7,12,18,0.38);
+          border: 1px solid rgba(255,255,255,0.06);
+          backdrop-filter: blur(4px);
+        }
+
+        .blackjack-felt-pile-label {
+          font-size: 0.68rem;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: rgba(255,255,255,0.54);
+          margin-bottom: 3px;
+        }
+
+        .blackjack-felt-pile-count {
+          font-size: 0.96rem;
+          font-weight: 900;
+        }
+
+        .blackjack-dealer-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          align-items: flex-start;
+          margin-bottom: 14px;
+        }
+
+        .blackjack-dealer-title {
+          font-size: clamp(1rem, 1.4vw, 1.2rem);
+          font-weight: 900;
+          color: #f8fafc;
+          margin-bottom: 4px;
+        }
+
+        .blackjack-dealer-status {
+          color: rgba(255,255,255,0.72);
+          font-size: 0.82rem;
+        }
+
+        .blackjack-dealer-cards,
+        .blackjack-hand-wrap {
+          display: flex;
+          align-items: flex-end;
+          min-height: 96px;
+        }
+
+        .blackjack-dealer-cards .blackjack-card + .blackjack-card,
+        .blackjack-hand-wrap .blackjack-card + .blackjack-card {
+          margin-left: -18px;
+        }
+
+        .blackjack-card {
+          position: relative;
+          z-index: 1;
+        }
+
+        .blackjack-card.compact {
+          transform: scale(0.94);
+          transform-origin: bottom left;
+        }
+
+        .blackjack-card.hidden-card::before {
+          content: "";
+          position: absolute;
+          inset: 7px;
+          border-radius: 10px;
+          background:
+            linear-gradient(135deg, rgba(245,158,11,0.16), rgba(59,130,246,0.18)),
+            repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 6px, transparent 6px 12px);
+          opacity: 0.92;
+        }
+
+        .blackjack-header-status {
+          display: grid;
+          gap: 10px;
+          min-width: min(100%, 280px);
+          max-width: 360px;
           padding: 14px 16px;
           border-radius: 22px;
           background: linear-gradient(180deg, rgba(8,18,14,0.94), rgba(7,12,18,0.96));
@@ -643,78 +1104,258 @@ const Blackjack = ({ socket }) => {
         .blackjack-seat {
           position: absolute;
           z-index: 3;
-          width: min(260px, calc(100% - 40px));
-          padding: 18px;
-          border-radius: 26px;
-          background: linear-gradient(180deg, rgba(9, 18, 14, 0.72), rgba(9, 13, 18, 0.78));
-          border: 1px solid rgba(255,255,255,0.08);
-          backdrop-filter: blur(8px);
-          box-shadow: 0 18px 30px rgba(0,0,0,0.18);
+          width: min(var(--seat-width), calc(100% - 24px));
+          padding: 8px 8px 0;
+          border-radius: 24px;
+          background: transparent;
+          border: none;
+          backdrop-filter: none;
+          box-shadow: none;
+          transform: var(--seat-transform, none);
           transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
         }
 
         .blackjack-seat.current-turn {
-          border-color: rgba(245, 158, 11, 0.34);
-          transform: translateY(-4px);
-          animation: blackjackGlowPulse 2.2s ease-in-out infinite;
+          transform: var(--seat-transform, none) translateY(-4px);
+          animation: blackjackGlowPulse 2s ease-in-out infinite;
+        }
+
+        .blackjack-seat.local-seat {
+          filter: drop-shadow(0 10px 22px rgba(0,0,0,0.16));
         }
 
         .blackjack-seat.winner-seat {
-          border-color: rgba(245, 158, 11, 0.85);
-          box-shadow: 0 0 0 1px rgba(245,158,11,0.35), 0 18px 34px rgba(245,158,11,0.22);
-          background: linear-gradient(180deg, rgba(42, 28, 8, 0.82), rgba(18, 16, 10, 0.82));
+          filter: drop-shadow(0 0 18px rgba(245,158,11,0.22));
         }
 
-        .blackjack-seat-badge {
+        .blackjack-turn-arrow {
+          position: absolute;
+          top: -14px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 5px 10px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          color: #111827;
+          font-size: 0.72rem;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          box-shadow: 0 10px 18px rgba(245,158,11,0.22);
+        }
+
+        .blackjack-seat-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+          margin-bottom: 8px;
+        }
+
+        .blackjack-seat-user {
+          display: flex;
+          gap: 10px;
+          min-width: 0;
+          align-items: center;
+        }
+
+        .blackjack-seat-name {
+          font-weight: 800;
+          color: #f8fafc;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .blackjack-seat-subline {
+          color: rgba(255,255,255,0.52);
+          font-size: 0.78rem;
+        }
+
+        .blackjack-seat-metrics {
+          display: grid;
+          gap: 8px;
+          justify-items: end;
+        }
+
+        .blackjack-value-badge {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
           padding: 6px 10px;
           border-radius: 999px;
-          background: rgba(245,158,11,0.16);
-          border: 1px solid rgba(245,158,11,0.35);
-          color: #fde68a;
-          font-size: 0.76rem;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: #f8fafc;
+          font-size: 0.8rem;
           font-weight: 800;
         }
 
-        .blackjack-seat-3-1 { bottom: 228px; left: 50%; transform: translateX(-50%); }
-        .blackjack-seat-3-2 { bottom: 252px; left: 70px; }
-        .blackjack-seat-3-3 { bottom: 252px; right: 70px; }
+        .blackjack-seat-status {
+          color: rgba(255,255,255,0.72);
+          font-size: 0.78rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
 
-        .blackjack-seat-5-1 { bottom: 242px; left: 50%; transform: translateX(-50%); }
-        .blackjack-seat-5-2 { bottom: 166px; left: 72px; }
-        .blackjack-seat-5-3 { bottom: 286px; left: 142px; }
-        .blackjack-seat-5-4 { bottom: 286px; right: 142px; }
-        .blackjack-seat-5-5 { bottom: 166px; right: 72px; }
+        .blackjack-seat-status.is-result {
+          color: #fde68a;
+        }
+
+        .blackjack-seat-bet-row {
+          display: grid;
+          gap: 6px;
+          margin: 8px auto 10px;
+          justify-items: center;
+        }
+
+        .blackjack-seat-spot {
+          position: relative;
+          width: 92px;
+          height: 92px;
+          border-radius: 50%;
+          border: 4px solid rgba(255,255,255,0.16);
+          background: radial-gradient(circle, rgba(255,255,255,0.02), transparent 64%);
+          display: grid;
+          place-items: center;
+        }
+
+        .blackjack-seat.current-turn .blackjack-seat-spot {
+          border-color: rgba(245,158,11,0.72);
+          box-shadow: 0 0 0 8px rgba(245,158,11,0.08);
+        }
+
+        .blackjack-seat-bet-label {
+          font-size: 0.72rem;
+          color: rgba(255,255,255,0.52);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .blackjack-seat-empty,
+        .blackjack-seat-empty-shell {
+          display: grid;
+          place-items: center;
+          text-align: center;
+        }
+
+        .blackjack-seat-empty {
+          opacity: 0.76;
+        }
+
+        .blackjack-seat-empty-shell {
+          min-height: 136px;
+          width: 100%;
+          border-radius: 26px 26px 999px 999px;
+          border: 1px dashed rgba(255,255,255,0.14);
+          background: radial-gradient(circle at 50% 18%, rgba(255,255,255,0.03), rgba(255,255,255,0.008));
+          color: rgba(255,255,255,0.42);
+          gap: 8px;
+          appearance: none;
+          box-shadow: none;
+          cursor: default;
+        }
+
+        .blackjack-seat-empty-shell.is-clickable {
+          cursor: pointer;
+          border-color: rgba(245,158,11,0.22);
+          background: radial-gradient(circle at 50% 18%, rgba(245,158,11,0.08), rgba(255,255,255,0.01));
+          color: rgba(255,255,255,0.74);
+          transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+        }
+
+        .blackjack-seat-empty-shell.is-clickable:hover {
+          transform: translateY(-4px);
+          border-color: rgba(245,158,11,0.42);
+        }
+
+        .blackjack-seat-empty-title {
+          color: rgba(255,255,255,0.72);
+          font-weight: 700;
+        }
+
+        .blackjack-seat-empty-copy {
+          color: rgba(255,255,255,0.46);
+          font-size: 0.82rem;
+        }
+
+        .blackjack-seat-3-1 { --seat-transform: translateX(-50%); bottom: 148px; left: 50%; }
+        .blackjack-seat-3-2 { bottom: 228px; left: 10%; }
+        .blackjack-seat-3-3 { bottom: 228px; right: 10%; }
+
+        .blackjack-seat-5-1 { --seat-transform: translateX(-50%); bottom: 132px; left: 50%; }
+        .blackjack-seat-5-1,
+        .blackjack-seat-5-2,
+        .blackjack-seat-5-3,
+        .blackjack-seat-5-4,
+        .blackjack-seat-5-5 {
+          width: min(clamp(156px, 11vw, 206px), calc(100% - 24px));
+        }
+        .blackjack-seat-5-2 { bottom: 286px; left: 3.2%; }
+        .blackjack-seat-5-3 { bottom: 184px; left: 16%; }
+        .blackjack-seat-5-4 { bottom: 184px; right: 16%; }
+        .blackjack-seat-5-5 { bottom: 248px; right: 2.2%; }
 
         .blackjack-control-deck {
-          position: absolute;
-          left: 50%;
-          bottom: 18px;
-          transform: translateX(-50%);
-          width: min(920px, calc(100% - 44px));
-          z-index: 4;
-          padding: 16px 18px;
-          border-radius: 28px;
-          background: linear-gradient(180deg, rgba(8,18,14,0.96), rgba(7,12,18,0.96));
-          border: 1px solid rgba(255,255,255,0.08);
-          box-shadow: 0 24px 44px rgba(0,0,0,0.34);
-          backdrop-filter: blur(12px);
+          position: relative;
+          width: min(1080px, 100%);
+          margin: 16px auto 0;
+          z-index: 1;
+          padding: 8px;
+          border-radius: 22px;
+          background: linear-gradient(180deg, rgba(5,16,13,0.84), rgba(7,12,18,0.88));
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow: 0 16px 34px rgba(0,0,0,0.28);
+          backdrop-filter: blur(8px);
+        }
+
+        .blackjack-control-deck.is-live {
+          box-shadow: 0 24px 44px rgba(0,0,0,0.34), 0 0 0 1px rgba(245,158,11,0.2);
         }
 
         .blackjack-control-grid {
           display: grid;
-          grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(220px, 280px);
-          gap: 16px;
-          align-items: center;
+          grid-template-columns: minmax(180px, 240px) minmax(0, 1.2fr) minmax(240px, 290px);
+          gap: 10px;
+          align-items: stretch;
+        }
+
+        .blackjack-control-panel {
+          display: grid;
+          gap: 8px;
+          align-content: start;
+          padding: 10px 12px;
+          border-radius: 18px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .blackjack-controls-caption {
+          font-size: 0.72rem;
+          color: rgba(255,255,255,0.52);
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+        }
+
+        .blackjack-action-panel.active {
+          background: linear-gradient(180deg, rgba(245,158,11,0.12), rgba(255,255,255,0.03));
+          border-color: rgba(245,158,11,0.22);
         }
 
         .blackjack-chip-row {
           display: flex;
-          gap: 8px;
+          gap: 6px;
           flex-wrap: wrap;
-          justify-content: center;
+          justify-content: flex-start;
+        }
+
+        .blackjack-chip-button {
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.05);
+          color: #fff;
+          border-radius: 999px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-weight: 700;
         }
 
         .blackjack-chip-mode {
@@ -727,10 +1368,10 @@ const Blackjack = ({ socket }) => {
         }
 
         .blackjack-chip-mode button {
-          min-width: 52px;
+          min-width: 44px;
           border: none;
           border-radius: 999px;
-          padding: 8px 12px;
+          padding: 7px 10px;
           background: transparent;
           color: rgba(255,255,255,0.72);
           font-weight: 800;
@@ -743,20 +1384,19 @@ const Blackjack = ({ socket }) => {
         }
 
         .blackjack-action-row {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 10px;
-          justify-content: flex-end;
-          flex-wrap: wrap;
         }
 
         .blackjack-countdown-clock {
           display: inline-flex;
-          min-width: 110px;
+          min-width: 88px;
           justify-content: center;
           align-items: center;
-          padding: 10px 14px;
-          border-radius: 18px;
-          font-size: 1.55rem;
+          padding: 8px 12px;
+          border-radius: 16px;
+          font-size: clamp(1.2rem, 1.8vw, 1.6rem);
           font-weight: 900;
           letter-spacing: 0.04em;
           background: rgba(10,16,24,0.82);
@@ -766,9 +1406,9 @@ const Blackjack = ({ socket }) => {
 
         .blackjack-pending-chip {
           display: grid;
-          gap: 8px;
-          padding: 12px 14px;
-          border-radius: 18px;
+          gap: 6px;
+          padding: 10px 12px;
+          border-radius: 16px;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
           color: #f8fafc;
@@ -783,8 +1423,8 @@ const Blackjack = ({ socket }) => {
 
         .blackjack-toggle {
           position: relative;
-          width: 54px;
-          height: 30px;
+          width: 48px;
+          height: 28px;
           border-radius: 999px;
           border: none;
           cursor: pointer;
@@ -801,31 +1441,19 @@ const Blackjack = ({ socket }) => {
           position: absolute;
           top: 3px;
           left: 3px;
-          width: 24px;
-          height: 24px;
+          width: 22px;
+          height: 22px;
           border-radius: 50%;
           background: #fff;
           transition: transform 180ms ease;
         }
 
         .blackjack-toggle.active::after {
-          transform: translateX(24px);
-        }
-
-        .blackjack-amount-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 9px 12px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          color: #f8fafc;
-          font-weight: 800;
+          transform: translateX(20px);
         }
 
         .blackjack-turn-button {
-          min-width: 132px;
+          min-width: 120px;
           min-height: 54px;
           border-radius: 18px;
           font-size: 1rem;
@@ -833,8 +1461,8 @@ const Blackjack = ({ socket }) => {
         }
 
         .blackjack-control-button {
-          min-height: 54px;
-          border-radius: 18px;
+          min-height: 44px;
+          border-radius: 16px;
           border: 1px solid rgba(255,255,255,0.12);
           background: rgba(255,255,255,0.05);
           color: #f8fafc;
@@ -842,12 +1470,70 @@ const Blackjack = ({ socket }) => {
           box-shadow: none;
         }
 
+        .blackjack-control-button.hit:not(:disabled) {
+          background: linear-gradient(135deg, rgba(34,197,94,0.92), rgba(22,163,74,0.92));
+          border-color: rgba(74,222,128,0.46);
+        }
+
+        .blackjack-control-button.stand:not(:disabled) {
+          background: linear-gradient(135deg, rgba(251,191,36,0.92), rgba(217,119,6,0.92));
+          border-color: rgba(245,158,11,0.44);
+          color: #111827;
+        }
+
         .blackjack-control-button:disabled {
-          opacity: 0.5;
+          opacity: 0.42;
         }
 
         .blackjack-settlement-card {
           animation: blackjackSettlementIn 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @media (max-width: 1500px) {
+          .blackjack-stage {
+            --seat-width: clamp(170px, 14vw, 218px);
+          }
+
+          .blackjack-dealer-zone {
+            width: min(500px, calc(100% - 2 * var(--stage-side-padding) - 240px));
+          }
+
+          .blackjack-seat-5-2 { bottom: 266px; left: 2%; }
+          .blackjack-seat-5-3 { left: 14%; }
+          .blackjack-seat-5-4 { right: 14%; }
+          .blackjack-seat-5-5 { right: 1%; }
+        }
+
+        @media (max-width: 1260px) {
+          .blackjack-stage {
+            --seat-width: clamp(154px, 14vw, 186px);
+            min-height: 860px;
+          }
+
+          .blackjack-dealer-zone {
+            width: min(420px, calc(100% - 2 * var(--stage-side-padding) - 180px));
+          }
+
+          .blackjack-control-deck {
+            width: min(920px, calc(100% - 2 * var(--stage-side-padding)));
+          }
+
+          .blackjack-control-grid {
+            grid-template-columns: minmax(150px, 190px) minmax(0, 1fr) minmax(200px, 236px);
+          }
+
+          .blackjack-seat-5-2,
+          .blackjack-seat-5-3,
+          .blackjack-seat-5-4,
+          .blackjack-seat-5-5 {
+            width: min(clamp(146px, 13vw, 176px), calc(100% - 24px));
+          }
+
+          .blackjack-seat-5-1 { bottom: 126px; }
+          .blackjack-seat-5-2 { bottom: 254px; left: 2%; }
+          .blackjack-seat-5-3 { bottom: 176px; left: 12.8%; }
+          .blackjack-seat-5-4 { bottom: 176px; right: 12.8%; }
+          .blackjack-seat-5-5 { bottom: 228px; right: 1%; }
         }
 
         @media (max-width: 980px) {
@@ -857,15 +1543,16 @@ const Blackjack = ({ socket }) => {
             display: grid;
             gap: 18px;
           }
+
           .blackjack-stage::before,
           .blackjack-stage::after,
           .blackjack-table-center {
             display: none;
           }
-          .blackjack-corner-status,
+
           .blackjack-dealer-zone,
-          .blackjack-seat,
-          .blackjack-control-deck {
+          .blackjack-felt-pile,
+          .blackjack-seat {
             position: relative;
             width: 100%;
             left: auto;
@@ -874,11 +1561,13 @@ const Blackjack = ({ socket }) => {
             bottom: auto;
             transform: none !important;
           }
+
           .blackjack-control-grid {
             grid-template-columns: 1fr;
           }
+
           .blackjack-action-row {
-            justify-content: stretch;
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
@@ -887,14 +1576,15 @@ const Blackjack = ({ socket }) => {
         position: 'relative',
         overflow: 'hidden',
         borderRadius: '36px',
-        padding: '28px',
+        marginTop: '14px',
+        padding: 'clamp(18px, 2vw, 28px)',
         background: 'radial-gradient(circle at top, rgba(20,83,45,0.95), rgba(9,37,24,0.98) 50%, rgba(7,18,12,0.98) 100%)',
         border: '1px solid rgba(255,255,255,0.08)',
         boxShadow: '0 30px 80px rgba(0,0,0,0.28)'
       }}>
         <div style={{ position: 'absolute', inset: '18px', border: '1px solid rgba(245,158,11,0.14)', borderRadius: '28px', pointerEvents: 'none' }} />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '22px', paddingRight: '96px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '22px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(245,158,11,0.18)', display: 'grid', placeItems: 'center', color: '#fbbf24' }}>
@@ -914,31 +1604,16 @@ const Blackjack = ({ socket }) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: '12px', minWidth: 'min(100%, 220px)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255,255,255,0.72)' }}>Tischgröße</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {TABLE_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => {
-                      setSelectedTable(option);
-                      setCurrentRoomId(getRoomId(option));
-                      setRoomState(null);
-                    }}
-                    style={{
-                      border: 'none',
-                      cursor: 'pointer',
-                      borderRadius: '999px',
-                      padding: '10px 16px',
-                      background: selectedTable === option ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.07)',
-                      color: '#fff',
-                      fontWeight: 800
-                    }}
-                  >
-                    {option} Seats
-                  </button>
-                ))}
+          <div className="blackjack-header-status">
+            <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.56)' }}>
+              {tableStatusMeta.label}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="blackjack-countdown-clock" style={{ color: tableStatusMeta.color }}>
+                {String(tableStatusMeta.seconds).padStart(2, '0')}s
+              </div>
+              <div style={{ fontSize: '0.86rem', lineHeight: 1.4, maxWidth: '210px', color: 'rgba(255,255,255,0.8)' }}>
+                {tableStatusMeta.copy}
               </div>
             </div>
           </div>
@@ -953,215 +1628,54 @@ const Blackjack = ({ socket }) => {
 
         <div style={{ display: 'grid', gap: '20px' }}>
           <div className="blackjack-stage">
-            <div className="blackjack-corner-status">
-              <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.56)', marginBottom: '8px' }}>
-                {roomState?.currentPlayerTurn === user?.id ? 'Dein Zugtimer' : autoStartSeconds !== null ? 'Nächste Runde' : 'Tischstatus'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <div className="blackjack-countdown-clock" style={{ color: roomState?.currentPlayerTurn === user?.id ? '#fbbf24' : '#f8fafc' }}>
-                  {String(roomState?.currentPlayerTurn === user?.id ? turnCountdownSeconds : (autoStartSeconds ?? 0)).padStart(2, '0')}s
-                </div>
-                <div style={{ fontSize: '0.82rem', lineHeight: 1.35, maxWidth: '180px', color: 'rgba(255,255,255,0.8)' }}>
-                  {roomState?.currentPlayerTurn === user?.id ? 'Zeit fuer Hit oder Stand.' : autoStartSeconds !== null ? 'Der Tisch teilt danach automatisch aus.' : 'Warte auf den naechsten Einsatz.'}
-                </div>
-              </div>
-            </div>
-
             <div className="blackjack-table-center">
-              <div style={{ fontSize: '0.76rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: '6px' }}>
-                KoalaSync Casino
-              </div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#f8fafc', marginBottom: '6px' }}>
-                Blackjack Table
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.86rem' }}>
-                6-Deck-Shoe, Live-Raum und Settlement am Tisch.
-              </div>
+              <div className="blackjack-area-kicker">KoalaSync Casino</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#f8fafc', marginBottom: '6px' }}>Blackjack Table</div>
+              <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.86rem' }}>Live seats, hidden hole card and automatic dealer flow.</div>
             </div>
 
-            <div className="blackjack-dealer-zone" style={{
-              padding: '22px',
-              borderRadius: '28px',
-              background: 'linear-gradient(180deg, rgba(18,28,21,0.84), rgba(9,15,12,0.82))',
-              border: '1px solid rgba(255,255,255,0.08)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f8fafc', fontWeight: 800, marginBottom: '4px' }}>
-                    <Swords size={16} color="#fbbf24" />
-                    Dealer
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.88rem' }}>Hole Card bleibt bis zum Reveal versteckt.</div>
-                </div>
-                <div style={{ fontWeight: 700, color: '#fbbf24' }}>Hand Value: {roomState?.dealerHandValue ?? 0}</div>
-              </div>
+            <FeltPile label="Shoe" count={roomState?.shoeRemaining ?? 0} side="right" accent="#fbbf24" />
+            <FeltPile label="Discard" count={roomState?.discardCount ?? 0} side="left" accent="#93c5fd" />
 
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
-                {(roomState?.dealerHand || []).map((card, index) => <PlayingCard key={`${card.code}-${index}`} card={card} index={index} />)}
-                {!roomState?.dealerHand?.length && <div style={{ color: 'rgba(255,255,255,0.46)' }}>Noch keine Karten verteilt.</div>}
-              </div>
-            </div>
+            <DealerHand roomState={roomState} />
 
             {tableSeats.map((player) => {
               const isCurrentTurn = roomState?.currentPlayerTurn === player.userId;
               const settlement = roomState?.lastSettlement?.find((entry) => entry.userId === player.userId);
-              const resultMeta = settlement ? RESULT_META[settlement.result] : null;
-              const isWinningSeat = roomState?.status === 'settlement' && settlement?.result === 'win';
-
               return (
-                <div
+                <PlayerSeat
                   key={player.userId || `seat-${player.visualSeat}`}
-                  className={`${getSeatClass(roomState?.maxPlayers || selectedTable, player.visualSeat)}${isCurrentTurn ? ' current-turn' : ''}${isWinningSeat ? ' winner-seat' : ''}`}
-                  style={{ minHeight: '250px', display: 'grid', alignContent: 'start', gap: '14px' }}
-                >
-                  {player.userId ? (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', minWidth: 0 }}>
-                          <Avatar user={{ username: player.username, preferences: {} }} size={34} />
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.displayName || player.username}</div>
-                            <div style={{ color: 'rgba(255,255,255,0.54)', fontSize: '0.82rem' }}>Seat {player.seat}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                          {isWinningSeat && <div className="blackjack-seat-badge">🏆 Gewinner</div>}
-                          {player.userId === user?.id && <div style={{ fontSize: '0.76rem', color: '#fbbf24', fontWeight: 800 }}>DU</div>}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <ChipStack amount={player.currentBet} />
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: 800 }}>Wert: {player.handValue || 0}</div>
-                          <div style={{ fontSize: '0.78rem', color: player.busted ? '#f87171' : 'rgba(255,255,255,0.52)' }}>
-                            {player.blackjack ? 'Blackjack' : player.busted ? 'Bust' : player.stood ? 'Stand' : isCurrentTurn ? 'Am Zug' : 'Wartet'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        {(player.hand || []).map((card, index) => <PlayingCard key={`${card.code}-${index}`} card={card} index={index} />)}
-                        {!player.hand?.length && <div style={{ color: 'rgba(255,255,255,0.4)' }}>Noch keine Karten.</div>}
-                      </div>
-
-                      {resultMeta && (
-                        <div style={{ padding: '10px 12px', borderRadius: '14px', background: resultMeta.bg, color: resultMeta.color, display: 'flex', justifyContent: 'space-between', gap: '12px', fontWeight: 800 }}>
-                          <span>{resultMeta.label}</span>
-                          <span>{formatKC(settlement.netProfit)}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.38)', textAlign: 'center' }}>
-                      <div>
-                        <UserRound size={22} style={{ marginBottom: '10px' }} />
-                        Freier Seat {player.visualSeat}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  player={player}
+                  selectedTable={selectedTable}
+                  roomState={roomState}
+                  settlement={settlement}
+                  isCurrentTurn={isCurrentTurn}
+                  isLocalPlayer={player.userId === user?.id}
+                  canSelectEmptySeat={canSwitchSeats}
+                  onSelectEmptySeat={handleSeatSwitch}
+                />
               );
             })}
 
-            <div className="blackjack-control-deck">
-              {isGuest ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#fca5a5', textAlign: 'center' }}>
-                  <LogIn size={16} />
-                  Für Multiplayer-Blackjack brauchst du einen Login.
-                </div>
-              ) : (
-                <div className="blackjack-control-grid">
-                  <div style={{ display: 'grid', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f8fafc', fontWeight: 800 }}>
-                      <Coins size={16} color="#fbbf24" />
-                      Wallet
-                    </div>
-                    <div style={{ fontSize: '1.32rem', fontWeight: 900 }}>{formatKC(user?.koala_balance || 0)}</div>
-                    <div className="blackjack-pending-chip">
-                      <div className="blackjack-toggle-row">
-                        <div>
-                          <div style={{ fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.56)', marginBottom: '4px' }}>
-                            Automatisch setzen
-                          </div>
-                          <strong style={{ fontSize: '1rem' }}>{formatKC(pendingBet)}</strong>
-                        </div>
-                        <button
-                          type="button"
-                          className={`blackjack-toggle${autoBetEnabled ? ' active' : ''}`}
-                          onClick={() => setAutoBetEnabled((prev) => !prev)}
-                          disabled={actionBusy}
-                          aria-label="Automatisch setzen umschalten"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gap: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <div className="blackjack-chip-mode">
-                        <button
-                          type="button"
-                          className={betAdjustMode === 'add' ? 'active' : ''}
-                          onClick={() => setBetAdjustMode('add')}
-                          disabled={actionBusy}
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          className={betAdjustMode === 'subtract' ? 'active' : ''}
-                          onClick={() => setBetAdjustMode('subtract')}
-                          disabled={actionBusy}
-                        >
-                          -
-                        </button>
-                      </div>
-                    </div>
-                    <div className="blackjack-chip-row">
-                      {(config?.allowedBets || CHIP_VALUES).map((chip) => (
-                        <button
-                          key={chip}
-                          onClick={() => setPendingBet((prev) => (
-                            betAdjustMode === 'add'
-                              ? prev + chip * 100
-                              : Math.max(0, prev - chip * 100)
-                          ))}
-                          disabled={actionBusy || !['waiting', 'betting'].includes(roomState?.status)}
-                          style={{
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            background: 'rgba(255,255,255,0.05)',
-                            color: '#fff',
-                            borderRadius: '999px',
-                            padding: '10px 14px',
-                            cursor: 'pointer',
-                            fontWeight: 700
-                          }}
-                        >
-                          {betAdjustMode === 'add' ? '+' : '-'}{chip}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <button className="btn-ghost blackjack-control-button" onClick={() => setPendingBet(0)} disabled={actionBusy}>Reset</button>
-                      <button className="btn-ghost blackjack-control-button" onClick={handleBetSubmit} disabled={actionBusy || pendingBet <= 0 || !['waiting', 'betting'].includes(roomState?.status)}>
-                        {pendingBet > 0 ? `Setzen ${formatKC(pendingBet)}` : 'Setzen'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="blackjack-action-row">
-                    <button className="btn-ghost blackjack-turn-button blackjack-control-button" onClick={() => handleTurnAction(EVENTS.BLACKJACK_HIT)} disabled={!canAct}>
-                      Hit
-                    </button>
-                    <button className="btn-ghost blackjack-turn-button blackjack-control-button" onClick={() => handleTurnAction(EVENTS.BLACKJACK_STAND)} disabled={!canAct}>
-                      Stand
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
+
+          <BlackjackActionBar
+            isGuest={isGuest}
+            user={user}
+            pendingBet={pendingBet}
+            autoBetEnabled={autoBetEnabled}
+            setAutoBetEnabled={setAutoBetEnabled}
+            actionBusy={actionBusy}
+            betAdjustMode={betAdjustMode}
+            setBetAdjustMode={setBetAdjustMode}
+            config={config}
+            roomState={roomState}
+            setPendingBet={setPendingBet}
+            handleBetSubmit={handleBetSubmit}
+            canAct={canAct}
+            handleTurnAction={handleTurnAction}
+            currentTurnIsLocal={roomState?.currentPlayerTurn === user?.id}
+          />
         </div>
       </section>
 
@@ -1198,6 +1712,29 @@ const Blackjack = ({ socket }) => {
             <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.86rem' }}>
               Optionalen Namen angeben oder automatisch erzeugen lassen.
             </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {TABLE_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => {
+                    setSelectedTable(option);
+                    setCurrentRoomId(getRoomId(option));
+                    setRoomState(null);
+                  }}
+                  style={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    borderRadius: '999px',
+                    padding: '10px 14px',
+                    background: selectedTable === option ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.07)',
+                    color: '#fff',
+                    fontWeight: 800
+                  }}
+                >
+                  {option} Seats
+                </button>
+              ))}
+            </div>
             <input
               value={roomDraft}
               onChange={(event) => setRoomDraft(event.target.value)}
@@ -1220,7 +1757,12 @@ const Blackjack = ({ socket }) => {
           </div>
 
           <div style={{ display: 'grid', gap: '10px' }}>
-            <div style={{ fontWeight: 800 }}>Offene {selectedTable}er-Tische</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ fontWeight: 800 }}>Offene {selectedTable}er-Tische</div>
+              <button className="btn-ghost" onClick={() => handleAddBot(roomId, selectedTable)} disabled={actionBusy}>
+                Bot zum aktiven Tisch
+              </button>
+            </div>
             {filteredRooms.length === 0 && (
               <div style={{
                 padding: '16px',
@@ -1237,7 +1779,7 @@ const Blackjack = ({ socket }) => {
                 key={room.roomId}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(160px, 1fr) 90px 120px 120px',
+                  gridTemplateColumns: 'minmax(160px, 1fr) 90px 120px 220px',
                   gap: '12px',
                   alignItems: 'center',
                   padding: '14px 16px',
@@ -1254,7 +1796,14 @@ const Blackjack = ({ socket }) => {
                 <div style={{ textAlign: 'right', color: room.needsShuffle ? '#fbbf24' : 'rgba(255,255,255,0.62)' }}>
                   {room.needsShuffle ? 'Reshuffle' : `${room.shoeRemaining} Karten`}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn-ghost"
+                    onClick={() => handleAddBot(room.roomId, room.maxPlayers)}
+                    disabled={actionBusy || room.connectedCount >= room.maxPlayers}
+                  >
+                    Bot hinzufügen
+                  </button>
                   <button
                     className={room.roomId === roomId ? 'btn-primary' : 'btn-ghost'}
                     onClick={() => handleSwitchRoom(room.roomId, room.maxPlayers)}

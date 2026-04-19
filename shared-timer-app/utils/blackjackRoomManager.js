@@ -16,6 +16,9 @@ const CENTS_PER_KC = 100;
 const TURN_TIMEOUT_MS = 90 * 1000;
 const AUTO_START_DELAY_MS = 6 * 1000;
 const SETTLEMENT_DISPLAY_MS = 5 * 1000;
+const DEALER_ACTION_DELAY_MS = 1200;
+const BOT_ACTION_DELAY_MS = 1400;
+const BOT_DEFAULT_BET_CENTS = 100 * CENTS_PER_KC;
 
 function normalizeMaxPlayers(maxPlayers = 5) {
   return ALLOWED_MAX_PLAYERS.has(Number(maxPlayers)) ? Number(maxPlayers) : 5;
@@ -26,6 +29,7 @@ function createPlayerState(user, seat) {
     userId: user.userId,
     username: user.username || user.displayName || `User ${seat}`,
     displayName: user.displayName || user.username || `User ${seat}`,
+    isBot: Boolean(user.isBot),
     seat,
     currentBet: 0,
     hand: [],
@@ -60,12 +64,21 @@ function getNextFreeSeat(room) {
   return null;
 }
 
+function canSwitchSeat(player) {
+  if (!player) return false;
+  return player.currentBet <= 0 && (!player.hand || player.hand.length === 0) && !player.done;
+}
+
 function hasActiveRound(room) {
   return ['dealing', 'player_turns', 'dealer_turn', 'settlement'].includes(room.status);
 }
 
 function getPlayerByUserId(room, userId) {
   return room.players.find((player) => String(player.userId) === String(userId)) || null;
+}
+
+function getDealerPhase(room) {
+  return room?.dealerPhase || null;
 }
 
 function syncPlayerState(player) {
@@ -91,6 +104,7 @@ function serializePlayer(player) {
     userId: player.userId,
     username: player.username,
     displayName: player.displayName || player.username,
+    isBot: Boolean(player.isBot),
     seat: player.seat,
     currentBet: player.currentBet,
     hand: (player.hand || []).map((card) => serializeCard(card, true)),
@@ -107,6 +121,7 @@ function serializeSettlement(results) {
   return (results || []).map((entry) => ({
     userId: entry.userId,
     username: entry.username,
+    isBot: Boolean(entry.isBot),
     bet: entry.bet,
     handValue: entry.handValue,
     blackjack: entry.blackjack,
@@ -135,6 +150,9 @@ function getOrCreateRoom(roomId, maxPlayers = 5) {
       autoStartAt: null,
       autoStartQueuedByUserId: null,
       settlementCompleteAt: null,
+      dealerPhase: null,
+      dealerActionAt: null,
+      botActionAt: null,
       lastSettlement: [],
       lastSettlementRoundId: null,
       lastAppliedSettlementRoundId: null,
@@ -158,6 +176,7 @@ function listRooms() {
         userId: player.userId,
         username: player.username,
         displayName: player.displayName || player.username,
+        isBot: Boolean(player.isBot),
         seat: player.seat,
         connected: player.connected
       })),
@@ -205,6 +224,66 @@ function joinRoom(roomId, user, maxPlayers = 5) {
   return room;
 }
 
+function addBot(roomId, maxPlayers = 5) {
+  const room = getOrCreateRoom(roomId, maxPlayers);
+
+  if (room.players.length >= room.maxPlayers) {
+    throw new Error('This blackjack table is full.');
+  }
+
+  const botNumber = room.players.filter((player) => player.isBot).length + 1;
+  const seat = getNextFreeSeat(room);
+  if (!seat) {
+    throw new Error('No free blackjack seat is available.');
+  }
+
+  const botId = `blackjack-bot-${room.roomId}-${botNumber}`;
+  room.players.push(createPlayerState({
+    userId: botId,
+    username: `blackjackbot${botNumber}`,
+    displayName: `Blackjack Bot ${botNumber}`,
+    isBot: true
+  }, seat));
+  room.players = getOrderedPlayers(room);
+  room.status = room.players.length > 0 ? 'betting' : 'waiting';
+  maybeScheduleAutoStart(room);
+
+  return room;
+}
+
+function moveSeat(roomId, userId, targetSeat) {
+  const room = rooms.get(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
+  }
+
+  const player = getPlayerByUserId(room, userId);
+  if (!player) {
+    throw new Error('Player is not seated at this blackjack table.');
+  }
+
+  const nextSeat = Number.parseInt(targetSeat, 10);
+  if (!Number.isInteger(nextSeat) || nextSeat < 1 || nextSeat > room.maxPlayers) {
+    throw new Error('Invalid blackjack seat.');
+  }
+
+  if (player.seat === nextSeat) {
+    return room;
+  }
+
+  if (room.players.some((entry) => entry.seat === nextSeat)) {
+    throw new Error('This blackjack seat is already occupied.');
+  }
+
+  if (!canSwitchSeat(player) || hasActiveRound(room)) {
+    throw new Error('Seat switching is only available without an active hand.');
+  }
+
+  player.seat = nextSeat;
+  room.players = getOrderedPlayers(room);
+  return room;
+}
+
 function leaveRoom(roomId, userId) {
   const room = rooms.get(roomId);
   if (!room) return null;
@@ -249,6 +328,8 @@ function getRoomState(roomId, viewerUserId = null) {
     currentPlayerTurn: room.currentPlayerTurn,
     turnDeadlineAt: room.turnDeadlineAt,
     autoStartAt: room.autoStartAt,
+    dealerPhase: getDealerPhase(room),
+    dealerActionAt: room.dealerActionAt,
     shoeRemaining: room.shoe.length,
     discardCount: room.discardPile.length,
     needsShuffle: room.needsShuffle,
@@ -277,7 +358,7 @@ function validateBetAmount(amount) {
     throw new Error('Bet must align with whole KC chip values.');
   }
 
-  if (!ALLOWED_BET_CHIPS_KC.includes(1) && !ALLOWED_BET_CHIPS_KC.includes(inKC)) {
+  if (!ALLOWED_BET_CHIPS_KC.includes(inKC)) {
     throw new Error('Unsupported chip denomination total.');
   }
 }
@@ -299,7 +380,7 @@ function placeBet(roomId, userId, amount, userBalance) {
 
   validateBetAmount(amount);
 
-  if (!Number.isFinite(userBalance) || userBalance < amount) {
+  if (!player.isBot && (!Number.isFinite(userBalance) || userBalance < amount)) {
     throw new Error('Not enough KoalaCoins for that bet.');
   }
 
@@ -355,6 +436,9 @@ function startRound(roomId, startedByUserId) {
   room.autoStartAt = null;
   room.autoStartQueuedByUserId = null;
   room.settlementCompleteAt = null;
+  room.dealerPhase = null;
+  room.dealerActionAt = null;
+  room.botActionAt = null;
   room.lastSettlement = [];
   room.lastSettlementRoundId = null;
   room.dealerHand = [];
@@ -386,10 +470,10 @@ function startRound(roomId, startedByUserId) {
   room.status = 'player_turns';
   room.currentPlayerTurn = activePlayers.find((player) => !player.done)?.userId || null;
   room.turnDeadlineAt = room.currentPlayerTurn ? Date.now() + TURN_TIMEOUT_MS : null;
+  room.botActionAt = room.currentPlayerTurn && getPlayerByUserId(room, room.currentPlayerTurn)?.isBot ? Date.now() + BOT_ACTION_DELAY_MS : null;
 
   if (!room.currentPlayerTurn) {
-    room.status = 'dealer_turn';
-    resolveDealerTurn(roomId);
+    beginDealerTurn(roomId);
   }
 
   return room;
@@ -472,29 +556,78 @@ function advanceTurn(roomId) {
   if (!nextPlayer) {
     room.currentPlayerTurn = null;
     room.turnDeadlineAt = null;
-    room.status = 'dealer_turn';
-    resolveDealerTurn(roomId);
+    beginDealerTurn(roomId);
     return room;
   }
 
   room.currentPlayerTurn = nextPlayer.userId;
   room.turnDeadlineAt = Date.now() + TURN_TIMEOUT_MS;
+  room.botActionAt = nextPlayer.isBot ? Date.now() + BOT_ACTION_DELAY_MS : null;
   room.status = 'player_turns';
   return room;
 }
 
-function resolveDealerTurn(roomId) {
+function beginDealerTurn(roomId, now = Date.now()) {
   const room = rooms.get(roomId);
   if (!room) {
     throw new Error('Blackjack room not found.');
   }
 
   room.status = 'dealer_turn';
-  while (calculateHandValue(room.dealerHand) < 17) {
-    drawIntoHand(room, room.dealerHand);
+  room.dealerPhase = 'reveal';
+  room.dealerActionAt = now + DEALER_ACTION_DELAY_MS;
+
+  return room;
+}
+
+function resolveDealerTurn(roomId, now = Date.now()) {
+  const room = rooms.get(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
   }
 
-  return settleRound(roomId);
+  if (room.status !== 'dealer_turn') {
+    return room;
+  }
+
+  const dealerValue = calculateHandValue(room.dealerHand);
+
+  if (room.dealerPhase === 'reveal') {
+    if (dealerValue > 21) {
+      room.dealerPhase = 'bust';
+    } else if (dealerValue < 17) {
+      room.dealerPhase = 'draw';
+    } else {
+      room.dealerPhase = 'stand';
+    }
+
+    room.dealerActionAt = now + DEALER_ACTION_DELAY_MS;
+    return room;
+  }
+
+  if (room.dealerPhase === 'draw') {
+    drawIntoHand(room, room.dealerHand);
+    const nextValue = calculateHandValue(room.dealerHand);
+
+    if (nextValue > 21) {
+      room.dealerPhase = 'bust';
+    } else if (nextValue < 17) {
+      room.dealerPhase = 'draw';
+    } else {
+      room.dealerPhase = 'stand';
+    }
+
+    room.dealerActionAt = now + DEALER_ACTION_DELAY_MS;
+    return room;
+  }
+
+  if (room.dealerPhase === 'stand' || room.dealerPhase === 'bust') {
+    return settleRound(roomId);
+  }
+
+  room.dealerPhase = dealerValue >= 17 ? 'stand' : 'draw';
+  room.dealerActionAt = now + DEALER_ACTION_DELAY_MS;
+  return room;
 }
 
 function finishSettlementPhase(room, now = Date.now()) {
@@ -509,6 +642,7 @@ function finishSettlementPhase(room, now = Date.now()) {
   room.autoStartAt = null;
   room.autoStartQueuedByUserId = null;
   room.settlementCompleteAt = null;
+  room.botActionAt = null;
 
   room.players.forEach((player) => {
     player.currentBet = 0;
@@ -530,6 +664,7 @@ function settleRound(roomId) {
   room.status = 'settlement';
   const dealerValue = calculateHandValue(room.dealerHand);
   const dealerBust = dealerValue > 21;
+  const dealerBlackjack = isBlackjack(room.dealerHand);
 
   const results = getOrderedPlayers(room)
     .filter((player) => player.currentBet > 0)
@@ -538,7 +673,11 @@ function settleRound(roomId) {
 
       let result = 'push';
       if (player.busted) {
-        result = 'lose';
+        result = 'bust';
+      } else if (player.blackjack && dealerBlackjack) {
+        result = 'push';
+      } else if (player.blackjack) {
+        result = 'blackjack';
       } else if (dealerBust) {
         result = 'win';
       } else if (player.handValue > dealerValue) {
@@ -547,13 +686,14 @@ function settleRound(roomId) {
         result = 'lose';
       }
 
-      const payout = result === 'win' ? player.currentBet * 2 : result === 'push' ? player.currentBet : 0;
+      const payout = ['win', 'blackjack'].includes(result) ? player.currentBet * 2 : result === 'push' ? player.currentBet : 0;
       const netProfit = payout - player.currentBet;
 
       return {
         userId: player.userId,
         username: player.username,
         displayName: player.displayName || player.username,
+        isBot: Boolean(player.isBot),
         bet: player.currentBet,
         handValue: player.handValue,
         blackjack: player.blackjack,
@@ -576,6 +716,9 @@ function settleRound(roomId) {
   room.autoStartAt = null;
   room.autoStartQueuedByUserId = null;
   room.settlementCompleteAt = Date.now() + SETTLEMENT_DISPLAY_MS;
+  room.botActionAt = null;
+  room.dealerPhase = null;
+  room.dealerActionAt = null;
 
   room.status = room.players.length > 0 ? 'settlement' : 'waiting';
   updateShuffleFlag(room);
@@ -592,8 +735,24 @@ function tick(now = Date.now()) {
   rooms.forEach((room, roomId) => {
     let changed = false;
 
+    if (['waiting', 'betting'].includes(room.status)) {
+      const idleBots = getOrderedPlayers(room).filter((player) => player.isBot && player.currentBet <= 0);
+      if (idleBots.length > 0) {
+        idleBots.forEach((bot) => {
+          bot.currentBet = BOT_DEFAULT_BET_CENTS;
+        });
+        maybeScheduleAutoStart(room, idleBots[0]?.userId || null, now);
+        changed = true;
+      }
+    }
+
     if (room.status === 'settlement' && room.settlementCompleteAt && now >= room.settlementCompleteAt) {
       finishSettlementPhase(room, now);
+      changed = true;
+    }
+
+    if (room.status === 'dealer_turn' && room.dealerActionAt && now >= room.dealerActionAt) {
+      resolveDealerTurn(roomId, now);
       changed = true;
     }
 
@@ -603,6 +762,26 @@ function tick(now = Date.now()) {
         changed = true;
       } catch (err) {
         room.turnDeadlineAt = now + TURN_TIMEOUT_MS;
+      }
+    }
+
+    if (room.status === 'player_turns' && room.currentPlayerTurn) {
+      const currentPlayer = getPlayerByUserId(room, room.currentPlayerTurn);
+      if (currentPlayer?.isBot) {
+        if (!room.botActionAt) {
+          room.botActionAt = now + BOT_ACTION_DELAY_MS;
+        } else if (now >= room.botActionAt) {
+          try {
+            if (currentPlayer.handValue < 17 && !currentPlayer.blackjack && !currentPlayer.busted) {
+              hit(roomId, currentPlayer.userId);
+            } else {
+              stand(roomId, currentPlayer.userId);
+            }
+            changed = true;
+          } catch (err) {
+            room.botActionAt = now + BOT_ACTION_DELAY_MS;
+          }
+        }
       }
     }
 
@@ -641,6 +820,8 @@ module.exports = {
   leaveRoom,
   getRoomState,
   placeBet,
+  addBot,
+  moveSeat,
   startRound,
   hit,
   stand,

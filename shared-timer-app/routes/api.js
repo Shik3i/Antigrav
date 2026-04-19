@@ -196,6 +196,8 @@ router.get('/blackjack/state', authController.authenticateToken, blackjackContro
 router.get('/blackjack/leaderboard', authController.optionalAuthenticateToken, blackjackController.getLeaderboard);
 router.post('/blackjack/table/join', authController.authenticateToken, blackjackController.joinTable);
 router.post('/blackjack/table/leave', authController.authenticateToken, blackjackController.leaveTable);
+router.post('/blackjack/table/add-bot', authController.authenticateToken, blackjackController.addBot);
+router.post('/blackjack/table/switch-seat', authController.authenticateToken, blackjackController.switchSeat);
 
 // ─── Polymarket General ───────────────────────────────────
 router.get('/polymarket/settings', polymarketController.getSettings);
