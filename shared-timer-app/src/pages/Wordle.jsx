@@ -21,6 +21,7 @@ const Wordle = ({ user, token }) => {
     const [dailyPlayed, setDailyPlayed] = useState(false);
     const [dailyStatus, setDailyStatus] = useState(null);
     const [dictionary, setDictionary] = useState([]);
+    const [metadata, setMetadata] = useState({ definition: null, funny_quote: null });
     const [activeModeData, setActiveModeData] = useState(null);
     const [dailyLeaderboard, setDailyLeaderboard] = useState([]);
     const [expandedUserId, setExpandedUserId] = useState(null);
@@ -146,10 +147,18 @@ const Wordle = ({ user, token }) => {
                     setSolution(res.data.word || '');
                     setGuesses(res.data.status.guesses || []);
                     setGameState(res.data.status.won ? 'won' : 'lost');
+                    setMetadata({ 
+                        definition: res.data.definition || null, 
+                        funny_quote: res.data.funny_quote || null 
+                    });
                 } else {
                     const word = res.data.word || '';
                     setSolution(word);
                     setDailyPlayed(false);
+                    setMetadata({ 
+                        definition: res.data.definition || null, 
+                        funny_quote: res.data.funny_quote || null 
+                    });
 
                     if (savedData && savedData.solution === word) {
                         setGuesses(savedData.guesses || []);
@@ -629,6 +638,62 @@ const Wordle = ({ user, token }) => {
                                         </button>
                                     )}
                                 </div>
+
+                                {metadata.funny_quote && (
+                                    <div className="glass-panel" style={{ 
+                                        padding: '16px 24px', 
+                                        borderRadius: '16px', 
+                                        background: 'rgba(255,255,255,0.05)', 
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        fontStyle: 'italic',
+                                        color: 'rgba(255,255,255,0.9)',
+                                        maxWidth: '400px',
+                                        position: 'relative',
+                                        marginTop: '8px'
+                                    }}>
+                                        "{metadata.funny_quote}"
+                                        
+                                        {metadata.definition && (
+                                            <div style={{ position: 'absolute', top: '-10px', right: '-10px' }}>
+                                                <div className="tooltip-trigger" style={{ 
+                                                    background: 'var(--accent-primary)', 
+                                                    width: '24px', 
+                                                    height: '24px', 
+                                                    borderRadius: '50%', 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center',
+                                                    cursor: 'help',
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                                                }}>
+                                                    <Info size={14} color="#fff" />
+                                                    <div className="tooltip-content" style={{
+                                                        position: 'absolute',
+                                                        bottom: '120%',
+                                                        right: '0',
+                                                        width: '200px',
+                                                        padding: '12px',
+                                                        background: '#1f2937',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.8rem',
+                                                        fontStyle: 'normal',
+                                                        textAlign: 'left',
+                                                        lineHeight: '1.4',
+                                                        zIndex: 100,
+                                                        border: '1px solid rgba(255,255,255,0.1)',
+                                                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                                                        visibility: 'hidden',
+                                                        opacity: 0,
+                                                        transition: 'all 0.2s ease'
+                                                    }}>
+                                                        <strong style={{ color: 'var(--accent-primary)', display: 'block', marginBottom: '4px' }}>Definition:</strong>
+                                                        {metadata.definition}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                          )}
                          

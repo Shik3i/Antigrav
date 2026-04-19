@@ -996,12 +996,93 @@ function initializeDatabaseSchema() {
       db.run("UPDATE UserRssPreferences SET showInTicker = 1 WHERE feedId IN (SELECT id FROM RssFeeds WHERE is_default = 1)");
   });
 
+    // --- Wordle 2.0 Dictionary ---
+    db.run(`CREATE TABLE IF NOT EXISTS wordle_dictionary (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      word TEXT UNIQUE NOT NULL,
+      is_used BOOLEAN DEFAULT 0,
+      definition TEXT,
+      funny_quote TEXT,
+      used_at DATETIME
+    )`, () => {
+      // Automatic migration/seeding on startup
+      seedWordleDictionary();
+    });
+
   // Signal database is ready and mirror initial logs
   db.run("SELECT 1", () => {
     console.log('Database initialized and ready for system logging');
     logSystemEvent('info', 'System', 'Database initialized and ready for system logging');
     logSystemEvent('info', 'System', 'Connected to SQLite database');
   });
+  });
+}
+
+/**
+ * Wordle 2.0: Seeds the dictionary from JSON if empty and syncs with history
+ */
+function seedWordleDictionary() {
+  db.get("SELECT COUNT(*) as count FROM wordle_dictionary", (err, row) => {
+    if (err) return console.error("[Wordle Migration] Error checking dictionary:", err);
+    if (row && row.count > 0) return; // Already seeded
+
+    console.log("[Wordle Migration] Dictionary empty. Starting migration...");
+
+    try {
+      const listPath = path.join(__dirname, 'WordleWordList.json');
+      const metaPath = path.join(__dirname, 'wordle_metadata.json');
+      
+      if (!fs.existsSync(listPath)) {
+        console.warn("[Wordle Migration] WordleWordList.json not found. Skipping seed.");
+        return;
+      }
+
+      const content = fs.readFileSync(listPath, 'utf8');
+      const jsonData = JSON.parse(content);
+      if (!jsonData || !Array.isArray(jsonData.data)) return;
+
+      // Optional metadata
+      let metadata = {};
+      if (fs.existsSync(metaPath)) {
+        try {
+          metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+          console.log(`[Wordle Migration] Found metadata for ${Object.keys(metadata).length} words.`);
+        } catch (e) {
+          console.error("[Wordle Migration] Error reading wordle_metadata.json:", e);
+        }
+      }
+
+      const words = [...new Set(jsonData.data.map(w => w.trim().toUpperCase()).filter(w => w.length === 5))];
+      
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        const stmt = db.prepare("INSERT OR IGNORE INTO wordle_dictionary (word, definition, funny_quote) VALUES (?, ?, ?)");
+        words.forEach(word => {
+          const meta = metadata[word] || {};
+          stmt.run(word, meta.definition || null, meta.funny_quote || null);
+        });
+        stmt.finalize();
+
+        // Historical Sync: Mark already played words as used
+        const syncQuery = `
+          UPDATE wordle_dictionary 
+          SET is_used = 1, 
+              used_at = (SELECT createdAt FROM Wordle_DailyWords WHERE Wordle_DailyWords.word = wordle_dictionary.word LIMIT 1)
+          WHERE word IN (SELECT word FROM Wordle_DailyWords)
+        `;
+        db.run(syncQuery, (err) => {
+          if (err) {
+            console.error("[Wordle Migration] Error during historical sync:", err);
+            db.run("ROLLBACK");
+          } else {
+            db.run("COMMIT");
+            console.log(`[Wordle Migration] Successfully seeded ${words.length} words and synced history.`);
+          }
+        });
+      });
+    } catch (error) {
+      console.error("[Wordle Migration] Fatal error during seeding:", error);
+    }
   });
 }
 
@@ -3211,9 +3292,15 @@ const getAllPolymarketGeneralBets = () => {
 
 const getDailyWord = (date) => {
   return new Promise((resolve, reject) => {
-    db.get('SELECT word FROM Wordle_DailyWords WHERE date = ?', [date], (err, row) => {
+    const query = `
+      SELECT wdw.word, d.definition, d.funny_quote 
+      FROM Wordle_DailyWords wdw
+      LEFT JOIN wordle_dictionary d ON wdw.word = d.word
+      WHERE wdw.date = ?
+    `;
+    db.get(query, [date], (err, row) => {
       if (err) reject(err);
-      else resolve(row ? row.word : null);
+      else resolve(row || null);
     });
   });
 };
@@ -4964,6 +5051,70 @@ module.exports = {
         if (err) reject(err);
         else resolve(this.changes);
       });
+    });
+  },
+
+  // ─── Wordle 2.0 CRUD ────────────────────────────────────────
+
+  addWordleWord: (word) => {
+    return new Promise((resolve, reject) => {
+      const formatted = word.trim().toUpperCase();
+      if (formatted.length !== 5) return reject(new Error("Word must be 5 characters long"));
+      db.run("INSERT INTO wordle_dictionary (word) VALUES (?)", [formatted], function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    });
+  },
+
+  getWordleWords: () => {
+    return new Promise((resolve, reject) => {
+      db.all("SELECT * FROM wordle_dictionary ORDER BY word ASC", (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  },
+
+  deleteWordleWord: (id) => {
+    return new Promise((resolve, reject) => {
+      // Constraint: Never delete if used
+      db.run("DELETE FROM wordle_dictionary WHERE id = ? AND is_used = 0", [id], function(err) {
+        if (err) reject(err);
+        else if (this.changes === 0) reject(new Error("Word cannot be deleted (already used or not found)"));
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  pickUnusedWordleWord: () => {
+    return new Promise((resolve, reject) => {
+      db.get("SELECT * FROM wordle_dictionary WHERE is_used = 0 ORDER BY RANDOM() LIMIT 1", (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+  },
+
+  markWordleWordUsed: (id) => {
+    return new Promise((resolve, reject) => {
+      db.run("UPDATE wordle_dictionary SET is_used = 1, used_at = CURRENT_TIMESTAMP WHERE id = ?", [id], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  },
+
+  updateWordleMetadata: (id, definition, funnyQuote) => {
+    return new Promise((resolve, reject) => {
+      db.run(
+        "UPDATE wordle_dictionary SET definition = ?, funny_quote = ? WHERE id = ?",
+        [definition, funnyQuote, id],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
     });
   },
 

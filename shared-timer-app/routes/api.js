@@ -216,6 +216,12 @@ router.post('/wordle/daily', authController.authenticateToken, wordleController.
 router.get('/wordle/random', wordleController.getRandomWord);
 router.get('/wordle/dictionary', wordleController.getDictionary);
 
+// Wordle Admin
+router.get('/admin/wordle/dictionary', authController.authenticateToken, wordleController.adminGetDictionary);
+router.post('/admin/wordle/dictionary', authController.authenticateToken, wordleController.adminAddWord);
+router.delete('/admin/wordle/dictionary/:id', authController.authenticateToken, wordleController.adminDeleteWord);
+router.post('/admin/wordle/bulk-update', authController.authenticateToken, wordleController.adminBulkUpdateMetadata);
+
 // ─── Color Sync (Color Guessing Game) ─────────────────────────
 router.get('/colorsync/daily', colorSyncController.getDailyColor);
 router.get('/colorsync/random', colorSyncController.getRandomColor);
