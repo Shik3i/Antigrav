@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import Home from './pages/Home';
+import Login from './pages/Login';
+
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import { User, Settings as SettingsIcon, LogOut, Menu, X, Timer as TimerIcon, BarChart3, Bell, Shield, Heart, Sparkles, RefreshCw, ChevronRight, Clock } from 'lucide-react';
@@ -37,11 +40,11 @@ import { AUTH_SESSION_INVALIDATED_EVENT, getStoredValue, setStoredValue } from '
 import { scheduleDeferred } from './utils/deferred';
 
 // Lazy load pages for code splitting
-const Home = React.lazy(() => import('./pages/Home'));
+
 const Room = React.lazy(() => import('./pages/Room'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Countdowns = React.lazy(() => import('./pages/Countdowns'));
-const Login = React.lazy(() => import('./pages/Login'));
+
 const Register = React.lazy(() => import('./pages/Register'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 
