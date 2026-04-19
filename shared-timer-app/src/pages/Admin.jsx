@@ -60,6 +60,10 @@ const Admin = ({ socket }) => {
     const [rssStats, setRssStats] = useState([]);
     const [refreshingRss, setRefreshingRss] = useState(false);
     const [newNavbarItem, setNewNavbarItem] = useState({ key: '', label: '', path: '', category: 'Tools', icon: '' });
+    const [wordleDictionary, setWordleDictionary] = useState([]);
+    const [wordleSearch, setWordleSearch] = useState('');
+    const [bulkMetadataInput, setBulkMetadataInput] = useState('');
+    const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
     const handleFetchNavbarSettings = async () => {
     
@@ -380,6 +384,60 @@ const Admin = ({ socket }) => {
         addLog('Broadcast', 'Global message sent to all users.', 'success');
     };
 
+    const handleFetchWordleDictionary = async () => {
+        try {
+            const res = await axios.get('/api/admin/wordle/dictionary', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setWordleDictionary(res.data);
+        } catch (err) {
+            console.error('[Admin Wordle] Fetch failed:', err);
+        }
+    };
+
+    const handleAddWordleWord = async (word) => {
+        try {
+            await axios.post('/api/admin/wordle/dictionary', { word }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', `Word "${word}" added to Wordle dictionary.`, 'success');
+            handleFetchWordleDictionary();
+        } catch (err) {
+            addLog('Error', err.response?.data?.error || 'Failed to add word.', 'error');
+        }
+    };
+
+    const handleDeleteWordleWord = async (id) => {
+        if (!window.confirm("Delete this word?")) return;
+        try {
+            await axios.delete(`/api/admin/wordle/dictionary/${id}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Word deleted.', 'success');
+            handleFetchWordleDictionary();
+        } catch (err) {
+            addLog('Error', err.response?.data?.error || 'Delete failed.', 'error');
+        }
+    };
+
+    const handleBulkUpdateWordleMetadata = async () => {
+        if (!bulkMetadataInput.trim()) return;
+        setIsBulkUpdating(true);
+        try {
+            const json = JSON.parse(bulkMetadataInput);
+            const res = await axios.post('/api/admin/wordle/bulk-update', json, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', `Bulk update complete. ${res.data.updatedCount} words updated.`, 'success');
+            setBulkMetadataInput('');
+            handleFetchWordleDictionary();
+        } catch (err) {
+            addLog('Error', 'Invalid JSON or update failed.', 'error');
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
     const moveTeam = (index, direction) => {
         const newTeams = [...packTeams];
         const newIndex = index + direction;
@@ -640,6 +698,9 @@ const Admin = ({ socket }) => {
         }
         if (activeTab === 'rss') {
             handleFetchRssFeeds();
+        }
+        if (activeTab === 'wordle') {
+            handleFetchWordleDictionary();
         }
     }, [activeTab]);
 
@@ -1278,6 +1339,12 @@ const Admin = ({ socket }) => {
                     onClick={() => { setActiveTab('rss'); handleFetchRssFeeds(); }}
                     style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <LucideIcons.Rss size={16} /> RSS Feeds
+                </button>
+                <button
+                    className={activeTab === 'wordle' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => { setActiveTab('wordle'); handleFetchWordleDictionary(); }}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <LucideIcons.Gamepad2 size={16} /> Wordle Dictionary
                 </button>
             </div>
 
@@ -2935,6 +3002,144 @@ const Admin = ({ socket }) => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* TAB: WORDLE DICTIONARY */}
+            {activeTab === 'wordle' && (
+                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                    {/* Bulk Actions Section */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        <div className="glass-card" style={{ padding: '32px', borderLeft: '4px solid #10b981' }}>
+                            <h3 style={{ marginTop: 0, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <LucideIcons.FileJson size={24} color="#10b981" />
+                                Bulk Import Metadata
+                            </h3>
+                            <textarea
+                                className="input-primary"
+                                style={{ width: '100%', minHeight: '150px', fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '16px', padding: '16px' }}
+                                placeholder='{"WORT": {"definition": "...", "funny_quote": "..."}}'
+                                value={bulkMetadataInput}
+                                onChange={(e) => setBulkMetadataInput(e.target.value)}
+                            />
+                            <button 
+                                className="btn-primary" 
+                                style={{ width: '100%', justifyContent: 'center' }}
+                                disabled={isBulkUpdating || !bulkMetadataInput.trim()}
+                                onClick={handleBulkUpdateWordleMetadata}
+                            >
+                                {isBulkUpdating ? 'Updating...' : 'Import / Update Metadata'}
+                            </button>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '32px', borderLeft: '4px solid #3b82f6' }}>
+                            <h3 style={{ marginTop: 0, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <LucideIcons.Download size={24} color="#3b82f6" />
+                                Export Metadata
+                            </h3>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                                Download the current database content as <code>wordle_metadata.json</code> to use with the AI enrichment script.
+                            </p>
+                            <button 
+                                className="btn-secondary" 
+                                style={{ width: '100%', justifyContent: 'center', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                onClick={() => {
+                                    const exportData = {};
+                                    wordleDictionary.forEach(w => {
+                                        if (w.definition || w.funny_quote) {
+                                            exportData[w.word] = {
+                                                definition: w.definition,
+                                                funny_quote: w.funny_quote
+                                            };
+                                        }
+                                    });
+                                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = 'wordle_metadata.json';
+                                    a.click();
+                                    addLog('Success', 'Metadata exported successfully.', 'success');
+                                }}
+                            >
+                                <LucideIcons.Download size={18} />
+                                Download JSON Export
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Dictionary Management Section */}
+                    <div className="glass-card" style={{ padding: '32px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ margin: 0 }}>Wordle Dictionary ({wordleDictionary.length} words)</h3>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <input 
+                                    type="text" 
+                                    className="input-primary" 
+                                    placeholder="Search word..." 
+                                    style={{ width: '200px' }}
+                                    value={wordleSearch}
+                                    onChange={(e) => setWordleSearch(e.target.value.toUpperCase())}
+                                />
+                                <button className="btn-primary" onClick={() => {
+                                    const word = prompt("Enter 5-letter word:");
+                                    if (word) handleAddWordleWord(word.toUpperCase());
+                                }}>
+                                    <LucideIcons.Plus size={18} /> Add Word
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Word</th>
+                                        <th>Used?</th>
+                                        <th>Definition</th>
+                                        <th>Funny Quote</th>
+                                        <th style={{ textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {wordleDictionary
+                                        .filter(w => !wordleSearch || w.word.includes(wordleSearch))
+                                        .slice(0, 50) 
+                                        .map(w => (
+                                            <tr key={w.id}>
+                                                <td style={{ fontWeight: 800, color: 'var(--accent-primary)' }}>{w.word}</td>
+                                                <td>
+                                                    <span style={{ 
+                                                        padding: '2px 6px', 
+                                                        borderRadius: '4px', 
+                                                        fontSize: '0.75rem',
+                                                        background: w.is_used ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                        color: w.is_used ? '#10b981' : 'var(--text-muted)'
+                                                    }}>
+                                                        {w.is_used ? 'Yes' : 'No'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ fontSize: '0.85rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {w.definition || <span style={{ opacity: 0.3 }}>- none -</span>}
+                                                </td>
+                                                <td style={{ fontSize: '0.85rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {w.funny_quote || <span style={{ opacity: 0.3 }}>- none -</span>}
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <button 
+                                                        className="btn-ghost" 
+                                                        style={{ color: '#ef4444' }}
+                                                        onClick={() => handleDeleteWordleWord(w.id)}
+                                                    >
+                                                        <LucideIcons.Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

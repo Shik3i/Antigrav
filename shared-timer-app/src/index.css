@@ -1495,3 +1495,19 @@ body.zen-mode .news-ticker-wrapper {
         width: 100%;
     }
 }
+/* Tooltip Styles */
+.tooltip-trigger:hover .tooltip-content {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateY(-8px);
+}
+
+.tooltip-content::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 10px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1f2937 transparent transparent transparent;
+}
