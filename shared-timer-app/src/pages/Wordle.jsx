@@ -354,8 +354,8 @@ const Wordle = ({ user, token }) => {
             });
             setDailyPlayed(true);
             
-            // If won, reveal full metadata immediately
-            if (won && res.data.definition) {
+            // Reveal full metadata immediately on game completion
+            if (res.data.definition) {
                 setMetadata({
                     definition: res.data.definition,
                     funny_quote: res.data.funny_quote || null

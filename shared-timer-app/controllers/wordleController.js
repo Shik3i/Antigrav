@@ -46,7 +46,8 @@ exports.getDailyGame = async (req, res, next) => {
         }
 
         const status = userId ? await dbLayer.getWordleStatus(userId, targetDate) : null;
-        const isFinished = !!status;
+        // A game is only finished if won is true OR guesses length is 6
+        const isFinished = status && (status.won || (status.guesses && status.guesses.length >= 6));
 
         // Mask metadata if not finished? 
         // Actually, the user wants to show definition/quote ON SUCCESS.
@@ -63,7 +64,7 @@ exports.getDailyGame = async (req, res, next) => {
         response.hintUsed = hintUsed;
         response.hasDefinition = !!gameData.definition;
 
-        if (isFinished && status.won) {
+        if (isFinished) {
             response.definition = gameData.definition;
             response.funny_quote = gameData.funny_quote;
         } else if (hintUsed && gameData.definition) {
@@ -87,7 +88,8 @@ exports.submitDailyResult = async (req, res, next) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
         const existing = await dbLayer.getWordleStatus(userId, targetDate);
-        if (existing) return res.status(400).json({ error: 'Das tägliche Wordle wurde für dieses Datum bereits aufgezeichnet.' });
+        const isActuallyFinished = existing && (existing.won || (existing.guesses && existing.guesses.length >= 6));
+        if (isActuallyFinished) return res.status(400).json({ error: 'Das tägliche Wordle wurde für dieses Datum bereits aufgezeichnet.' });
 
         let earnedCoins = 0;
         if (won) {
@@ -99,12 +101,10 @@ exports.submitDailyResult = async (req, res, next) => {
 
         const response = { success: true, earnedCoins };
         
-        if (won) {
-            const gameData = await dbLayer.getDailyWord(targetDate);
-            if (gameData) {
-                response.definition = gameData.definition;
-                response.funny_quote = gameData.funny_quote;
-            }
+        const gameData = await dbLayer.getDailyWord(targetDate);
+        if (gameData) {
+            response.definition = gameData.definition;
+            response.funny_quote = gameData.funny_quote;
         }
 
         res.json(response);
