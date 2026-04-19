@@ -1030,7 +1030,6 @@ function seedWordleDictionary() {
 
     try {
       const listPath = path.join(__dirname, 'WordleWordList.json');
-      const metaPath = path.join(__dirname, 'wordle_metadata.json');
       
       if (!fs.existsSync(listPath)) {
         console.warn("[Wordle Migration] WordleWordList.json not found. Skipping seed.");
@@ -1041,25 +1040,13 @@ function seedWordleDictionary() {
       const jsonData = JSON.parse(content);
       if (!jsonData || !Array.isArray(jsonData.data)) return;
 
-      // Optional metadata
-      let metadata = {};
-      if (fs.existsSync(metaPath)) {
-        try {
-          metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-          console.log(`[Wordle Migration] Found metadata for ${Object.keys(metadata).length} words.`);
-        } catch (e) {
-          console.error("[Wordle Migration] Error reading wordle_metadata.json:", e);
-        }
-      }
-
       const words = [...new Set(jsonData.data.map(w => w.trim().toUpperCase()).filter(w => w.length === 5))];
       
       db.serialize(() => {
         db.run("BEGIN TRANSACTION");
-        const stmt = db.prepare("INSERT OR IGNORE INTO wordle_dictionary (word, definition, funny_quote) VALUES (?, ?, ?)");
+        const stmt = db.prepare("INSERT OR IGNORE INTO wordle_dictionary (word) VALUES (?)");
         words.forEach(word => {
-          const meta = metadata[word] || {};
-          stmt.run(word, meta.definition || null, meta.funny_quote || null);
+          stmt.run(word);
         });
         stmt.finalize();
 
@@ -5115,6 +5102,21 @@ module.exports = {
           else resolve(this.changes);
         }
       );
+    });
+  },
+  upsertWordleWord: (word, definition, funnyQuote) => {
+    return new Promise((resolve, reject) => {
+      const q = `
+        INSERT INTO wordle_dictionary (word, definition, funny_quote) 
+        VALUES (?, ?, ?) 
+        ON CONFLICT(word) DO UPDATE SET 
+          definition = COALESCE(excluded.definition, definition),
+          funny_quote = COALESCE(excluded.funny_quote, funny_quote)
+      `;
+      db.run(q, [word.toUpperCase(), definition, funnyQuote], function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID || this.changes);
+      });
     });
   },
 

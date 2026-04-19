@@ -3010,61 +3010,99 @@ const Admin = ({ socket }) => {
             {activeTab === 'wordle' && (
                 <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                     {/* Bulk Actions Section */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)', gap: '20px' }}>
                         <div className="glass-card" style={{ padding: '32px', borderLeft: '4px solid #10b981' }}>
                             <h3 style={{ marginTop: 0, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <LucideIcons.FileJson size={24} color="#10b981" />
-                                Bulk Import Metadata
+                                Bulk Import / Upsert Metadata
                             </h3>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+                                Paste JSON here to update definitions and quotes. Supports single objects or arrays of word objects. 
+                                <strong> Existing words will be updated; new words will be inserted.</strong>
+                            </p>
                             <textarea
                                 className="input-primary"
-                                style={{ width: '100%', minHeight: '150px', fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '16px', padding: '16px' }}
-                                placeholder='{"WORT": {"definition": "...", "funny_quote": "..."}}'
+                                style={{ width: '100%', minHeight: '200px', fontFamily: 'monospace', fontSize: '0.8rem', marginBottom: '16px', padding: '16px', color: '#10b981' }}
+                                placeholder='[
+  {"word": "APPLE", "definition": "A fruit", "funny_quote": "Keep doctors away"},
+  {"word": "GAMES", "definition": "Fun activity", "funny_quote": "Level up!"}
+]'
                                 value={bulkMetadataInput}
                                 onChange={(e) => setBulkMetadataInput(e.target.value)}
                             />
-                            <button 
-                                className="btn-primary" 
-                                style={{ width: '100%', justifyContent: 'center' }}
-                                disabled={isBulkUpdating || !bulkMetadataInput.trim()}
-                                onClick={handleBulkUpdateWordleMetadata}
-                            >
-                                {isBulkUpdating ? 'Updating...' : 'Import / Update Metadata'}
-                            </button>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button 
+                                    className="btn-primary" 
+                                    style={{ flex: 1, justifyContent: 'center' }}
+                                    disabled={isBulkUpdating || !bulkMetadataInput.trim()}
+                                    onClick={handleBulkUpdateWordleMetadata}
+                                >
+                                    {isBulkUpdating ? 'Processing...' : 'Run Bulk Upsert'}
+                                </button>
+                                <button
+                                    className="btn-secondary"
+                                    onClick={() => setBulkMetadataInput('')}
+                                    style={{ padding: '0 16px' }}
+                                >
+                                    Clear
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="glass-card" style={{ padding: '32px', borderLeft: '4px solid #3b82f6' }}>
+                        <div className="glass-card" style={{ padding: '32px', borderLeft: '4px solid #3b82f6', display: 'flex', flexDirection: 'column' }}>
                             <h3 style={{ marginTop: 0, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <LucideIcons.Download size={24} color="#3b82f6" />
-                                Export Metadata
+                                Dictionary Export
                             </h3>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                                Download the current database content as <code>wordle_metadata.json</code> to use with the AI enrichment script.
+                                Download the full dictionary to run the local enrichment script (Python + LM Studio).
                             </p>
+                            
+                            <div style={{ padding: '16px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', marginBottom: '24px' }}>
+                                <h5 style={{ margin: '0 0 8px 0', color: '#3b82f6', fontSize: '0.85rem' }}>Pro-Tip: Local Enrichment</h5>
+                                <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.5, color: 'var(--text-muted)' }}>
+                                    1. Export this file<br />
+                                    2. Run <code>scripts/wordle_enricher.py</code><br />
+                                    3. Paste the result back into the Import field.
+                                </p>
+                            </div>
+
                             <button 
                                 className="btn-secondary" 
-                                style={{ width: '100%', justifyContent: 'center', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-                                onClick={() => {
-                                    const exportData = {};
-                                    wordleDictionary.forEach(w => {
-                                        if (w.definition || w.funny_quote) {
-                                            exportData[w.word] = {
-                                                definition: w.definition,
-                                                funny_quote: w.funny_quote
-                                            };
-                                        }
-                                    });
-                                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = 'wordle_metadata.json';
-                                    a.click();
-                                    addLog('Success', 'Metadata exported successfully.', 'success');
+                                style={{ 
+                                    width: '100%', 
+                                    justifyContent: 'center', 
+                                    background: 'rgba(59, 130, 246, 0.1)', 
+                                    color: '#3b82f6', 
+                                    border: 'none', 
+                                    padding: '16px', 
+                                    borderRadius: '12px', 
+                                    cursor: 'pointer', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px',
+                                    fontWeight: 700,
+                                    marginTop: 'auto'
+                                }}
+                                onClick={async () => {
+                                    try {
+                                        const res = await axios.get('/api/admin/wordle/export', {
+                                            headers: { 'Authorization': `Bearer ${globalToken}` }
+                                        });
+                                        const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `wordle_dictionary_export_${new Date().toISOString().split('T')[0]}.json`;
+                                        a.click();
+                                        addLog('Success', 'Full dictionary exported.', 'success');
+                                    } catch (err) {
+                                        addLog('Error', 'Export failed.', 'error');
+                                    }
                                 }}
                             >
-                                <LucideIcons.Download size={18} />
-                                Download JSON Export
+                                <LucideIcons.Download size={20} />
+                                Download Full Dictionary JSON
                             </button>
                         </div>
                     </div>

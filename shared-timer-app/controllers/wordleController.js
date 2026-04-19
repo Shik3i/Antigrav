@@ -211,30 +211,41 @@ exports.adminDeleteWord = async (req, res, next) => {
     }
 };
 
+exports.adminExportDictionary = async (req, res, next) => {
+    try {
+        if (!req.user?.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
+        const words = await dbLayer.getWordleWords();
+        res.json(words);
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.adminBulkUpdateMetadata = async (req, res, next) => {
     try {
         if (!req.user?.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-        const metadata = req.body;
+        const data = req.body;
         
-        if (typeof metadata !== 'object' || metadata === null) {
-            return res.status(400).json({ error: 'Invalid JSON format' });
+        let wordsToProcess = [];
+        if (Array.isArray(data)) {
+            wordsToProcess = data;
+        } else if (typeof data === 'object' && data !== null) {
+            wordsToProcess = Object.keys(data).map(word => ({
+                word,
+                definition: data[word].definition,
+                funny_quote: data[word].funny_quote
+            }));
+        } else {
+            return res.status(400).json({ error: 'Invalid JSON format. Expected Array of objects or Word-keyed Object.' });
         }
 
-        const words = Object.keys(metadata);
         let updatedCount = 0;
+        for (const entry of wordsToProcess) {
+            const word = entry.word;
+            if (!word || word.length !== 5) continue;
 
-        for (const word of words) {
-            const formatted = word.trim().toUpperCase();
-            const { definition, funny_quote } = metadata[word];
-            
-            // Find word id
-            const allWords = await dbLayer.getWordleWords();
-            const target = allWords.find(w => w.word === formatted);
-            
-            if (target) {
-                await dbLayer.updateWordleMetadata(target.id, definition, funny_quote);
-                updatedCount++;
-            }
+            await dbLayer.upsertWordleWord(word, entry.definition || null, entry.funny_quote || null);
+            updatedCount++;
         }
 
         res.json({ success: true, updatedCount });

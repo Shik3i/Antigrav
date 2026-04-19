@@ -218,6 +218,7 @@ router.get('/wordle/dictionary', wordleController.getDictionary);
 
 // Wordle Admin
 router.get('/admin/wordle/dictionary', authController.authenticateToken, wordleController.adminGetDictionary);
+router.get('/admin/wordle/export', authController.authenticateToken, wordleController.adminExportDictionary);
 router.post('/admin/wordle/dictionary', authController.authenticateToken, wordleController.adminAddWord);
 router.delete('/admin/wordle/dictionary/:id', authController.authenticateToken, wordleController.adminDeleteWord);
 router.post('/admin/wordle/bulk-update', authController.authenticateToken, wordleController.adminBulkUpdateMetadata);
