@@ -19,19 +19,19 @@ const MaintenanceGuard = ({ children }) => {
     // Find if the current path is locked in navbar settings
     const currentPathSetting = useMemo(() => {
         if (!navbarLoaded) return null;
-        
+
         const path = location.pathname;
-        
+
         // Try exact match first
         let match = navbarSettings.find(n => n.path === path);
-        
+
         // Try prefix match for sub-routes (e.g. /games/rift-defense)
         if (!match) {
             // Sort by length descending to match most specific path first
             const sortedSettings = [...navbarSettings].sort((a, b) => b.path.length - a.path.length);
             match = sortedSettings.find(n => n.path !== '/' && path.startsWith(n.path));
         }
-        
+
         return match;
     }, [navbarSettings, navbarLoaded, location.pathname]);
 
@@ -39,14 +39,14 @@ const MaintenanceGuard = ({ children }) => {
     const isSuperadmin = user?.is_superadmin;
 
     // If locked and NOT a superadmin, show the maintenance screen
-    if (isLocked && !isSuperadmin) {
+    if (!!isLocked && !isSuperadmin) {
         return <MaintenanceScreen />;
     }
 
     // If locked AND superadmin, show the page with a warning banner
     return (
         <div style={{ position: 'relative', width: '100%' }}>
-            {isLocked && isSuperadmin && (
+            {!!isLocked && isSuperadmin && (
                 <div style={{
                     position: 'sticky',
                     top: '-2rem',
