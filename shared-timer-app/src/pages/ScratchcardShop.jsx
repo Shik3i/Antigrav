@@ -76,8 +76,9 @@ const ScratchcardShop = () => {
                     });
                     setUser(prev => ({ ...prev, koala_balance: meRes.data.koala_balance }));
                 } catch (err) {
-                    console.log('Error fetching user balance:', err);
+                    // Fail silently or handle in UI
                 }
+
             }
         } catch (err) {
             console.error('Failed to fetch scratchcard data:', err);
@@ -132,12 +133,11 @@ const ScratchcardShop = () => {
             const cardId = typeof activeCard.id === 'object' ? activeCard.id.id : activeCard.id;
             if (!cardId) throw new Error('Invalid Card ID');
 
-            console.log('[Shop] Claiming card ID:', cardId);
             const res = await axios.post('/api/scratchcards/claim', { id: cardId }, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            console.log('[Shop] Claim result:', res.data);
             setResult(res.data);
+
             
             if (res.data.winAmount > 0) {
                 if (!isMuted) playCoinJingle();

@@ -17,11 +17,7 @@ const formatLastActive = (timestamp) => {
     const now = new Date();
     const lastActive = new Date(utcTimestamp);
     const diffInSeconds = Math.floor((now.getTime() - lastActive.getTime()) / 1000);
-    
-    console.log('[DEBUG] lastActive raw:', timestamp);
-    console.log('[DEBUG] lastActive parsed:', lastActive.toISOString());
-    console.log('[DEBUG] now:', now.toISOString());
-    console.log('[DEBUG] diffInSeconds:', diffInSeconds);
+
 
     if (diffInSeconds < 60) return 'Gerade online';
     if (diffInSeconds < 3600) return `Vor ${Math.floor(diffInSeconds / 60)} Min.`;

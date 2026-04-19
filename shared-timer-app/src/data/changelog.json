@@ -1,5 +1,11 @@
 [
   {
+    "id": 72,
+    "version": "2.43.0",
+    "date": "2026-04-19",
+    "changes": "- **Dashboard Performance**: Implementierung eines O(n log n) Algorithmus zur Rekonstruktion der Finanzhistorie. Ein Stresstest mit 5.000 Transaktionen wird nun in nur ~8,7ms verarbeitet.\n- **Finanzielle Präzision**: Überarbeitung der mathematischen Rückwärts-Rekonstruktion zur Gewährleistung von 100% Genauigkeit zwischen Transaktions-Historie und lokalem Guthaben.\n- **Adaptive Timeframes**: Neue Steuerung für die Chart-Historie mit standardmäßiger 30-Tage-Ansicht und optionaler Gesamthistorie (\"ALLE\").\n- **Smart Downsampling**: Automatische Zusammenfassung von Datenpunkten bei großen Zeiträumen zur Steigerung der Übersichtlichkeit und Render-Performance.\n- **Premium Custom Tooltip**: Einführung eines glassmophischen Tooltips mit getrennter Ausweisung von Liquidität und Risiko-Anteilen."
+  },
+  {
     "id": 71,
     "version": "2.42.1",
     "date": "2026-04-19",
