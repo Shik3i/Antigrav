@@ -1,5 +1,11 @@
 [
   {
+    "id": 71,
+    "version": "2.42.1",
+    "date": "2026-04-19",
+    "changes": "- **Active Session UX**: Das Timer-Widget wurde in den fixierten Footer verschoben und ist nun permanent über dem Profil sichtbar (\"sticky\").\n- **Kompaktes Interface**: Reduzierung der Widget-Größe und Optimierung der Abstände für eine bessere Integration in den Fußbereich der Sidebar."
+  },
+  {
     "id": 70,
     "version": "2.42.0",
     "date": "2026-04-19",
