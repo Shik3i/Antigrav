@@ -1,5 +1,11 @@
 [
   {
+    "id": 68,
+    "version": "2.41.2",
+    "date": "2026-04-19",
+    "changes": "- **Admin-UX**: Fix für den Wartungs-Banner im `MaintenanceGuard`. Die Leiste ist nun wieder korrekt sichtbar, lesbar und wird nicht mehr durch Layout-Abstände abgeschnitten."
+  },
+  {
     "id": 67,
     "version": "2.41.1",
     "date": "2026-04-19",
