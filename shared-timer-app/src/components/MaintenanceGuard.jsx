@@ -39,7 +39,12 @@ const MaintenanceGuard = ({ children }) => {
     const isSuperadmin = user?.is_superadmin;
 
     // Case 1: Not locked -> Transparently return children (restores original layout chain)
-    if (!isLocked) {
+    // [WICHTIG: NICHT ENTFERNEN / NICHT UMWICKELN]
+    // Wir geben 'children' hier absolut direkt zurück, ohne umschließende <div> oder Wrapper.
+    // Jedes zusätzliche Element an dieser Stelle bricht den Flexbox-Fluss von App.jsx 
+    // und verhindert korrektes Scrolling auf Unterseiten (z.B. Esports-Seite).
+    // Der Check Number(isLocked) === 0 ist kritisch, da SQLite-Werte oft als String ("0") kommen.
+    if (!isLocked || Number(isLocked) === 0) {
         return children;
     }
 
