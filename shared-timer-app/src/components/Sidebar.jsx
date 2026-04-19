@@ -289,22 +289,26 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     })}
                 </nav>
 
+            </div>
+
+            {/* Footer Area */}
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {roomState?.state && !isRoomRoute && (
                     <div
                         className="glass-panel"
-                        style={{ padding: '16px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', cursor: 'pointer', marginTop: '24px', marginBottom: '8px' }}
+                        style={{ padding: '12px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', cursor: 'pointer', marginBottom: '4px' }}
                         onMouseEnter={() => prefetchRoute('/c')}
                         onClick={() => navigate(`/room/${roomState.id}${activeToken ? `?token=${activeToken}` : ''}`)}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>Active Session</span>
-                            <LucideIcons.Maximize2 size={14} color="var(--text-muted)" />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>Active Session</span>
+                            <LucideIcons.Maximize2 size={12} color="var(--text-muted)" />
                         </div>
-                        <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '4px' }}>
                             {formatTime(localRemainingMs)}
                         </div>
                         {user?.preferences?.timerVisual === 'bar' && (
-                            <div style={{ height: '4px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '12px' }}>
+                            <div style={{ height: '3px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
                                 <div style={{
                                     height: '100%',
                                     width: `${(localRemainingMs / (roomState.config?.durationMs || 1)) * 100}%`,
@@ -316,22 +320,18 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                         {isWrite && (
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 {!roomState.state.isRunning ? (
-                                    <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px' }} onClick={(e) => handleAction(e, 'START')}>
-                                        <LucideIcons.Play size={14} /> Start
+                                    <button className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '6px' }} onClick={(e) => handleAction(e, 'START')}>
+                                        <LucideIcons.Play size={12} /> Start
                                     </button>
                                 ) : (
-                                    <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
-                                        <LucideIcons.Pause size={14} /> Pause
+                                    <button className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '6px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
+                                        <LucideIcons.Pause size={12} /> Pause
                                     </button>
                                 )}
                             </div>
                         )}
                     </div>
                 )}
-            </div>
-
-            {/* Footer Area */}
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {isGuest ? (
                     <div style={{ ...UserInfoStyle, marginTop: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
