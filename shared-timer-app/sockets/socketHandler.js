@@ -1192,6 +1192,12 @@ module.exports = function (io) {
                 if (userSockets) {
                     userSockets.delete(socket.id);
                     if (userSockets.size === 0) {
+                        blackjackRoomManager.rooms.forEach((room, roomId) => {
+                            const state = blackjackRoomManager.leaveRoom(roomId, userId);
+                            if (state) {
+                                io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, blackjackRoomManager.getRoomState(roomId, userId));
+                            }
+                        });
                         onlineUsers.delete(userId);
                         broadcastFriendStatus(io, userId, false);
                     }
