@@ -13,7 +13,7 @@
     function findVideo() {
         const videos = document.querySelectorAll('video');
         if (videos.length > 0) return videos[0];
-        return document.querySelector('video');
+        return null;
     }
 
     // --- Helper: safely play/pause taking YouTube, Twitch and other SPA players into account ---
@@ -22,66 +22,60 @@
         try {
             const host = window.location.hostname.toLowerCase();
             const isYouTube = host.includes('youtube.com');
-            const isTwitch = host.includes('twitch.tv');
+            const isTwitch  = host.includes('twitch.tv');
 
-            // --- YOUTUBE SPECIAL HANDLING ---
+            // --- YOUTUBE ---
             if (isYouTube) {
                 const ytButton = document.querySelector('.ytp-play-button');
                 if (ytButton) {
-                    const title = ytButton.getAttribute('title') || ytButton.getAttribute('data-title-no-tooltip') || ytButton.getAttribute('aria-label') || '';
+                    const title = ytButton.getAttribute('title') ||
+                                  ytButton.getAttribute('data-title-no-tooltip') ||
+                                  ytButton.getAttribute('aria-label') || '';
                     const isCurrentlyPlaying = title.toLowerCase().includes('pause');
-
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         ytButton.click();
-                        setTimeout(() => { isProcessingCommand = false; }, 1000);
-                        return;
-                    } else {
-                        isProcessingCommand = false;
-                        return;
                     }
+                    setTimeout(() => { isProcessingCommand = false; }, 1000);
+                    return;
                 }
             }
 
-            // --- TWITCH SPECIAL HANDLING ---
+            // --- TWITCH ---
             if (isTwitch) {
                 const twitchButton = document.querySelector('[data-a-target="player-play-pause-button"]');
                 if (twitchButton) {
-                    // Language-independent check: check for the "Play" vs "Pause" icon class/attribute
-                    // Twitch buttons usually have an SVG icon inside.
-                    const icon = twitchButton.querySelector('svg');
                     const label = twitchButton.getAttribute('aria-label')?.toLowerCase() || '';
-                    
-                    // Fallback: check many languages or just icon presence
-                    // 'Pause' is common, but let's check for the icon path or use the attribute we already have
-                    // and add more language indicators.
-                    const isCurrentlyPlaying = label.includes('pause') || 
-                                               label.includes('stoppen') || 
-                                               label.includes('arrête') || 
+                    // Mehrsprachige Pause-Erkennung
+                    const isCurrentlyPlaying = label.includes('pause') ||
+                                               label.includes('stoppen') ||
+                                               label.includes('arrête') ||
                                                label.includes('detener');
-
                     if ((action === 'play' && !isCurrentlyPlaying) || (action === 'pause' && isCurrentlyPlaying)) {
                         twitchButton.click();
-                        setTimeout(() => { isProcessingCommand = false; }, 1000);
-                        return;
-                    } else {
-                        isProcessingCommand = false;
-                        return;
                     }
+                    setTimeout(() => { isProcessingCommand = false; }, 1000);
+                    return;
                 }
             }
 
-            // --- DEFAULT HTML5 VIDEO FALLBACK ---
+            // --- DEFAULT HTML5 VIDEO ---
             const videos = document.querySelectorAll('video');
             videos.forEach(v => {
                 if (action === 'play') {
                     if (v.paused) {
                         v.play().catch(e => {
                             if (e.name === 'NotAllowedError') {
-                                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: 'SyncExtension: Autoplay blocked. Please click the page once.', logType: 'warn' }).catch(() => {});
-                                console.warn('SyncExtension: Autoplay blocked. Please click the page once to enable sync.');
+                                chrome.runtime.sendMessage({
+                                    type: 'ADD_DEV_LOG',
+                                    message: 'Autoplay blockiert. Bitte einmal auf die Seite klicken.',
+                                    logType: 'warn'
+                                }).catch(() => {});
                             } else {
-                                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `SyncExtension: Native play failed: ${e.message}`, logType: 'error' }).catch(() => {});
-                                console.debug('SyncExtension: Native play failed:', e.message);
+                                chrome.runtime.sendMessage({
+                                    type: 'ADD_DEV_LOG',
+                                    message: `Native play fehlgeschlagen: ${e.message}`,
+                                    logType: 'error'
+                                }).catch(() => {});
                             }
                         });
                     }
@@ -90,8 +84,11 @@
                 }
             });
         } catch (e) {
-            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `SyncExtension: Error in media action: ${e.message}`, logType: 'error' }).catch(() => {});
-            console.error('SyncExtension: Error in media action:', e);
+            chrome.runtime.sendMessage({
+                type: 'ADD_DEV_LOG',
+                message: `Media action Fehler: ${e.message}`,
+                logType: 'error'
+            }).catch(() => {});
         }
         setTimeout(() => { isProcessingCommand = false; }, 1000);
     }
@@ -101,8 +98,6 @@
         return new Promise((resolve) => {
             const video = findVideo();
             if (!video) { resolve(false); return; }
-
-            // Check immediately
             if (video.paused === targetPaused) { resolve(true); return; }
 
             const interval = 100;
@@ -120,7 +115,7 @@
         });
     }
 
-    // --- Helper: poll until seeked & buffered ---
+    // --- Helper: poll until seeked & buffered (readyState >= 3) ---
     function pollSeekReady(targetTime, timeoutMs = 8000) {
         return new Promise((resolve) => {
             const video = findVideo();
@@ -143,49 +138,47 @@
         });
     }
 
+    // ─── Message Handler ──────────────────────────────────────────────────────
+
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        // Ignore messages meant for bridge.js (bidirectional sync and ACK)
+        // Nachrichten die nicht für content.js bestimmt sind ignorieren
         if (message.source === 'extension_popup' || message.source === 'extension_background') {
             return false;
         }
-        // Ignore generic pipe wrappers — only handle raw payloads
         if (message.type === 'EXTENSION_INBOUND' || message.type === 'EXTENSION_OUTBOUND') {
             return false;
         }
 
         if (message.action === 'ping') {
             sendResponse({ status: 'ok' });
-            return true;
+            return false;
         }
 
         // --- Diagnostics ---
         if (message.action === 'get_debug_info') {
             const result = {
                 detectionStatus: 'Not Found',
-                videoState: 'N/A',
-                currentTime: 'N/A',
-                readyState: 'N/A',
-                sourceUrl: window.location.href
+                videoState:      'N/A',
+                currentTime:     'N/A',
+                readyState:      'N/A',
+                sourceUrl:       window.location.href
             };
-
             try {
-                const targetVideo = findVideo();
-                if (targetVideo) {
+                const video = findVideo();
+                if (video) {
                     result.detectionStatus = 'Found';
-                    result.videoState = targetVideo.paused ? 'Paused' : 'Playing';
-                    result.currentTime = targetVideo.currentTime.toFixed(1) + 's';
-                    result.readyState = targetVideo.readyState;
-                    result.sourceUrl = targetVideo.src || targetVideo.currentSrc || window.location.href;
+                    result.videoState      = video.paused ? 'Paused' : 'Playing';
+                    result.currentTime     = video.currentTime.toFixed(1) + 's';
+                    result.readyState      = video.readyState;
+                    result.sourceUrl       = video.src || video.currentSrc || window.location.href;
                 } else {
                     result.detectionStatus = 'No <video> element found';
                 }
             } catch (e) {
-                chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Content: Debug info error: ${e.message}`, logType: 'warn' }).catch(() => {});
                 result.detectionStatus = `Error: ${e.message}`;
             }
-
             sendResponse(result);
-            return true;
+            return false;
         }
 
         const videos = document.querySelectorAll('video');
@@ -194,166 +187,157 @@
             return true;
         }
 
-        // --- PLAY with verified ACK ---
+        // --- PLAY ---
         if (message.action === 'play') {
             tryMediaAction('play');
             pollVideoState(false).then(success => {
                 sendResponse({ status: success ? 'playing' : 'failed' });
             });
-            return true; // async
+            return true;
         }
 
-        // --- PAUSE with verified ACK ---
+        // --- PAUSE ---
         if (message.action === 'pause') {
             tryMediaAction('pause');
             pollVideoState(true).then(success => {
                 sendResponse({ status: success ? 'paused' : 'failed' });
             });
-            return true; // async
+            return true;
         }
 
-        // --- FORCE SYNC: Phase 1 - Pause + Seek ---
+        // --- FORCE SYNC Phase 1: Pause + Seek + warten bis gebuffert ---
         if (message.action === 'force_sync_pause_seek') {
             const targetTime = message.targetTime;
             const video = findVideo();
-
             if (!video) {
                 sendResponse({ status: 'no_video' });
                 return true;
             }
 
-            // Pause first
             tryMediaAction('pause');
-
-            // Wait until paused, then seek
             pollVideoState(true, 1500).then(() => {
                 video.currentTime = targetTime;
-
-                // Wait until seeked and buffered
                 pollSeekReady(targetTime).then(ready => {
                     sendResponse({
-                        status: ready ? 'seek_ready' : 'seek_timeout',
+                        status:      ready ? 'seek_ready' : 'seek_timeout',
                         currentTime: video.currentTime,
-                        readyState: video.readyState
+                        readyState:  video.readyState
                     });
                 });
             });
-
-            return true; // async
+            return true;
         }
 
-        // --- FORCE SYNC: Phase 2 - Play ---
+        // --- FORCE SYNC Phase 2: Play ---
         if (message.action === 'force_sync_play') {
             tryMediaAction('play');
             pollVideoState(false).then(success => {
                 sendResponse({ status: success ? 'playing' : 'failed' });
             });
-            return true; // async
+            return true;
         }
 
-        return;
+        return false;
     });
 
-    // HEARTBEAT: Ping background.js every 15 seconds to keep it alive
-    // Only run when a real video is present to minimize noise on non-media tabs.
+    // ─── Heartbeat an background.js ───────────────────────────────────────────
+    // Sendet alle 15s Playback-Status + ReadyState des Videos.
+    // background.js cached diese Werte und sendet sie beim nächsten Bridge-Heartbeat
+    // als tab_status an den Room. Kein direktes Antworten nötig.
+
     const heartbeatInterval = setInterval(() => {
         try {
-            // 1. Extra robust check: id is gone = context dead
             if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id) {
                 clearInterval(heartbeatInterval);
                 return;
             }
 
             const video = findVideo();
-            if (video) {
-                const playbackState = video ? (video.paused ? 'paused' : 'playing') : null;
-                // 2. Double protection with try/catch because sendMessage throws synchronously on invalid context
-                chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content', playbackState })
-                    .catch(err => {
-                        if (err.message?.includes('Receiving end does not exist')) {
-                            setTimeout(() => {
-                                if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-                                    chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'content', playbackState }).catch(() => {});
-                                }
-                            }, 1000);
-                        } else {
-                            chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Content Heartbeat transient failure: ${err.message}`, logType: 'warn' }).catch(() => {});
-                            // We do NOT clear the interval here anymore, as it might be a temporary hiccup
+            if (!video) return; // Kein Video = kein Heartbeat (Rauschen reduzieren)
+
+            const playbackState  = video.paused ? 'paused' : 'playing';
+            const videoReadyState = video.readyState;
+
+            chrome.runtime.sendMessage({
+                type:             'EXTENSION_HEARTBEAT',
+                source:           'content',
+                playbackState,
+                videoReadyState
+            }).catch(err => {
+                if (err.message?.includes('Receiving end does not exist')) {
+                    // Service Worker war schlafen — einmal wiederholen
+                    setTimeout(() => {
+                        if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+                            chrome.runtime.sendMessage({
+                                type: 'EXTENSION_HEARTBEAT',
+                                source: 'content',
+                                playbackState,
+                                videoReadyState
+                            }).catch(() => {});
                         }
-                    });
-            }
+                    }, 1000);
+                } else {
+                    chrome.runtime.sendMessage({
+                        type: 'ADD_DEV_LOG',
+                        message: `Content Heartbeat Fehler: ${err.message}`,
+                        logType: 'warn'
+                    }).catch(() => {});
+                }
+            });
         } catch (e) {
-            // Context is definitely gone - no way to log here as sendMessage would throw
+            // Context definitiv weg
             clearInterval(heartbeatInterval);
         }
     }, 15000);
 
-    // --- TWO-WAY SYNC: Listen for native video events ---
-    function reportVideoEvent(action) {
-        if (isProcessingCommand) return;
-        
-        const video = findVideo();
-        const payload = {
-            action: action,
-            timestamp: new Date().toISOString(),
-            currentTime: video ? video.currentTime : null,
-            sourceUrl: window.location.href
-        };
+    // ─── Native Video Events (User drückt selbst Play/Pause) ─────────────────
+    // Wird sofort an den Room gemeldet, nicht erst beim nächsten Heartbeat.
 
+    function reportVideoEvent(action) {
+        if (isProcessingCommand) return; // Ignorieren wenn wir selbst einen Befehl ausführen
+
+        const video = findVideo();
         chrome.runtime.sendMessage({
-            type: 'EXTENSION_OUTBOUND',
+            type:   'EXTENSION_OUTBOUND',
             source: 'video_native_event',
-            payload: payload
-        }).catch((err) => {
-            console.warn('Silent sync failure (context likely gone)');
-        });
+            payload: {
+                action,
+                timestamp:   new Date().toISOString(),
+                currentTime: video ? video.currentTime : null,
+                sourceUrl:   window.location.href
+            }
+        }).catch(() => {});
     }
 
     function attachVideoListeners(video) {
         if (!video || video.dataset.syncAttached === 'true') return;
-        
-        video.addEventListener('play', () => reportVideoEvent('play'));
+        video.addEventListener('play',  () => reportVideoEvent('play'));
         video.addEventListener('pause', () => reportVideoEvent('pause'));
         video.dataset.syncAttached = 'true';
     }
 
-    function waitForBody(callback) {
-        if (document.body) {
-            callback();
-            return;
-        }
+    // ─── Video-Erkennung (auch für SPAs mit nachträglich eingefügten Videos) ──
 
+    function waitForBody(callback) {
+        if (document.body) { callback(); return; }
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', callback, { once: true });
             return;
         }
-
         setTimeout(() => waitForBody(callback), 100);
     }
 
-    // Check for videos immediately and periodically
-    let observer;
-    let fallbackInterval = null;
-
     const initSync = () => {
         const video = findVideo();
-        if (video) {
-            attachVideoListeners(video);
-        }
+        if (video) attachVideoListeners(video);
     };
 
-    observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            if (mutation.addedNodes.length) {
-                initSync();
-            }
-        }
-    });
+    const observer = new MutationObserver(() => initSync());
+    const fallbackInterval = setInterval(initSync, 5000);
 
     initSync();
-    fallbackInterval = setInterval(initSync, 5000);
     waitForBody(() => {
-        if (!observer || !document.body) return;
+        if (!document.body) return;
         observer.observe(document.body, { childList: true, subtree: true });
         initSync();
     });

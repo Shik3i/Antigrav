@@ -183,11 +183,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (data.targetTabId !== undefined && data.targetTabId !== 'none') {
             const id = parseInt(data.targetTabId, 10);
             targetTabSelect.value = id;
-            
-            // Proactive check/inject on startup
-            chrome.tabs.sendMessage(id, { action: 'ping' }).catch(() => {
-                chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] }).catch(() => {});
-            });
         }
         if (hasTimerTab) {
             // REMOVED automated announceTabStatus() to prevent noise on popup open
@@ -242,23 +237,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         let val = targetTabSelect.value;
         let id = val === 'none' ? null : parseInt(val, 10);
         
-        // Proactive injection for better UX (so bidirectional sync starts immediately)
         if (id) {
-            chrome.scripting.executeScript({
-                target: { tabId: id },
-                files: ['content.js']
-            }).then(() => {
-                statusDiv.innerText = "Sync Script Loaded! ✅";
-                statusDiv.style.color = '#4CAF50';
-                statusDiv.style.display = 'block';
-                setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
-            }).catch((err) => { 
-                logToDev(`Injection failed: ${err.message}`, 'warn');
-                statusDiv.innerText = "Restricted Page! ❌";
-                statusDiv.style.color = '#ef4444';
-                statusDiv.style.display = 'block';
-                setTimeout(() => { statusDiv.style.display = 'none'; }, 4000);
-            });
+            statusDiv.innerText = "Syncing with Tab...";
+            statusDiv.style.color = '#4CAF50';
+            statusDiv.style.display = 'block';
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
         }
 
         chrome.storage.local.set({ targetTabId: id }, () => {

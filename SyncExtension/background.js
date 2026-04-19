@@ -1,193 +1,153 @@
 /**
- * background.js - Passive Receiver
- * No longer connects to Socket.IO.
- * Listens for messages from popup.js and bridge.js
+ * background.js
+ *
+ * Kommunikationsmodell:
+ *  - Alle 15s kommt ein Bridge-Heartbeat → wir senden sofort unseren vollen Status (tab_status) an den Room
+ *  - Tab-Wechsel → sofort Status senden
+ *  - Befehle (play/pause/force_sync) → ausführen + ACK zurück senden
+ *  - Eingehender tab_status von Peers → einfach in roomPeers speichern, KEINE Antwort
+ *  - Kein broadcast/response Pingpong
+ *  - Peer-Prune-Alarm alle 2 Minuten (nur Housekeeping, kein Netzwerk-Traffic)
  */
 
 const PRODUCTION_URLS = ["*://timer.shik3i.net/*", "*://*.timer.shik3i.net/*"];
-const LOCALHOST_URLS = ["http://localhost:3001/*"];
+const LOCALHOST_URLS  = ["http://localhost:3001/*"];
 
 async function getTimerTabUrls() {
     const data = await new Promise(r => chrome.storage.local.get(['bridgeDomainMode'], r));
-    const mode = data.bridgeDomainMode || 'production';
-    return mode === 'localhost' ? LOCALHOST_URLS : PRODUCTION_URLS;
+    return (data.bridgeDomainMode || 'production') === 'localhost' ? LOCALHOST_URLS : PRODUCTION_URLS;
 }
 
-// Bug 1 Fix: In-memory playback state cache so bridge.js heartbeats (which lack playbackState) never erase it
-let cachedPlaybackState = null;
+// In-memory cache — vermeidet redundante Storage-Reads bei jedem Heartbeat
+let cachedPlaybackState = null; // 'playing' | 'paused' | null
+let cachedVideoReady    = false; // video.readyState >= 3
 
-// Traffic Optimization: Cooldown for status broadcasts to prevent noise/bursts
-let lastStatusBroadcastTime = 0;
+// Cooldown damit ein Burst von Events den Room nicht flutet
+let lastStatusSentTime = 0;
+const STATUS_COOLDOWN_MS = 500;
+
+// ─── Logging ─────────────────────────────────────────────────────────────────
 
 function addDevLog(message, type = 'info') {
     chrome.storage.local.get(['devModeEnabled', 'devLogs'], (data) => {
         if (data.devModeEnabled !== true) return;
-        
         const logs = data.devLogs || [];
-        logs.unshift({
-            timestamp: new Date().toISOString(),
-            message,
-            type
-        });
-        
-        // Rolling buffer: keep only last 50 entries
+        logs.unshift({ timestamp: new Date().toISOString(), message, type });
         chrome.storage.local.set({ devLogs: logs.slice(0, 50) });
     });
 }
 
-function getOrCreateExtensionInstanceId(callback) {
-    chrome.storage.local.get(['extensionInstanceId'], (storageData) => {
-        if (storageData.extensionInstanceId) {
-            callback(storageData.extensionInstanceId);
-            return;
-        }
+// ─── Instance ID ──────────────────────────────────────────────────────────────
 
-        const instanceId = crypto.randomUUID();
-        chrome.storage.local.set({ extensionInstanceId: instanceId }, () => callback(instanceId));
+function getOrCreateExtensionInstanceId(callback) {
+    chrome.storage.local.get(['extensionInstanceId'], (data) => {
+        if (data.extensionInstanceId) { callback(data.extensionInstanceId); return; }
+        const id = crypto.randomUUID();
+        chrome.storage.local.set({ extensionInstanceId: id }, () => callback(id));
     });
 }
+
+// ─── Senden an Room-Tab(s) ────────────────────────────────────────────────────
 
 function broadcastToTimerTabs(message) {
     getTimerTabUrls().then(urls => {
         chrome.tabs.query({ url: urls }, (tabs) => {
-            if (tabs.length === 0) {
-                // Heartbeats are silent if no tabs found, but active commands log a warning
-                if (['EXTENSION_PONG', 'EXTENSION_HEARTBEAT'].includes(message.type)) return;
-                addDevLog(`No active Timer tabs (${urls[0]}...) found for broadcast`, 'info');
-                return;
-            }
-            addDevLog(`Broadcasting ${message.type} to ${tabs.length} timer tab(s)`, 'info');
+            if (!tabs.length) return;
             tabs.forEach(tab => {
-                chrome.tabs.sendMessage(tab.id, message).catch((err) => { 
-                    addDevLog(`Failed to send to timer tab ${tab.id}: ${err.message}`, 'error');
+                chrome.tabs.sendMessage(tab.id, message).catch(err => {
+                    addDevLog(`Broadcast zu Timer-Tab ${tab.id} fehlgeschlagen: ${err.message}`, 'error');
                 });
             });
         });
     });
 }
 
-function announceLocalTabStatus(reason = 'broadcast') {
-    const now = Date.now();
-    const cooldown = reason === 'broadcast' ? 500 : 2000;
-    
-    if (now - lastStatusBroadcastTime < cooldown) {
-        if (reason === 'broadcast') {
-            addDevLog(`Status broadcast throttled (${reason})`, 'info');
-        }
-        return;
-    }
+// ─── Unseren Status an den Room senden ───────────────────────────────────────
+// Wird bei jedem Bridge-Heartbeat und sofort bei Tab-Wechsel aufgerufen.
+// Peers empfangen das als EXTENSION_INBOUND { action: 'tab_status' } und speichern es nur.
 
-    chrome.storage.local.get(['targetTabId'], (storageData) => {
-        const targetTabId = storageData.targetTabId;
-        
-        // LAZY STATUS: If no tab is selected and it's just a routine heartbeat, 
-        // don't bother the room with "No tab selected" updates.
-        if (reason !== 'broadcast' && (!targetTabId || targetTabId === 'none')) {
-            return;
-        }
-        const playbackState = cachedPlaybackState;
+function sendStatusToRoom() {
+    const now = Date.now();
+    if (now - lastStatusSentTime < STATUS_COOLDOWN_MS) return;
+    lastStatusSentTime = now;
+
+    chrome.storage.local.get(['targetTabId'], (data) => {
+        const targetTabId = data.targetTabId;
 
         getOrCreateExtensionInstanceId((instanceId) => {
             const version = chrome.runtime.getManifest().version;
-            
-            const createPayload = (tabTitle, isReady) => ({
-                action: 'tab_status',
+
+            const buildPayload = (tabTitle) => ({
+                action:        'tab_status',
                 tabTitle,
-                isReady,
-                playbackState,
+                isReady:       cachedVideoReady,
+                playbackState: cachedPlaybackState,
                 version,
-                instanceId,
-                reason // 'broadcast' (needs reply) or 'response' (end of chain)
+                instanceId
             });
 
             if (!targetTabId || targetTabId === 'none') {
-                const payload = createPayload(null, false);
-                addDevLog(`OUTBOUND: Status (${reason}) - No tab selected`, 'info');
-                broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
+                broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload: buildPayload(null) });
                 return;
             }
 
             chrome.tabs.get(targetTabId, (tab) => {
                 if (chrome.runtime.lastError || !tab) {
+                    // Tab ist weg — aufräumen
                     chrome.storage.local.set({ targetTabId: 'none' });
-                    const payload = createPayload(null, false);
-                    addDevLog(`OUTBOUND: Status (${reason}) - Tab ${targetTabId} not found`, 'warn');
-                    broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
+                    updateBadgeStatus();
+                    broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload: buildPayload(null) });
                     return;
                 }
-
                 const tabTitle = tab.title ? tab.title.substring(0, 30) : null;
-                const payload = createPayload(tabTitle, !!tabTitle);
-                addDevLog(`OUTBOUND: Status (${reason}) - ${tabTitle || 'No Title'}`, 'success');
-                lastStatusBroadcastTime = Date.now();
-                broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload });
+                addDevLog(`Status gesendet: "${tabTitle}" isReady=${cachedVideoReady} ${cachedPlaybackState}`, 'info');
+                broadcastToTimerTabs({ type: 'EXTENSION_OUTBOUND', payload: buildPayload(tabTitle) });
             });
         });
     });
 }
 
-let forceSyncUpdateQueue = Promise.resolve();
+// ─── Force Sync State (Queue gegen Race Conditions) ───────────────────────────
+
+let forceSyncWriteQueue = Promise.resolve();
 
 function updateForceSyncState(timestamp, updater) {
     if (!timestamp) return;
-
-    // Use a queue to prevent race conditions during simultaneous storage updates (e.g. multiple ACKs)
-    forceSyncUpdateQueue = forceSyncUpdateQueue.then(() => {
-        return new Promise((resolve) => {
-            chrome.storage.local.get(['forceSyncState'], (storageData) => {
-                try {
-                    const nextState = updater(storageData.forceSyncState || {});
-                    chrome.storage.local.set({ forceSyncState: nextState }, resolve);
-                } catch (e) {
-                    addDevLog(`Error in forceSyncState updater: ${e.message}`, 'error');
-                    resolve();
-                }
-            });
+    forceSyncWriteQueue = forceSyncWriteQueue.then(() => new Promise(resolve => {
+        chrome.storage.local.get(['forceSyncState'], (data) => {
+            try {
+                const next = updater(data.forceSyncState || {});
+                chrome.storage.local.set({ forceSyncState: next }, resolve);
+            } catch (e) {
+                addDevLog(`forceSyncState updater Fehler: ${e.message}`, 'error');
+                resolve();
+            }
         });
-    });
+    }));
 }
+
+// ─── Benachrichtigungen ───────────────────────────────────────────────────────
 
 function showPeerActionNotification(senderName, action) {
     chrome.storage.local.get(['notificationsEnabled'], (data) => {
         if (data.notificationsEnabled === false) return;
-
-        let actionLabel = action === 'play' ? 'gestartet' :
-                          action === 'pause' ? 'pausiert' :
-                          action === 'force_sync_pause_seek' ? 'Synchronisierung gestartet' :
-                          action === 'force_sync_play' ? 'Synchronisierung abgeschlossen' :
-                          action.toUpperCase();
-
-        const notificationId = `sync_${action}_${Date.now()}`;
-        chrome.notifications.create(notificationId, {
+        const label = action === 'play'                  ? 'gestartet' :
+                      action === 'pause'                 ? 'pausiert' :
+                      action === 'force_sync_pause_seek' ? 'Synchronisierung gestartet' :
+                      action === 'force_sync_play'       ? 'Synchronisierung abgeschlossen' :
+                      action.toUpperCase();
+        chrome.notifications.create(`sync_${action}_${Date.now()}`, {
             type: 'basic',
             iconUrl: 'icons/icon128.png',
             title: 'Sync Extension',
-            message: `${senderName || 'Ein Teilnehmer'} hat das Video ${actionLabel}.`,
+            message: `${senderName || 'Ein Teilnehmer'} hat das Video ${label}.`,
             priority: 1
         });
     });
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-    // L4 Fix: Guard with .get to avoid recreating an existing alarm
-    chrome.alarms.get('extension-tab-status-heartbeat', (alarm) => {
-        if (!alarm) chrome.alarms.create('extension-tab-status-heartbeat', { periodInMinutes: 1 });
-    });
-});
+// ─── Badge ────────────────────────────────────────────────────────────────────
 
-chrome.runtime.onStartup.addListener(() => {
-    chrome.alarms.get('extension-tab-status-heartbeat', (alarm) => {
-        if (!alarm) chrome.alarms.create('extension-tab-status-heartbeat', { periodInMinutes: 1 });
-    });
-});
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'extension-tab-status-heartbeat') {
-        announceLocalTabStatus('response');
-        updateBadgeStatus();
-        pruneRoomPeers(); // Periodically clean up old peers
-    }
-});
 function updateBadgeStatus() {
     chrome.storage.local.get(['targetTabId'], (data) => {
         if (data.targetTabId && data.targetTabId !== 'none') {
@@ -199,142 +159,171 @@ function updateBadgeStatus() {
     });
 }
 
-// Bug C Fix: Removed duplicate global compareVersions – the local definition inside
-// the version_announce handler is the only one used.
+// ─── Inaktive Peers entfernen ─────────────────────────────────────────────────
+// Ein Peer der 4 Heartbeat-Zyklen (60s) nichts gesendet hat gilt als offline.
 
-// Memory Cleanup: Prune peers that haven't been seen in > 1 minute to prevent storage bloat.
 function pruneRoomPeers() {
     chrome.storage.local.get(['roomPeers'], (data) => {
         const peers = data.roomPeers || {};
         const now = Date.now();
         let changed = false;
-
         Object.keys(peers).forEach(name => {
             const lastSeen = peers[name].lastSeen;
-            if (!lastSeen || (now - lastSeen) > 120 * 1000) {
-                addDevLog(`Pruning inactive peer: ${name} (Last seen: ${lastSeen ? Math.round((now-lastSeen)/1000)+'s ago' : 'never'})`, 'info');
+            if (!lastSeen || (now - lastSeen) > 60 * 1000) {
+                addDevLog(`Peer entfernt: ${name} (zuletzt: ${lastSeen ? Math.round((now - lastSeen) / 1000) + 's' : 'nie'})`, 'info');
                 delete peers[name];
                 changed = true;
             }
         });
-
-        if (changed) {
-            chrome.storage.local.set({ roomPeers: peers });
-        }
+        if (changed) chrome.storage.local.set({ roomPeers: peers });
     });
 }
 
-// Monitor Tab closure: If the target tab is closed, clear it immediately.
+// ─── Lifecycle ────────────────────────────────────────────────────────────────
+
+chrome.runtime.onInstalled.addListener(() => {
+    // Alten Alarm-Namen löschen (Migration von vorheriger Version)
+    chrome.alarms.clear('extension-tab-status-heartbeat');
+    chrome.alarms.get('extension-peer-prune', (alarm) => {
+        if (!alarm) chrome.alarms.create('extension-peer-prune', { periodInMinutes: 2 });
+    });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    chrome.alarms.get('extension-peer-prune', (alarm) => {
+        if (!alarm) chrome.alarms.create('extension-peer-prune', { periodInMinutes: 2 });
+    });
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'extension-peer-prune') {
+        updateBadgeStatus();
+        pruneRoomPeers();
+    }
+});
+
+// ─── Tab geschlossen ──────────────────────────────────────────────────────────
+
 chrome.tabs.onRemoved.addListener((tabId) => {
     chrome.storage.local.get(['targetTabId'], (data) => {
         if (data.targetTabId === tabId) {
             chrome.storage.local.set({ targetTabId: 'none' });
+            cachedPlaybackState = null;
+            cachedVideoReady = false;
             updateBadgeStatus();
-            announceLocalTabStatus();
+            sendStatusToRoom();
         }
     });
 });
 
-// Proactive Injection: When the user selects a target tab, inject the sync logic immediately.
+// ─── Tab-Wechsel → content.js injizieren + sofort Status senden ───────────────
+
 chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.targetTabId) {
-        const newId = changes.targetTabId.newValue;
-        if (newId && newId !== 'none') {
-            chrome.scripting.executeScript({
-                target: { tabId: newId },
-                files: ['content.js']
-            }).then(() => {
-                addDevLog(`Proactively injected content.js into tab ${newId}`, 'success');
-                console.log(`Background: Proactively injected sync script into tab ${newId}`);
-                // Refresh status so the timer tab knows we are ready
-                announceLocalTabStatus();
-            }).catch(err => {
-                addDevLog(`Proactive injection failed for tab ${newId}: ${err.message}`, 'error');
-                console.warn(`Background: Proactive injection failed for tab ${newId}:`, err.message);
-            });
-        }
-        updateBadgeStatus();
+    if (area !== 'local' || !changes.targetTabId) return;
+    const newId = changes.targetTabId.newValue;
+    // Cache zurücksetzen da neuer Tab
+    cachedPlaybackState = null;
+    cachedVideoReady = false;
+    if (newId && newId !== 'none') {
+        chrome.scripting.executeScript({
+            target: { tabId: newId },
+            files: ['content.js']
+        }).then(() => {
+            addDevLog(`content.js in Tab ${newId} injiziert`, 'success');
+            sendStatusToRoom();
+        }).catch(err => {
+            addDevLog(`Injektion in Tab ${newId} fehlgeschlagen: ${err.message}`, 'error');
+            if (err.message.includes('No tab with id')) {
+                chrome.storage.local.set({ targetTabId: 'none' });
+            }
+        });
+    } else {
+        sendStatusToRoom();
     }
+    updateBadgeStatus();
 });
 
+// ─── Message Handler ──────────────────────────────────────────────────────────
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // Flag to keep the message channel open for async responses if needed
     let isAsync = false;
 
-    // Bug A Fix: HEARTBEAT handled FIRST, outside the INBOUND/OUTBOUND block.
-    // Previously this check was inside that block and could never be reached because
-    // EXTENSION_HEARTBEAT doesn't match INBOUND or OUTBOUND.
-    if (message.type === 'EXTENSION_HEARTBEAT') {
-        if (message.source === 'content' && message.playbackState) {
-            addDevLog(`Heartbeat (content): ${message.playbackState}`, 'info');
-            if (cachedPlaybackState !== message.playbackState) {
-                cachedPlaybackState = message.playbackState;
-                // Write to storage so popup.js changes.localPlaybackState listener fires
-                chrome.storage.local.set({ localPlaybackState: message.playbackState });
-                announceLocalTabStatus('response');
-            }
-        } else if (message.source === 'bridge') {
-            addDevLog(`Heartbeat (bridge): triggering quiet status update`, 'info');
-            announceLocalTabStatus('response');
-        }
-    }
-
-    // New Central Logging Service for all extension parts
+    // ── Logging von anderen Extension-Teilen ──────────────────────────────────
     if (message.type === 'ADD_DEV_LOG') {
         addDevLog(message.message, message.logType || 'info');
-        return;
+        return false;
     }
 
-    // Also handle TAB_SELECTION_CHANGED here so it is never accidentally skipped
+    // ── Heartbeat von bridge.js ───────────────────────────────────────────────
+    // Bridge lebt = Room-Tab ist offen = unseren vollen Status an alle Peers senden.
+    // Das ist der einzige Mechanismus für Peer-Discovery. Keine Antwort nötig.
+    if (message.type === 'EXTENSION_HEARTBEAT' && message.source === 'bridge') {
+        addDevLog('Heartbeat (bridge): sende Status an Room', 'info');
+        sendStatusToRoom();
+        return false;
+    }
+
+    // ── Heartbeat von content.js ──────────────────────────────────────────────
+    // Enthält aktuellen Playback-Status und Video-ReadyState des Ziel-Tabs.
+    // Nur Cache updaten — wird beim nächsten Bridge-Heartbeat automatisch mitgesendet.
+    if (message.type === 'EXTENSION_HEARTBEAT' && message.source === 'content') {
+        addDevLog(`Heartbeat (content): ${message.playbackState}, readyState: ${message.videoReadyState ?? 'n/a'}`, 'info');
+        if (message.playbackState && cachedPlaybackState !== message.playbackState) {
+            cachedPlaybackState = message.playbackState;
+            chrome.storage.local.set({ localPlaybackState: message.playbackState });
+        }
+        const nowReady = (message.videoReadyState ?? 0) >= 3;
+        cachedVideoReady = nowReady;
+        return false;
+    }
+
+    // ── Tab-Selektion geändert (aus popup.js) ─────────────────────────────────
     if (message.type === 'TAB_SELECTION_CHANGED') {
-        addDevLog('TAB_SELECTION_CHANGED detected -> broadcasting status', 'info');
-        announceLocalTabStatus('broadcast'); 
+        addDevLog('TAB_SELECTION_CHANGED → Status sofort senden', 'info');
+        // Cooldown ignorieren — Tab-Wechsel soll immer sofort durch
+        lastStatusSentTime = 0;
+        sendStatusToRoom();
+        return false;
     }
 
+    // ── INBOUND / OUTBOUND Payloads ───────────────────────────────────────────
     if (message.type === 'EXTENSION_INBOUND' || message.type === 'EXTENSION_OUTBOUND') {
-        if (!message.payload) return true;
+        if (!message.payload) return false;
 
         const p = message.payload;
-        if (p.action !== 'tab_status') {
-             addDevLog(`${message.type}: ${p.action}`, 'info');
-        }
+        addDevLog(`${message.type}: ${p.action}`, 'info');
 
-        // 1. Handle incoming ACKs from other users via the React Bridge
+        // ── ACK von einem Peer empfangen ──────────────────────────────────────
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'EXTENSION_SYNC_ACK') {
             const ackName = message.senderName || p.userDisplayName || 'Unknown';
-            addDevLog(`ACK received from ${ackName} for ${p.originalAction}`, 'success');
-            
-            // 1a. Update history (legacy)
-            chrome.storage.local.get(['history'], (storageData) => {
-                const currentHistory = storageData.history || [];
-                if (currentHistory.length > 0) {
-                    const targetEntry = currentHistory.find(entry => entry.timestamp === p.timestamp && entry.action === p.originalAction);
-                    if (targetEntry) {
-                        if (!targetEntry.acks) targetEntry.acks = [];
-                        if (ackName && !targetEntry.acks.includes(ackName)) {
-                            targetEntry.acks.push(ackName);
-                            chrome.storage.local.set({ history: currentHistory });
-                        }
+            addDevLog(`ACK von ${ackName} für ${p.originalAction}`, 'success');
+
+            chrome.storage.local.get(['history'], (data) => {
+                const history = data.history || [];
+                const entry = history.find(e => e.timestamp === p.timestamp && e.action === p.originalAction);
+                if (entry) {
+                    if (!entry.acks) entry.acks = [];
+                    if (ackName && !entry.acks.includes(ackName)) {
+                        entry.acks.push(ackName);
+                        chrome.storage.local.set({ history });
                     }
                 }
             });
 
-            // 1b. Update forceSyncState for real-time Two-Phase validation
             if (p.originalAction === 'force_sync_pause_seek' && p.timestamp) {
-                updateForceSyncState(p.timestamp, (currentState) => {
-                    const remoteAcks = currentState.remoteAcks || {};
+                updateForceSyncState(p.timestamp, (state) => {
+                    const remoteAcks = state.remoteAcks || {};
                     remoteAcks[ackName] = true;
-                    return { ...currentState, remoteAcks, updatedAt: Date.now() };
+                    return { ...state, remoteAcks, updatedAt: Date.now() };
                 });
             }
-            return;
+            return false;
         }
 
-        // 2. Handle version announcements from other users
+        // ── Version-Ankündigung von Peer ──────────────────────────────────────
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'version_announce' && p.version) {
             getOrCreateExtensionInstanceId((instanceId) => {
                 if (p.instanceId && p.instanceId === instanceId) return;
-
                 const myVersion = chrome.runtime.getManifest().version;
                 const compareVersions = (a, b) => {
                     const pa = a.split('.').map(Number);
@@ -350,20 +339,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     chrome.storage.local.set({ updateAvailable: p.version });
                 }
             });
-            return true;
+            return false;
         }
 
-        // 2b. Handle tab_status announcements from other users
+        // ── tab_status von Peer empfangen → speichern, KEINE Antwort ─────────
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'tab_status') {
             getOrCreateExtensionInstanceId((instanceId) => {
-                if (p.instanceId && p.instanceId === instanceId) {
-                    addDevLog(`INBOUND: Status from self (ignored) - ID: ${p.instanceId}`, 'info');
-                    return;
-                }
+                if (p.instanceId && p.instanceId === instanceId) return; // eigene Nachricht ignorieren
 
                 const peerName = message.senderName || p.senderName || 'Unknown';
-                const reason = p.reason || 'broadcast';
-                addDevLog(`INBOUND: Status (${reason}) from ${peerName}`, 'success');
+                addDevLog(`Peer-Status von ${peerName}: isReady=${p.isReady} ${p.playbackState}`, 'success');
 
                 chrome.storage.local.get(['roomPeers'], (data) => {
                     const peers = data.roomPeers || {};
@@ -378,201 +363,195 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     };
                     chrome.storage.local.set({ roomPeers: peers });
                 });
-
-                // RESPONSE LOGIC:
-                // Only reply if the sender asked for a broadcast (discovery).
-                // If they explicitly sent a 'response', we stop here to avoid infinite loops.
-                if (reason === 'broadcast') {
-                    addDevLog(`Responding to ${peerName}'s discovery broadcast...`, 'info');
-                    announceLocalTabStatus('response');
-                } else {
-                    addDevLog(`Peer ${peerName} sent a response - chain ends here.`, 'info');
-                }
+                // Kein sendStatusToRoom() — der nächste Bridge-Heartbeat sendet unseren Status
             });
-            return true;
+            return false;
         }
 
-        // 2c. Track force-sync readiness from the room
+        // ── Force Sync Ready von Peer ─────────────────────────────────────────
         if (message.type === 'EXTENSION_INBOUND' && p.action === 'force_sync_ready' && p.timestamp) {
             getOrCreateExtensionInstanceId((instanceId) => {
                 if (p.instanceId && p.instanceId === instanceId) return;
-
                 const peerName = message.senderName || p.senderName || 'Unknown';
-                updateForceSyncState(p.timestamp, (currentState) => {
-                    const remoteReady = { ...(currentState.remoteReady || {}) };
+                updateForceSyncState(p.timestamp, (state) => {
+                    const remoteReady = { ...(state.remoteReady || {}) };
                     remoteReady[peerName] = {
                         currentTime: p.currentTime ?? null,
-                        readyState: p.readyState ?? null,
-                        instanceId: p.instanceId || null,
-                        updatedAt: Date.now()
+                        readyState:  p.readyState  ?? null,
+                        instanceId:  p.instanceId  || null,
+                        updatedAt:   Date.now()
                     };
-                    return { ...currentState, timestamp: p.timestamp, remoteReady };
+                    return { ...state, timestamp: p.timestamp, remoteReady };
                 });
             });
-            return true;
+            return false;
         }
 
-        // Bug B Fix: Broadcast EXTENSION_OUTBOUND to timer tabs IMMEDIATELY and
-        // UNCONDITIONALLY before entering the storage.get block. This ensures:
-        // (a) even without a targetTabId, native events reach the timer website, and
-        // (b) we can return early for video_native_event to prevent echo-looping
-        //     (content.js fired a native play/pause → background must NOT send it back).
-        if (message.type === 'EXTENSION_OUTBOUND') {
+        // ── Native Video Events (User hat selbst Play/Pause gedrückt) ─────────
+        // Direkt an Room weiterleiten, NICHT zurück an content.js (Echo-Loop).
+        if (message.type === 'EXTENSION_OUTBOUND' && message.source === 'video_native_event') {
             broadcastToTimerTabs(message);
-            if (message.source === 'video_native_event') {
-                // Native events are already done – only the broadcast above is needed.
-                // Sending a command back to content.js would cause an infinite echo loop.
-                return true;
-            }
+            return false;
         }
 
-        // 3. Handle actionable payloads (play, pause, seek, force_sync)
-        //    Applies to: OUTBOUND from popup, INBOUND from remote peers
-        chrome.storage.local.get(['targetTabId', 'history'], (storageData) => {
-            const currentHistory = storageData.history || [];
-            const actionTarget = p.action || 'unknown_payload';
+        // ── Aktions-Payloads: play / pause / force_sync ───────────────────────
+        // Gilt für OUTBOUND vom Popup (lokale Aktion) UND INBOUND von Remote-Peers.
+        if (['play', 'pause', 'force_sync_pause_seek', 'force_sync_play'].includes(p.action)) {
 
-            if (actionTarget === 'force_sync_pause_seek' && p.timestamp) {
+            // OUTBOUND vom Popup → an alle anderen Peers im Room weiterleiten
+            if (message.type === 'EXTENSION_OUTBOUND') {
+                broadcastToTimerTabs(message);
+            }
+
+            // Force Sync State initialisieren + Sofort-ACK an Initiator
+            if (p.action === 'force_sync_pause_seek' && p.timestamp) {
                 chrome.storage.local.set({
                     forceSyncState: {
-                        timestamp: p.timestamp,
-                        stage: 'seeking',
-                        targetTime: p.targetTime ?? null,
-                        localReady: false,
+                        timestamp:   p.timestamp,
+                        stage:       'seeking',
+                        targetTime:  p.targetTime ?? null,
+                        localReady:  false,
                         remoteReady: {},
-                        remoteAcks: {},
-                        error: null,
-                        updatedAt: Date.now()
+                        remoteAcks:  {},
+                        error:       null,
+                        updatedAt:   Date.now()
                     }
                 });
-            }
-            
-            // Bug Fix: Immediate ACK for Force Sync (Receipt Confirmation)
-            // This ensures the initiator doesn't wait 5 seconds for peers that are just buffering.
-            if (message.type === 'EXTENSION_INBOUND' && actionTarget === 'force_sync_pause_seek') {
-                addDevLog(`Immediate ACK sent for ${actionTarget}`, 'info');
-                broadcastToTimerTabs({
-                    type: 'EXTENSION_OUTBOUND',
-                    payload: {
-                        action: 'EXTENSION_SYNC_ACK',
-                        originalAction: actionTarget,
-                        timestamp: p.timestamp
-                    }
-                });
-            }
-
-            // Log core actions to history
-            if (['play', 'pause', 'force_sync_pause_seek', 'force_sync_play'].includes(actionTarget)) {
-                addDevLog(`Action Logger: ${message.type} ${actionTarget} from ${message.source || 'remote'}`, 'info');
-                const logEntry = {
-                    action: actionTarget,
-                    timestamp: p.timestamp || new Date().toISOString(),
-                    source: message.source || 'extension',
-                    senderName: message.senderName || (message.source === 'extension_popup' ? 'You' : null)
-                };
-                currentHistory.unshift(logEntry);
-                chrome.storage.local.set({ history: currentHistory.slice(0, 50) });
-
-                // Show notification for inbound actions from remote peers
-                if (message.type === 'EXTENSION_INBOUND' && message.senderName) {
-                    showPeerActionNotification(message.senderName, actionTarget);
+                // Sofortiges Empfangs-ACK damit der Initiator weiß dass wir da sind
+                if (message.type === 'EXTENSION_INBOUND') {
+                    broadcastToTimerTabs({
+                        type: 'EXTENSION_OUTBOUND',
+                        payload: {
+                            action:         'EXTENSION_SYNC_ACK',
+                            originalAction: p.action,
+                            timestamp:      p.timestamp
+                        }
+                    });
                 }
             }
 
-            if (storageData.targetTabId && storageData.targetTabId !== 'none') {
+            // History loggen
+            chrome.storage.local.get(['history'], (data) => {
+                const history = data.history || [];
+                history.unshift({
+                    action:     p.action,
+                    timestamp:  p.timestamp || new Date().toISOString(),
+                    source:     message.source || 'remote',
+                    senderName: message.senderName || (message.source === 'extension_popup' ? 'You' : null)
+                });
+                chrome.storage.local.set({ history: history.slice(0, 50) });
+            });
+
+            // Benachrichtigung für eingehende Remote-Aktionen
+            if (message.type === 'EXTENSION_INBOUND' && message.senderName) {
+                showPeerActionNotification(message.senderName, p.action);
+            }
+
+            // Befehl an Ziel-Tab senden
+            chrome.storage.local.get(['targetTabId'], (data) => {
+                const targetTabId = data.targetTabId;
+                if (!targetTabId || targetTabId === 'none') return;
+
                 const sendCommand = (retryCount = 0) => {
-                    chrome.tabs.sendMessage(storageData.targetTabId, p).then((response) => {
+                    chrome.tabs.sendMessage(targetTabId, p).then((response) => {
                         if (!response) return;
 
-                        // Verified ACK: content.js confirmed the action succeeded
+                        // play/pause bestätigt → Cache updaten + ACK an Room
                         if (response.status === 'playing' || response.status === 'paused') {
                             const newState = response.status === 'playing' ? 'playing' : 'paused';
                             if (cachedPlaybackState !== newState) {
                                 cachedPlaybackState = newState;
-                                // Write to storage so popup.js changes.localPlaybackState listener fires
                                 chrome.storage.local.set({ localPlaybackState: newState });
                             }
-                            announceLocalTabStatus();
+                            // Cooldown überspringen — Befehlsbestätigung soll sofort durch
+                            lastStatusSentTime = 0;
+                            sendStatusToRoom();
                             broadcastToTimerTabs({
                                 type: 'EXTENSION_OUTBOUND',
                                 payload: {
-                                    action: 'EXTENSION_SYNC_ACK',
-                                    originalAction: actionTarget,
-                                    timestamp: p.timestamp
+                                    action:         'EXTENSION_SYNC_ACK',
+                                    originalAction: p.action,
+                                    timestamp:      p.timestamp
                                 }
                             });
                         }
 
-                        // Force Sync: content.js confirmed seek is ready
+                        // Force Sync Phase 1: seek + buffer fertig → Ready-Signal an Room
                         if (response.status === 'seek_ready') {
-                            addDevLog(`Force Sync Phase 1 Ready: Tab ${storageData.targetTabId} at ${response.currentTime}`, 'success');
-                            
-                            updateForceSyncState(p.timestamp, (currentState) => ({
-                                ...currentState,
-                                timestamp: p.timestamp,
-                                stage: 'ready',
-                                localReady: true,
+                            addDevLog(`Force Sync bereit: Tab ${targetTabId} bei ${response.currentTime}s`, 'success');
+                            cachedVideoReady = true;
+
+                            updateForceSyncState(p.timestamp, (state) => ({
+                                ...state,
+                                stage:            'ready',
+                                localReady:       true,
                                 localCurrentTime: response.currentTime,
-                                localReadyState: response.readyState,
-                                error: null,
-                                updatedAt: Date.now()
+                                localReadyState:  response.readyState,
+                                error:            null,
+                                updatedAt:        Date.now()
                             }));
 
                             getOrCreateExtensionInstanceId((instanceId) => {
                                 broadcastToTimerTabs({
                                     type: 'EXTENSION_OUTBOUND',
                                     payload: {
-                                        action: 'force_sync_ready',
+                                        action:      'force_sync_ready',
                                         currentTime: response.currentTime,
-                                        readyState: response.readyState,
-                                        timestamp: p.timestamp,
+                                        readyState:  response.readyState,
+                                        timestamp:   p.timestamp,
                                         instanceId
                                     }
                                 });
                             });
                         }
 
+                        // Force Sync Fehler
                         if (response.status === 'seek_timeout' || response.status === 'no_video') {
-                            updateForceSyncState(p.timestamp, (currentState) => ({
-                                ...currentState,
-                                timestamp: p.timestamp,
-                                stage: 'error',
+                            updateForceSyncState(p.timestamp, (state) => ({
+                                ...state,
+                                stage:      'error',
                                 localReady: false,
-                                error: response.status,
-                                updatedAt: Date.now()
+                                error:      response.status,
+                                updatedAt:  Date.now()
                             }));
                         }
+
                     }).catch(err => {
-                        addDevLog(`Failed to send message to target tab: ${err.message}`, 'error');
-                        console.warn('Background: Failed to send message to target tab:', err.message);
-                        updateForceSyncState(p.timestamp, (currentState) => ({
-                            ...currentState,
-                            timestamp: p.timestamp,
-                            stage: 'error',
+                        addDevLog(`Senden an Ziel-Tab fehlgeschlagen: ${err.message}`, 'error');
+                        updateForceSyncState(p.timestamp, (state) => ({
+                            ...state,
+                            stage:      'error',
                             localReady: false,
-                            error: err.message,
-                            updatedAt: Date.now()
+                            error:      err.message,
+                            updatedAt:  Date.now()
                         }));
-                        if (retryCount === 0 && (err.message.includes('Receiving end does not exist') || err.message.includes('Could not establish connection'))) {
+
+                        // Einmalig versuchen content.js neu zu injizieren
+                        if (retryCount === 0 && (
+                            err.message.includes('Receiving end does not exist') ||
+                            err.message.includes('Could not establish connection')
+                        )) {
                             chrome.scripting.executeScript({
-                                target: { tabId: storageData.targetTabId },
+                                target: { tabId: targetTabId },
                                 files: ['content.js']
                             }).then(() => {
                                 setTimeout(() => sendCommand(1), 500);
                             }).catch(e => {
-                                addDevLog(`Retry injection failed: ${e.message}`, 'error');
-                                console.error('Inject Err', e.message);
+                                addDevLog(`Re-Injektion fehlgeschlagen: ${e.message}`, 'error');
                                 if (e.message.includes('No tab with id')) {
                                     chrome.storage.local.set({ targetTabId: 'none' });
+                                    updateBadgeStatus();
                                 }
                             });
                         }
                     });
                 };
+
                 sendCommand();
-            }
-        });
-        isAsync = true;
+            });
+
+            isAsync = true;
+        }
     }
 
     return isAsync;
