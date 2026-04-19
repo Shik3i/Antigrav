@@ -1,459 +1,94 @@
-# 🔌 SyncExtension
+# 🔌 SyncExtension v3.0 // Unified Management & Status-Push
 
-A lightweight Chrome extension for **browser-based media sync** with the Antigrav room.
+SyncExtension is a high-performance Chrome extension (Manifest V3) designed for **real-time media synchronization** across multiple browser instances within an Antigrav room.
 
-It connects three layers:
-
-- 🎛️ the **extension popup**
-- 🌉 the **room bridge** on `timer.shik3i.net` or `localhost:3001`
-- 🎬 the **selected browser tab** that contains a playable video
-
-The extension is **not** a standalone sync platform.  
-It is a helper layer for the broader **Antigrav** project.
+It bridges the gap between a web-based coordination room and native HTML5 video elements in arbitrary browser tabs.
 
 ---
 
-## ✨ Purpose
+## 🎯 Purpose & Core Logic
+The primary goal is to keep video playback in sync for all participants in a room. Unlike traditional polling-heavy systems, this extension uses a **unidirectional Status-Push model**.
 
-SyncExtension allows a user inside an Antigrav room to:
-
-- choose a browser tab as the sync target
-- send **Play / Pause** commands to that tab
-- run a **Force Sync** flow
-- share tab readiness and playback status with the room
-- inspect diagnostics and development logs during testing
+- **Minimizes Network Traffic**: No more constant ping-pong.
+- **Reliability**: Direct control over the video's `readyState`.
+- **Transparency**: Includes extensive developer logs and diagnostics.
 
 ---
 
-## ✅ What matches the current codebase
+## 🛰️ Architecture Overview
 
-This README was checked against the current files in `SyncExtension/`.
+The extension consists of four distinct layers:
 
-### Confirmed behaviors
-
-- ✅ **Manifest V3** extension
-- ✅ **Popup-based controls**
-- ✅ **Background service worker**
-- ✅ **Bridge script** for the Antigrav room page
-- ✅ **Dynamic content script injection** into the selected media tab
-- ✅ **Play / Pause controls**
-- ✅ **Two-step Force Sync**
-- ✅ **Room peer tracking**
-- ✅ **History view**
-- ✅ **Developer diagnostics**
-- ✅ **Optional browser notifications**
-- ✅ **Bridge mode switch** for production vs localhost
-- ✅ **Badge state** when a target tab is active
-- ✅ **Heartbeat / cleanup logic**
-- ✅ **Playback state cache**
-- ✅ **Noise filtering for tab selection**
+1.  **🌉 Bridge (`bridge.js`)**: 
+    - Runs only on `timer.shik3i.net` or `localhost:3001`.
+    - Acts as a translator between the React WebApp (`window.postMessage`) and the Extension Background (`chrome.runtime`).
+2.  **🧠 Background Worker (`background.js`)**:
+    - The central router. 
+    - Manages peer states, handles the 2-minute pruning alarm, and coordinates command routing between the room and the media tab.
+3.  **🎬 Content Script (`content.js`)**:
+    - Dynamically injected into the target media tab.
+    - Directly interacts with `<video>` elements (Play, Pause, Seek).
+    - Monitors `readyState` to ensure commands only finish when the video is actually ready.
+4.  **🎛️ Popup (`popup.js/html`)**:
+    - The management UI for users.
+    - Handles tab selection and triggers immediate coordination events.
 
 ---
 
-## 🧱 Project structure
+## 🔄 The New Communication Model (v3.0)
 
-```text
-SyncExtension/
-├── manifest.json
-├── background.js
-├── bridge.js
-├── content.js
-├── popup.html
-├── popup.js
-└── icons/
-    └── icon128.png
-```
+### 1. Heartbeats (15s Cycle)
+- **Bridge Heartbeat**: Every 15s, the Bridge triggers the Background to broadcast the **full current status** (`tab_status`) to the room. This is the primary discovery mechanism.
+- **Content Heartbeat**: Every 15s, the Content Script sends its current playback state and `readyState` to the Background. This **only updates the local cache** and does not generate room traffic. The next Bridge Heartbeat will pick up these cached values.
 
-### File overview
+### 2. Immediate Updates (Reactive)
+- **Tab Change**: Choosing a new tab in the popup triggers an **instant** status broadcast.
+- **Command Confirmation**: When a `play` or `pause` command is confirmed by the video, the Background resets its cooldown and pushes the new status + ACK to the room immediately.
 
-#### `manifest.json`
-Defines:
-
-- Manifest V3 setup
-- permissions
-- host permissions
-- popup entry
-- service worker
-- bridge content script for the room URLs
-
-#### `background.js`
-The central coordinator.
-
-It handles:
-
-- runtime messages
-- room broadcasts
-- peer tracking
-- heartbeat processing
-- badge updates
-- cleanup of stale peers
-- force-sync state handling
-- optional notifications
-- proactive `content.js` injection after target-tab changes
-
-#### `bridge.js`
-Runs only on the Antigrav room URLs:
-
-- `https://timer.shik3i.net/*`
-- `http://localhost:3001/*`
-
-It bridges communication between:
-
-- the room page via `window.postMessage`
-- the extension background worker via `chrome.runtime.sendMessage`
-
-It also respects the selected **bridge environment mode**.
-
-#### `content.js`
-Injected into the selected media tab.
-
-It handles:
-
-- media commands
-- video detection
-- playback confirmation
-- force-sync pause/seek/play flow
-- native video event reporting
-- special handling for YouTube and Twitch
-- heartbeat messages when a real video exists
-
-#### `popup.html` / `popup.js`
-The popup UI and popup logic.
-
-The popup currently contains these areas:
-
-- 🎮 Controls
-- 🕘 History
-- 🧪 Dev
-- 📜 Logs
-- ⚙️ Settings
+### 3. Messaging Protocols (Rules for Agents)
+- **Internal Responses**: Background and Content scripts use `sendResponse` to confirm local execution (e.g., "Yes, I have successfully paused").
+- **External ACKs**: To peers, the extension **never** sends a technical "Response" packet. Instead, it sends **independent ACK messages** within the room's message stream.
+- **Unidirectional**: If a peer sends a `tab_status` update, we store it and **do not respond**. Peer discovery happens passively via heartbeats.
 
 ---
 
-## 🧩 Requirements
+## ⏱️ Force Sync: Detailed Event Chain
 
-You need:
+This is the most complex coordination flow in the extension. Here is exactly what happens when **Client A** triggers a Force Sync:
 
-- a Chromium-based browser with Manifest V3 support
-- the Antigrav room open on one of these URLs:
-  - `https://timer.shik3i.net/...`
-  - `http://localhost:3001/...`
-- a browser tab with a playable media element, usually an HTML5 `<video>`
+### Phase 1: Preparation (The Handshake)
+1.  **Client A (Popup)**: Calculates the target time, sets its local state to `seeking`, and broadcasts `force_sync_pause_seek` to the room.
+2.  **Client B (Background)**:
+    - Receives the inbound message.
+    - **MUST** immediately broadcast an `EXTENSION_SYNC_ACK` to the room (so Client A knows Client B is participating).
+    - Tells its local **Content B** to pause and seek.
+3.  **Content A & B**: Pause the video, set `currentTime`, and poll until `readyState >= 3` (buffered).
+4.  **Ready Signal**: Once buffered, both Backgrounds broadcast a `force_sync_ready` message to the room.
 
----
-
-## 🔐 Permissions
-
-### Extension permissions
-
-The current manifest uses:
-
-- `tabs`
-- `storage`
-- `scripting`
-- `alarms`
-- `notifications`
-
-### Host permissions
-
-The current manifest uses:
-
-- `<all_urls>`
-- `https://timer.shik3i.net/*`
-
-### Important note
-
-The extension does **not** inject `content.js` everywhere automatically.
-
-Actual behavior is more precise:
-
-- `bridge.js` is loaded only on the Antigrav room URLs
-- `content.js` is injected **on demand** into the selected target tab via `chrome.scripting.executeScript(...)`
-
-So the host permission scope is broad, but the actual runtime behavior is narrower than “always active on all sites”.
+### Phase 2: Execution (The Trigger)
+1.  **Client A (Popup)**: Polls local storage. Once it sees that its own tab is ready AND it has received `force_sync_ready` from peers (or reached a timeout), it broadcasts `force_sync_play`.
+2.  **Background A & B**: Receive the play command and immediately trigger `video.play()` via their Content Scripts.
+3.  **Confirmation**: Both clients are now synchronized. Any slight offset is handled by the initial `seek` precision.
 
 ---
 
-## 🚀 Installation
+## 🛠️ Housekeeping & Technical Notes
 
-### Load as unpacked extension
+### Automated Pruning
+A background alarm (`extension-peer-prune`) runs every 2 minutes. It checks the `roomPeers` list and deletes any peer that hasn't sent a status update in more than 60 seconds.
 
-1. Open Chrome
-2. Go to `chrome://extensions`
-3. Enable **Developer mode**
-4. Click **Load unpacked**
-5. Select the `SyncExtension` folder
+### Injection Logic
+Injection is **centralized in the background**. 
+- Triggered by `storage.onChanged` for the `targetTabId`.
+- Includes a **retry-on-failure** mechanism: if a command fails because the "Receiving end does not exist," the background worker automatically re-injects `content.js` and retries the command.
 
-After that, the extension popup is available from the toolbar.
-
----
-
-## 🎮 How to use
-
-### 1. Open the Antigrav room
-Open either:
-
-- **Production:** `https://timer.shik3i.net/...`
-- **Local development:** `http://localhost:3001/...`
-
-### 2. Open the extension popup
-The popup checks your open tabs and also tries to detect whether a room tab is available.
-
-If a room tab is open, the popup status changes from **Disconnected** to **Timer detected**.
-
-### 3. Select the target tab
-Choose the tab that should receive media sync commands.
-
-Important design rule from the code:
-
-- ⭐ matching tabs may be highlighted
-- 🚫 the extension must **not** auto-switch the selected target tab
-- 👆 the user chooses the target tab manually
-
-### 4. Use the controls
-Available popup controls include:
-
-- ▶️ Play
-- ⏸ Pause
-- ⏱ Force Sync
+### Developer Diagnostics
+The "Dev" tab in the popup allows for:
+- **Force Announce**: Manually triggering a `tab_status` broadcast.
+- **Live Logs**: Inspecting the last 50 messaging events.
+- **Environment Switch**: Toggle between `Production` and `Localhost` bridge modes.
 
 ---
 
-## ⏱ Force Sync behavior
-
-The current implementation is a **two-phase** sync flow.
-
-### Phase 1
-`force_sync_pause_seek`
-
-The target tab:
-
-- pauses playback
-- seeks to the requested timestamp
-- waits until the seek is ready / buffered
-
-### Phase 2
-`force_sync_play`
-
-The target tab:
-
-- resumes playback
-- returns an ACK-like status after verification
-
-This is more accurate than a simple “jump and play” description.
-
----
-
-## 👥 Peer and room behavior
-
-The extension tracks room peers in local storage.
-
-Confirmed behaviors include:
-
-- storing peer presence/status
-- pruning inactive peers after a timeout
-- showing room peer information in the popup
-- displaying latest activity and ACK information
-- sending version announcements between peers
-
-This means the extension is not only a local media remote.  
-It also participates in lightweight room-level sync state sharing.
-
----
-
-## 🧠 Playback handling details
-
-### Playback state cache
-`background.js` keeps an in-memory playback state cache so heartbeat messages without playback state do not overwrite the last known status.
-
-### Status throttling
-Status announcements are throttled to reduce noise.
-
-### Target tab lifecycle
-If the selected target tab is closed:
-
-- the target is cleared
-- the badge is updated
-- a fresh status announcement is triggered
-
-### Badge state
-If a target tab is selected, the extension badge shows:
-
-- `ON`
-
----
-
-## 🎬 Supported media behavior
-
-The extension is mainly built around HTML5 video control.
-
-### Explicitly visible in the current code
-
-- generic HTML5 `<video>` handling
-- YouTube-specific play/pause handling
-- Twitch-specific play/pause handling
-
-### Practical implication
-It should work best on pages where:
-
-- a normal video element exists
-- the page allows scripted media control
-- autoplay/browser interaction restrictions do not block playback
-
-If autoplay is blocked, the code already logs a warning that the page may need one manual click first.
-
----
-
-## 🧪 Popup areas
-
-### 🎮 Controls
-Contains:
-
-- target tab selector
-- play / pause buttons
-- force sync button
-- connection state
-- room peers
-- latest sync activity
-
-### 🕘 History
-Shows recent commands.
-
-### 🧪 Dev
-Contains:
-
-- diagnostics refresh
-- peer discovery / force announce
-- bridge environment selector
-- developer mode toggle
-
-### 📜 Logs
-Available when Developer Mode is enabled.
-
-Current behavior:
-
-- stores the last **50** log entries
-- supports **copy**
-- supports **clear**
-- supports **refresh**
-
-### ⚙️ Settings
-Contains:
-
-- **Clean Tab List**  
-  hides common mail, messenger, work, and timer tabs from the selection list
-
-- **Remote Notifications**  
-  enables or disables browser notifications for peer actions
-
----
-
-## 🌍 Bridge environment mode
-
-The popup allows switching between:
-
-- **Production**
-- **Localhost**
-
-This affects which room tabs are considered valid by the background worker and whether `bridge.js` stays active for the current page.
-
-### Production mode
-Targets:
-
-- `*://timer.shik3i.net/*`
-- `*://*.timer.shik3i.net/*`
-
-### Localhost mode
-Targets:
-
-- `http://localhost:3001/*`
-
----
-
-## 🔔 Notifications
-
-Notifications are optional and controlled in popup settings.
-
-When enabled, the extension can show browser notifications for peer actions such as:
-
-- play
-- pause
-- force sync started
-- force sync completed
-
-The user-facing notification text is currently partly localized in German.
-
----
-
-## 🛠️ Local development notes
-
-For local testing:
-
-1. run the Antigrav room on `http://localhost:3001/`
-2. switch the popup bridge environment to **localhost**
-3. open a target tab with a usable video
-4. choose that tab manually in the popup
-
-If sync does not work, check these first:
-
-- the room tab is actually open
-- the correct target tab is selected
-- the page contains a video element
-- `content.js` could be injected successfully
-- autoplay restrictions are not blocking playback
-- developer logs do not show runtime or messaging errors
-
----
-
-## ⚠️ Security and maintenance notes
-
-A few practical notes after checking the implementation:
-
-### Broad host permissions
-`<all_urls>` is currently used.  
-That is convenient for development and dynamic target-tab injection, but broader than ideal for long-term hardening.
-
-### Origin checks exist
-`bridge.js` restricts accepted page messages to:
-
-- `https://timer.shik3i.net`
-- `http://localhost:3001`
-
-That is good and should stay strict.
-
-### Manual target selection is intentional
-The code explicitly avoids automatic target switching.  
-That is a good safety and UX decision and should remain documented.
-
-### Version alignment matters
-Because the extension exchanges sync and status payloads with the room, extension changes and room changes should stay aligned during active development.
-
----
-
-## 🔄 Version
-
-Current manifest version in this checked project snapshot:
-
-- **2.9.3**
-
----
-
-## 📝 Suggested future improvements
-
-Based on the current implementation, these would be sensible future steps:
-
-- narrow host permissions where possible
-- document the message protocol between room and extension
-- improve user-facing error messages when no video is found
-- add release notes per extension version
-- document compatibility expectations with the room frontend
-- optionally support a clearer allowlist model for supported media sites
-
----
-
-## 🤝 Summary
-
-SyncExtension is currently best described as:
-
-> a Chrome Manifest V3 helper extension for Antigrav that bridges room-based sync events to a manually selected media tab, supports play/pause and two-step force sync, and provides popup diagnostics, history, peer awareness, and optional notifications.
-
+## 🤝 Summary for Future AI Agents
+When working on this extension, respect the **unidirectional status push**. Do not re-introduce ping-pong responses for status updates. Focus on maintaining the `background.js` as the single source of truth for peer states and ensure that any new media commands follow the **two-phase coordination** (ACK -> Execution) if multiple peers are involved.

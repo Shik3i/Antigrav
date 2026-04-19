@@ -1,6 +1,6 @@
 /**
  * bridge.js - Injected ONLY on timer.shik3i.net
- * This script acts as a bridge between the website's window.postMessage 
+ * This script acts as a bridge between the website's window.postMessage
  * and the Chrome Extension's Background Worker.
  */
 
@@ -23,8 +23,7 @@ chrome.storage.local.get(['bridgeDomainMode'], (data) => {
     const mode = data.bridgeDomainMode || 'production';
     const origin = window.location.origin;
     const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-    
-    // If we are in production mode but on localhost, or vice-versa, stop.
+
     if (mode === 'production' && isLocal) {
         console.log('SyncExtension: Bridge disabled (Mode: Production, Origin: Localhost)');
         return;
@@ -38,13 +37,13 @@ chrome.storage.local.get(['bridgeDomainMode'], (data) => {
 });
 
 function initBridge() {
-    // Listen for messages from the React application (timer.shik3i.net)
+    // Listen for messages from the React application
     window.addEventListener('message', (event) => {
         if (!event.data) return;
         if (event.source !== window) return;
         if (!ALLOWED_ORIGINS.has(event.origin)) return;
 
-        // React App asks if Extension is alive
+        // React App fragt ob Extension da ist
         if (event.data.action === 'EXTENSION_PING') {
             window.postMessage(
                 { action: isContextValid() ? 'EXTENSION_PONG' : 'EXTENSION_GONE' },
@@ -53,72 +52,83 @@ function initBridge() {
             return;
         }
 
-        // New Generic Pipe: React App -> Extension (Inbound to Extension)
+        // React App → Extension (Befehle und Status vom Room)
         if (event.data.type === 'EXTENSION_INBOUND' && event.data.payload) {
-            if (!isContextValid()) return; 
+            if (!isContextValid()) return;
             try {
                 chrome.runtime.sendMessage({
-                    source: 'timer_website',
-                    type: 'EXTENSION_INBOUND',
-                    payload: event.data.payload,
+                    source:     'timer_website',
+                    type:       'EXTENSION_INBOUND',
+                    payload:    event.data.payload,
                     senderName: event.data.senderName || null
                 }).catch(err => {
                     if (isContextValid()) {
-                        chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge error: ${err.message}`, logType: 'warn' }).catch(() => {});
+                        chrome.runtime.sendMessage({
+                            type: 'ADD_DEV_LOG',
+                            message: `Bridge error: ${err.message}`,
+                            logType: 'warn'
+                        }).catch(() => {});
                     }
                 });
             } catch (e) {
                 if (isContextValid()) {
-                    chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge context error: ${e.message}`, logType: 'warn' }).catch(() => {});
+                    chrome.runtime.sendMessage({
+                        type: 'ADD_DEV_LOG',
+                        message: `Bridge context error: ${e.message}`,
+                        logType: 'warn'
+                    }).catch(() => {});
                 }
             }
         }
     });
 
-    // Proactively announce presence to the React App as soon as bridge.js is loaded
+    // Präsenz sofort ankündigen wenn bridge.js geladen ist
     setTimeout(() => {
         if (isContextValid()) {
             window.postMessage({ action: 'EXTENSION_PONG' }, window.location.origin);
         }
     }, 100);
 
-    // HEARTBEAT: Ping background.js every 15 seconds to keep it alive
-    // and trigger a tab status broadcast.
+    // HEARTBEAT: Alle 15s an background.js senden.
+    // background.js sendet daraufhin unseren vollen Status an den Room —
+    // das ist der einzige Mechanismus für Peer-Discovery, keine Antwort nötig.
     function sendHeartbeat() {
         if (!isContextValid()) return;
         chrome.runtime.sendMessage({ type: 'EXTENSION_HEARTBEAT', source: 'bridge' })
             .catch(err => {
                 if (err.message?.includes('Receiving end does not exist')) {
+                    // Service Worker war schlafen — einmal wiederholen
                     setTimeout(() => {
                         if (isContextValid()) {
                             chrome.runtime.sendMessage({
                                 type: 'EXTENSION_HEARTBEAT', source: 'bridge'
-                            }).catch(e => {
-                                 // Context likely gone now, console only
-                                 console.warn('Bridge: Persistent heartbeat failure');
+                            }).catch(() => {
+                                console.warn('Bridge: Heartbeat persistently failing');
                             });
                         }
                     }, 1000);
                 } else {
                     if (isContextValid()) {
-                        chrome.runtime.sendMessage({ type: 'ADD_DEV_LOG', message: `Bridge heartbeat transient failure: ${err.message}`, logType: 'warn' }).catch(() => {});
+                        chrome.runtime.sendMessage({
+                            type: 'ADD_DEV_LOG',
+                            message: `Bridge heartbeat transient failure: ${err.message}`,
+                            logType: 'warn'
+                        }).catch(() => {});
                     }
-                    // We do NOT clear the interval here as it might be a temporary context issue
                 }
             });
     }
     setInterval(sendHeartbeat, 15000);
 
-    // Listen for reverse messages from the Extension generic pipe
-    // and forward them to the React Website so it can sync the room.
+    // Extension → React App (Status und ACKs weiterleiten)
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (!isContextValid()) return;
-        // New Generic Pipe: Extension -> React App (Outbound to React)
+        if (!isContextValid()) return false;
         if (message.type === 'EXTENSION_OUTBOUND' && message.payload) {
             window.postMessage({
-                type: 'EXTENSION_OUTBOUND',
+                type:    'EXTENSION_OUTBOUND',
                 payload: message.payload
             }, window.location.origin);
         }
+        return false; // kein async sendResponse
     });
 }
