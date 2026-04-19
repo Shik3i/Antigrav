@@ -1,5 +1,11 @@
 [
   {
+    "id": 69,
+    "version": "2.41.3",
+    "date": "2026-04-19",
+    "changes": "- **Layout-Fix**: Korrektur der `Impressum`- und `Datenschutz`-Seiten zur Behebung von Scrolling-Problemen. Der Inhalt wird nun nicht mehr am oberen Rand abgeschnitten und ist auf allen Bildschirmgrößen vollständig zugänglich."
+  },
+  {
     "id": 68,
     "version": "2.41.2",
     "date": "2026-04-19",
