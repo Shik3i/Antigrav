@@ -45,6 +45,19 @@ export default defineConfig(({ mode }) => ({
     react(),
     bundleAnalysisPlugin(mode === 'analyze')
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-utils': ['axios', 'socket.io-client', 'xss', 'fast-xml-parser'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-charts': ['recharts'],
+        }
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': {
