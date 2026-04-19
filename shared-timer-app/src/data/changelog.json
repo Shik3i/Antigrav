@@ -1,5 +1,11 @@
 [
   {
+    "id": 77,
+    "version": "2.46.0",
+    "date": "2026-04-20",
+    "changes": "- **Wordle Admin Upgrade**: Vollständige Überarbeitung der Wörterbuch-Verwaltung mit Full-Width Layout und Inline-Editing für Definitionen und Zitate.\n- **Effizienz-Tools**: Neue Filter für fehlende Definitionen (\"No Def\") und Zitate (\"No Quote\") zur schnellen Identifikation unvollständiger Einträge.\n- **Kompakte UI**: Der Bereich für Bulk Import / Export ist nun standardmäßig eingeklappt, was die Übersichtlichkeit bei der manuellen Wortpflege deutlich verbessert.\n- **Bulk-Performance**: Drastische Erhöhung des Request-Limits auf 10MB in der `server.js`, um auch sehr große Wörterbuch-Importe (850+ Wörter) ohne Fehler zu ermöglichen.\n- **Backend-Sicherheit**: Implementierung eines neuen atomaren Patch-Endpoints für gezielte Metadaten-Updates einzelner Wörter via Admin-Panel."
+  },
+  {
     "id": 76,
     "version": "2.45.0",
     "date": "2026-04-19",

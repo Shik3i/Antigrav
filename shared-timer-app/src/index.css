@@ -1495,3 +1495,43 @@ body.zen-mode .news-ticker-wrapper {
         width: 100%;
     }
 }
+/* Tooltip Styles */
+.tooltip-trigger:hover .tooltip-content {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateY(-8px);
+}
+
+.tooltip-content::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 10px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1f2937 transparent transparent transparent;
+}
+
+/* Wordle Animations */
+.wordle-row-shake {
+  animation: wordleShake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes wordleShake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+.wordle-cell.reveal {
+  animation: wordleFlip 0.6s ease-in forwards;
+}
+
+@keyframes wordleFlip {
+  0% { transform: rotateX(0); }
+  45% { transform: rotateX(90deg); }
+  55% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0); }
+}
+

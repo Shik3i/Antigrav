@@ -16,7 +16,27 @@ const formatSprintTime = (ms) => {
 
 const GameLeaderboards = () => {
     const { user, token } = useAuth();
-    const [leaderboards, setLeaderboards] = useState({ koala: [], scratch: [], blackjack: [], rift: { highestWave: [], totalMinions: [], totalBosses: [] }, tetris: [], tower: [] });
+    const [leaderboards, setLeaderboards] = useState({ 
+        koala: [], 
+        scratch: [], 
+        blackjack: [], 
+        rift: { highestWave: [], totalMinions: [], totalBosses: [] }, 
+        tetris: [], 
+        tower: [],
+        wordle: []
+    });
+    const { token: authToken } = useAuth(); // rename for helper scope if needed
+
+    const safeJsonParse = (str, fallback = {}) => {
+        if (!str) return fallback;
+        if (typeof str !== 'string') return str;
+        try {
+            return JSON.parse(str);
+        } catch (e) {
+            console.error('Safe JSON Parse failed:', e);
+            return fallback;
+        }
+    };
     const [settings, setSettings] = useState({});
     const [updatingGames, setUpdatingGames] = useState({});
     const [loading, setLoading] = useState(true);
@@ -27,27 +47,30 @@ const GameLeaderboards = () => {
     const [scratchSortDir, setScratchSortDir] = useState('desc');
     const [blackjackSortField, setBlackjackSortField] = useState('totalWon');
     const [blackjackSortDir, setBlackjackSortDir] = useState('desc');
-    const [riftWaveSortField, setRiftWaveSortField] = useState('value');
-    const [riftWaveSortDir, setRiftWaveSortDir] = useState('desc');
-    const [riftMinionsSortField, setRiftMinionsSortField] = useState('value');
-    const [riftMinionsSortDir, setRiftMinionsSortDir] = useState('desc');
-    const [riftBossesSortField, setRiftBossesSortField] = useState('value');
-    const [riftBossesSortDir, setRiftBossesSortDir] = useState('desc');
+    const [riftHighestWaveSortField, setRiftHighestWaveSortField] = useState('value');
+    const [riftHighestWaveSortDir, setRiftHighestWaveSortDir] = useState('desc');
+    const [riftTotalMinionsSortField, setRiftTotalMinionsSortField] = useState('value');
+    const [riftTotalMinionsSortDir, setRiftTotalMinionsSortDir] = useState('desc');
+    const [riftTotalBossesSortField, setRiftTotalBossesSortField] = useState('value');
+    const [riftTotalBossesSortDir, setRiftTotalBossesSortDir] = useState('desc');
     const [tetrisSortField, setTetrisSortField] = useState('highscore');
     const [tetrisSortDir, setTetrisSortDir] = useState('desc');
     const [towerSortField, setTowerSortField] = useState('highscore');
     const [towerSortDir, setTowerSortDir] = useState('desc');
+    const [wordleSortField, setWordleSortField] = useState('totalWins');
+    const [wordleSortDir, setWordleSortDir] = useState('desc');
 
     useEffect(() => {
         const fetchLeaderboards = async () => {
             try {
-                const [lbRes, scratchRes, blackjackRes, riftRes, tetrisRes, towerRes, settingsRes] = await Promise.all([
+                const [lbRes, scratchRes, blackjackRes, riftRes, tetrisRes, towerRes, wordleRes, settingsRes] = await Promise.all([
                     axios.get('/api/games/leaderboard?gameId=koala_flap'),
                     axios.get('/api/scratchcards/stats'),
                     axios.get('/api/blackjack/leaderboard?sortBy=totalWon').catch(() => ({ data: { leaderboard: [] } })),
                     axios.get('/api/rift-defense/leaderboards').catch(() => ({ data: { leaderboards: { highestWave: [], totalMinions: [], totalBosses: [] } } })),
                     axios.get('/api/games/leaderboard?gameId=tetris').catch(() => ({ data: { highscores: [], cumulative: [] } })),
                     axios.get('/api/games/leaderboard?gameId=tower_climb').catch(() => ({ data: { highscores: [], cumulative: [] } })),
+                    axios.get('/api/games/leaderboard?gameId=wordle').catch(() => ({ data: { highscores: [] } })),
                     axios.get('/api/leaderboards/settings').catch(() => ({ data: [] }))
                 ]);
 
@@ -110,7 +133,8 @@ const GameLeaderboards = () => {
                     blackjack: blackjackRes.data.leaderboard || [],
                     rift: riftRes.data.leaderboards || { highestWave: [], totalMinions: [], totalBosses: [] },
                     tetris: Object.values(tetrisMap),
-                    tower: Object.values(towerMap)
+                    tower: Object.values(towerMap),
+                    wordle: wordleRes.data.highscores || []
                 });
 
                 const settingsMap = {};
@@ -279,7 +303,10 @@ const GameLeaderboards = () => {
                             {/* Name + Avatar */}
                             <UserContextMenu username={row.username || row.displayName} userId={row.userId}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                    <Avatar user={{ username: row.username || row.displayName, preferences: typeof row.preferences === 'string' ? JSON.parse(row.preferences || '{}') : (row.preferences || {}) }} size={26} />
+                                    <Avatar user={{ 
+                                        username: row.username || row.displayName, 
+                                        preferences: safeJsonParse(row.preferences)
+                                    }} size={26} />
                                     <span style={{ fontWeight: 500, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {row.displayName}
                                     </span>
@@ -304,14 +331,15 @@ const GameLeaderboards = () => {
         );
     };
 
+    const sortedTower = sortData(leaderboards.tower, towerSortField, towerSortDir);
+    const sortedWordle = sortData(leaderboards.wordle, wordleSortField, wordleSortDir);
     const sortedKoala = sortData(leaderboards.koala, koalaSortField, koalaSortDir);
     const sortedScratch = sortData(leaderboards.scratch, scratchSortField, scratchSortDir);
     const sortedBlackjack = sortData(leaderboards.blackjack, blackjackSortField, blackjackSortDir);
-    const sortedRiftWave = sortData(leaderboards.rift.highestWave, riftWaveSortField, riftWaveSortDir);
-    const sortedRiftMinions = sortData(leaderboards.rift.totalMinions, riftMinionsSortField, riftMinionsSortDir);
-    const sortedRiftBosses = sortData(leaderboards.rift.totalBosses, riftBossesSortField, riftBossesSortDir);
+    const sortedRiftHighestWave = sortData(leaderboards.rift.highestWave, riftHighestWaveSortField, riftHighestWaveSortDir);
+    const sortedRiftTotalMinions = sortData(leaderboards.rift.totalMinions, riftTotalMinionsSortField, riftTotalMinionsSortDir);
+    const sortedRiftTotalBosses = sortData(leaderboards.rift.totalBosses, riftTotalBossesSortField, riftTotalBossesSortDir);
     const sortedTetris = sortData(leaderboards.tetris, tetrisSortField, tetrisSortDir);
-    const sortedTower = sortData(leaderboards.tower, towerSortField, towerSortDir);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '48px', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
@@ -449,11 +477,11 @@ const GameLeaderboards = () => {
                                 <span style={{ fontWeight: 700, fontSize: '1rem', color: '#10b981' }}>Höchste Welle</span>
                             </div>
                             {renderTable({
-                                data: sortedRiftWave,
+                                data: sortedRiftHighestWave,
                                 accentColor: '#10b981',
-                                sortField: riftWaveSortField,
-                                sortDir: riftWaveSortDir,
-                                onSort: (f) => handleSort(riftWaveSortField, setRiftWaveSortField, riftWaveSortDir, setRiftWaveSortDir, f),
+                                sortField: riftHighestWaveSortField,
+                                sortDir: riftHighestWaveSortDir,
+                                onSort: (f) => handleSort(riftHighestWaveSortField, setRiftHighestWaveSortField, riftHighestWaveSortDir, setRiftHighestWaveSortDir, f),
                                 columns: [{ field: 'value', label: 'Welle', width: '80px', format: v => v.toLocaleString() }]
                             })}
                         </div>
@@ -464,11 +492,11 @@ const GameLeaderboards = () => {
                                 <span style={{ fontWeight: 700, fontSize: '1rem', color: '#8b5cf6' }}>Minion Kills</span>
                             </div>
                             {renderTable({
-                                data: sortedRiftMinions,
+                                data: sortedRiftTotalMinions,
                                 accentColor: '#8b5cf6',
-                                sortField: riftMinionsSortField,
-                                sortDir: riftMinionsSortDir,
-                                onSort: (f) => handleSort(riftMinionsSortField, setRiftMinionsSortField, riftMinionsSortDir, setRiftMinionsSortDir, f),
+                                sortField: riftTotalMinionsSortField,
+                                sortDir: riftTotalMinionsSortDir,
+                                onSort: (f) => handleSort(riftTotalMinionsSortField, setRiftTotalMinionsSortField, riftTotalMinionsSortDir, setRiftTotalMinionsSortDir, f),
                                 columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
                             })}
                         </div>
@@ -479,11 +507,11 @@ const GameLeaderboards = () => {
                                 <span style={{ fontWeight: 700, fontSize: '1rem', color: '#ef4444' }}>Boss Kills</span>
                             </div>
                             {renderTable({
-                                data: sortedRiftBosses,
+                                data: sortedRiftTotalBosses,
                                 accentColor: '#ef4444',
-                                sortField: riftBossesSortField,
-                                sortDir: riftBossesSortDir,
-                                onSort: (f) => handleSort(riftBossesSortField, setRiftBossesSortField, riftBossesSortDir, setRiftBossesSortDir, f),
+                                sortField: riftTotalBossesSortField,
+                                sortDir: riftTotalBossesSortDir,
+                                onSort: (f) => handleSort(riftTotalBossesSortField, setRiftTotalBossesSortField, riftTotalBossesSortDir, setRiftTotalBossesSortDir, f),
                                 columns: [{ field: 'value', label: 'Kills', width: '80px', format: v => v.toLocaleString() }]
                             })}
                         </div>
@@ -527,34 +555,36 @@ const GameLeaderboards = () => {
                 </section>
             )}
 
-            {/* Tower Climb */}
-            {(!settings['tower_climb'] || user?.is_superadmin) && (
+            {/* Wordle */}
+            {(!settings['wordle'] || user?.is_superadmin) && (
                 <section style={{ 
-                    opacity: settings['tower_climb'] ? 0.6 : 1, 
-                    filter: settings['tower_climb'] ? 'grayscale(0.5)' : 'none',
+                    opacity: settings['wordle'] ? 0.6 : 1, 
+                    filter: settings['wordle'] ? 'grayscale(0.5)' : 'none',
                     transition: 'opacity 0.3s ease, filter 0.3s ease'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ShieldCheck size={18} color="#fff" />
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trophy size={18} color="#fff" />
                         </div>
-                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>TOWER CLIMB</h2>
-                        {renderVisibilityControls('tower_climb')}
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>WORDLE</h2>
+                        {renderVisibilityControls('wordle')}
                     </div>
                     <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                            <ShieldCheck size={18} color="#8b5cf6" />
-                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Rangliste</span>
+                            <TrendingUp size={18} color="#06b6d4" />
+                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Overall Stats</span>
                         </div>
                         {renderTable({
-                            data: sortedTower,
-                            accentColor: '#8b5cf6',
-                            sortField: towerSortField,
-                            sortDir: towerSortDir,
-                            onSort: (f) => handleSort(towerSortField, setTowerSortField, towerSortDir, setTowerSortDir, f),
+                            data: sortedWordle,
+                            accentColor: '#06b6d4',
+                            sortField: wordleSortField,
+                            sortDir: wordleSortDir,
+                            onSort: (f) => handleSort(wordleSortField, setWordleSortField, wordleSortDir, setWordleSortDir, f),
                             columns: [
-                                { field: 'highscore', label: 'Best Level', width: '100px', format: v => v.toLocaleString() },
-                                { field: 'totalEarned', label: 'Total Cashout', width: '120px', format: v => (v / 100).toLocaleString('de-DE'), suffix: 'KC' }
+                                { field: 'totalWins', label: 'Wins', width: '80px' },
+                                { field: 'currentStreak', label: 'Streak', width: '90px' },
+                                { field: 'maxStreak', label: 'Max Streak', width: '110px' },
+                                { field: 'totalPlayed', label: 'Games', width: '80px' }
                             ]
                         })}
                     </div>
