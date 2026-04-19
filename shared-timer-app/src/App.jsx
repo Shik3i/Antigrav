@@ -38,6 +38,9 @@ import { getNextPokemon } from './utils/pokemonUtils';
 import { fetchJson } from './utils/apiClient';
 import { AUTH_SESSION_INVALIDATED_EVENT, getStoredValue, setStoredValue } from './utils/clientStorage';
 import { scheduleDeferred } from './utils/deferred';
+import { getExactRemainingMs, formatTimerTitle } from './utils/timerUtils';
+import { DEFAULT_LEAGUES, DEFAULT_TITLE, EMPTY_ROOM_TOKENS } from './constants/appConstants';
+
 
 // Lazy load pages for code splitting
 
@@ -84,10 +87,8 @@ const News = React.lazy(() => import('./pages/News'));
 const Impressum = React.lazy(() => import('./pages/Impressum'));
 const Datenschutz = React.lazy(() => import('./pages/Datenschutz'));
 
-// Constants
-const DEFAULT_LEAGUES = ['LEC', 'LCS', 'LCK', 'LPL', 'VCT_LOCK_IN', 'VCT_EMEA', 'VCT_AMERICAS', 'VCT_PACIFIC'];
-const DEFAULT_TITLE = 'KoalaSync';
-const EMPTY_ROOM_TOKENS = { readToken: null, writeToken: null };
+// Constants moved to src/constants/appConstants.js
+
 
 // Global styles for the app container
 const appStyle = {
@@ -97,28 +98,9 @@ const appStyle = {
 };
 
 /**
- * Utility: Calculates precision remaining ms based on sync state and server offset.
+ * Notes: Remaining ms and title formatting moved to src/utils/timerUtils.js
  */
-function getExactRemainingMs(roomState, serverTimeOffset = 0) {
-  if (!roomState?.state) return 0;
-  if (!roomState.state.isRunning || !roomState.state.lastTickTime) {
-    return roomState.state.remainingMs || 0;
-  }
 
-  const trueServerTime = Date.now() + serverTimeOffset;
-  const elapsedSinceTick = trueServerTime - roomState.state.lastTickTime;
-  return Math.max(0, (roomState.state.remainingMs || 0) - elapsedSinceTick);
-}
-
-/**
- * Utility: Formats ms to title-compatible string (mm:ss).
- */
-function formatTimerTitle(ms) {
-  const totalSeconds = Math.ceil(Math.max(0, ms) / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
 
 const EsportsNotificationHandler = ({ selectedLeagues, socket, enabled }) => {
   useEsportsNotifications(selectedLeagues, socket, { enabled });
@@ -154,8 +136,11 @@ function InnerApp() {
   const [pendingInvite, setPendingInvite] = useState(null);
 
   // --- Local Persistence ---
-  useEffect(() => { setStoredValue('activeRoomId', activeRoomId); }, [activeRoomId]);
-  useEffect(() => { setStoredValue('activeToken', activeToken); }, [activeToken]);
+  useEffect(() => {
+    setStoredValue('activeRoomId', activeRoomId);
+    setStoredValue('activeToken', activeToken);
+  }, [activeRoomId, activeToken]);
+
   
   useEffect(() => {
     if (!token) {

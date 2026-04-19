@@ -69,12 +69,9 @@ const Admin = ({ socket }) => {
             });
             setNavbarSettings(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
-            console.error('[Admin API Debug] Request failed for Navbar Settings:', {
-                status: err.response?.status,
-                data: err.response?.data,
-                message: err.message
-            });
+            // Error logged silently or handled by UI
         }
+
     };
 
     const handleSaveNavbarSettings = async () => {
@@ -110,12 +107,9 @@ const Admin = ({ socket }) => {
             });
             setPokemonConfigs(res.data);
         } catch (err) {
-            console.error('[Admin API Debug] Request failed for Pokemon Configs:', {
-                status: err.response?.status,
-                data: err.response?.data,
-                message: err.message
-            });
+            // Error handled by UI
         }
+
     };
 
     const handleFetchPolymarketSettings = async () => {
@@ -226,12 +220,9 @@ const Admin = ({ socket }) => {
             addLog('Success', 'Pack deleted.', 'success');
             handleFetchPacks();
         } catch (err) {
-            console.error(`[Admin API Debug] Delete failed for Scratchcard Pack ${id}:`, {
-                status: err.response?.status,
-                data: err.response?.data,
-                message: err.message
-            });
+            // Quiet fail
         }
+
     };
 
     const handleFetchRssFeeds = async () => {
