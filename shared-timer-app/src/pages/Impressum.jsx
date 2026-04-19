@@ -33,8 +33,8 @@ const ProtectedEmail = ({ user, domain }) => {
 };
 
 const Impressum = () => (
-    <div className="animate-fade-in" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
-        <div className="glass-card" style={{ maxWidth: '700px', width: '100%', padding: '40px', textAlign: 'center' }}>
+    <div className="animate-fade-in" style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', padding: '40px 20px', overflowY: 'auto' }}>
+        <div className="glass-card" style={{ maxWidth: '700px', width: '100%', padding: '40px', textAlign: 'center', margin: 'auto' }}>
             <h1 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', color: 'var(--text-main)' }}>Impressum</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
                 Transparenz & Identifikation

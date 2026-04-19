@@ -8,8 +8,6 @@ import Avatar from './Avatar';
 import { fetchJson } from '../utils/apiClient';
 import { prefetchRoute } from '../utils/prefetchRoutes';
 
-const SharedTodo = React.lazy(() => import('./SharedTodo'));
-const SharedCanvas = React.lazy(() => import('./SharedCanvas'));
 
 const iconMap = {
     'dashboard': <LucideIcons.LayoutDashboard size={18} />,
@@ -68,9 +66,8 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px 16px',
-        gap: '32px',
-        overflowY: 'auto'
+        padding: '16px 16px',
+        overflow: 'hidden'
     };
 
     const navStyle = {
@@ -186,198 +183,190 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
 
     return (
         <aside className={`glass-panel sidebar-drawer ${isOpen ? 'open' : ''}`} style={containerStyle}>
-            <Link to="/" onClick={onClose} style={{ padding: '0 8px', display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}>
-                <LucideIcons.Clock className="animate-glow" color="var(--accent-primary)" size={28} />
-                <h2 style={{ fontSize: '1.25rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    KoalaSync
-                </h2>
-            </Link>
+            {/* Header Area */}
+            <div style={{ flexShrink: 0, marginBottom: '24px', padding: '0 8px' }}>
+                <Link to="/" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}>
+                    <LucideIcons.Clock className="animate-glow" color="var(--accent-primary)" size={28} />
+                    <h2 style={{ fontSize: '1.25rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                        KoalaSync
+                    </h2>
+                </Link>
+            </div>
 
-            <nav style={navStyle}>
-                {CATEGORIES.map((cat) => {
-                    const items = groupedNav[cat] || [];
-                    const sectionKey = cat.toLowerCase();
-                    if (items.length === 0) return null;
+            {/* Scrollable Middle Content */}
+            <div className="sidebar-scroll-content" style={{ flex: 1, overflowY: 'auto', paddingRight: '6px', marginBottom: '16px', display: 'flex', flexDirection: 'column' }}>
+                <nav style={navStyle}>
+                    {CATEGORIES.map((cat) => {
+                        const items = groupedNav[cat] || [];
+                        const sectionKey = cat.toLowerCase();
+                        if (items.length === 0) return null;
 
-                    const hasBadge = items.some(item => isBadgeVisible(item.key));
+                        const hasBadge = items.some(item => isBadgeVisible(item.key));
 
-                    return (
-                        <div key={cat} className="nav-section" style={{ marginTop: cat === 'Timers' ? '0' : '12px' }}>
-                            <button 
-                                className="btn-ghost section-header" 
-                                onClick={() => setOpenGroup(p => p === sectionKey ? null : sectionKey)}
-                                style={{ 
-                                    width: '100%', 
-                                    justifyContent: 'space-between', 
-                                    opacity: 0.7, 
-                                    fontSize: '0.75rem', 
-                                    fontWeight: 700, 
-                                    letterSpacing: '0.05em', 
-                                    textTransform: 'uppercase', 
-                                    marginBottom: '4px',
-                                    position: 'relative'
-                                }}
-                            >
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {cat}
-                                    {hasBadge && (
-                                        <span style={{
-                                            width: '6px',
-                                            height: '6px',
-                                            background: '#ef4444',
-                                            borderRadius: '50%',
-                                            boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
-                                        }} title="Neuigkeiten verfuegbar"></span>
-                                    )}
-                                </span>
-                                {openGroup === sectionKey ? <LucideIcons.ChevronDown size={14} /> : <LucideIcons.ChevronRight size={14} />}
-                            </button>
-                            {openGroup === sectionKey && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
-                                    {items.map(item => {
-                                        if (item.key === 'admin' && !user?.is_superadmin) return null;
-                                        const showBadge = isBadgeVisible(item.key);
-                                        
-                                        let icon = iconMap[item.key];
-                                        if (!icon && item.icon) {
-                                            const IconComponent = LucideIcons[item.icon];
-                                            if (IconComponent) {
-                                                icon = <IconComponent size={18} />;
+                        return (
+                            <div key={cat} className="nav-section" style={{ marginTop: cat === 'Timers' ? '0' : '12px' }}>
+                                <button 
+                                    className="btn-ghost section-header" 
+                                    onClick={() => setOpenGroup(p => p === sectionKey ? null : sectionKey)}
+                                    style={{ 
+                                        width: '100%', 
+                                        justifyContent: 'space-between', 
+                                        opacity: 0.7, 
+                                        fontSize: '0.75rem', 
+                                        fontWeight: 700, 
+                                        letterSpacing: '0.05em', 
+                                        textTransform: 'uppercase', 
+                                        marginBottom: '4px',
+                                        position: 'relative'
+                                    }}
+                                >
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {cat}
+                                        {hasBadge && (
+                                            <span style={{
+                                                width: '6px',
+                                                height: '6px',
+                                                background: '#ef4444',
+                                                borderRadius: '50%',
+                                                boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
+                                            }} title="Neuigkeiten verfuegbar"></span>
+                                        )}
+                                    </span>
+                                    {openGroup === sectionKey ? <LucideIcons.ChevronDown size={14} /> : <LucideIcons.ChevronRight size={14} />}
+                                </button>
+                                {openGroup === sectionKey && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
+                                        {items.map(item => {
+                                            if (item.key === 'admin' && !user?.is_superadmin) return null;
+                                            const showBadge = isBadgeVisible(item.key);
+                                            
+                                            let icon = iconMap[item.key];
+                                            if (!icon && item.icon) {
+                                                const IconComponent = LucideIcons[item.icon];
+                                                if (IconComponent) {
+                                                    icon = <IconComponent size={18} />;
+                                                }
                                             }
-                                        }
-                                        if (!icon) {
-                                            icon = <LucideIcons.ListTodo size={18} />;
-                                        }
+                                            if (!icon) {
+                                                icon = <LucideIcons.ListTodo size={18} />;
+                                            }
 
-                                        return (
-                                            <NavLink 
-                                                key={item.key} 
-                                                to={item.path} 
-                                                onMouseEnter={() => prefetchRoute(item.path)}
-                                                onFocus={() => prefetchRoute(item.path)}
-                                                onClick={() => {
-                                                    markAsVisited(item.key);
-                                                    onClose();
-                                                }} 
-                                                className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 
-                                                style={{ justifyContent: 'flex-start', position: 'relative' }}
-                                            >
-                                                {icon}
-                                                {item.label}
-                                                {showBadge && (
-                                                    <span style={{
-                                                        position: 'absolute',
-                                                        right: '8px',
-                                                        top: '50%',
-                                                        transform: 'translateY(-50%)',
-                                                        width: '8px',
-                                                        height: '8px',
-                                                        background: '#ef4444',
-                                                        borderRadius: '50%',
-                                                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)'
-                                                    }}></span>
-                                                )}
-                                            </NavLink>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </nav>
+                                            return (
+                                                <NavLink 
+                                                    key={item.key} 
+                                                    to={item.path} 
+                                                    onMouseEnter={() => prefetchRoute(item.path)}
+                                                    onFocus={() => prefetchRoute(item.path)}
+                                                    onClick={() => {
+                                                        markAsVisited(item.key);
+                                                        onClose();
+                                                    }} 
+                                                    className={({ isActive }) => `btn-ghost ${isActive ? 'active' : ''}`} 
+                                                    style={{ justifyContent: 'flex-start', position: 'relative' }}
+                                                >
+                                                    {icon}
+                                                    {item.label}
+                                                    {showBadge && (
+                                                        <span style={{
+                                                            position: 'absolute',
+                                                            right: '8px',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)',
+                                                            width: '8px',
+                                                            height: '8px',
+                                                            background: '#ef4444',
+                                                            borderRadius: '50%',
+                                                            boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)'
+                                                        }}></span>
+                                                    )}
+                                                </NavLink>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </nav>
 
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '4px', marginTop: '16px' }}>
-                {roomState && isRoomRoute && (
-                    <>
-                        <div style={{ flex: 1, minHeight: '200px' }}>
-                            <React.Suspense fallback={null}>
-                                <SharedTodo roomState={roomState} socket={socket} />
-                            </React.Suspense>
+                {roomState?.state && !isRoomRoute && (
+                    <div
+                        className="glass-panel"
+                        style={{ padding: '16px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', cursor: 'pointer', marginTop: '24px', marginBottom: '8px' }}
+                        onMouseEnter={() => prefetchRoute('/c')}
+                        onClick={() => navigate(`/room/${roomState.id}${activeToken ? `?token=${activeToken}` : ''}`)}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>Active Session</span>
+                            <LucideIcons.Maximize2 size={14} color="var(--text-muted)" />
                         </div>
-                        <div style={{ flex: 1, minHeight: '200px' }}>
-                            <React.Suspense fallback={null}>
-                                <SharedCanvas roomState={roomState} socket={socket} />
-                            </React.Suspense>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '8px' }}>
+                            {formatTime(localRemainingMs)}
                         </div>
-                    </>
+                        {user?.preferences?.timerVisual === 'bar' && (
+                            <div style={{ height: '4px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '12px' }}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${(localRemainingMs / (roomState.config?.durationMs || 1)) * 100}%`,
+                                    background: 'var(--accent-primary)',
+                                    transition: roomState.state.isRunning ? 'none' : 'width 0.3s ease'
+                                }}></div>
+                            </div>
+                        )}
+                        {isWrite && (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {!roomState.state.isRunning ? (
+                                    <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px' }} onClick={(e) => handleAction(e, 'START')}>
+                                        <LucideIcons.Play size={14} /> Start
+                                    </button>
+                                ) : (
+                                    <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
+                                        <LucideIcons.Pause size={14} /> Pause
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 
-            {roomState?.state && !isRoomRoute && (
-                <div
-                    className="glass-panel"
-                    style={{ padding: '16px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', cursor: 'pointer', marginBottom: '16px' }}
-                    onMouseEnter={() => prefetchRoute('/c')}
-                    onClick={() => navigate(`/room/${roomState.id}${activeToken ? `?token=${activeToken}` : ''}`)}
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-primary)' }}>Active Session</span>
-                        <LucideIcons.Maximize2 size={14} color="var(--text-muted)" />
-                    </div>
-                    <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '8px' }}>
-                        {formatTime(localRemainingMs)}
-                    </div>
-                    {user?.preferences?.timerVisual === 'bar' && (
-                        <div style={{ height: '4px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '12px' }}>
-                            <div style={{
-                                height: '100%',
-                                width: `${(localRemainingMs / (roomState.config?.durationMs || 1)) * 100}%`,
-                                background: 'var(--accent-primary)',
-                                transition: roomState.state.isRunning ? 'none' : 'width 0.3s ease'
-                            }}></div>
+            {/* Footer Area */}
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {isGuest ? (
+                    <div style={{ ...UserInfoStyle, marginTop: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                            <Avatar user={user} size={36} />
+                            <div style={{ overflow: 'hidden' }}>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.displayName} (Guest)</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Progress not saved</div>
+                            </div>
                         </div>
-                    )}
-                    {isWrite && (
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            {!roomState.state.isRunning ? (
-                                <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px' }} onClick={(e) => handleAction(e, 'START')}>
-                                    <LucideIcons.Play size={14} /> Start
-                                </button>
-                            ) : (
-                                <button className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
-                                    <LucideIcons.Pause size={14} /> Pause
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {isGuest ? (
-                <div style={{ ...UserInfoStyle, marginTop: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                        <Avatar user={user} size={36} />
-                        <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.displayName} (Guest)</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Progress not saved</div>
+                            <Link to="/login" onClick={onClose} className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.8rem', textAlign: 'center', borderRadius: '6px' }}><LucideIcons.LogIn size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Login</Link>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <Link to="/login" onClick={onClose} className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.8rem', textAlign: 'center', borderRadius: '6px' }}><LucideIcons.LogIn size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Login</Link>
+                ) : (
+                    <div style={{ ...UserInfoStyle, marginTop: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <NavLink to="/settings" onClick={onClose} className="user-profile-link" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
+                            <Avatar user={user} size={36} />
+                            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                    {user?.displayName}
+                                </span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logged In</span>
+                            </div>
+                        </NavLink>
+                        <button onClick={() => { logout(); navigate('/'); }} className="btn-ghost" style={{ padding: '6px', fontSize: '0.8rem', borderRadius: '6px', background: 'rgba(255,0,0,0.1)', color: '#ef4444' }}>
+                            <LucideIcons.LogOut size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Logout
+                        </button>
                     </div>
-                </div>
-            ) : (
-                <div style={{ ...UserInfoStyle, marginTop: 0, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <NavLink to="/settings" onClick={onClose} className="user-profile-link" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-                        <Avatar user={user} size={36} />
-                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                {user?.displayName}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Logged In</span>
-                        </div>
-                    </NavLink>
-                    <button onClick={() => { logout(); navigate('/'); }} className="btn-ghost" style={{ padding: '6px', fontSize: '0.8rem', borderRadius: '6px', background: 'rgba(255,0,0,0.1)', color: '#ef4444' }}>
-                        <LucideIcons.LogOut size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Logout
-                    </button>
-                </div>
-            )}
+                )}
 
-            {/* Legal Links */}
-            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '16px', paddingBottom: '8px' }}>
-                <Link to="/impressum" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Impressum</Link>
-                <Link to="/datenschutz" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Datenschutz</Link>
+                {/* Legal Links */}
+                <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '16px', paddingBottom: '4px' }}>
+                    <Link to="/impressum" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Impressum</Link>
+                    <Link to="/datenschutz" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Datenschutz</Link>
+                </div>
             </div>
         </aside>
     );
