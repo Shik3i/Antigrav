@@ -425,6 +425,15 @@ function initializeDatabaseSchema() {
   db.run("ALTER TABLE PolymarketUserBets ADD COLUMN priceAtBet REAL DEFAULT 0.0", () => { });
 
   // --- Wordle Minigame ---
+  db.run(`CREATE TABLE IF NOT EXISTS wordle_dictionary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    word TEXT UNIQUE NOT NULL,
+    is_used BOOLEAN DEFAULT 0,
+    definition TEXT,
+    funny_quote TEXT,
+    used_at DATETIME
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS Wordle_DailyWords (
     date TEXT PRIMARY KEY,
     word TEXT NOT NULL,
@@ -438,10 +447,49 @@ function initializeDatabaseSchema() {
     guesses TEXT NOT NULL, -- JSON array of guesses
     won BOOLEAN NOT NULL,
     earnedCoins INTEGER DEFAULT 0,
+    hintUsed BOOLEAN DEFAULT 0,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(userId, date),
     FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS Wordle_UserStats (
+    userId TEXT PRIMARY KEY,
+    totalPlayed INTEGER DEFAULT 0,
+    totalWins INTEGER DEFAULT 0,
+    currentStreak INTEGER DEFAULT 0,
+    maxStreak INTEGER DEFAULT 0,
+    totalHintsBought INTEGER DEFAULT 0,
+    lastStreakDate TEXT,
+    FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+  )`, () => {
+      // Check if the history has already been migrated
+      db.get("SELECT value FROM ServerSettings WHERE key = 'wordle_history_migrated'", (err, row) => {
+          if (!err && (!row || row.value !== '1')) {
+              console.log("[Migration] Full backfill of Wordle_UserStats from history...");
+              db.run(`
+                  INSERT OR REPLACE INTO Wordle_UserStats (userId, totalPlayed, totalWins, currentStreak, maxStreak, lastStreakDate, totalHintsBought)
+                  SELECT 
+                    userId, 
+                    COUNT(*) as totalPlayed, 
+                    SUM(CASE WHEN won = 1 THEN 1 ELSE 0 END) as totalWins,
+                    0, 0, NULL, 0
+                  FROM Wordle_DailyResults
+                  GROUP BY userId
+              `, (err) => {
+                  if (!err) {
+                      db.run("INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('wordle_history_migrated', '1')");
+                      console.log("[Migration] Wordle history backfill completed.");
+                  } else {
+                      console.error("[Migration] Wordle backfill failed:", err.message);
+                  }
+              });
+          }
+      });
+  });
+
+  // Migration: Add hintUsed to existing Wordle_DailyResults
+  db.run("ALTER TABLE Wordle_DailyResults ADD COLUMN hintUsed BOOLEAN DEFAULT 0", () => { });
 
   // Phase 19 Migration: Remove sessionLog column from GameScores
   db.all("PRAGMA table_info(GameScores)", (err, cols) => {
@@ -3301,10 +3349,114 @@ const saveDailyWord = (date, word) => {
   });
 };
 
+const validateWordleWord = (word) => {
+  return new Promise((resolve, reject) => {
+    db.get("SELECT word FROM wordle_dictionary WHERE word = ?", [word.toUpperCase()], (err, row) => {
+      if (err) reject(err);
+      else resolve(!!row);
+    });
+  });
+};
+
+const completeWordleGame = (userId, date, guesses, won, earnedCoins) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+
+      const today = new Date().toISOString().split('T')[0];
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterday = yesterdayDate.toISOString().split('T')[0];
+
+      // 1. Save Result
+      const saveResult = `
+        INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) 
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(userId, date) DO UPDATE SET
+          guesses = excluded.guesses,
+          won = excluded.won,
+          earnedCoins = excluded.earnedCoins
+      `;
+      
+      db.run(saveResult, [userId, date, JSON.stringify(guesses), won ? 1 : 0, earnedCoins], function(err) {
+        if (err) return db.run('ROLLBACK', () => reject(err));
+
+        const proceedToStats = () => {
+          // 3. Update Stats
+          db.get('SELECT * FROM Wordle_UserStats WHERE userId = ?', [userId], (err, stats) => {
+            if (err) return db.run('ROLLBACK', () => reject(err));
+
+            const isDaily = (date === today);
+            let currentStreak = stats ? stats.currentStreak : 0;
+            let maxStreak = stats ? stats.maxStreak : 0;
+            let lastStreakDate = stats ? stats.lastStreakDate : null;
+
+            if (isDaily) {
+              if (won) {
+                if (lastStreakDate === yesterday) {
+                  currentStreak += 1;
+                } else {
+                  currentStreak = 1;
+                }
+              } else {
+                currentStreak = 0;
+              }
+              lastStreakDate = today;
+              maxStreak = Math.max(maxStreak, currentStreak);
+            }
+
+            const upsertStats = `
+              INSERT INTO Wordle_UserStats (userId, totalPlayed, totalWins, currentStreak, maxStreak, lastStreakDate)
+              VALUES (?, 1, ?, ?, ?, ?)
+              ON CONFLICT(userId) DO UPDATE SET
+                totalPlayed = totalPlayed + 1,
+                totalWins = totalWins + ?,
+                currentStreak = ?,
+                maxStreak = ?,
+                lastStreakDate = ?
+            `;
+
+            db.run(upsertStats, [
+              userId, won ? 1 : 0, currentStreak, maxStreak, lastStreakDate,
+              won ? 1 : 0, currentStreak, maxStreak, lastStreakDate
+            ], (err) => {
+              if (err) return db.run('ROLLBACK', () => reject(err));
+
+              db.run('COMMIT', (err) => {
+                if (err) reject(err);
+                else resolve({ success: true });
+              });
+            });
+          });
+        };
+
+        // 2. Award Coins
+        if (earnedCoins > 0) {
+          db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [earnedCoins, userId], (err) => {
+            if (err) return db.run('ROLLBACK', () => reject(err));
+            
+            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, earnedCoins, `Wordle Daily Reward (${date})`], (err) => {
+               if (err) return db.run('ROLLBACK', () => reject(err));
+               proceedToStats();
+            });
+          });
+        } else {
+          proceedToStats();
+        }
+      });
+    });
+  });
+};
+
 const saveWordleResult = (userId, date, guesses, won, earnedCoins) => {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) VALUES (?, ?, ?, ?, ?)',
+      `INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) 
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(userId, date) DO UPDATE SET
+         guesses = excluded.guesses,
+         won = excluded.won,
+         earnedCoins = excluded.earnedCoins`,
       [userId, date, JSON.stringify(guesses), won ? 1 : 0, earnedCoins],
       function(err) {
         if (err) reject(err);
@@ -3314,11 +3466,75 @@ const saveWordleResult = (userId, date, guesses, won, earnedCoins) => {
   });
 };
 
+const buyWordleHint = (userId, date) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+
+      // 1. Check balance and existing hint status
+      const checkQuery = `
+        SELECT u.koala_balance, r.hintUsed 
+        FROM Users u
+        LEFT JOIN Wordle_DailyResults r ON u.id = r.userId AND r.date = ?
+        WHERE u.id = ?
+      `;
+
+      db.get(checkQuery, [date, userId], (err, row) => {
+        if (err || !row) {
+          return db.run('ROLLBACK', () => reject(err || new Error('Benutzer nicht gefunden')));
+        }
+
+        if (row.hintUsed) {
+          return db.run('ROLLBACK', () => reject(new Error('Tipp wurde bereits gekauft.')));
+        }
+
+        if (row.koala_balance < 500) {
+          return db.run('ROLLBACK', () => reject(new Error('Nicht genügend Koala Coins (5 KC benötigt).')));
+        }
+
+        // 2. Deduct coins
+        db.run('UPDATE Users SET koala_balance = koala_balance - 500 WHERE id = ?', [userId], (err) => {
+          if (err) return db.run('ROLLBACK', () => reject(err));
+
+          // 3. Log transaction
+          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, -500, `Wordle Hint (${date})`], (err) => {
+            if (err) return db.run('ROLLBACK', () => reject(err));
+
+            // 4. Mark hintUsed (Upsert because result might not exist yet)
+            const upsertHint = `
+              INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins, hintUsed)
+              VALUES (?, ?, '[]', 0, 0, 1)
+              ON CONFLICT(userId, date) DO UPDATE SET hintUsed = 1
+            `;
+            db.run(upsertHint, [userId, date], (err) => {
+              if (err) return db.run('ROLLBACK', () => reject(err));
+
+              // 5. Update Stats Table (Total Hints)
+              const updateHintStats = `
+                INSERT INTO Wordle_UserStats (userId, totalHintsBought) VALUES (?, 1)
+                ON CONFLICT(userId) DO UPDATE SET totalHintsBought = totalHintsBought + 1
+              `;
+              db.run(updateHintStats, [userId], (err) => {
+                if (err) return db.run('ROLLBACK', () => reject(err));
+
+                db.run('COMMIT', (err) => {
+                  if (err) reject(err);
+                  else resolve({ success: true, newBalance: row.koala_balance - 500 });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+};
+
 const getWordleStatus = (userId, date) => {
   return new Promise((resolve, reject) => {
     db.get('SELECT * FROM Wordle_DailyResults WHERE userId = ? AND date = ?', [userId, date], (err, row) => {
       if (err) reject(err);
-      else resolve(row ? { ...row, guesses: JSON.parse(row.guesses), won: !!row.won } : null);
+      else resolve(row ? { ...row, guesses: JSON.parse(row.guesses), won: !!row.won, hintUsed: !!row.hintUsed } : null);
     });
   });
 };
@@ -3326,15 +3542,31 @@ const getWordleStatus = (userId, date) => {
 const getWordleDailyLeaderboard = (date) => {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT r.*, u.username, u.displayName, u.preferences
+      SELECT 
+        r.*, 
+        u.username, u.displayName, u.preferences,
+        s.totalPlayed, s.totalWins, s.currentStreak, s.maxStreak, s.totalHintsBought
       FROM Wordle_DailyResults r
       JOIN Users u ON r.userId = u.id
+      LEFT JOIN Wordle_UserStats s ON r.userId = s.userId
       WHERE r.date = ?
       ORDER BY r.won DESC, r.earnedCoins DESC, r.id ASC
     `;
     db.all(query, [date], (err, rows) => {
       if (err) reject(err);
-      else resolve(rows.map(r => ({ ...r, guesses: JSON.parse(r.guesses), won: !!r.won })));
+      else resolve(rows.map(r => ({ 
+        ...r, 
+        guesses: JSON.parse(r.guesses), 
+        won: !!r.won, 
+        hintUsed: !!r.hintUsed,
+        stats: {
+           totalPlayed: r.totalPlayed || 0,
+           totalWins: r.totalWins || 0,
+           currentStreak: r.currentStreak || 0,
+           maxStreak: r.maxStreak || 0,
+           totalHintsBought: r.totalHintsBought || 0
+        }
+      })));
     });
   });
 };
@@ -3503,6 +3735,24 @@ const getGameLeaderboards = (gameId) => {
           resolve({ highscores, cumulative });
         })
         .catch(reject);
+      return;
+    }
+
+    if (gameId === 'wordle') {
+      const statsQuery = `
+        SELECT u.displayName, u.username, u.preferences, u.id as userId,
+               ws.totalWins, ws.currentStreak, ws.maxStreak, ws.totalPlayed, ws.totalHintsBought
+        FROM Wordle_UserStats ws
+        JOIN Users u ON ws.userId = u.id
+        ORDER BY ws.totalWins DESC, ws.maxStreak DESC
+        LIMIT 50
+      `;
+
+      db.all(statsQuery, [], (err, rows) => {
+        if (err) return reject(err);
+        // Map to return as cumulative/highscore structure to keep frontend simple
+        resolve({ highscores: rows, cumulative: rows });
+      });
       return;
     }
 
@@ -4569,8 +4819,11 @@ module.exports = {
   getDailyWord,
   saveDailyWord,
   saveWordleResult,
+  completeWordleGame,
+  validateWordleWord,
   getWordleStatus,
   getWordleDailyLeaderboard,
+  buyWordleHint,
   updateUserGameStats,
   updateUserBalance,
   getGlobalGameStats,
@@ -5117,6 +5370,19 @@ module.exports = {
         if (err) reject(err);
         else resolve(this.lastID || this.changes);
       });
+    });
+  },
+
+  updateWordleWordMetadataById: (id, definition, funnyQuote) => {
+    return new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE wordle_dictionary SET definition = ?, funny_quote = ? WHERE id = ?',
+        [definition, funnyQuote, id],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
     });
   },
 

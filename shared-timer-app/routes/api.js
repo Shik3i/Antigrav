@@ -213,6 +213,8 @@ router.put('/admin/polymarket/settings', authController.authenticateToken, polym
 router.get('/wordle/daily', authController.optionalAuthenticateToken, wordleController.getDailyGame);
 router.get('/wordle/daily/leaderboard', authController.authenticateToken, wordleController.getDailyLeaderboard);
 router.post('/wordle/daily', authController.authenticateToken, wordleController.submitDailyResult);
+router.post('/wordle/daily/hint', authController.authenticateToken, wordleController.buyDailyHint);
+router.post('/wordle/validate', wordleController.validateWord);
 router.get('/wordle/random', wordleController.getRandomWord);
 router.get('/wordle/dictionary', wordleController.getDictionary);
 
@@ -221,6 +223,7 @@ router.get('/admin/wordle/dictionary', authController.authenticateToken, wordleC
 router.get('/admin/wordle/export', authController.authenticateToken, wordleController.adminExportDictionary);
 router.post('/admin/wordle/dictionary', authController.authenticateToken, wordleController.adminAddWord);
 router.delete('/admin/wordle/dictionary/:id', authController.authenticateToken, wordleController.adminDeleteWord);
+router.patch('/admin/wordle/dictionary/:id', authController.authenticateToken, wordleController.adminUpdateWordMetadata);
 router.post('/admin/wordle/bulk-update', authController.authenticateToken, wordleController.adminBulkUpdateMetadata);
 
 // ─── Color Sync (Color Guessing Game) ─────────────────────────
