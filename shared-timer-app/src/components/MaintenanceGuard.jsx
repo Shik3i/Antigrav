@@ -51,46 +51,46 @@ const MaintenanceGuard = ({ children }) => {
     // Case 3: Locked and Superadmin -> Show page with warning banner
     return (
         <div style={{ 
-            position: 'relative', 
-            width: '100%', 
-            height: '100%', 
             display: 'flex', 
             flexDirection: 'column',
-            overflow: 'hidden' // Only hide overflow in admin-debug view
+            width: '100%',
+            height: '100%',
+            position: 'relative'
         }}>
+            {/* Optimized Admin Banner (High Visibility) */}
             <div style={{
-                position: 'sticky',
-                top: '-2rem', // Adjusted for padding in App.jsx
-                zIndex: 99,
                 background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
                 color: '#000',
-                padding: '12px 24px',
+                padding: '14px 20px',
                 textAlign: 'center',
-                fontWeight: 700,
-                fontSize: '0.9rem',
+                fontWeight: 800,
+                fontSize: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                borderBottom: '1px solid rgba(0,0,0,0.1)',
-                margin: '-2rem -2rem 1.5rem -2rem',
-                backdropFilter: 'blur(8px)',
+                zIndex: 1000,
+                boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                borderBottom: '3px solid rgba(0,0,0,0.15)',
+                borderRadius: '8px',
+                marginBottom: '24px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
             }}>
-                <LucideIcons.ShieldAlert size={20} />
-                <span>⚠️ Wartungsmodus aktiv: Diese Seite ist aktuell für normale User gesperrt.</span>
-                <div style={{
-                    background: 'rgba(0,0,0,0.1)',
-                    padding: '4px 12px',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.05em'
+                <span style={{ fontSize: '20px' }}>🛡️</span>
+                <span>Wartungsmodus aktiv: Diese Seite ist aktuell für normale User gesperrt.</span>
+                <span style={{
+                    background: 'rgba(0,0,0,0.15)',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    marginLeft: '8px'
                 }}>
-                    ADMIN VIEW
-                </div>
+                    ADMIN ONLY
+                </span>
             </div>
-            <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+            
+            <div style={{ flex: 1, width: '100%', height: '100%', position: 'relative' }}>
                 {children}
             </div>
         </div>
