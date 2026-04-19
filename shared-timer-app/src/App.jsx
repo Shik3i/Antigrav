@@ -78,6 +78,8 @@ const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
 const LiveStreamWidget = React.lazy(() => import('./components/LiveStreamWidget'));
 const Friends = React.lazy(() => import('./pages/Friends'));
 const News = React.lazy(() => import('./pages/News'));
+const Impressum = React.lazy(() => import('./pages/Impressum'));
+const Datenschutz = React.lazy(() => import('./pages/Datenschutz'));
 
 // Constants
 const DEFAULT_LEAGUES = ['LEC', 'LCS', 'LCK', 'LPL', 'VCT_LOCK_IN', 'VCT_EMEA', 'VCT_AMERICAS', 'VCT_PACIFIC'];
@@ -484,6 +486,8 @@ function InnerApp() {
                       <Route path="/lotto" element={<LottoImitat />} />
                       <Route path="/news" element={<News socket={activeSocket} />} />
                       <Route path="/c" element={<SharedCountdown />} />
+                      <Route path="/impressum" element={<Impressum />} />
+                      <Route path="/datenschutz" element={<Datenschutz />} />
                       <Route path="*" element={<ProtectedNotFound />} />
                     </Routes>
                   </MaintenanceGuard>

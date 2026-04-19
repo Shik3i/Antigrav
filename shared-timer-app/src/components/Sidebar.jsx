@@ -373,6 +373,12 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     </button>
                 </div>
             )}
+
+            {/* Legal Links */}
+            <div className="mt-4 flex flex-col gap-1 text-xs text-gray-500 text-center pb-2">
+                <Link to="/impressum" onClick={onClose} className="hover:text-gray-300 transition-colors">Impressum</Link>
+                <Link to="/datenschutz" onClick={onClose} className="hover:text-gray-300 transition-colors">Datenschutz</Link>
+            </div>
         </aside>
     );
 };
