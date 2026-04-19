@@ -64,6 +64,8 @@ const Admin = ({ socket }) => {
     const [wordleSearch, setWordleSearch] = useState('');
     const [wordleFilterNoDef, setWordleFilterNoDef] = useState(false);
     const [wordleFilterNoQuote, setWordleFilterNoQuote] = useState(false);
+    const [wordleFilterUsed, setWordleFilterUsed] = useState(false);
+    const [wordleFilterUnused, setWordleFilterUnused] = useState(false);
     const [bulkMetadataInput, setBulkMetadataInput] = useState('');
     const [isBulkUpdating, setIsBulkUpdating] = useState(false);
     const [showWordleImportExport, setShowWordleImportExport] = useState(false);
@@ -3153,6 +3155,26 @@ const Admin = ({ socket }) => {
                                     >
                                         No Quote
                                     </button>
+                                    <button 
+                                        className={wordleFilterUsed ? 'btn-primary' : 'btn-ghost'} 
+                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                                        onClick={() => {
+                                            setWordleFilterUsed(!wordleFilterUsed);
+                                            if (!wordleFilterUsed) setWordleFilterUnused(false);
+                                        }}
+                                    >
+                                        Used
+                                    </button>
+                                    <button 
+                                        className={wordleFilterUnused ? 'btn-primary' : 'btn-ghost'} 
+                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                                        onClick={() => {
+                                            setWordleFilterUnused(!wordleFilterUnused);
+                                            if (!wordleFilterUnused) setWordleFilterUsed(false);
+                                        }}
+                                    >
+                                        Unused
+                                    </button>
                                 </div>
                                 <input 
                                     type="text" 
@@ -3187,6 +3209,8 @@ const Admin = ({ socket }) => {
                                         .filter(w => !wordleSearch || w.word.includes(wordleSearch))
                                         .filter(w => !wordleFilterNoDef || !w.definition)
                                         .filter(w => !wordleFilterNoQuote || !w.funny_quote)
+                                        .filter(w => !wordleFilterUsed || w.is_used === 1)
+                                        .filter(w => !wordleFilterUnused || w.is_used === 0)
                                         .slice(0, 50) 
                                         .map(w => {
                                             const isEditing = editingWordId === w.id;
