@@ -1,5 +1,11 @@
 [
   {
+    "id": 74,
+    "version": "2.44.0",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Room Sync**: Echtzeit-Broadcast fuer Blackjack-Raeume und Seats eingefuehrt, damit Lobby, Join/Leave, Bots und Seat-Wechsel live synchron bleiben.\n- **Blackjack Room Creation**: Explizite Raum-Erstellung ohne Auto-Join umgesetzt und fehlende Raeume in State-Reads sicher mit 404 beantwortet.\n- **Blackjack Bet Validation**: Einsatzpruefung auf kumulative Chip-Totals umgestellt und um harte Gueltigkeitschecks fuer Null, negativ, NaN und Ausreisser erweitert."
+  },
+  {
     "id": 73,
     "version": "2.43.1",
     "date": "2026-04-19",

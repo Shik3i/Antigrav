@@ -52,8 +52,20 @@ function broadcastCoinUpdate(io, userId, newBalanceCents) {
 
 function emitBlackjackState(io, roomId) {
     const state = blackjackRoomManager.getRoomState(roomId);
-    io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
+    if (state) {
+        io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
+    }
     return state;
+}
+
+function emitBlackjackRooms(io, targetSocket = null) {
+    const rooms = blackjackRoomManager.listRooms();
+    if (targetSocket) {
+        targetSocket.emit(EVENTS.BLACKJACK_ROOMS, rooms);
+        return rooms;
+    }
+    io.emit(EVENTS.BLACKJACK_ROOMS, rooms);
+    return rooms;
 }
 
 module.exports = function (io) {
@@ -108,6 +120,52 @@ module.exports = function (io) {
 
         // Send initial list of active rooms to this user only
         broadcastActiveRooms(io, socket);
+        emitBlackjackRooms(io, socket);
+
+        const emitBlackjackStateAndRooms = (roomId, viewerUserId = null) => {
+            const state = roomId ? blackjackRoomManager.getRoomState(roomId, viewerUserId) : null;
+            if (roomId && state) {
+                io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
+            }
+            emitBlackjackRooms(io);
+            return state;
+        };
+
+        const leaveBlackjackRoomForUser = (roomId, userId) => {
+            if (!roomId || !userId) return null;
+            blackjackRoomManager.leaveRoom(roomId, userId);
+            socket.leave(getBlackjackSocketRoom(roomId));
+            socket.data.blackjackRoomId = null;
+            return emitBlackjackStateAndRooms(roomId, userId);
+        };
+
+        const switchBlackjackRoomForUser = async ({ userId, targetRoomId, socketOnly = false }) => {
+            const activeRoomId = socketOnly
+                ? socket.data.blackjackRoomId || null
+                : blackjackRoomManager.getPlayerRoomId(userId);
+
+            if (activeRoomId && activeRoomId !== targetRoomId) {
+                blackjackRoomManager.leaveRoom(activeRoomId, userId);
+                socket.leave(getBlackjackSocketRoom(activeRoomId));
+                emitBlackjackState(io, activeRoomId);
+            }
+
+            const user = await dbLayer.getUser(userId);
+            if (!user) {
+                throw new Error('User not found.');
+            }
+
+            blackjackRoomManager.joinRoom(targetRoomId, {
+                userId,
+                username: user.username || user.displayName,
+                displayName: user.displayName || user.username
+            });
+
+            socket.join(getBlackjackSocketRoom(targetRoomId));
+            socket.data.blackjackRoomId = targetRoomId;
+            await persistBlackjackSettlementIfNeeded(targetRoomId);
+            return emitBlackjackStateAndRooms(targetRoomId, userId);
+        };
 
         socket.on(EVENTS.GET_FRIENDS_STATUS, async () => {
             if (!socket.user) return;
@@ -574,7 +632,7 @@ module.exports = function (io) {
             }
         });
 
-        socket.on(EVENTS.BLACKJACK_JOIN, async ({ roomId, maxPlayers } = {}, ack) => {
+        socket.on(EVENTS.BLACKJACK_CREATE_ROOM, ({ roomId, maxPlayers } = {}, ack) => {
             try {
                 const userId = socket.user?.userId;
                 if (!userId) {
@@ -584,30 +642,74 @@ module.exports = function (io) {
                     return;
                 }
 
-                const user = await dbLayer.getUser(userId);
-                if (!user) {
-                    const payload = { success: false, error: 'User not found.' };
+                const safeMaxPlayers = Number(maxPlayers);
+                if (![3, 5].includes(safeMaxPlayers)) {
+                    throw new Error('Invalid blackjack table size.');
+                }
+
+                const room = blackjackRoomManager.createRoom(roomId, safeMaxPlayers);
+                emitBlackjackRooms(io);
+                sendSocketAck(ack, { success: true, roomId: room.roomId, room });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to create blackjack room.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to create blackjack room.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_JOIN, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    const payload = { success: false, error: 'Authentication required.' };
                     socket.emit(EVENTS.BLACKJACK_ERROR, payload.error);
                     sendSocketAck(ack, payload);
                     return;
                 }
 
-                const safeMaxPlayers = Number(maxPlayers) === 3 ? 3 : 5;
-                const resolvedRoomId = roomId || `blackjack-main-${safeMaxPlayers}`;
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
 
-                blackjackRoomManager.joinRoom(resolvedRoomId, {
+                const state = await switchBlackjackRoomForUser({
                     userId,
-                    username: user.username || user.displayName,
-                    displayName: user.displayName || user.username
-                }, safeMaxPlayers);
-
-                socket.join(getBlackjackSocketRoom(resolvedRoomId));
-                await persistBlackjackSettlementIfNeeded(resolvedRoomId);
-                const state = emitBlackjackState(io, resolvedRoomId);
-                sendSocketAck(ack, { success: true, roomId: resolvedRoomId, state });
+                    targetRoomId: roomId,
+                    socketOnly: false
+                });
+                sendSocketAck(ack, { success: true, roomId, state });
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to join blackjack table.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to join blackjack table.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_SWITCH_ROOM, async ({ fromRoomId, roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                const previousRoomId = fromRoomId || socket.data.blackjackRoomId || blackjackRoomManager.getPlayerRoomId(userId);
+                if (previousRoomId && previousRoomId !== roomId) {
+                    blackjackRoomManager.leaveRoom(previousRoomId, userId);
+                    socket.leave(getBlackjackSocketRoom(previousRoomId));
+                    socket.data.blackjackRoomId = null;
+                    emitBlackjackState(io, previousRoomId);
+                }
+
+                const state = await switchBlackjackRoomForUser({
+                    userId,
+                    targetRoomId: roomId,
+                    socketOnly: true
+                });
+
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to switch blackjack room.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to switch blackjack room.' });
             }
         });
 
@@ -628,16 +730,49 @@ module.exports = function (io) {
                     return;
                 }
 
-                blackjackRoomManager.leaveRoom(roomId, userId);
-                socket.leave(getBlackjackSocketRoom(roomId));
-                const state = blackjackRoomManager.getRoomState(roomId, userId);
-                if (state) {
-                    io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
-                }
+                const state = leaveBlackjackRoomForUser(roomId, userId);
                 sendSocketAck(ack, { success: true, roomId, state });
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to leave blackjack table.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to leave blackjack table.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_ADD_BOT, ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.addBot(roomId);
+                const state = emitBlackjackStateAndRooms(roomId, userId);
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to add blackjack bot.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to add blackjack bot.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_SWITCH_SEAT, ({ roomId, seat } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.moveSeat(roomId, userId, Number.parseInt(seat, 10));
+                const state = emitBlackjackStateAndRooms(roomId, userId);
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to switch blackjack seat.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to switch blackjack seat.' });
             }
         });
 
@@ -1193,11 +1328,10 @@ module.exports = function (io) {
                     userSockets.delete(socket.id);
                     if (userSockets.size === 0) {
                         blackjackRoomManager.rooms.forEach((room, roomId) => {
-                            const state = blackjackRoomManager.leaveRoom(roomId, userId);
-                            if (state) {
-                                io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, blackjackRoomManager.getRoomState(roomId, userId));
-                            }
+                            blackjackRoomManager.leaveRoom(roomId, userId);
+                            emitBlackjackState(io, roomId);
                         });
+                        emitBlackjackRooms(io);
                         onlineUsers.delete(userId);
                         broadcastFriendStatus(io, userId, false);
                     }
@@ -1299,6 +1433,9 @@ module.exports = function (io) {
                 console.error('Blackjack tick failed:', err);
             }
         });
+        if (blackjackChangedRooms.length > 0) {
+            emitBlackjackRooms(io);
+        }
     }, 1000); // 1Hz sync is enough since clients will animate the visual themselves
 
     return io;

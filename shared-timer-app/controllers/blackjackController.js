@@ -1,5 +1,6 @@
 const dbLayer = require('../database');
 const blackjackRoomManager = require('../utils/blackjackRoomManager');
+const EVENTS = require('../socketEvents.json');
 
 const DEFAULT_MAX_PLAYERS = 5;
 const DEFAULT_ROOM_ID = 'blackjack-main-5';
@@ -7,6 +8,8 @@ const DEFAULT_ROOM_ID = 'blackjack-main-5';
 const getUserId = (req) => req.user?.userId || req.user?.id || null;
 
 const getIo = (req) => req.app?.get('io') || req.app?.get('socketio') || null;
+const BLACKJACK_ROOM_PREFIX = 'blackjack:';
+const getBlackjackSocketRoom = (roomId) => `${BLACKJACK_ROOM_PREFIX}${roomId}`;
 
 const emitBalanceUpdates = (req, updates = []) => {
   const io = getIo(req);
@@ -17,6 +20,17 @@ const emitBalanceUpdates = (req, updates = []) => {
       io.to(entry.userId).emit('COIN_BALANCE_UPDATE', { balance: entry.balance });
     }
   });
+};
+
+const emitBlackjackSync = (req, roomId, viewerUserId = null) => {
+  const io = getIo(req);
+  if (!io) return;
+
+  const state = roomId ? blackjackRoomManager.getRoomState(roomId, viewerUserId) : null;
+  if (roomId && state) {
+    io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
+  }
+  io.emit(EVENTS.BLACKJACK_ROOMS, blackjackRoomManager.listRooms());
 };
 
 function resolveRoomRequest(req) {
@@ -57,9 +71,11 @@ exports.getState = async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const { roomId, maxPlayers } = resolveRoomRequest(req);
-    blackjackRoomManager.getOrCreateRoom(roomId, maxPlayers);
+    const { roomId } = resolveRoomRequest(req);
     const state = blackjackRoomManager.getRoomState(roomId, userId);
+    if (!state) {
+      return res.status(404).json({ roomId, state: null, error: 'Blackjack room not found' });
+    }
     res.json({ roomId, state });
   } catch (err) {
     console.error('[Blackjack] Error fetching room state:', err);
@@ -91,12 +107,13 @@ exports.joinTable = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { roomId, maxPlayers } = resolveRoomRequest(req);
+    const { roomId } = resolveRoomRequest(req);
     blackjackRoomManager.joinRoom(roomId, {
       userId,
       username: user.username || user.displayName,
       displayName: user.displayName || user.username
-    }, maxPlayers);
+    });
+    emitBlackjackSync(req, roomId, userId);
 
     res.json({
       success: true,
@@ -118,6 +135,7 @@ exports.leaveTable = async (req, res) => {
 
     const { roomId } = resolveRoomRequest(req);
     const room = blackjackRoomManager.leaveRoom(roomId, userId);
+    emitBlackjackSync(req, roomId, userId);
     res.json({
       success: true,
       roomId,
@@ -135,8 +153,9 @@ exports.addBot = async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const { roomId, maxPlayers } = resolveRoomRequest(req);
-    const room = blackjackRoomManager.addBot(roomId, maxPlayers);
+    const { roomId } = resolveRoomRequest(req);
+    const room = blackjackRoomManager.addBot(roomId);
+    emitBlackjackSync(req, roomId, userId);
     res.json({
       success: true,
       roomId,
@@ -158,6 +177,7 @@ exports.switchSeat = async (req, res) => {
     const { roomId } = resolveRoomRequest(req);
     const targetSeat = Number.parseInt(req.body?.seat, 10);
     const room = blackjackRoomManager.moveSeat(roomId, userId, targetSeat);
+    emitBlackjackSync(req, roomId, userId);
     res.json({
       success: true,
       roomId,
