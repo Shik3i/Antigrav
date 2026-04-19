@@ -375,9 +375,13 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
             )}
 
             {/* Legal Links */}
-            <div className="mt-4 flex flex-col gap-1 text-xs text-gray-500 text-center pb-2">
-                <Link to="/impressum" onClick={onClose} className="hover:text-gray-300 transition-colors">Impressum</Link>
-                <Link to="/datenschutz" onClick={onClose} className="hover:text-gray-300 transition-colors">Datenschutz</Link>
+            <div className="mt-4 pt-4 border-t border-white/5 flex flex-col gap-2 items-center pb-2">
+                <div className="flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.15em] text-gray-500">
+                    <Link to="/impressum" onClick={onClose} className="hover:text-blue-400 transition-colors px-1">Impressum</Link>
+                    <span className="opacity-20 text-[8px]">•</span>
+                    <Link to="/datenschutz" onClick={onClose} className="hover:text-green-400 transition-colors px-1">Datenschutz</Link>
+                </div>
+                <div className="text-[9px] text-gray-600 font-medium opacity-50">© {new Date().getFullYear()} KoalaSync</div>
             </div>
         </aside>
     );
