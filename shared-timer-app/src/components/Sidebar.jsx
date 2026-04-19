@@ -374,14 +374,47 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 </div>
             )}
 
-            {/* Legal Links */}
-            <div className="mt-4 pt-4 border-t border-white/5 flex flex-col gap-2 items-center pb-2">
-                <div className="flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.15em] text-gray-500">
-                    <Link to="/impressum" onClick={onClose} className="hover:text-blue-400 transition-colors px-1">Impressum</Link>
-                    <span className="opacity-20 text-[8px]">•</span>
-                    <Link to="/datenschutz" onClick={onClose} className="hover:text-green-400 transition-colors px-1">Datenschutz</Link>
+            {/* Platform Meta Section */}
+            <div className="mt-auto pt-6 px-4 pb-4">
+                <div className="glass-card bg-black/20 border border-white/5 p-3 rounded-2xl transition-all hover:bg-black/30 group">
+                    <div className="flex items-center justify-around mb-2">
+                        <Link 
+                            to="/impressum" 
+                            onClick={onClose} 
+                            className="flex flex-col items-center gap-1 text-gray-500 hover:text-blue-400 transition-all duration-300 transform hover:scale-110"
+                            title="Impressum & Rechtliches"
+                        >
+                            <div className="p-1.5 bg-white/5 rounded-lg group-hover:bg-blue-400/10 transition-colors">
+                                <Info size={14} />
+                            </div>
+                            <span className="text-[8px] font-black uppercase tracking-wider">Legal</span>
+                        </Link>
+
+                        <div className="w-[1px] h-8 bg-white/5" />
+
+                        <Link 
+                            to="/datenschutz" 
+                            onClick={onClose} 
+                            className="flex flex-col items-center gap-1 text-gray-500 hover:text-green-400 transition-all duration-300 transform hover:scale-110"
+                            title="Datenschutzerklärung"
+                        >
+                            <div className="p-1.5 bg-white/5 rounded-lg group-hover:bg-green-400/10 transition-colors">
+                                <ShieldCheck size={14} />
+                            </div>
+                            <span className="text-[8px] font-black uppercase tracking-wider">Privacy</span>
+                        </Link>
+                    </div>
+                    
+                    <div className="border-t border-white/5 pt-2 flex flex-col items-center">
+                        <span className="text-[7px] text-gray-600 font-bold uppercase tracking-[0.4em] opacity-40">
+                            KoalaSync Global Infrastructure
+                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+                            <span className="text-[8px] text-gray-500 font-bold">Node v2.3.0 · {new Date().getFullYear()}</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="text-[9px] text-gray-600 font-medium opacity-50">© {new Date().getFullYear()} KoalaSync</div>
             </div>
         </aside>
     );
