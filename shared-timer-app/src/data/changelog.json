@@ -1,5 +1,11 @@
 [
   {
+    "id": 66,
+    "version": "2.41.0",
+    "date": "2026-04-19",
+    "changes": "- **Rechtliche Absicherung**: Umfassendes Update von Impressum und Datenschutz gemäß aktuellem DDG (Digitale-Dienste-Gesetz).\n- **Bot-Schutz (Spam-Security)**: Implementierung eines interaktiven \"Click-to-Reveal\" Schutzes für alle E-Mail-Adressen sowie zusätzliche Obfuskation im gerenderten DOM zur Abwehr von Scrapern.\n- **Inhaltliche Erweiterung**: Integration von Haftungsausschlüssen für Inhalte und Links, Urheberrechtshinweisen sowie einem speziellen Abschnitt für den Datenschutzbeauftragten.\n- **UI-Alignment**: Perfekte optische Integration in das App-Design-System mittels Glassmorphismus und systemweiten CSS-Variablen."
+  },
+  {
     "id": 65,
     "version": "2.40.0",
     "date": "2026-04-19",

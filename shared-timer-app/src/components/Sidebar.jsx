@@ -374,47 +374,10 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 </div>
             )}
 
-            {/* Platform Meta Section */}
-            <div className="mt-auto pt-6 px-4 pb-4">
-                <div className="glass-card bg-black/20 border border-white/5 p-3 rounded-2xl transition-all hover:bg-black/30 group">
-                    <div className="flex items-center justify-around mb-2">
-                        <Link 
-                            to="/impressum" 
-                            onClick={onClose} 
-                            className="flex flex-col items-center gap-1 text-gray-500 hover:text-blue-400 transition-all duration-300 transform hover:scale-110"
-                            title="Impressum & Rechtliches"
-                        >
-                            <div className="p-1.5 bg-white/5 rounded-lg group-hover:bg-blue-400/10 transition-colors">
-                                <Info size={14} />
-                            </div>
-                            <span className="text-[8px] font-black uppercase tracking-wider">Legal</span>
-                        </Link>
-
-                        <div className="w-[1px] h-8 bg-white/5" />
-
-                        <Link 
-                            to="/datenschutz" 
-                            onClick={onClose} 
-                            className="flex flex-col items-center gap-1 text-gray-500 hover:text-green-400 transition-all duration-300 transform hover:scale-110"
-                            title="Datenschutzerklärung"
-                        >
-                            <div className="p-1.5 bg-white/5 rounded-lg group-hover:bg-green-400/10 transition-colors">
-                                <ShieldCheck size={14} />
-                            </div>
-                            <span className="text-[8px] font-black uppercase tracking-wider">Privacy</span>
-                        </Link>
-                    </div>
-                    
-                    <div className="border-t border-white/5 pt-2 flex flex-col items-center">
-                        <span className="text-[7px] text-gray-600 font-bold uppercase tracking-[0.4em] opacity-40">
-                            KoalaSync Global Infrastructure
-                        </span>
-                        <div className="flex items-center gap-2 mt-1">
-                            <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
-                            <span className="text-[8px] text-gray-500 font-bold">Node v2.3.0 · {new Date().getFullYear()}</span>
-                        </div>
-                    </div>
-                </div>
+            {/* Legal Links */}
+            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '16px', paddingBottom: '8px' }}>
+                <Link to="/impressum" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Impressum</Link>
+                <Link to="/datenschutz" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Datenschutz</Link>
             </div>
         </aside>
     );
