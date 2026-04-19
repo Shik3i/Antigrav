@@ -530,7 +530,7 @@ const Blackjack = ({ socket }) => {
   const [now, setNow] = useState(() => Date.now());
   const [betAdjustMode, setBetAdjustMode] = useState('add');
   const [autoBetEnabled, setAutoBetEnabled] = useState(() => localStorage.getItem('blackjack_auto_bet') === 'true');
-  const previousRoomIdRef = useRef(null);
+  const joinedRoomIdRef = useRef(null);
 
   const roomId = useMemo(() => currentRoomId || getRoomId(selectedTable), [currentRoomId, selectedTable]);
   const mySeat = useMemo(() => roomState?.players?.find((player) => player.userId === user?.id) || null, [roomState?.players, user?.id]);
@@ -647,6 +647,10 @@ const Blackjack = ({ socket }) => {
       const data = await fetchJson(`/api/blackjack/state?roomId=${encodeURIComponent(roomId)}&maxPlayers=${selectedTable}`);
       setRoomState(data.state || null);
     } catch (err) {
+      if (err.status === 404) {
+        setRoomState(null);
+        return;
+      }
       console.error('Failed to load blackjack fallback state:', err);
       setError(err.message || 'Blackjack-Status konnte nicht geladen werden.');
     }
@@ -681,15 +685,14 @@ const Blackjack = ({ socket }) => {
   }, [loadLeaderboard]);
 
   useEffect(() => {
-    loadRooms();
-  }, [loadRooms, roomState?.players?.length, roomState?.status, roomId]);
-
-  useEffect(() => {
     if (isGuest || !socket) return undefined;
 
     const handleState = (state) => {
       setRoomState(state);
       setError('');
+    };
+    const handleRooms = (rooms) => {
+      setAvailableRooms(Array.isArray(rooms) ? rooms : []);
     };
     const handleError = (message) => {
       setError(message || 'Blackjack-Fehler');
@@ -697,12 +700,25 @@ const Blackjack = ({ socket }) => {
       loadFallbackState();
     };
     const handleConnect = () => {
-      runSocketAction(EVENTS.BLACKJACK_JOIN, { roomId, maxPlayers: selectedTable }).catch((err) => {
+      const previouslyJoinedRoom = joinedRoomIdRef.current;
+      const eventName = previouslyJoinedRoom && previouslyJoinedRoom !== roomId
+        ? EVENTS.BLACKJACK_SWITCH_ROOM
+        : EVENTS.BLACKJACK_JOIN;
+      const payload = eventName === EVENTS.BLACKJACK_SWITCH_ROOM
+        ? { fromRoomId: previouslyJoinedRoom, roomId, maxPlayers: selectedTable }
+        : { roomId };
+
+      runSocketAction(eventName, payload)
+        .then((response) => {
+          joinedRoomIdRef.current = response?.roomId || roomId;
+        })
+        .catch((err) => {
         setError(err.message);
       });
     };
 
     socket.on(EVENTS.BLACKJACK_STATE, handleState);
+    socket.on(EVENTS.BLACKJACK_ROOMS, handleRooms);
     socket.on(EVENTS.BLACKJACK_ERROR, handleError);
     socket.on(EVENTS.CONNECT, handleConnect);
 
@@ -712,20 +728,11 @@ const Blackjack = ({ socket }) => {
 
     return () => {
       socket.off(EVENTS.BLACKJACK_STATE, handleState);
+      socket.off(EVENTS.BLACKJACK_ROOMS, handleRooms);
       socket.off(EVENTS.BLACKJACK_ERROR, handleError);
       socket.off(EVENTS.CONNECT, handleConnect);
     };
   }, [isGuest, roomId, runSocketAction, selectedTable, showToast, socket]);
-
-  useEffect(() => {
-    if (isGuest || !socket) return;
-
-    const previousRoomId = previousRoomIdRef.current;
-    if (socket.connected && previousRoomId && previousRoomId !== roomId) {
-      socket.emit(EVENTS.BLACKJACK_LEAVE, { roomId: previousRoomId });
-    }
-    previousRoomIdRef.current = roomId;
-  }, [isGuest, roomId, socket]);
 
   useEffect(() => {
     const handleCoinUpdate = ({ balance }) => syncBalance(balance);
@@ -744,7 +751,6 @@ const Blackjack = ({ socket }) => {
     try {
       await runSocketAction(EVENTS.BLACKJACK_BET, { roomId, amount: pendingBet });
       showToast(`Einsatz von ${formatKC(pendingBet)} gesetzt.`, 'success');
-      await loadRooms();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -766,7 +772,6 @@ const Blackjack = ({ socket }) => {
     }
 
     runSocketAction(EVENTS.BLACKJACK_BET, { roomId, amount: pendingBet })
-      .then(() => loadRooms())
       .catch((err) => {
         setError(err.message);
       });
@@ -774,7 +779,6 @@ const Blackjack = ({ socket }) => {
     actionBusy,
     autoBetEnabled,
     isGuest,
-    loadRooms,
     mySeat?.currentBet,
     mySeat?.userId,
     pendingBet,
@@ -789,7 +793,6 @@ const Blackjack = ({ socket }) => {
     try {
       await runSocketAction(eventName, { roomId });
       await loadLeaderboard();
-      await loadRooms();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -806,29 +809,33 @@ const Blackjack = ({ socket }) => {
     setError('');
   }, [selectedTable]);
 
-  const handleCreateRoom = useCallback(() => {
+  const handleCreateRoom = useCallback(async () => {
     const nextRoomId = normalizeRoomSlug(roomDraft, selectedTable);
-    setRoomDraft('');
-    handleSwitchRoom(nextRoomId, selectedTable);
-  }, [handleSwitchRoom, roomDraft, selectedTable]);
-
-  const handleAddBot = useCallback(async (targetRoomId, targetMaxPlayers = selectedTable) => {
     setActionBusy(true);
     setError('');
     try {
-      await fetchJson('/api/blackjack/table/add-bot', {
-        method: 'POST',
-        body: JSON.stringify({ roomId: targetRoomId, maxPlayers: targetMaxPlayers })
-      });
-      await loadRooms();
-      await loadFallbackState();
+      await runSocketAction(EVENTS.BLACKJACK_CREATE_ROOM, { roomId: nextRoomId, maxPlayers: selectedTable });
+      setRoomDraft('');
+      showToast(`Tisch ${nextRoomId} erstellt.`, 'success');
+    } catch (err) {
+      setError(err.message || 'Tisch konnte nicht erstellt werden.');
+    } finally {
+      setActionBusy(false);
+    }
+  }, [roomDraft, runSocketAction, selectedTable, showToast]);
+
+  const handleAddBot = useCallback(async (targetRoomId) => {
+    setActionBusy(true);
+    setError('');
+    try {
+      await runSocketAction(EVENTS.BLACKJACK_ADD_BOT, { roomId: targetRoomId });
       showToast('Blackjack-Bot hinzugefuegt.', 'success');
     } catch (err) {
       setError(err.message || 'Bot konnte nicht hinzugefuegt werden.');
     } finally {
       setActionBusy(false);
     }
-  }, [loadFallbackState, loadRooms, selectedTable, showToast]);
+  }, [runSocketAction, showToast]);
 
   const handleSeatSwitch = useCallback(async (seatPlayer) => {
     if (!canSwitchSeats || !mySeat?.seat) return;
@@ -837,19 +844,14 @@ const Blackjack = ({ socket }) => {
     setActionBusy(true);
     setError('');
     try {
-      const response = await fetchJson('/api/blackjack/table/switch-seat', {
-        method: 'POST',
-        body: JSON.stringify({ roomId, seat: actualSeat, maxPlayers: roomState?.maxPlayers || selectedTable })
-      });
-      setRoomState(response.state || null);
-      await loadRooms();
+      await runSocketAction(EVENTS.BLACKJACK_SWITCH_SEAT, { roomId, seat: actualSeat });
       showToast(`Du sitzt jetzt auf Platz ${actualSeat}.`, 'success');
     } catch (err) {
       setError(err.message || 'Platzwechsel fehlgeschlagen.');
     } finally {
       setActionBusy(false);
     }
-  }, [canSwitchSeats, loadRooms, mySeat?.seat, roomId, roomState?.maxPlayers, selectedTable, showToast]);
+  }, [canSwitchSeats, mySeat?.seat, roomId, roomState?.maxPlayers, runSocketAction, selectedTable, showToast]);
 
   if (pageLoading) {
     return (
@@ -1751,8 +1753,8 @@ const Blackjack = ({ socket }) => {
             <div style={{ color: 'rgba(255,255,255,0.46)', fontSize: '0.78rem' }}>
               Raum-ID: <code>{normalizeRoomSlug(roomDraft || 'dein-tisch', selectedTable)}</code>
             </div>
-            <button className="btn-primary" onClick={handleCreateRoom}>
-              Tisch erstellen und beitreten
+            <button className="btn-primary" onClick={handleCreateRoom} disabled={actionBusy}>
+              Tisch erstellen
             </button>
           </div>
 

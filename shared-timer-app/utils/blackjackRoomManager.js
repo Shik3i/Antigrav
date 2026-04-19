@@ -13,6 +13,8 @@ const rooms = new Map();
 const ALLOWED_MAX_PLAYERS = new Set([3, 5]);
 const ALLOWED_BET_CHIPS_KC = [1, 5, 10, 50, 100, 500, 1000];
 const CENTS_PER_KC = 100;
+const MAX_BET_KC = 1000000;
+const MAX_BET_CENTS = MAX_BET_KC * CENTS_PER_KC;
 const TURN_TIMEOUT_MS = 90 * 1000;
 const AUTO_START_DELAY_MS = 6 * 1000;
 const SETTLEMENT_DISPLAY_MS = 5 * 1000;
@@ -22,6 +24,10 @@ const BOT_DEFAULT_BET_CENTS = 100 * CENTS_PER_KC;
 
 function normalizeMaxPlayers(maxPlayers = 5) {
   return ALLOWED_MAX_PLAYERS.has(Number(maxPlayers)) ? Number(maxPlayers) : 5;
+}
+
+function normalizeRoomId(roomId) {
+  return String(roomId || '').trim();
 }
 
 function createPlayerState(user, seat) {
@@ -132,35 +138,59 @@ function serializeSettlement(results) {
   }));
 }
 
-function getOrCreateRoom(roomId, maxPlayers = 5) {
-  const safeMaxPlayers = normalizeMaxPlayers(maxPlayers);
-
-  if (!rooms.has(roomId)) {
-    const shoeState = createShoe(6);
-    rooms.set(roomId, {
-      roomId,
-      game: 'blackjack',
-      status: 'waiting',
-      maxPlayers: safeMaxPlayers,
-      roundId: 1,
-      players: [],
-      dealerHand: [],
-      currentPlayerTurn: null,
-      turnDeadlineAt: null,
-      autoStartAt: null,
-      autoStartQueuedByUserId: null,
-      settlementCompleteAt: null,
-      dealerPhase: null,
-      dealerActionAt: null,
-      botActionAt: null,
-      lastSettlement: [],
-      lastSettlementRoundId: null,
-      lastAppliedSettlementRoundId: null,
-      ...shoeState
-    });
+function createRoom(roomId, maxPlayers = 5) {
+  const safeRoomId = normalizeRoomId(roomId);
+  if (!safeRoomId) {
+    throw new Error('roomId is required.');
   }
 
-  return rooms.get(roomId);
+  const safeMaxPlayers = normalizeMaxPlayers(maxPlayers);
+  if (!ALLOWED_MAX_PLAYERS.has(safeMaxPlayers)) {
+    throw new Error('Invalid blackjack table size.');
+  }
+
+  if (rooms.has(safeRoomId)) {
+    throw new Error('Blackjack room already exists.');
+  }
+
+  const shoeState = createShoe(6);
+  rooms.set(safeRoomId, {
+    roomId: safeRoomId,
+    game: 'blackjack',
+    status: 'waiting',
+    maxPlayers: safeMaxPlayers,
+    roundId: 1,
+    players: [],
+    dealerHand: [],
+    currentPlayerTurn: null,
+    turnDeadlineAt: null,
+    autoStartAt: null,
+    autoStartQueuedByUserId: null,
+    settlementCompleteAt: null,
+    dealerPhase: null,
+    dealerActionAt: null,
+    botActionAt: null,
+    lastSettlement: [],
+    lastSettlementRoundId: null,
+    lastAppliedSettlementRoundId: null,
+    ...shoeState
+  });
+
+  return rooms.get(safeRoomId);
+}
+
+function getRoom(roomId) {
+  const safeRoomId = normalizeRoomId(roomId);
+  if (!safeRoomId) return null;
+  return rooms.get(safeRoomId) || null;
+}
+
+function getPlayerRoomId(userId) {
+  if (!userId) return null;
+  for (const [roomId, room] of rooms.entries()) {
+    if (getPlayerByUserId(room, userId)) return roomId;
+  }
+  return null;
 }
 
 function listRooms() {
@@ -192,12 +222,15 @@ function listRooms() {
     });
 }
 
-function joinRoom(roomId, user, maxPlayers = 5) {
+function joinRoom(roomId, user) {
   if (!user?.userId) {
     throw new Error('Authenticated user is required.');
   }
 
-  const room = getOrCreateRoom(roomId, maxPlayers);
+  const room = getRoom(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
+  }
   const existing = getPlayerByUserId(room, user.userId);
 
   if (existing) {
@@ -224,8 +257,11 @@ function joinRoom(roomId, user, maxPlayers = 5) {
   return room;
 }
 
-function addBot(roomId, maxPlayers = 5) {
-  const room = getOrCreateRoom(roomId, maxPlayers);
+function addBot(roomId) {
+  const room = getRoom(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
+  }
 
   if (room.players.length >= room.maxPlayers) {
     throw new Error('This blackjack table is full.');
@@ -344,7 +380,11 @@ function getRoomState(roomId, viewerUserId = null) {
 }
 
 function validateBetAmount(amount) {
-  if (!Number.isInteger(amount) || amount <= 0) {
+  if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
+    throw new Error('Bet must be a valid whole-KC amount.');
+  }
+
+  if (amount <= 0) {
     throw new Error('Bet must be a positive whole-KC amount.');
   }
 
@@ -354,12 +394,12 @@ function validateBetAmount(amount) {
   }
 
   const inKC = asCents / CENTS_PER_KC;
-  if (!Number.isInteger(inKC) || inKC <= 0) {
+  if (!Number.isInteger(inKC)) {
     throw new Error('Bet must align with whole KC chip values.');
   }
 
-  if (!ALLOWED_BET_CHIPS_KC.includes(inKC)) {
-    throw new Error('Unsupported chip denomination total.');
+  if (asCents > MAX_BET_CENTS) {
+    throw new Error(`Bet exceeds max ${MAX_BET_KC.toLocaleString('en-US')} KC.`);
   }
 }
 
@@ -814,7 +854,9 @@ module.exports = {
   ALLOWED_BET_CHIPS_KC,
   CENTS_PER_KC,
   TURN_TIMEOUT_MS,
-  getOrCreateRoom,
+  createRoom,
+  getRoom,
+  getPlayerRoomId,
   listRooms,
   joinRoom,
   leaveRoom,
