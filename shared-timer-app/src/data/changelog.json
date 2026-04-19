@@ -1,5 +1,11 @@
 [
   {
+    "id": 70,
+    "version": "2.42.0",
+    "date": "2026-04-19",
+    "changes": "- **Sidebar-UX**: Umfassende Optimierung des Layouts mit fixiertem Header und Footer. Die Navigation bleibt nun unabhängig scrollbar, was die Ergonomie bei vielen Menüpunkten deutlich verbessert.\n- **Feature-Cleanup**: Vollständige Entfernung der veralteten `SharedTodo` und `SharedCanvas` Komponenten aus der Seitenleiste zur Reduzierung von Code-Bloat.\n- **Aesthetic Refinement**: Reduzierung unnötiger vertikaler Abstände im Logo-Bereich für eine kompaktere und modernere Darstellung."
+  },
+  {
     "id": 69,
     "version": "2.41.3",
     "date": "2026-04-19",
