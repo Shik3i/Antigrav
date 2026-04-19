@@ -726,7 +726,7 @@ function settleRound(roomId) {
         result = 'lose';
       }
 
-      const payout = ['win', 'blackjack'].includes(result) ? player.currentBet * 2 : result === 'push' ? player.currentBet : 0;
+      const payout = result === 'blackjack' ? Math.floor(player.currentBet * 2.5) : result === 'win' ? player.currentBet * 2 : result === 'push' ? player.currentBet : 0;
       const netProfit = payout - player.currentBet;
 
       return {

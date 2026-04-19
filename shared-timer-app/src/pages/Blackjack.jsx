@@ -1632,8 +1632,20 @@ const Blackjack = ({ socket }) => {
           <div className="blackjack-stage">
             <div className="blackjack-table-center">
               <div className="blackjack-area-kicker">KoalaSync Casino</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#f8fafc', marginBottom: '6px' }}>Blackjack Table</div>
-              <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.86rem' }}>Live seats, hidden hole card and automatic dealer flow.</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#f8fafc', marginBottom: '12px' }}>Blackjack</div>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '8px',
+                color: '#facc15',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em'
+              }}>
+                <div>Blackjack pays 3 to 2</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Dealer must stand on 17</div>
+              </div>
             </div>
 
             <FeltPile label="Shoe" count={roomState?.shoeRemaining ?? 0} side="right" accent="#fbbf24" />
