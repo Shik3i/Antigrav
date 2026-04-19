@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { Share2, RefreshCw, Trophy, AlertCircle, CheckCircle2, Info, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Share2, RefreshCw, Trophy, AlertCircle, CheckCircle2, Info, ChevronRight, ChevronDown, ChevronUp, Lightbulb, Coins } from 'lucide-react';
 import Avatar from '../components/Avatar';
 
 const WORD_LENGTH = 5;
@@ -26,6 +26,24 @@ const Wordle = ({ user, token }) => {
     const [dailyLeaderboard, setDailyLeaderboard] = useState([]);
     const [expandedUserId, setExpandedUserId] = useState(null);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [hintUsed, setHintUsed] = useState(false);
+    const [hasDefinition, setHasDefinition] = useState(false);
+    const [buyingHint, setBuyingHint] = useState(false);
+    const [invalidRow, setInvalidRow] = useState(null); // Row index that should shake
+    const [isRevealing, setIsRevealing] = useState(false);
+    const [revealingRowIndex, setRevealingRowIndex] = useState(-1);
+    const abortControllerRef = useRef(null);
+
+    const safeJsonParse = (str, fallback = {}) => {
+        if (!str) return fallback;
+        if (typeof str !== 'string') return str;
+        try {
+            return JSON.parse(str);
+        } catch (e) {
+            console.error('Safe JSON Parse failed:', e);
+            return fallback;
+        }
+    };
 
     const isToday = (dateString) => {
         return dateString === new Date().toISOString().split('T')[0];
@@ -123,6 +141,12 @@ const Wordle = ({ user, token }) => {
     }, [getStorageKey, mode]);
 
     const initGame = useCallback(async (gameMode) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
         setLoading(true);
         setActiveModeData(null);
         setGuesses([]);
@@ -130,15 +154,19 @@ const Wordle = ({ user, token }) => {
         setGameState('playing');
         setMessage('');
         setError(null);
+        setInvalidRow(null);
+        setIsRevealing(false);
+        setRevealingRowIndex(-1);
 
         try {
             const storageKey = getStorageKey(gameMode);
             const saved = localStorage.getItem(storageKey);
-            const savedData = saved ? JSON.parse(saved) : null;
+            const savedData = safeJsonParse(saved, null);
 
             if (gameMode === 'daily') {
                 const res = await axios.get(`/api/wordle/daily?date=${selectedDate}`, {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    signal
                 });
                 
                 if (res.data.played) {
@@ -147,6 +175,8 @@ const Wordle = ({ user, token }) => {
                     setSolution(res.data.word || '');
                     setGuesses(res.data.status.guesses || []);
                     setGameState(res.data.status.won ? 'won' : 'lost');
+                    setHintUsed(res.data.hintUsed || false);
+                    setHasDefinition(res.data.hasDefinition || false);
                     setMetadata({ 
                         definition: res.data.definition || null, 
                         funny_quote: res.data.funny_quote || null 
@@ -155,6 +185,8 @@ const Wordle = ({ user, token }) => {
                     const word = res.data.word || '';
                     setSolution(word);
                     setDailyPlayed(false);
+                    setHintUsed(res.data.hintUsed || false);
+                    setHasDefinition(res.data.hasDefinition || false);
                     setMetadata({ 
                         definition: res.data.definition || null, 
                         funny_quote: res.data.funny_quote || null 
@@ -169,16 +201,24 @@ const Wordle = ({ user, token }) => {
                     setSolution(savedData.solution);
                     setGuesses(savedData.guesses || []);
                 } else {
-                    const res = await axios.get('/api/wordle/random');
+                    const res = await axios.get('/api/wordle/random', { signal });
                     setSolution(res.data.word.toUpperCase());
+                    setHintUsed(false);
+                    setHasDefinition(res.data.hasDefinition || false);
+                    setMetadata({ 
+                        definition: res.data.definition || null, 
+                        funny_quote: null 
+                    });
                 }
             }
             setActiveModeData(gameMode);
         } catch (err) {
+            if (err.name === 'CanceledError') return;
             console.error('Failed to init Wordle:', err);
             setError('Fehler beim Laden des Spiels.');
         } finally {
             setLoading(false);
+            setBuyingHint(false); // Clean up any lingering purchase state
         }
     }, [token, getStorageKey]);
 
@@ -186,53 +226,66 @@ const Wordle = ({ user, token }) => {
         initGame(mode);
     }, [mode, selectedDate, initGame]);
 
-    useEffect(() => {
-        const fetchDict = async () => {
-            try {
-                const res = await axios.get('/api/wordle/dictionary');
-                setDictionary(res.data || []);
-            } catch (err) {
-                console.error('Failed to fetch dictionary:', err);
-            }
-        };
-        fetchDict();
-    }, []);
 
-    const handleInput = useCallback((key) => {
-        if (gameState !== 'playing' || loading || (mode === 'daily' && dailyPlayed)) return;
+    const memoizedEvaluations = useMemo(() => {
+        return guesses.map(g => evaluateGuess(g, solution));
+    }, [guesses, solution, evaluateGuess]);
+
+    const handleInput = useCallback(async (key) => {
+        if (gameState !== 'playing' || loading || submitting || isRevealing || (mode === 'daily' && dailyPlayed)) return;
 
         if (key === 'Backspace' || key === 'Delete') {
             setCurrentGuess(prev => prev.slice(0, -1));
+            setInvalidRow(null);
             return;
         }
 
         if (key === 'Enter') {
             if (currentGuess.length !== WORD_LENGTH) {
                 setMessage('Wort ist zu kurz!');
-                setTimeout(() => setMessage(''), 2000);
+                setInvalidRow(guesses.length);
+                setTimeout(() => { setMessage(''); setInvalidRow(null); }, 1000);
                 return;
             }
 
             const newGuess = currentGuess.toUpperCase();
             
-            if (dictionary.length > 0 && !dictionary.includes(newGuess)) {
-                setMessage('Wort nicht in Liste!');
-                setTimeout(() => setMessage(''), 2000);
-                return;
+            // Server-side validation
+            try {
+                const res = await axios.post('/api/wordle/validate', { word: newGuess });
+                if (!res.data.valid) {
+                    setMessage('Wort nicht in Liste!');
+                    setInvalidRow(guesses.length);
+                    setTimeout(() => { setMessage(''); setInvalidRow(null); }, 1000);
+                    return;
+                }
+            } catch (err) {
+                console.error('Validation failed:', err);
+                // Fallback: If server is down, we might want to allow it or block it. 
+                // Let's block for consistency unless user is offline.
             }
 
             const newGuesses = [...guesses, newGuess];
-            setGuesses(newGuesses);
-            saveToStorage(newGuesses, solution);
-            setCurrentGuess('');
+            
+            // Trigger Reveal Animation
+            setRevealingRowIndex(guesses.length);
+            setIsRevealing(true);
+            setTimeout(() => {
+                setGuesses(newGuesses);
+                saveToStorage(newGuesses, solution);
+                setCurrentGuess('');
+                setIsRevealing(false);
+                setRevealingRowIndex(-1);
+            }, WORD_LENGTH * 150 + 100); // Wait for flip animations
             return;
         }
 
         const upperKey = key.toUpperCase();
         if (/^[A-ZÄÖÜß]$/.test(upperKey) && currentGuess.length < WORD_LENGTH) {
             setCurrentGuess(prev => prev + upperKey);
+            setInvalidRow(null);
         }
-    }, [currentGuess, guesses, gameState, loading, mode, dailyPlayed, dictionary, saveToStorage, solution]);
+    }, [currentGuess, guesses, gameState, loading, submitting, isRevealing, mode, dailyPlayed, dictionary, saveToStorage, solution]);
 
     const onKeyDown = useCallback((e) => {
         if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -293,13 +346,22 @@ const Wordle = ({ user, token }) => {
         if (!token || submitting) return;
         setSubmitting(true);
         try {
-            await axios.post(`/api/wordle/daily?date=${selectedDate}`, {
+            const res = await axios.post(`/api/wordle/daily?date=${selectedDate}`, {
                 guesses,
                 won
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setDailyPlayed(true);
+            
+            // If won, reveal full metadata immediately
+            if (won && res.data.definition) {
+                setMetadata({
+                    definition: res.data.definition,
+                    funny_quote: res.data.funny_quote || null
+                });
+            }
+            
             clearStorage('daily');
         } catch (err) {
             console.error('Failed to submit daily:', err);
@@ -310,6 +372,43 @@ const Wordle = ({ user, token }) => {
             setSubmitting(false);
         }
     }, [token, submitting, guesses, selectedDate, clearStorage]);
+    
+    const buyHint = async () => {
+        if (!token || buyingHint || hintUsed || gameState !== 'playing') return;
+        
+        if (mode === 'daily') {
+            if (!window.confirm('Möchtest du für 5 Koala Coins einen Tipp kaufen? (Zeigt die ersten 35 Zeichen der Definition)')) return;
+
+            setBuyingHint(true);
+            try {
+                const res = await axios.post(`/api/wordle/daily/hint?date=${selectedDate}`, {}, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (res.data.success) {
+                    setHintUsed(true);
+                    setMetadata(prev => ({
+                        ...prev,
+                        definition: res.data.hint
+                    }));
+                    setMessage('Tipp freigeschaltet!');
+                    setTimeout(() => setMessage(''), 3000);
+                }
+            } catch (err) {
+                console.error('Failed to buy hint:', err);
+                const errMsg = err.response?.data?.error || 'Fehler beim Kauf.';
+                setMessage(errMsg);
+                setTimeout(() => setMessage(''), 3000);
+            } finally {
+                setBuyingHint(false);
+            }
+        } else {
+            // Endless mode: Free hint
+            setHintUsed(true);
+            setMessage('Tipp angezeigt!');
+            setTimeout(() => setMessage(''), 3000);
+        }
+    };
 
 
     const renderGrid = () => {
@@ -317,17 +416,23 @@ const Wordle = ({ user, token }) => {
         for (let i = 0; i < MAX_GUESSES; i++) {
             const guess = guesses[i] || (i === guesses.length ? currentGuess : '');
             const isSubmitted = i < guesses.length;
+            const isRevealingThisRow = i === revealingRowIndex;
             
-            const evaluation = isSubmitted ? evaluateGuess(guess, solution) : [];
+            const evaluation = isSubmitted ? memoizedEvaluations[i] : [];
             
             rows.push(
-                <div key={i} style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <div 
+                    key={i} 
+                    className={invalidRow === i ? 'wordle-row-shake' : ''}
+                    style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}
+                >
                     {Array.from({ length: WORD_LENGTH }).map((_, j) => {
                         const letter = guess[j] || '';
                         const status = isSubmitted ? evaluation[j] : '';
+                        const shouldAnimate = isRevealingThisRow;
                         
                         return (
-                            <div key={j} className={`wordle-cell ${status} ${letter ? 'pop' : ''}`} style={{
+                            <div key={j} className={`wordle-cell ${status} ${letter ? 'pop' : ''} ${shouldAnimate ? 'reveal' : ''}`} style={{
                                 width: '58px',
                                 height: '58px',
                                 border: `2px solid ${status ? 'transparent' : (letter ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)')}`,
@@ -342,7 +447,8 @@ const Wordle = ({ user, token }) => {
                                             status === 'absent' ? '#374151' : 'transparent',
                                 color: '#fff',
                                 textTransform: 'uppercase',
-                                transition: 'all 0.3s ease'
+                                transition: shouldAnimate ? 'none' : 'all 0.3s ease',
+                                animationDelay: shouldAnimate ? `${j * 150}ms` : '0ms'
                             }}>
                                 {letter}
                             </div>
@@ -355,8 +461,8 @@ const Wordle = ({ user, token }) => {
     };
 
     const shareResults = () => {
-        const emojiGrid = guesses.map(guess => {
-            const evaluation = evaluateGuess(guess, solution);
+        const emojiGrid = guesses.map((guess, i) => {
+            const evaluation = memoizedEvaluations[i];
             return evaluation.map(status => {
                 if (status === 'correct') return '🟩';
                 if (status === 'present') return '🟨';
@@ -364,20 +470,27 @@ const Wordle = ({ user, token }) => {
             }).join('');
         }).join('\n');
 
-        const text = `KoalaWordle ${mode === 'daily' ? 'Daily' : 'Endless'} ${guesses.length}/${MAX_GUESSES}\n\n${emojiGrid}`;
+        const dateDisplay = mode === 'daily' 
+            ? new Date(selectedDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : 'Endless';
+        
+        const score = gameState === 'won' ? `${guesses.length}/6` : 'X/6';
+        
+        const text = `🐨 KoalaWordle · ${dateDisplay}\n🎮 Modus: ${mode.charAt(0).toUpperCase() + mode.slice(1)}\n🏆 Ergebnis: ${score}\n\n${emojiGrid}\n\n🌐 wordle.shik3i.net`;
+        
         navigator.clipboard.writeText(text);
-        setMessage('Ergebnis in Zwischenablage kopiert!');
+        setMessage('Ergebnis kopiert! 🐨');
         setTimeout(() => setMessage(''), 3000);
     };
 
     const MiniWordleGrid = ({ entry, solution: sol }) => {
-        const { guesses: userGuesses, evaluations } = entry;
-        const rowsToRender = userGuesses || evaluations || [];
+        const { guesses: userGuesses, evaluations: serverEvaluations } = entry;
+        const rowsToRender = userGuesses || serverEvaluations || [];
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px' }}>
                 {rowsToRender.map((_, i) => {
-                    const evaluation = evaluations ? evaluations[i] : evaluateGuess(userGuesses[i], sol);
+                    const evaluation = serverEvaluations ? serverEvaluations[i] : (userGuesses ? evaluateGuess(userGuesses[i], sol) : null);
                     const guess = userGuesses ? userGuesses[i] : null;
                     
                     if (!evaluation) return null;
@@ -446,28 +559,76 @@ const Wordle = ({ user, token }) => {
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <Avatar user={{ id: entry.userId, preferences: entry.preferences }} size={32} />
+                                        <Avatar 
+                                            user={{ 
+                                                id: entry.userId, 
+                                                username: entry.username || entry.displayName,
+                                                preferences: safeJsonParse(entry.preferences)
+                                            }} 
+                                            size={32} 
+                                        />
                                         <div style={{ fontWeight: 600 }}>
                                             {entry.displayName || entry.username}
                                             {entry.userId === user?.id && <span style={{ marginLeft: '8px', fontSize: '0.7rem', opacity: 0.6 }}>(Du)</span>}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <div style={{ 
-                                            padding: '2px 8px', 
-                                            borderRadius: '12px', 
-                                            background: entry.won ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                            color: entry.won ? '#10b981' : '#ef4444',
-                                            fontSize: '0.85rem',
-                                            fontWeight: 700
-                                        }}>
-                                            {score}
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                            <div style={{ 
+                                                padding: '2px 8px', 
+                                                borderRadius: '12px', 
+                                                background: entry.won ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                                color: entry.won ? '#10b981' : '#ef4444',
+                                                fontSize: '0.85rem',
+                                                fontWeight: 700
+                                            }}>
+                                                {score}
+                                            </div>
                                         </div>
+                                        {entry.hintUsed && <div title="Tipp benutzt" style={{ color: '#f59e0b' }}><Lightbulb size={16} /></div>}
                                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                     </div>
                                 </div>
                                 {isExpanded && (
                                     <div style={{ animation: 'slideDown 0.3s ease' }}>
+                                        {entry.stats && (
+                                            <div style={{ 
+                                                display: 'grid', 
+                                                gridTemplateColumns: 'repeat(3, 1fr)', 
+                                                gap: '8px', 
+                                                marginTop: '12px',
+                                                padding: '12px',
+                                                background: 'rgba(255,255,255,0.03)',
+                                                borderRadius: '8px',
+                                                textAlign: 'center',
+                                                fontSize: '0.75rem'
+                                            }}>
+                                                <div>
+                                                    <div style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase' }}>Gespielt</div>
+                                                    <div style={{ fontWeight: 700 }}>{entry.stats.totalPlayed}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase' }}>Gewonnen</div>
+                                                    <div style={{ fontWeight: 700 }}>{entry.stats.totalWins}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase' }}>Tipps</div>
+                                                    <div style={{ fontWeight: 700 }}>{entry.stats.totalHintsBought}</div>
+                                                </div>
+                                                <div style={{ gridColumn: 'span 3', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
+                                                     <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
+                                                         <div>
+                                                             <span style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', marginRight: '4px' }}>Streak</span>
+                                                             <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{entry.stats.currentStreak}</span>
+                                                         </div>
+                                                         <div>
+                                                             <span style={{ opacity: 0.6, fontSize: '0.65rem', textTransform: 'uppercase', marginRight: '4px' }}>Max</span>
+                                                             <span style={{ fontWeight: 700 }}>{entry.stats.maxStreak}</span>
+                                                         </div>
+                                                     </div>
+                                                </div>
+                                            </div>
+                                        )}
                                         <MiniWordleGrid entry={entry} solution={solution} />
                                     </div>
                                 )}
@@ -537,7 +698,7 @@ const Wordle = ({ user, token }) => {
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ textAlign: 'center' }}>
-                <h1 style={{ fontSize: '2.5rem', marginBottom: '8px', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <h1 style={{ fontSize: '2.5rem', marginBottom: '4px', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     KoalaWordle
                 </h1>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
@@ -556,6 +717,48 @@ const Wordle = ({ user, token }) => {
                         Endless
                     </button>
                 </div>
+            </div>
+
+            {gameState === 'playing' && !dailyPlayed && hasDefinition && (
+                    <div style={{ marginTop: '16px' }}>
+                        <button
+                            onClick={buyHint}
+                            disabled={buyingHint || hintUsed}
+                            className={hintUsed ? 'btn-ghost' : 'btn-primary'}
+                            style={{ 
+                                padding: '6px 16px', 
+                                borderRadius: '20px', 
+                                fontSize: '0.85rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                margin: '0 auto',
+                                border: hintUsed ? '1px solid rgba(245, 158, 11, 0.3)' : 'none',
+                                background: hintUsed ? 'rgba(245, 158, 11, 0.1)' : undefined,
+                                color: hintUsed ? '#f59e0b' : undefined,
+                                opacity: buyingHint ? 0.7 : 1
+                            }}
+                        >
+                            <Lightbulb size={16} />
+                            {hintUsed ? 'Tipp aktiv' : (mode === 'daily' ? 'Tipp kaufen (5 KC)' : 'Tipp anzeigen')}
+                        </button>
+                        {hintUsed && metadata.definition && (
+                            <div style={{ 
+                                marginTop: '12px', 
+                                fontSize: '0.85rem', 
+                                color: 'rgba(255,255,255,0.7)',
+                                background: 'rgba(255,255,255,0.03)',
+                                padding: '10px 16px',
+                                borderRadius: '12px',
+                                borderLeft: '3px solid #f59e0b',
+                                maxWidth: '400px',
+                                margin: '12px auto 0'
+                            }}>
+                                <strong style={{ color: '#f59e0b' }}>Hinweis:</strong> {metadata.definition}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {mode === 'daily' && (
                     <div style={{ 
@@ -570,7 +773,8 @@ const Wordle = ({ user, token }) => {
                         border: '1px solid rgba(255,255,255,0.1)'
                     }}>
                         <button 
-                            onClick={() => handleDateChange(-1)} 
+                            onClick={(e) => { e.currentTarget.blur(); handleDateChange(-1); }} 
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                             className="btn-ghost" 
                             style={{ padding: '4px', borderRadius: '50%', opacity: selectedDate <= MIN_DATE ? 0.3 : 1 }}
                             disabled={selectedDate <= MIN_DATE}
@@ -590,7 +794,8 @@ const Wordle = ({ user, token }) => {
                         </div>
 
                         <button 
-                            onClick={() => handleDateChange(1)} 
+                            onClick={(e) => { e.currentTarget.blur(); handleDateChange(1); }} 
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                             className="btn-ghost" 
                             style={{ padding: '4px', borderRadius: '50%', opacity: isToday(selectedDate) ? 0.3 : 1 }}
                             disabled={isToday(selectedDate)}
@@ -599,7 +804,6 @@ const Wordle = ({ user, token }) => {
                         </button>
                     </div>
                 )}
-            </div>
 
             <div style={{ height: '24px', textAlign: 'center', color: 'var(--accent-primary)', fontWeight: 600 }}>
                 {message}

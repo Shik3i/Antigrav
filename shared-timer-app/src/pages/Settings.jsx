@@ -1002,7 +1002,7 @@ const Settings = ({ user, setUser, socket }) => {
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.41.3
+                    Version 2.44.0
                 </div>
                 </div>
             </div>
