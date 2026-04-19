@@ -137,15 +137,19 @@ const Tetris = () => {
 
     const updateScale = useCallback(() => {
         if (!containerRef.current) return;
-        const parent = containerRef.current.parentElement;
-        if (!parent) return;
-
-        const rect = parent.getBoundingClientRect();
-        const availableH = rect.height;
-        const headerH = 60; 
-        const targetH = 610; // Tighter target to maximize board size
         
-        // Scale factor: fill height aggressively
+        // ─── AGGRESSIVE SCALING STRATEGY ───
+        const viewportH = window.innerHeight;
+        
+        // Use a much smaller buffer to allow the board to "push" into the layout padding
+        // 48px NewsTicker + 12px extra = 60px absolute minimum
+        const layoutBuffer = 75; 
+        const availableH = Math.max(400, viewportH - layoutBuffer); 
+        
+        const headerH = 40; 
+        const targetH = 610; 
+        
+        // Return to the user's preferred scaling range
         const newScale = Math.max(0.6, Math.min(3.2, (availableH - headerH) / targetH));
         setGameScale(newScale);
     }, []);

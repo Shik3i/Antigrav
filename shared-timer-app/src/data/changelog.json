@@ -1,5 +1,11 @@
 [
   {
+    "id": 67,
+    "version": "2.41.1",
+    "date": "2026-04-19",
+    "changes": "- **Layout-Integrität**: Refactoring des `MaintenanceGuard` zur Vermeidung von DOM-Interferenzen. Der Guard ist nun für normale Nutzer vollständig transparent und stellt den korrekten Layout-Fluss wieder her.\n- **Scrolling**: Behebung des Problems, dass Unterseiten wie Esports nicht mehr scrollbar waren.\n- **Tetris-Skalierung**: Implementierung einer aggressiven, Viewport-basierten Skalierungslogik, die den verfügbaren Platz maximal ausnutzt, ohne den News-Ticker zu überlagern."
+  },
+  {
     "id": 66,
     "version": "2.41.0",
     "date": "2026-04-19",
