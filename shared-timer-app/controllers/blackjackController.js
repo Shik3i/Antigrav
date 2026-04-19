@@ -128,6 +128,46 @@ exports.leaveTable = async (req, res) => {
   }
 };
 
+exports.addBot = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { roomId, maxPlayers } = resolveRoomRequest(req);
+    const room = blackjackRoomManager.addBot(roomId, maxPlayers);
+    res.json({
+      success: true,
+      roomId,
+      state: room ? blackjackRoomManager.getRoomState(roomId, userId) : null
+    });
+  } catch (err) {
+    const status = err.message?.includes('full') ? 409 : 400;
+    res.status(status).json({ error: err.message || 'Failed to add blackjack bot' });
+  }
+};
+
+exports.switchSeat = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { roomId } = resolveRoomRequest(req);
+    const targetSeat = Number.parseInt(req.body?.seat, 10);
+    const room = blackjackRoomManager.moveSeat(roomId, userId, targetSeat);
+    res.json({
+      success: true,
+      roomId,
+      state: room ? blackjackRoomManager.getRoomState(roomId, userId) : null
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Failed to switch blackjack seat' });
+  }
+};
+
 exports.applySettlement = async (req, settlement = []) => {
   const updates = await dbLayer.applyBlackjackSettlement(settlement);
   emitBalanceUpdates(req, updates);
