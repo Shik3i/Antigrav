@@ -1,5 +1,11 @@
 [
   {
+    "id": 75,
+    "version": "2.44.1",
+    "date": "2026-04-19",
+    "changes": "- **Blackjack Shoe Accounting**: Burn-Card- und Discard-Handling auf realistische Casino-Bilanz umgestellt, damit eine Runde nie mid-hand reshufflt und Karten nur einmal im Discard landen.\n- **Blackjack Reshuffle**: Automatische Reshuffles laufen jetzt nur vor der naechsten Hand und nicht waehrend des aktuellen Spiels.\n- **Blackjack Settlement Visibility**: Karten bleiben waehrend der Settlement-Anzeige sichtbar und werden erst danach in den Discard verschoben."
+  },
+  {
     "id": 74,
     "version": "2.44.0",
     "date": "2026-04-19",
