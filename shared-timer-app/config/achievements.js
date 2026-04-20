@@ -38,6 +38,37 @@ const ACHIEVEMENTS_CONFIG = [
     { id: 'critic',          chain: 'special_critic',       title: 'Kritiker',           description: 'Stimme für 10 verschiedene Feature-Vorschläge auf der Roadmap ab.',                        requiredCount: 10,      icon: 'Medal',    statKey: 'vote_count' },
     { id: 'feature_suggest', chain: 'special_feature',      title: 'Visionär',           description: 'Reiche einen eigenen Feature-Vorschlag auf der Roadmap ein.',                              requiredCount: 1,       icon: 'Award',    statKey: 'feature_suggests' },
     { id: 'holzfaeller',     chain: 'koalaflap_lumberjack', title: 'Holzfäller',         description: 'Fliege 50 Mal in Folge gegen das allererste Hindernis (Score = 0). Troll-Achievement!',   requiredCount: 50,      icon: 'Crown',    statKey: 'zero_streak' },
+
+    // ─── Casino & Minigames ─────────────────────────────────────
+    { id: 'wordle_1',    chain: 'casino_wordle', title: 'Wort-Lehrling',             description: 'Gewinne dein erstes Wordle-Rätsel.',                             requiredCount: 1,    icon: 'Type',        statKey: 'wordle_wins' },
+    { id: 'wordle_10',   chain: 'casino_wordle', title: 'Phrasendrescher',           description: '10 Wordles gelöst. Deine Wortwahl ist exquisit.',               requiredCount: 10,   icon: 'Type',        statKey: 'wordle_wins' },
+    { id: 'wordle_50',   chain: 'casino_wordle', title: 'Lexikon auf Beinen',        description: '50 Wordles gelöst. Ein wandelndes Wörterbuch!',                 requiredCount: 50,   icon: 'Type',        statKey: 'wordle_wins' },
+
+    { id: 'fortune_7',   chain: 'casino_fortunes', title: 'Neugierig',                description: 'Öffne 7 Glückskekse. Was bringt die Zukunft?',                  requiredCount: 7,    icon: 'Cookie',      statKey: 'fortunes_count' },
+    { id: 'fortune_30',  chain: 'casino_fortunes', title: 'Wochenprophet',            description: '30 Glückskekse geöffnet. Du kennst dein Schicksal.',            requiredCount: 30,   icon: 'Cookie',      statKey: 'fortunes_count' },
+    { id: 'fortune_100', chain: 'casino_fortunes', title: 'Schicksalsversteher',      description: '100 Glückskekse! Du liest zwischen den Krümeln.',               requiredCount: 100,  icon: 'Cookie',      statKey: 'fortunes_count' },
+
+    { id: 'bj_50',       chain: 'casino_blackjack', title: 'Hobbyspieler',             description: 'Absolviere 50 Runden Blackjack.',                                requiredCount: 50,   icon: 'Dices',       statKey: 'blackjack_played' },
+    { id: 'bj_250',      chain: 'casino_blackjack', title: 'Casino-Stammgast',         description: '250 Runden Blackjack. Der Dealer kennt deinen Namen.',          requiredCount: 250,  icon: 'Dices',       statKey: 'blackjack_played' },
+    { id: 'bj_1000',     chain: 'casino_blackjack', title: 'Dealer-Endgegner',         description: '1000 Runden Blackjack. Das Haus zittert vor dir.',              requiredCount: 1000, icon: 'Dices',       statKey: 'blackjack_played' },
+
+    { id: 'tower_10',    chain: 'casino_tower', title: 'Höhenangst-Besieger',        description: 'Absolviere 10 Runden Tower Climb.',                             requiredCount: 10,   icon: 'Layers',      statKey: 'tower_count' },
+    { id: 'tower_50',    chain: 'casino_tower', title: 'Stockwerk-Sammler',          description: '50 Runden Tower Climb. Stufe um Stufe nach oben.',              requiredCount: 50,   icon: 'Layers',      statKey: 'tower_count' },
+    { id: 'tower_200',   chain: 'casino_tower', title: 'Gipfelstürmer',               description: '200 Runden Tower Climb. Die Aussicht ist herrlich.',            requiredCount: 200,  icon: 'Layers',      statKey: 'tower_count' },
+
+    { id: 'lotto_10',    chain: 'casino_lotto', title: 'Hoffnungsvoll',               description: 'Kaufe 10 Lotto-Tickets. Das große Los wartet!',                 requiredCount: 10,   icon: 'Ticket',      statKey: 'lotto_count' },
+    { id: 'lotto_50',    chain: 'casino_lotto', title: 'Lotto-Stammgast',              description: '50 Lotto-Tickets. Treue zahlt sich hoffentlich aus.',           requiredCount: 50,   icon: 'Ticket',      statKey: 'lotto_count' },
+    { id: 'lotto_100',   chain: 'casino_lotto', title: 'Optimist',                    description: '100 Lotto-Tickets. Wer nicht wagt, der nicht gewinnt!',        requiredCount: 100,  icon: 'Ticket',      statKey: 'lotto_count' },
+
+    // ─── Soziales ───────────────────────────────────────────────
+    { id: 'friends_1',   chain: 'social_friends', title: 'Gefährte',                  description: 'Füge deinen ersten Freund hinzu.',                               requiredCount: 1,    icon: 'Users',       statKey: 'friends' },
+    { id: 'friends_5',   chain: 'social_friends', title: 'Beliebter Koala',           description: 'Habe 5 akzeptierte Freunde in deiner Liste.',                    requiredCount: 5,    icon: 'Users',       statKey: 'friends' },
+    { id: 'friends_15',  chain: 'social_friends', title: 'Community-Hub',             description: '15 Freunde! Du bist der Mittelpunkt der Party.',                 requiredCount: 15,   icon: 'Users',       statKey: 'friends' },
+
+    // ─── Wirtschaft ─────────────────────────────────────────────
+    { id: 'spending_10k', chain: 'economy_spending', title: 'Großzügig',               description: 'Gib insgesamt 10.000 KoalaCoins aus.',                          requiredCount: 1000000, icon: 'ShoppingBag', statKey: 'total_spent' },
+    { id: 'spending_50k', chain: 'economy_spending', title: 'Kaufrausch',               description: 'Gib insgesamt 50.000 KoalaCoins aus.',                          requiredCount: 5000000, icon: 'ShoppingBag', statKey: 'total_spent' },
+    { id: 'spending_100k',chain: 'economy_spending', title: 'Zentralbank',              description: '100.000 KoalaCoins investiert. Du bewegst den Markt.',          requiredCount: 10000000,icon: 'ShoppingBag', statKey: 'total_spent' },
 ];
 
 module.exports = { ACHIEVEMENTS_CONFIG };

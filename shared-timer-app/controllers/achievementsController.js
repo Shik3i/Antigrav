@@ -21,6 +21,13 @@ const STAT_FETCHERS = {
     vote_count: (userId) => dbLayer.getUserVoteCount(userId),
     feature_suggests: (userId) => dbLayer.getUserFeatureRequestCount(userId),
     zero_streak: (userId) => dbLayer.getUserZeroScoreStreak(userId),
+    wordle_wins: (userId) => dbLayer.getUserWordleWins(userId),
+    fortunes_count: (userId) => dbLayer.getUserFortunesCount(userId),
+    blackjack_played: (userId) => dbLayer.getUserBlackjackGames(userId),
+    total_spent: (userId) => dbLayer.getUserTotalSpent(userId),
+    friends: (userId) => dbLayer.getUserFriendCount(userId),
+    tower_count: (userId) => dbLayer.getUserTowerClimbCount(userId),
+    lotto_count: (userId) => dbLayer.getUserLottoTicketCount(userId),
 };
 
 exports.getStatus = async (req, res) => {

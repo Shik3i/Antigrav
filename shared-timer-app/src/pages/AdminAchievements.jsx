@@ -7,6 +7,9 @@ const CHAIN_META = {
     timer:     { label: '⏱️ Timer-Abschlüsse',     color: '#3b82f6' },
     esports:   { label: '⚔️ Esports-Wetten',        color: '#a855f7' },
     koalaflap: { label: '🎮 KoalaFlap Minigame',    color: '#f59e0b' },
+    casino:    { label: '🎰 Casino & Minigames',    color: '#10b981' },
+    social:    { label: '🤝 Soziales',              color: '#6366f1' },
+    economy:   { label: '💰 Wirtschaft',            color: '#f59e0b' },
     special:   { label: '🌟 Spezial-Erfolge',        color: '#ec4899' },
 };
 
