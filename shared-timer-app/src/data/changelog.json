@@ -1,5 +1,11 @@
 [
   {
+    "id": 78,
+    "version": "2.47.0",
+    "date": "2026-04-20",
+    "changes": "- **Consolidated Rewards**: Zusammenf\u00fchrung des t\u00e4glichen Login-Bonus (+10 KC) und des Gl\u00fcckskekses zu einer einzigen, intuitiven Interaktion auf der Achievements-Seite.\n- **Backend-Optimierung**: Der `openFortune`-Endpunkt gew\u00e4hrt nun automatisch die t\u00e4gliche Belohnung, inklusive atomarer Guthaben-Updates und Schutz vor Doppel-Abholungen.\n- **UI/UX Redesign**: Entfernung der redundanten \"T\u00e4glicher Bonus\" Karte; der Gl\u00fcckskeks fungiert nun als prominente, zentrale Tagesaufgabe.\n- **Echtzeit-Synchronisation**: Sofortige Aktualisierung des KoalaCoin-Guthabens in der Navigationsleiste direkt nach dem Knacken des Kekses."
+  },
+  {
     "id": 77,
     "version": "2.46.0",
     "date": "2026-04-20",

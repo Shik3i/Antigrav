@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Medal, Award, Crown, CheckCircle2, Clock, Calendar, Gift, Lock, Timer, Gamepad2, Swords, ChevronDown, Settings, Shield } from 'lucide-react';
+import { Trophy, Medal, Award, Crown, CheckCircle2, Clock, Calendar, Gift, Lock, Timer, Gamepad2, Swords, ChevronDown, Settings, Shield, Cookie, Ghost, Quote } from 'lucide-react';
 import { usePageVisibility } from '../hooks/usePageVisibility';
 
 const CHAIN_META = {
@@ -23,6 +23,12 @@ const Achievements = () => {
     const [showCompleted, setShowCompleted] = useState(false);
     const [hoveredCard, setHoveredCard] = useState(null);
     const isVisible = usePageVisibility();
+
+    // Fortune Cookie State
+    const [fortune, setFortune] = useState({ opened: false, text: null, loading: true });
+    const [cookieState, setCookieState] = useState('idle'); // idle, cracking, opened
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [isOpening, setIsOpening] = useState(false);
 
     const fetchStatus = async () => {
         if (!token) {
@@ -53,6 +59,22 @@ const Achievements = () => {
         }
     };
 
+    const fetchFortune = async () => {
+        if (!token) return;
+        try {
+            const res = await fetch('/api/fortune/status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setFortune({ opened: data.opened, text: data.text, loading: false });
+                if (data.opened) setCookieState('opened');
+            }
+        } catch (err) {
+            console.error('Failed to fetch fortune:', err);
+        }
+    };
+
     useEffect(() => {
         if (!token) {
             setLoading(false);
@@ -60,7 +82,11 @@ const Achievements = () => {
         }
         
         fetchStatus();
-        const interval = setInterval(fetchStatus, isVisible ? 60000 : 10 * 60000);
+        fetchFortune();
+        const interval = setInterval(() => {
+            fetchStatus();
+            fetchFortune();
+        }, isVisible ? 60000 : 10 * 60000);
         return () => clearInterval(interval);
     }, [isVisible, token]);
 
@@ -91,6 +117,63 @@ const Achievements = () => {
             setTimeout(() => setError(null), 4000);
         } finally {
             setClaiming(false);
+        }
+    };
+
+    const handleOpenCookie = async () => {
+        if (fortune.opened || cookieState !== 'idle' || isOpening) return;
+        
+        setIsOpening(true);
+        setCookieState('cracking');
+        
+        // Wait for wiggle animation
+        await new Promise(r => setTimeout(r, 800));
+        
+        try {
+            const res = await fetch('/api/fortune/status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            // Re-check status to prevent double-fire
+            const currentStatus = await res.json();
+            if (currentStatus.opened) {
+               setFortune({ ...currentStatus, loading: false });
+               setCookieState('opened');
+               setIsOpening(false);
+               return;
+            }
+
+            const openRes = await fetch('/api/fortune/open', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await openRes.json();
+            
+            if (openRes.ok) {
+                setFortune({ opened: true, text: data.text, loading: false });
+                setCookieState('opened');
+                setShowConfetti(true);
+                
+                // If a reward was granted, update balance
+                if (data.reward && data.newBalance !== undefined) {
+                    setUser(prev => ({ ...prev, koala_balance: data.newBalance }));
+                }
+                
+                // Update local daily status
+                setStatus(prev => ({ 
+                    ...prev, 
+                    daily: { ...prev.daily, available: false } 
+                }));
+
+                setTimeout(() => setShowConfetti(false), 3000);
+            } else {
+                setError(data.error);
+                setCookieState('idle');
+            }
+        } catch (err) {
+            setError('Fehler beim Öffnen des Glückskekses.');
+            setCookieState('idle');
+        } finally {
+            setIsOpening(false);
         }
     };
 
@@ -184,72 +267,113 @@ const Achievements = () => {
             </header>
 
             {error && (
-                <div className="animate-slide-up" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(239,68,68,0.3)', textAlign: 'center', fontWeight: 500 }}>
+                <div className="animate-slide-up" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', padding: '1rem', borderRadius: '16px', border: '1px solid rgba(239,68,68,0.3)', textAlign: 'center', fontWeight: 500, marginBottom: '24px' }}>
                     {error}
                 </div>
             )}
 
-            {/* Daily Bonus Section */}
-            <section className="glass-card-premium animate-slide-up" style={{
-                background: status?.daily?.available 
-                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.22))' 
-                    : 'rgba(255,255,255,0.02)',
-                border: status?.daily?.available ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255,255,255,0.05)',
-                display: 'flex', flexWrap: 'wrap', gap: '2rem', alignItems: 'center', justifyContent: 'space-between',
-                padding: '32px'
-            }}>
-                <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
-                    <div style={{
-                        width: '72px', height: '72px', borderRadius: '22px',
-                        background: status?.daily?.available ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: status?.daily?.available ? '0 0 20px rgba(16, 185, 129, 0.2)' : 'none'
-                    }}>
-                        <Calendar size={36} color={status?.daily?.available ? '#10b981' : '#64748b'} />
-                    </div>
-                    <div>
-                        <h2 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.5rem' }}>
-                            Täglicher Login-Bonus
-                            {status?.daily?.available && (
-                                <span style={{ fontSize: '0.7rem', background: '#10b981', color: 'white', padding: '3px 10px', borderRadius: '20px', fontWeight: 800, letterSpacing: '0.05em', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)' }}>
-                                    BEREIT
-                                </span>
-                            )}
-                        </h2>
-                        <p style={{ margin: 0, color: 'var(--text-secondary)', maxWidth: '450px', lineHeight: 1.5 }}>
-                            Komm jeden Tag zurück, um deinen Fokus-Bonus abzuholen! Ein kleiner Dank für deine Kontinuität.
-                        </p>
-                    </div>
-                </div>
+            <div className="animate-fade-in" style={{ marginBottom: '2rem' }}>
+                {/* Consolidated Daily Fortune Cookie Section */}
+                <section className="glass-card-premium" style={{
+                    background: !fortune.opened 
+                        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.18))' 
+                        : 'rgba(255,255,255,0.02)',
+                    border: !fortune.opened ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                    display: 'flex', flexDirection: 'column', gap: '1.5rem',
+                    padding: '32px', minHeight: '200px', justifyContent: 'space-between',
+                    position: 'relative', overflow: 'hidden',
+                    boxShadow: !fortune.opened ? '0 15px 35px rgba(245, 158, 11, 0.1)' : 'none'
+                }}>
+                    {showConfetti && <div className="confetti-container">
+                        {[...Array(20)].map((_, i) => <div key={i} className="confetti" style={{
+                            left: `${Math.random() * 100}%`,
+                            backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][Math.floor(Math.random() * 4)],
+                            animationDelay: `${Math.random() * 2}s`
+                        }} />)}
+                    </div>}
 
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', minWidth: '180px' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '2rem', fontWeight: 900, color: '#f59e0b', letterSpacing: '-0.02em' }}>
-                            +{formatCoins(status?.daily?.rewardCoins || 0)}
-                        </span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 700 }}>KC</span>
-                    </div>
-                    {status?.daily?.available ? (
-                        <button
-                            className="btn-primary"
-                            style={{ width: '100%', padding: '1rem', fontWeight: 800, background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 10px 20px -5px rgba(16, 185, 129, 0.4)', borderRadius: '14px' }}
-                            onClick={() => handleClaim('daily', true)}
-                            disabled={claiming}
+                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div 
+                            className={`cookie-wrapper ${cookieState}`} 
+                            onClick={handleOpenCookie}
+                            style={{
+                                width: '80px', height: '80px', borderRadius: '24px',
+                                background: !fortune.opened ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.05)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: (fortune.opened || fortune.loading || isOpening) ? 'default' : 'pointer',
+                                boxShadow: !fortune.opened ? '0 12px 24px rgba(245, 158, 11, 0.25)' : 'none',
+                                transition: 'all 0.4s ease',
+                                flexShrink: 0
+                            }}
                         >
-                            Bonus Abholen
-                        </button>
-                    ) : (
-                        <div style={{ 
-                            width: '100%', padding: '1rem', borderRadius: '14px', 
-                            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
-                            color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 
-                        }}>
-                            <Clock size={16} /> Bis Morgen
+                            {cookieState === 'opened' ? (
+                                <Ghost size={40} color="rgba(255,255,255,0.2)" />
+                            ) : (
+                                <Cookie size={40} color="#f59e0b" className={cookieState === 'idle' ? 'pulse-cookie' : 'wiggle-cookie'} />
+                            )}
                         </div>
-                    )}
-                </div>
-            </section>
+                        <div style={{ flex: 1, minWidth: '250px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900 }}>Täglicher Glückskeks</h3>
+                                {!fortune.opened && !fortune.loading && (
+                                    <span className="animate-pulse" style={{ fontSize: '0.7rem', background: '#f59e0b', color: 'white', padding: '4px 10px', borderRadius: '20px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Verfügbar
+                                    </span>
+                                )}
+                            </div>
+                            <p style={{ margin: 0, fontSize: '1rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                                {fortune.opened 
+                                    ? 'Du hast deine Belohnung bereits erhalten. Komm morgen wieder für einen neuen Keks!' 
+                                    : `Öffne deinen heutigen Glückskeks für eine Weisheit und den täglichen Bonus von ${formatCoins(status?.daily?.rewardCoins || 1000)} KC.`}
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: 900, fontSize: '1.4rem', background: 'rgba(245, 158, 11, 0.1)', padding: '12px 20px', borderRadius: '16px' }}>
+                             <Trophy size={24} /> +{formatCoins(status?.daily?.rewardCoins || 1000)} KC
+                        </div>
+                    </div>
+
+                    <div style={{ flex: 1, marginTop: '10px' }}>
+                        {fortune.opened ? (
+                            <div className="fortune-paper-slide-in" style={{
+                                background: 'rgba(0,0,0,0.3)',
+                                backdropFilter: 'blur(20px)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                padding: '24px 32px',
+                                borderRadius: '20px',
+                                borderLeft: '6px solid #f59e0b',
+                                color: '#fff',
+                                fontStyle: 'italic',
+                                fontSize: '1.1rem',
+                                lineHeight: 1.6,
+                                boxShadow: '0 15px 40px rgba(0,0,0,0.5)',
+                                position: 'relative'
+                            }}>
+                                <Quote size={24} style={{ opacity: 0.2, position: 'absolute', top: '12px', left: '8px' }} />
+                                {fortune.text}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                                <button
+                                    className="btn-primary"
+                                    style={{ 
+                                        padding: '1rem 4rem', 
+                                        fontSize: '1.2rem',
+                                        fontWeight: 900, 
+                                        background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
+                                        borderRadius: '16px',
+                                        boxShadow: '0 10px 25px rgba(245, 158, 11, 0.3)',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    onClick={handleOpenCookie}
+                                    disabled={isOpening}
+                                >
+                                    {isOpening ? 'Öffne...' : 'Keks knacken & +10 KC abholen'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </div>
 
             {/* Active Milestones by Chain */}
             <div className="animate-fade-in" style={{ marginTop: '1rem' }}>
@@ -430,5 +554,63 @@ const Achievements = () => {
         </div>
     );
 };
+
+const styles = `
+    @keyframes pulse-cookie {
+        0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0)); }
+        50% { transform: scale(1.08); filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.5)); }
+        100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0)); }
+    }
+    .pulse-cookie {
+        animation: pulse-cookie 2s infinite ease-in-out;
+    }
+    @keyframes wiggle-cookie {
+        0%, 100% { transform: rotate(0); }
+        20% { transform: rotate(-10deg); }
+        40% { transform: rotate(10deg); }
+        60% { transform: rotate(-10deg); }
+        80% { transform: rotate(10deg); }
+    }
+    .wiggle-cookie {
+        animation: wiggle-cookie 0.15s infinite linear;
+    }
+    @keyframes fortune-slide-in {
+        from { transform: translateY(10px); opacity: 0; filter: blur(5px); }
+        to { transform: translateY(0); opacity: 1; filter: blur(0); }
+    }
+    .fortune-paper-slide-in {
+        animation: fortune-slide-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .daily-rewards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    }
+    @media (max-width: 850px) {
+        .daily-rewards-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .confetti-container {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 10;
+    }
+    .confetti {
+        position: absolute;
+        width: 8px; height: 8px;
+        top: -10px;
+        animation: confetti-fall 3s linear forwards;
+    }
+    @keyframes confetti-fall {
+        from { transform: translateY(0) rotate(0); }
+        to { transform: translateY(400px) rotate(720deg); opacity: 0; }
+    }
+`;
+
+// Inject styles
+const styleSheet = document.createElement("style");
+styleSheet.innerText = styles;
+document.head.appendChild(styleSheet);
 
 export default Achievements;
