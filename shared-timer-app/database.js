@@ -434,6 +434,20 @@ function initializeDatabaseSchema() {
     used_at DATETIME
   )`);
 
+  // --- Daily Fortune Cookie ---
+  db.run(`CREATE TABLE IF NOT EXISTS fortunes_dictionary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT UNIQUE NOT NULL
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_fortunes_history (
+    user_id TEXT NOT NULL,
+    fortune_id INTEGER,
+    opened_date TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, opened_date)
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS Wordle_DailyWords (
     date TEXT PRIMARY KEY,
     word TEXT NOT NULL,
@@ -5383,6 +5397,127 @@ module.exports = {
           else resolve(this.changes);
         }
       );
+    });
+  },
+
+  // --- Daily Fortune Cookie Methods ---
+  getFortuneStatus: (userId, date) => {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT h.*, d.text 
+         FROM user_fortunes_history h 
+         LEFT JOIN fortunes_dictionary d ON h.fortune_id = d.id 
+         WHERE h.user_id = ? AND h.opened_date = ?`,
+        [userId, date],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+  },
+
+  openDailyFortune: (userId, date) => {
+    return new Promise((resolve, reject) => {
+      const fallbackMsg = "Wow, du hast das Universum durchgespielt! Wir haben aktuell keine neuen Kekse mehr für dich. Sag dem Admin Bescheid!";
+      
+      // Step 1: Find a random unused fortune
+      db.get(
+        `SELECT id, text FROM fortunes_dictionary 
+         WHERE id NOT IN (SELECT fortune_id FROM user_fortunes_history WHERE user_id = ? AND fortune_id IS NOT NULL) 
+         ORDER BY RANDOM() LIMIT 1`,
+        [userId],
+        (err, fortune) => {
+          if (err) return reject(err);
+
+          const fortuneId = fortune ? fortune.id : null;
+          const fortuneText = fortune ? fortune.text : fallbackMsg;
+
+          // Step 2: Record opening
+          db.run(
+            `INSERT INTO user_fortunes_history (user_id, fortune_id, opened_date) VALUES (?, ?, ?)`,
+            [userId, fortuneId, date],
+            function(err) {
+              if (err) {
+                if (err.message.includes('UNIQUE')) {
+                  reject(new Error('Du hast heute bereits einen Glückskeks geöffnet!'));
+                } else {
+                  reject(err);
+                }
+              } else {
+                resolve({ id: fortuneId, text: fortuneText });
+              }
+            }
+          );
+        }
+      );
+    });
+  },
+
+  addFortunesBulk: (fortunes) => {
+    return new Promise((resolve, reject) => {
+      if (!Array.isArray(fortunes)) return reject(new Error('Input must be an array of strings'));
+      
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        const stmt = db.prepare('INSERT OR IGNORE INTO fortunes_dictionary (text) VALUES (?)');
+        let count = 0;
+        
+        fortunes.forEach((text) => {
+          if (typeof text === 'string' && text.trim().length > 0) {
+            stmt.run(text.trim());
+            count++;
+          }
+        });
+        
+        stmt.finalize();
+        db.run('COMMIT', (err) => {
+          if (err) reject(err);
+          else resolve(count);
+        });
+      });
+    });
+  },
+
+  getFortunesDictionary: () => {
+    return new Promise((resolve, reject) => {
+      // Returns all fortunes with a count of how many times they've been opened
+      db.all(
+        `SELECT d.*, COUNT(h.fortune_id) as usage_count 
+         FROM fortunes_dictionary d 
+         LEFT JOIN user_fortunes_history h ON d.id = h.fortune_id 
+         GROUP BY d.id 
+         ORDER BY d.id DESC`, 
+        [], 
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+  },
+
+  deleteFortune: (id) => {
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        // Step 1: Set fortune_id to NULL in history to preserve user records
+        db.run('UPDATE user_fortunes_history SET fortune_id = NULL WHERE fortune_id = ?', [id]);
+        
+        // Step 2: Delete from dictionary
+        db.run('DELETE FROM fortunes_dictionary WHERE id = ?', [id], function(err) {
+          if (err) {
+            db.run('ROLLBACK');
+            return reject(err);
+          }
+          
+          db.run('COMMIT', (err) => {
+            if (err) reject(err);
+            else resolve(this.changes);
+          });
+        });
+      });
     });
   },
 

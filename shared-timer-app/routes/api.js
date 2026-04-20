@@ -280,6 +280,14 @@ router.post('/admin/rss/refresh', authController.authenticateToken, apiControlle
 // ─── Daily Status Aggregation ─────────────────────────────────
 router.get('/daily-status', authController.authenticateToken, apiController.getDailyStatus);
 
+// ─── Daily Fortune Cookie ────────────────────────────────────
+const fortuneController = require('../controllers/fortuneController');
+router.get('/fortune/status', authController.authenticateToken, fortuneController.getStatus);
+router.post('/fortune/open', authController.authenticateToken, fortuneController.openFortune);
+router.get('/admin/fortunes/dictionary', authController.authenticateToken, fortuneController.adminGetDictionary);
+router.post('/admin/fortunes/bulk-import', authController.authenticateToken, fortuneController.bulkImport);
+router.delete('/admin/fortunes/:id', authController.authenticateToken, fortuneController.deleteFortune);
+
 // ─── Lotto Imitat ────────────────────────────────────────────
 const lottoController = require('../controllers/lottoController');
 router.get('/lotto/config', authController.optionalAuthenticateToken, lottoController.getConfig);
