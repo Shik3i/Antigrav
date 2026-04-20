@@ -89,5 +89,7 @@
     "BLACKJACK_STAND": "blackjack:stand",
     "BLACKJACK_STATE": "blackjack:state",
     "BLACKJACK_ERROR": "blackjack:error",
-    "BLACKJACK_LEADERBOARD": "blackjack:leaderboard"
+    "BLACKJACK_LEADERBOARD": "blackjack:leaderboard",
+    "BLACKJACK_DOUBLE": "blackjack:double",
+    "BLACKJACK_SPLIT": "blackjack:split"
 }

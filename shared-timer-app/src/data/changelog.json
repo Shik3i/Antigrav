@@ -1,5 +1,11 @@
 [
   {
+    "id": 81,
+    "version": "2.49.0",
+    "date": "2026-04-20",
+    "changes": "- **Blackjack: Real-Time Seating**: Behebung des Synchronisationsfehlers beim Hinsetzen. Spieler werden nun ohne F5-Refresh sofort am Tisch angezeigt (ID-Normalisierung).\n- **Blackjack: Abrechnungs-Turbo**: Reduzierung der künstlichen Wartezeit während der Abrechnung von 5s auf 1s für einen deutlich schnelleren Spielverlauf.\n- **Blackjack: Result Overlays**: Neue, animierte Gewinn/Verlust-Toasts direkt über dem Sitzplatz sorgen für sofortiges Feedback nach jeder Runde.\n- **Blackjack: Feier-Animationen**: Einführung von goldenen \"BLACKJACK!\" Overlays und CSS-Konfetti-Effekten bei perfekten Händen für Spieler und Dealer.\n- **Blackjack: Sitzplatz verlassen**: Neuer Button zum Freigeben des Platzes zwischen den Runden inklusive sicherer Socket-Abmeldung.\n- **Blackjack: Casino-Animationen**: Karten fliegen nun physikalisch korrekt vom Kartenschlitten (Shoe) oben rechts an ihre jeweilige Position."
+  },
+  {
     "id": 80,
     "version": "2.48.1",
     "date": "2026-04-20",
