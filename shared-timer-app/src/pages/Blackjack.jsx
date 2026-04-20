@@ -91,6 +91,11 @@ function getSeatClass(maxPlayers, seat) {
   return `blackjack-seat blackjack-seat-${maxPlayers}-${seat}`;
 }
 
+function hasActiveRound(room) {
+  if (!room) return false;
+  return !['waiting', 'betting'].includes(room.status);
+}
+
 function getVisualSeat(seat, mySeat, maxPlayers) {
   if (!mySeat || !maxPlayers) return seat;
   return ((seat - mySeat + maxPlayers) % maxPlayers) + 1;
@@ -972,8 +977,8 @@ const Blackjack = ({ socket }) => {
     setActionBusy(true);
     try {
       await runSocketAction(EVENTS.BLACKJACK_LEAVE, { roomId });
-      showToast('Tisch verlassen.', 'success');
-      setRoomState(null);
+      showToast('Sitzplatz verlassen.', 'success');
+      // No need to setRoomState(null) manually, the next sync/ack will show we are gone
     } catch (err) {
       setError(err.message);
     } finally {
@@ -2270,7 +2275,9 @@ const Blackjack = ({ socket }) => {
               padding: '12px 24px',
               background: 'rgba(0,0,0,0.3)',
               borderRadius: '20px',
-              border: '1px solid rgba(255,255,255,0.05)'
+              border: '1px solid rgba(255,255,255,0.05)',
+              flexWrap: 'wrap',
+              gap: '12px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <Coins size={18} color="#fbbf24" />
@@ -2418,8 +2425,8 @@ const Blackjack = ({ socket }) => {
                   alignItems: 'center',
                   padding: '14px 16px',
                   borderRadius: '18px',
-                  background: room.roomId === roomId ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${room.roomId === roomId ? 'rgba(245,158,11,0.24)' : 'rgba(255,255,255,0.06)'}`
+                  background: String(room.roomId) === String(roomId) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${String(room.roomId) === String(roomId) ? 'rgba(245,158,11,0.24)' : 'rgba(255,255,255,0.06)'}`
                 }}
               >
                 <div>
