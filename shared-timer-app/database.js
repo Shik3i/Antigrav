@@ -86,6 +86,7 @@ function initializeDatabaseSchema() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES Users(id)
   )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_transactions_user ON KoalaTransactions(user_id)');
 
   // BannedUsers: stores banned accounts
   db.run(`CREATE TABLE IF NOT EXISTS BannedUsers (
@@ -123,6 +124,7 @@ function initializeDatabaseSchema() {
     FOREIGN KEY(userId) REFERENCES Users(id),
     FOREIGN KEY(friendId) REFERENCES Users(id)
   )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_friends_friendId ON Friends(friendId)');
 
   // TimerEvents: stores history of completed timers for stats
   // Note: No foreign key to Rooms anymore as rooms are RAM-only.
@@ -5517,6 +5519,69 @@ module.exports = {
             else resolve(this.changes);
           });
         });
+      });
+    });
+  },
+
+  getUserWordleWins: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COALESCE(totalWins, 0) as totalWins FROM Wordle_UserStats WHERE userId = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.totalWins : 0);
+      });
+    });
+  },
+
+  getUserFortunesCount: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COUNT(*) as count FROM user_fortunes_history WHERE user_id = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.count : 0);
+      });
+    });
+  },
+
+  getUserBlackjackGames: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COALESCE(gamesPlayed, 0) as gamesPlayed FROM BlackjackStats WHERE userId = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.gamesPlayed : 0);
+      });
+    });
+  },
+
+  getUserTotalSpent: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COALESCE(ABS(SUM(amount)), 0) as total FROM KoalaTransactions WHERE user_id = ? AND amount < 0', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.total : 0);
+      });
+    });
+  },
+
+  getUserFriendCount: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get("SELECT COUNT(*) as count FROM Friends WHERE (userId = ? OR friendId = ?) AND status = 'accepted'", [userId, userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.count : 0);
+      });
+    });
+  },
+
+  getUserTowerClimbCount: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COUNT(*) as count FROM TowerClimbRounds WHERE userId = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.count : 0);
+      });
+    });
+  },
+
+  getUserLottoTicketCount: (userId) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT COUNT(*) as count FROM LottoTickets WHERE userId = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.count : 0);
       });
     });
   },

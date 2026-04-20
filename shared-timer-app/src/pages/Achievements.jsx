@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Medal, Award, Crown, CheckCircle2, Clock, Calendar, Gift, Lock, Timer, Gamepad2, Swords, ChevronDown, Settings, Shield, Cookie, Ghost, Quote } from 'lucide-react';
+import { Trophy, Medal, Award, Crown, CheckCircle2, Clock, Calendar, Gift, Lock, Timer, Gamepad2, Swords, ChevronDown, Settings, Shield, Cookie, Ghost, Quote, Type, Dices, ShoppingBag, Users, Layers, Ticket } from 'lucide-react';
 import { usePageVisibility } from '../hooks/usePageVisibility';
 
 const CHAIN_META = {
     timer:     { label: '⏱️ Timer-Abschlüsse',     color: '#3b82f6', Icon: Timer },
     esports:   { label: '⚔️ Esports-Wetten',        color: '#a855f7', Icon: Swords },
     koalaflap: { label: '🎮 KoalaFlap Minigame',    color: '#f59e0b', Icon: Gamepad2 },
+    casino:    { label: '🎰 Casino & Minigames',    color: '#10b981', Icon: Dices },
+    social:    { label: '🤝 Soziales',              color: '#6366f1', Icon: Users },
+    economy:   { label: '💰 Wirtschaft',            color: '#f59e0b', Icon: ShoppingBag },
     special:   { label: '🌟 Spezial-Erfolge',        color: '#ec4899', Icon: Award },
 };
 
@@ -225,7 +228,11 @@ const Achievements = () => {
     );
 
     const getIcon = (iconName) => {
-        const icons = { Trophy, Medal, Award, Crown };
+        const icons = { 
+            Trophy, Medal, Award, Crown, 
+            Type, Cookie, Dices, ShoppingBag, 
+            Users, Layers, Ticket 
+        };
         const IconComponent = icons[iconName] || Trophy;
         return <IconComponent size={24} />;
     };

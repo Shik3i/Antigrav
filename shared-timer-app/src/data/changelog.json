@@ -1,5 +1,11 @@
 [
   {
+    "id": 79,
+    "version": "2.48.0",
+    "date": "2026-04-20",
+    "changes": "- **Achievement Expansion**: Einf\u00fchrung von 7 neuen Achievement-Ketten (Wortakrobat, Gl\u00fchbirnen-Moment, Kartenhai, G\u00f6nner-Modus, Sozialer Schmetterling, Turmspringer, Lottomania) mit insgesamt 21 neuen Meilensteinen.\n- **Backend-Optimierung**: Implementierung von hochperformanten Datenbank-Helpern mit atomaren Abfragen und Null-Safety (COALESCE) zur Gew\u00e4hrleistung der Datenintegrit\u00e4t.\n- **Performance-Tuning**: Hinzuf\u00fchgen von gezielten Datenbank-Indizes f\u00fcr Transaktionen und Freundschaftslisten zur Beschleunigung komplexer Statistiken.\n- **Kategorisiertes UI**: Neue Gruppierungen im Achievement-Bildschirm (Casino, Soziales, Wirtschaft) inklusive neuer Lucide-Icons f\u00fcr eine bessere \u00dcbersichtlichkeit.\n- **Admin-Panel Sync**: Vollst\u00e4ndige Integration der neuen Ketten in die Admin-Verwaltung zur flexiblen Multiplikator-Steuerung."
+  },
+  {
     "id": 78,
     "version": "2.47.0",
     "date": "2026-04-20",
