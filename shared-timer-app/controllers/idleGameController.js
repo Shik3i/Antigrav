@@ -1,5 +1,12 @@
 const dbLayer = require('../database');
 
+const emitBalanceUpdate = (req, userId, balance) => {
+    const io = req.app?.get('socketio') || req.app?.get('io');
+    if (io && userId && Number.isFinite(balance)) {
+        io.to(userId).emit('COIN_BALANCE_UPDATE', { balance });
+    }
+};
+
 const GACHA_CAPSULE_PRICE = 1000;
 const LEC_POOL = ['FNC', 'G2', 'GX', 'KC', 'KCB', 'LR', 'MKOI', 'NAVI', 'SHFT', 'SK', 'TH', 'VIT'];
 const ROLES = ['Top', 'Jungle', 'Mid', 'Bot', 'Support'];
@@ -114,7 +121,8 @@ exports.performGachaPull = async (req, res) => {
             const cost = 10 * pullAmount;
             const user = await dbLayer.getUser(userId);
             if (!user || user.koala_balance < cost) return res.status(400).json({ error: `Zu wenig KoalaCoins (${cost} KC benötigt)` });
-            await dbLayer.addKoalaCoins(userId, -cost, `LoL Idle Pull x${pullAmount} (KC)`);
+            const newBalanceValue = await dbLayer.addKoalaCoins(userId, -cost, `LoL Idle Pull x${pullAmount} (KC)`);
+            emitBalanceUpdate(req, userId, newBalanceValue);
         } else {
             const cost = 10000 * pullAmount;
             const profile = await dbLayer.getIdleProfile(userId);

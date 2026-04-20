@@ -4888,7 +4888,7 @@ module.exports = {
     });
   },
 
-  getUserLottoTicketCount: (userId, drawDate) => {
+  getUserLottoTicketCountForDraw: (userId, drawDate) => {
     return new Promise((resolve, reject) => {
       db.get("SELECT COUNT(*) as count FROM LottoTickets WHERE userId = ? AND drawDate = ?", [userId, drawDate], (err, row) => {
         if (err) reject(err);
@@ -5577,7 +5577,7 @@ module.exports = {
     });
   },
 
-  getUserLottoTicketCount: (userId) => {
+  getUserLifetimeLottoTicketCount: (userId) => {
     return new Promise((resolve, reject) => {
       db.get('SELECT COUNT(*) as count FROM LottoTickets WHERE userId = ?', [userId], (err, row) => {
         if (err) reject(err);

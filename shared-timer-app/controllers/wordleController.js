@@ -1,5 +1,12 @@
 const dbLayer = require('../database');
 
+const emitBalanceUpdate = (req, userId, balance) => {
+    const io = req.app?.get('socketio') || req.app?.get('io');
+    if (io && userId && Number.isFinite(balance)) {
+        io.to(userId).emit('COIN_BALANCE_UPDATE', { balance });
+    }
+};
+
 // Fallback words if database is completely empty
 const FALLBACK_WORDS = ['ALARM', 'APFEL', 'BIRNE', 'STERN', 'GLÜCK'];
 
@@ -97,7 +104,12 @@ exports.submitDailyResult = async (req, res, next) => {
         }
 
         // Use atomic transaction for coins, status, and streaks
-        await dbLayer.completeWordleGame(userId, targetDate, guesses, won, earnedCoins);
+        const newStatus = await dbLayer.completeWordleGame(userId, targetDate, guesses, won, earnedCoins);
+        
+        if (won) {
+            const user = await dbLayer.getUser(userId);
+            if (user) emitBalanceUpdate(req, userId, user.koala_balance);
+        }
 
         const response = { success: true, earnedCoins };
         
@@ -144,6 +156,8 @@ exports.buyDailyHint = async (req, res, next) => {
         // Truncate definition for immediate response
         const def = gameData.definition;
         const truncated = def.length > 35 ? def.slice(0, 35) + '...' : def;
+
+        emitBalanceUpdate(req, userId, result.newBalance);
 
         res.json({ 
             success: true, 

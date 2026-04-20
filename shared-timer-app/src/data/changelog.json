@@ -1,5 +1,11 @@
 [
   {
+    "id": 80,
+    "version": "2.48.1",
+    "date": "2026-04-20",
+    "changes": "- **Lotto Ticket-Limit Fix**: Behebung des Fehlers, bei dem das Lifetime-Statistik-Achievement die tägliche Limit-Prüfung überschrieben hat. Die Logik wurde architektonisch sauber in spezialisierte Datenbank-Funktionen getrennt.\n- **Live Balance Widget**: Das KoalaCoin-Guthaben-Widget aktualisiert sich nun in Echtzeit über Sockets bei Lotto-Käufen, Wordle-Gewinnen, Achievement-Claims und Gacha-Pulls.\n- **Optimistic UI Update**: Sofortige Rückmeldung des Guthabens auf der Lotto-Seite direkt nach dem Kauf, um Verzögerungen im Frontend zu vermeiden."
+  },
+  {
     "id": 79,
     "version": "2.48.0",
     "date": "2026-04-20",
