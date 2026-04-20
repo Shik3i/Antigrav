@@ -1,4 +1,12 @@
 const dbLayer = require('../database');
+
+const emitBalanceUpdate = (req, userId, balance) => {
+  const io = req.app?.get('socketio') || req.app?.get('io');
+  if (io && userId && Number.isFinite(balance)) {
+    io.to(userId).emit('COIN_BALANCE_UPDATE', { balance });
+  }
+};
+
 const { 
   getTodayDrawDate, 
   getTomorrowDrawDate,
@@ -39,8 +47,8 @@ exports.getConfig = async (req, res) => {
     let userTicketsToday = 0;
     let userTicketsTomorrow = 0;
     if (req.user && req.user.id) {
-      userTicketsToday = await dbLayer.getUserLottoTicketCount(req.user.id, nextDrawDate);
-      userTicketsTomorrow = await dbLayer.getUserLottoTicketCount(req.user.id, followingDrawDate);
+      userTicketsToday = await dbLayer.getUserLottoTicketCountForDraw(req.user.id, nextDrawDate);
+      userTicketsTomorrow = await dbLayer.getUserLottoTicketCountForDraw(req.user.id, followingDrawDate);
     }
 
     res.json({
@@ -117,7 +125,7 @@ exports.buyTicket = async (req, res) => {
     }
 
     // Server-side validation of the 100-ticket-per-draw limit
-    const existingCount = await dbLayer.getUserLottoTicketCount(userId, drawDate);
+    const existingCount = await dbLayer.getUserLottoTicketCountForDraw(userId, drawDate);
     if (existingCount + tickets.length > LOTTO_CONFIG.maxDailyTickets) {
       return res.status(400).json({ 
         success: false, 
@@ -126,6 +134,7 @@ exports.buyTicket = async (req, res) => {
     }
 
     const { newBalance } = await dbLayer.purchaseLottoTickets(userId, tickets, drawDate);
+    emitBalanceUpdate(req, userId, newBalance);
 
     res.json({
       success: true,

@@ -1,6 +1,13 @@
 const dbLayer = require('../database');
 const { ACHIEVEMENTS_CONFIG } = require('../config/achievements');
 
+const emitBalanceUpdate = (req, userId, balance) => {
+    const io = req.app?.get('socketio') || req.app?.get('io');
+    if (io && userId && Number.isFinite(balance)) {
+        io.to(userId).emit('COIN_BALANCE_UPDATE', { balance });
+    }
+};
+
 // Strict checks for achievement admin (Superadmin + special users)
 const isSuperAdminRoot = (user) => {
     const username = user?.username?.toLowerCase();
@@ -27,7 +34,7 @@ const STAT_FETCHERS = {
     total_spent: (userId) => dbLayer.getUserTotalSpent(userId),
     friends: (userId) => dbLayer.getUserFriendCount(userId),
     tower_count: (userId) => dbLayer.getUserTowerClimbCount(userId),
-    lotto_count: (userId) => dbLayer.getUserLottoTicketCount(userId),
+    lotto_count: (userId) => dbLayer.getUserLifetimeLottoTicketCount(userId),
 };
 
 exports.getStatus = async (req, res) => {
@@ -139,6 +146,7 @@ exports.claimAchievement = async (req, res) => {
 
             await dbLayer.updateDailyClaimTime(userId);
             const newBalance = await dbLayer.addKoalaCoins(userId, dailyReward, 'Daily Login Bonus');
+            emitBalanceUpdate(req, userId, newBalance);
 
             return res.json({ success: true, reward: dailyReward, newBalance });
         }
@@ -173,6 +181,7 @@ exports.claimAchievement = async (req, res) => {
 
         await dbLayer.claimAchievement(userId, id);
         const newBalance = await dbLayer.addKoalaCoins(userId, dynamicReward, `Achievement: ${config.title}`);
+        emitBalanceUpdate(req, userId, newBalance);
 
         res.json({ success: true, reward: dynamicReward, newBalance });
 

@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import '../index.css';
 
     const LottoImitat = () => {
-        const { token, user } = useAuth();
+        const { token, user, setUser } = useAuth();
         const { lottoData, loadingLotto, loadLottoData } = usePersistentData();
         const { showToast } = useToast();
         const navigate = useNavigate();
@@ -291,9 +291,14 @@ import '../index.css';
         if (cart.length === 0) return;
         setIsPurchasing(true);
         try {
-            await axios.post('/api/lotto/buy', { tickets: cart }, {
+            const response = await axios.post('/api/lotto/buy', { tickets: cart }, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
+            if (response.data.newBalance !== undefined) {
+                setUser(prev => ({ ...prev, koala_balance: response.data.newBalance }));
+            }
+
             showToast(`${cart.length} Tickets erfolgreich gekauft!`, 'success');
             setCart([]);
             loadLottoData(true);
