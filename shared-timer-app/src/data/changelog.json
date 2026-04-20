@@ -1,5 +1,11 @@
 [
   {
+    "id": 82,
+    "version": "2.49.1",
+    "date": "2026-04-20",
+    "changes": "- **Blackjack: Button-Fix**: Behebung des `ReferenceError: hasActiveRound is not defined` beim Verlassen des Tisches.\n- **Blackjack: Mobile-Optimierung**: Die Steuerungseinheit am unteren Rand des Tisches passt sich nun dynamisch an kleinere Bildschirme an (Flex-Wrap).\n- **Blackjack: Stabilitäts-Audit**: Verbesserung der Synchronisation bei schnellen Raumwechseln und Validierung aller ID-Vergleiche auf String-Ebene."
+  },
+  {
     "id": 81,
     "version": "2.49.0",
     "date": "2026-04-20",
