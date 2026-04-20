@@ -155,10 +155,21 @@ module.exports = function (io) {
                 throw new Error('User not found.');
             }
 
+            // Parse preferences if they are stored as a JSON string
+            let prefs = user.preferences || {};
+            if (typeof prefs === 'string') {
+                try {
+                    prefs = JSON.parse(prefs);
+                } catch (e) {
+                    prefs = {};
+                }
+            }
+
             blackjackRoomManager.joinRoom(targetRoomId, {
                 userId,
                 username: user.username || user.displayName,
-                displayName: user.displayName || user.username
+                displayName: user.displayName || user.username,
+                preferences: prefs
             });
 
             socket.join(getBlackjackSocketRoom(targetRoomId));
@@ -757,7 +768,7 @@ module.exports = function (io) {
             }
         });
 
-        socket.on(EVENTS.BLACKJACK_SWITCH_SEAT, ({ roomId, seat } = {}, ack) => {
+        socket.on(EVENTS.BLACKJACK_SWITCH_SEAT, async ({ roomId, seat } = {}, ack) => {
             try {
                 const userId = socket.user?.userId;
                 if (!userId) {
@@ -767,7 +778,12 @@ module.exports = function (io) {
                     throw new Error('roomId is required.');
                 }
 
-                blackjackRoomManager.moveSeat(roomId, userId, Number.parseInt(seat, 10));
+                const user = await dbLayer.getUser(userId);
+                if (!user) {
+                    throw new Error('User not found.');
+                }
+
+                blackjackRoomManager.moveSeat(roomId, user, Number.parseInt(seat, 10));
                 const state = emitBlackjackStateAndRooms(roomId, userId);
                 sendSocketAck(ack, { success: true, roomId, state });
             } catch (err) {
@@ -816,6 +832,25 @@ module.exports = function (io) {
             }
         });
 
+        socket.on(EVENTS.BLACKJACK_LEAVE, ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.leaveRoom(roomId, userId);
+                const state = emitBlackjackStateAndRooms(roomId, userId);
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to leave blackjack room.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to leave blackjack room.' });
+            }
+        });
+
         socket.on(EVENTS.BLACKJACK_HIT, async ({ roomId } = {}, ack) => {
             try {
                 const userId = socket.user?.userId;
@@ -853,6 +888,50 @@ module.exports = function (io) {
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to stand in blackjack.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to stand in blackjack.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_DOUBLE, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                const userBalance = await dbLayer.getUserBalance(userId);
+                blackjackRoomManager.doubleDown(roomId, userId, Number(userBalance || 0));
+                
+                await persistBlackjackSettlementIfNeeded(roomId);
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to double down.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to double down.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_SPLIT, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                const userBalance = await dbLayer.getUserBalance(userId);
+                blackjackRoomManager.split(roomId, userId, Number(userBalance || 0));
+
+                await persistBlackjackSettlementIfNeeded(roomId);
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to split.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to split.' });
             }
         });
 
