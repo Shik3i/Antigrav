@@ -49,144 +49,11 @@ const deleteSpeedcubeTime = (id, userId) => {
 // Helper functions for stats
 
 
-const addRoom = (id, name, isPublic, defaultDurationMinutes, ownerId, defaultRole = 'read', visibleToFriends = false) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT OR IGNORE INTO Rooms (id, name, isPublic, defaultDurationMinutes, ownerId, defaultRole, visibleToFriends) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, name, isPublic, defaultDurationMinutes, ownerId, defaultRole, visibleToFriends ? 1 : 0], function (err) {
-        if (err) reject(err);
-        else resolve(this.changes);
-      });
-  });
-};
-
-const getRoom = (id) => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM Rooms WHERE id = ?', [id], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-};
-
-const recordTimerCompletion = (userId, roomId, roomName, durationMinutes) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT INTO TimerEvents (userId, roomId, roomName, durationMinutes) VALUES (?, ?, ?, ?)', [userId, roomId, roomName || 'Unknown Room', durationMinutes || 0], function (err) {
-      if (err) reject(err);
-      else resolve(this.lastID);
-    });
-  });
-};
-
-const getHighscores = (limit = 10) => {
-  return new Promise((resolve, reject) => {
-    const queryUsers = `
-      SELECT u.id, u.username, u.displayName, u.preferences,
-        te.totalCompleted,
-        te.sessionCount
-      FROM (
-        SELECT
-          userId,
-          ROUND(SUM(CASE WHEN durationMinutes IS NULL OR durationMinutes = '' THEN 20 ELSE durationMinutes END) / 60.0, 1) as totalCompleted,
-          COUNT(id) as sessionCount
-        FROM TimerEvents
-        GROUP BY userId
-      ) te
-      JOIN Users u ON u.id = te.userId
-      ORDER BY te.totalCompleted DESC
-      LIMIT ?
-    `;
-
-    // 2. Completions by Weekday (0 = Sunday, 1 = Monday, etc.)
-    const queryWeekday = `
-      SELECT strftime('%w', completedAt) as dayOfWeek, 
-      ROUND(SUM(CASE WHEN durationMinutes IS NULL OR durationMinutes = '' THEN 20 ELSE durationMinutes END) / 60.0, 1) as count,
-      COUNT(id) as sessions
-      FROM TimerEvents
-      GROUP BY dayOfWeek
-      ORDER BY dayOfWeek ASC
-    `;
-
-    // 3. Completions by Hour of Day (00-23)
-    const queryHour = `
-      SELECT strftime('%H', completedAt) as hourOfDay, 
-      ROUND(SUM(CASE WHEN durationMinutes IS NULL OR durationMinutes = '' THEN 20 ELSE durationMinutes END) / 60.0, 1) as count,
-      COUNT(id) as sessions
-      FROM TimerEvents
-      GROUP BY hourOfDay
-      ORDER BY hourOfDay ASC
-    `;
-
-    // 4. Completions by Month (01-12)
-    const queryMonth = `
-      SELECT strftime('%m', completedAt) as monthOfYear, 
-      ROUND(SUM(CASE WHEN durationMinutes IS NULL OR durationMinutes = '' THEN 20 ELSE durationMinutes END) / 60.0, 1) as count,
-      COUNT(id) as sessions
-      FROM TimerEvents
-      GROUP BY monthOfYear
-      ORDER BY monthOfYear ASC
-    `;
-
-    // Execute queries in parallel using Promise.all
-    Promise.all([
-      new Promise((res, rej) => db.all(queryUsers, [limit], (err, rows) => err ? rej(err) : res(rows))),
-      new Promise((res, rej) => db.all(queryWeekday, [], (err, rows) => err ? rej(err) : res(rows))),
-      new Promise((res, rej) => db.all(queryHour, [], (err, rows) => err ? rej(err) : res(rows))),
-      new Promise((res, rej) => db.all(queryMonth, [], (err, rows) => err ? rej(err) : res(rows)))
-    ])
-      .then(([topUsers, byWeekday, byHour, byMonth]) => {
-        resolve({
-          topUsers,
-          stats: {
-            byWeekday: byWeekday.map(row => ({ label: getWeekdayName(row.dayOfWeek), count: row.count, sessions: row.sessions })),
-            byHour: byHour.map(row => ({ label: `${row.hourOfDay}:00`, count: row.count, sessions: row.sessions })),
-            byMonth: byMonth.map(row => ({ label: getMonthName(row.monthOfYear), count: row.count, sessions: row.sessions }))
-          }
-        });
-      })
-      .catch(reject);
-  });
-};
-
-const getActivityHistory = (days = 30) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT 
-        date(completedAt) as date,
-        ROUND(SUM(CASE WHEN durationMinutes IS NULL OR durationMinutes = '' THEN 20 ELSE durationMinutes END) / 60.0, 1) as count,
-        COUNT(id) as sessions
-      FROM TimerEvents
-      WHERE completedAt >= date('now', '-' || ? || ' days')
-      GROUP BY date
-      ORDER BY date ASC
-    `;
-
-    db.all(query, [days], (err, rows) => {
-      if (err) return reject(err);
-
-      // Backfill missing days
-      const result = [];
-      const today = new Date();
-      for (let i = days; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        const existing = (rows || []).find(r => r.date === dateStr);
-        result.push({
-          label: dateStr,
-          count: existing ? existing.count : 0,
-          sessions: existing ? existing.sessions : 0
-        });
-      }
-      resolve(result);
-    });
-  });
-};
 
 
-function getMonthName(monthStr) {
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  return months[parseInt(monthStr, 10) - 1] || monthStr;
-}
+
+
+
 
 // ─── Friends Helpers ───────────────────────────────────────────
 const addFriend = (userId, friendId, status = 'pending') => {
@@ -458,54 +325,9 @@ const claimScratchcard = (id, userId) => {
 };
 
 // ─── Admin Dashboard Helpers ─────────────────────────────────────
-const getAllTimerCompletions = () => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT te.id, te.completedAt, u.displayName as userName, 
-             te.roomName, 
-             te.durationMinutes as defaultDurationMinutes
-      FROM TimerEvents te
-      LEFT JOIN Users u ON te.userId = u.id
-      ORDER BY te.completedAt DESC
-      LIMIT 100
-    `;
-    db.all(query, [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
 
-const deleteTimerCompletion = (id) => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM TimerEvents WHERE id = ?', [id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
 
-const getAllRoomsAdmin = () => {
-  return new Promise((resolve, reject) => {
-    // Rooms are now exclusively in RAM (roomManager.js).
-    // The Admin panel should fetch active rooms via socket events that tap into roomManager.
-    resolve([]); 
-  });
-};
 
-const deleteRoomAdmin = (id) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // 1. Delete associated timer events from history
-      db.run('DELETE FROM TimerEvents WHERE roomId = ?', [id], function (err) {
-        if (err) console.error("Error deleting timer events for room", id, err);
-      });
-      // 2. Room removal itself happens in roomManager for RAM rooms.
-      // Database record no longer exists.
-      resolve(1);
-    });
-  });
-};
 
 
 // ─── Banning System ────────────────────────────────────────────────
@@ -2312,15 +2134,6 @@ function deleteGameScore(scoreId) {
 
 // ─── Achievements & Daily Bonus ────────────────────────────────
 
-const getUserTimerCount = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get(`SELECT COUNT(*) as count FROM TimerEvents WHERE userId = ?`, [userId], (err, row) => {
-      if (err) reject(err);
-      else resolve(row ? row.count : 0);
-    });
-  });
-};
-
 const getUserWonMatchCount = (userId) => {
   return new Promise((resolve, reject) => {
     db.get(`SELECT COUNT(DISTINCT matchName) as count FROM Bets WHERE userId = ? AND status = 'won'`, [userId], (err, row) => {
@@ -2338,44 +2151,6 @@ const getUserGameRoundCount = (userId) => {
     });
   });
 };
-
-// ─── Special Achievement Queries ─────────────────────────────
-const hasEarlyBirdTimer = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get(`SELECT COUNT(*) as c FROM TimerEvents WHERE userId = ? AND CAST(strftime('%H', completedAt) AS INTEGER) BETWEEN 5 AND 7`, [userId], (err, row) => {
-      if (err) reject(err);
-      else resolve(row && row.c > 0 ? 1 : 0);
-    });
-  });
-};
-
-const hasNightOwlTimer = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get(`SELECT COUNT(*) as c FROM TimerEvents WHERE userId = ? AND CAST(strftime('%H', completedAt) AS INTEGER) BETWEEN 0 AND 3`, [userId], (err, row) => {
-      if (err) reject(err);
-      else resolve(row && row.c > 0 ? 1 : 0);
-    });
-  });
-};
-
-const hasWeekendWarrior = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get(`
-      SELECT COUNT(*) as c FROM (
-        SELECT strftime('%Y-%W', completedAt) as yw
-        FROM TimerEvents
-        WHERE userId = ?
-        GROUP BY yw
-        HAVING SUM(CASE WHEN strftime('%w', completedAt) = '6' THEN 1 ELSE 0 END) > 0
-           AND SUM(CASE WHEN strftime('%w', completedAt) = '0' THEN 1 ELSE 0 END) > 0
-      )
-    `, [userId], (err, row) => {
-      if (err) reject(err);
-      else resolve(row && row.c > 0 ? 1 : 0);
-    });
-  });
-};
-
 
 const hasUnderdogWin = (userId) => {
   return new Promise((resolve, reject) => {
@@ -2807,19 +2582,10 @@ module.exports = {
   getLatestScratchcardWinners,
   getUserDailyPackCount,
   purchaseScratchcardTransaction,
-  addRoom,
-  getRoom,
-  recordTimerCompletion,
-  getHighscores,
-  getActivityHistory,
   getTeamMappings,
   getTeamMapping,
   addTeamMapping,
   deleteTeamMapping,
-  getAllTimerCompletions,
-  deleteTimerCompletion,
-  getAllRoomsAdmin,
-  deleteRoomAdmin,
   addFriend,
   removeFriend,
   getFriends,
@@ -2864,7 +2630,6 @@ module.exports = {
   cashoutTowerRound,
   getGameUpgradesConfig,
   purchaseUpgrade,
-  getUserTimerCount,
   getUserWonMatchCount,
   getUserGameRoundCount,
   getAdminGameScores,
@@ -2873,9 +2638,6 @@ module.exports = {
   getSpeedcubeTimes,
   updateSpeedcubeNote,
   deleteSpeedcubeTime,
-  hasEarlyBirdTimer,
-  hasNightOwlTimer,
-  hasWeekendWarrior,
   hasUnderdogWin,
   hasLoyalFanWin,
   getUserVoteCount,
