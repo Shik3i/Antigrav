@@ -4,6 +4,7 @@ const { TOWER_CLIMB_CONFIG, getTowerMultiplierTable, getTowerPayout } = require(
 
 // Singleton Connection: Use the shared database instance
 const db = require('./connection');
+const { logError, logSystemEvent } = require('./logging');
 
 
 
@@ -47,14 +48,6 @@ const deleteSpeedcubeTime = (id, userId) => {
 
 // Helper functions for stats
 
-const updateUserBalance = (id, newBalance) => {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE Users SET koala_balance = ? WHERE id = ?', [newBalance, id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
 
 const addRoom = (id, name, isPublic, defaultDurationMinutes, ownerId, defaultRole = 'read', visibleToFriends = false) => {
   return new Promise((resolve, reject) => {
@@ -189,20 +182,6 @@ const getActivityHistory = (days = 30) => {
   });
 };
 
-const getTopUsersByCoins = (limit = 10) => {
-  return new Promise((resolve, reject) => {
-    db.all(`SELECT id as userId, username, displayName, preferences, koala_balance FROM Users WHERE koala_balance > 0 ORDER BY koala_balance DESC LIMIT ?`, [limit], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
-
-// Helpers for stats labels
-function getWeekdayName(dayStr) {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[parseInt(dayStr, 10)] || dayStr;
-}
 
 function getMonthName(monthStr) {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -609,50 +588,7 @@ const updatePolymarketSettings = (allowUsersAdd) => {
   });
 };
 
-const addKoalaCoins = (userId, amountCents, reason) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      db.run(`UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?`, [amountCents, userId], function (err) {
-        if (err) {
-          logError(`addKoalaCoins: Update user failed: ${err.message}`, err.stack, JSON.stringify({ userId, amountCents, reason }));
-          return db.run('ROLLBACK', () => reject(err));
-        }
-      });
-      db.run(`INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)`, [userId, amountCents, reason], function (err) {
-        if (err) {
-          logError(`addKoalaCoins: Insert transaction failed: ${err.message}`, err.stack, JSON.stringify({ userId, amountCents, reason }));
-          return db.run('ROLLBACK', () => reject(err));
-        }
-      });
-      db.run('COMMIT', (err) => {
-        if (err) {
-          logError(`addKoalaCoins: Commit failed: ${err.message}`, err.stack, JSON.stringify({ userId, amountCents, reason }));
-          return reject(err);
-        }
-        // Return the new balance as a plain JS Number
-        db.get(`SELECT CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id = ?`, [userId], (err, row) => {
-          if (err) reject(err);
-          else resolve(row ? Number(row.koala_balance) : 0);
-        });
-      });
-    });
-  });
-};
 
-const getKoalaTransactions = (userId, limit = 5) => {
-  return new Promise((resolve, reject) => {
-    const query = limit > 0 
-      ? `SELECT id, amount, reason, created_at FROM KoalaTransactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`
-      : `SELECT id, amount, reason, created_at FROM KoalaTransactions WHERE user_id = ? ORDER BY created_at DESC`;
-    const params = limit > 0 ? [userId, limit] : [userId];
-    
-    db.all(query, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
 
 // ─── Countdowns ─────────────────────────────────────────────
 const getCountdowns = (userId = null) => {
@@ -704,41 +640,6 @@ const getCountdownById = (id) => {
   });
 };
 
-const logError = (message, stack = null, context = null) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT INTO ErrorLogs (message, stack, context) VALUES (?, ?, ?)', [message, stack, context], function (err) {
-      if (err) reject(err);
-      else resolve(this.lastID);
-    });
-  });
-};
-
-const getErrorLogs = (limit = 100) => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM ErrorLogs ORDER BY timestamp DESC LIMIT ?', [limit], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
-};
-
-const deleteErrorLog = (id) => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM ErrorLogs WHERE id = ?', [id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
-
-const clearErrorLogs = () => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM ErrorLogs', function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
 
 // ─── Bets ──────────────────────────────────────────────
 const createBet = (userId, matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, league, team1Logo, team2Logo) => {
@@ -2223,17 +2124,6 @@ const getGameUpgradesConfig = (category = 'koala_flap') => {
   });
 };
 
-const getUserUpgrades = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM UserUpgrades WHERE userId = ?', [userId], (err, rows) => {
-      if (err) {
-        logError(`getUserUpgrades failed: ${err.message}`, err.stack, userId);
-        reject(err);
-      } else resolve(rows || []);
-    });
-  });
-};
-
 const purchaseUpgrade = (userId, upgradeId) => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
@@ -2418,85 +2308,15 @@ function deleteGameScore(scoreId) {
   });
 }
 
-function checkDailyMission(userId, missionId) {
-  const today = new Date().toISOString().split('T')[0];
-  return new Promise((resolve, reject) => {
-    db.get('SELECT last_completed_at FROM UserMissions WHERE userId = ? AND mission_id = ?', [userId, missionId], (err, row) => {
-      if (err) return reject(err);
-      // Use startsWith to handle both 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS' formats
-      if (row && row.last_completed_at && row.last_completed_at.startsWith(today)) resolve(true);
-      else resolve(false);
-    });
-  });
-}
-
-function completeDailyMission(userId, missionId, rewardCents) {
-  const today = new Date().toISOString().split('T')[0];
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      db.run('INSERT INTO UserMissions (userId, mission_id, last_completed_at) VALUES (?, ?, ?) ON CONFLICT(userId, mission_id) DO UPDATE SET last_completed_at = ?', 
-        [userId, missionId, today, today], (err) => {
-        if (err) return db.run('ROLLBACK', () => reject(err));
-        
-        db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [rewardCents, userId], (err) => {
-          if (err) return db.run('ROLLBACK', () => reject(err));
-          
-          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', 
-            [userId, rewardCents, `Daily Mission: ${missionId}`], (err) => {
-            if (err) return db.run('ROLLBACK', () => reject(err));
-            
-            db.run('COMMIT', (err) => err ? reject(err) : resolve());
-          });
-        });
-      });
-    });
-  });
-}
 
 
 // ─── Achievements & Daily Bonus ────────────────────────────────
-const getUserAchievements = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.all(`SELECT achievementId, claimedAt FROM UserAchievements WHERE userId = ?`, [userId], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
-
-const claimAchievement = (userId, achievementId) => {
-  return new Promise((resolve, reject) => {
-    db.run(`INSERT INTO UserAchievements (userId, achievementId) VALUES (?, ?)`, [userId, achievementId], function(err) {
-      if (err) reject(err);
-      else resolve(this.lastID);
-    });
-  });
-};
-
-const updateDailyClaimTime = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.run(`UPDATE Users SET last_daily_claim = CURRENT_TIMESTAMP WHERE id = ?`, [userId], function(err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
 
 const getUserTimerCount = (userId) => {
   return new Promise((resolve, reject) => {
     db.get(`SELECT COUNT(*) as count FROM TimerEvents WHERE userId = ?`, [userId], (err, row) => {
       if (err) reject(err);
       else resolve(row ? row.count : 0);
-    });
-  });
-};
-
-const getUserDailyClaim = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get(`SELECT last_daily_claim FROM Users WHERE id = ?`, [userId], (err, row) => {
-      if (err) reject(err);
-      else resolve(row ? row.last_daily_claim : null);
     });
   });
 };
@@ -2556,14 +2376,6 @@ const hasWeekendWarrior = (userId) => {
   });
 };
 
-const getUserBalance = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get(`SELECT koala_balance FROM Users WHERE id = ?`, [userId], (err, row) => {
-      if (err) reject(err);
-      else resolve(row ? row.koala_balance : 0);
-    });
-  });
-};
 
 const hasUnderdogWin = (userId) => {
   return new Promise((resolve, reject) => {
@@ -2614,23 +2426,6 @@ const getUserZeroScoreStreak = (userId) => {
   });
 };
 
-const getAchievementSettings = () => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM AchievementSettings', (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
-
-const updateAchievementSetting = (achievementId, multiplier) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT OR REPLACE INTO AchievementSettings (achievementId, multiplier) VALUES (?, ?)', [achievementId, multiplier], (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-};
 
 const getGlobalScratchcardStats = async () => {
   try {
@@ -2738,52 +2533,10 @@ const getUserDailyPackCount = (userId, packId) => {
  * Log a system event (Info, Warn) to the SystemLogs table.
  * Includes a 24h retention policy (self-cleans on every new log).
  */
-const logSystemEvent = async (level, context, message) => {
-  try {
-    db.run(
-      'INSERT INTO SystemLogs (level, context, message) VALUES (?, ?, ?)',
-      [level, context, message],
-      (err) => {
-        if (err) console.error('[DB] SystemLog insertion failed:', err.message);
-      }
-    );
-
-    // Async cleanup: Delete logs older than 24 hours (Stochastic cleanup with 5% probability to reduce I/O)
-    if (Math.random() < 0.05) {
-      setImmediate(() => {
-        db.run("DELETE FROM SystemLogs WHERE createdAt < datetime('now', '-1 day')", (err) => {
-          if (err) console.error('[DB] SystemLog cleanup failed:', err.message);
-        });
-      });
-    }
-  } catch (e) {
-    console.error('[DB] Error in logSystemEvent:', e.message);
-  }
-};
-
-/**
- * Fetch the latest 500 system logs.
- */
-const getSystemLogs = () => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM SystemLogs ORDER BY createdAt DESC LIMIT 500', [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
 
 /**
  * Flush all system logs from the database.
  */
-const clearSystemLogs = () => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM SystemLogs', function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
 
 module.exports = {
   // --- LoL Idle Game (Road to Worlds) Helpers ---
@@ -3059,7 +2812,6 @@ module.exports = {
   recordTimerCompletion,
   getHighscores,
   getActivityHistory,
-  getTopUsersByCoins,
   getTeamMappings,
   getTeamMapping,
   addTeamMapping,
@@ -3076,16 +2828,10 @@ module.exports = {
   upsertEsportsTeams,
   getAllEsportsTeams,
   getEsportsTeamsLastUpdated,
-  addKoalaCoins,
-  getKoalaTransactions,
   getCountdowns,
   createCountdown,
   deleteCountdown,
   getCountdownById,
-  logError,
-  getErrorLogs,
-  deleteErrorLog,
-  clearErrorLogs,
   createBet,
   getUserBets,
   getUnresolvedPastBets,
@@ -3117,19 +2863,12 @@ module.exports = {
   resolveTowerPick,
   cashoutTowerRound,
   getGameUpgradesConfig,
-  getUserUpgrades,
   purchaseUpgrade,
-  getUserAchievements,
-  claimAchievement,
-  updateDailyClaimTime,
   getUserTimerCount,
-  getUserDailyClaim,
   getUserWonMatchCount,
   getUserGameRoundCount,
   getAdminGameScores,
   deleteGameScore,
-  checkDailyMission,
-  completeDailyMission,
   addSpeedcubeTime,
   getSpeedcubeTimes,
   updateSpeedcubeNote,
@@ -3137,14 +2876,10 @@ module.exports = {
   hasEarlyBirdTimer,
   hasNightOwlTimer,
   hasWeekendWarrior,
-  getUserBalance,
   hasUnderdogWin,
   hasLoyalFanWin,
   getUserVoteCount,
   getUserZeroScoreStreak,
-  getAchievementSettings,
-  updateAchievementSetting,
-  getUserFeatureRequestCount,
   createScratchcard,
   getScratchcard,
   getUserPurchasedScratchcard,
@@ -3416,11 +3151,7 @@ module.exports = {
   getWordleDailyLeaderboard,
   buyWordleHint,
   updateUserGameStats,
-  updateUserBalance,
   getGlobalGameStats,
-  logSystemEvent, // [NEW]
-  getSystemLogs,  // [NEW]
-  clearSystemLogs, // [NEW]
   // --- Lotto Helpers ---
   getLottoConfig: () => {
     return new Promise((resolve, reject) => {
