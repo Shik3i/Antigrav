@@ -196,6 +196,18 @@ exports.getTheOddsApi = async (req, res, next) => {
     }
 };
 
+exports.getOddsApiCacheStatus = () => {
+    return {
+        isCached: !!oddsApiCache.data,
+        items: oddsApiCache.data ? oddsApiCache.data.length : 0,
+        ageSeconds: oddsApiCache.timestamp ? Math.round((Date.now() - oddsApiCache.timestamp) / 1000) : null
+    };
+};
+
+exports.flushOddsApiCache = () => {
+    oddsApiCache = { data: null, timestamp: 0 };
+};
+
 exports.placeBet = async (req, res, next) => {
     try {
         const { matchName, chosenTeam, polymarketTeam, stake, odds, polymarketUrl, eventDate, team1Logo, team2Logo, league } = req.body;

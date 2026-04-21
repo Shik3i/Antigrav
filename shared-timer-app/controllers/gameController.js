@@ -235,6 +235,20 @@ exports.getKoalaFlapConfig = async (req, res, next) => {
 
 // --- Scratchcards ---
 let scratchcardPacksCache = null;
+let scratchcardPacksTimestamp = 0;
+
+exports.getScratchcardCacheStatus = () => {
+    return {
+        isCached: !!scratchcardPacksCache,
+        items: scratchcardPacksCache ? scratchcardPacksCache.length : 0,
+        ageSeconds: scratchcardPacksTimestamp ? Math.round((Date.now() - scratchcardPacksTimestamp) / 1000) : null
+    };
+};
+
+exports.flushScratchcardCache = () => {
+    scratchcardPacksCache = null;
+    scratchcardPacksTimestamp = 0;
+};
 const WINNING_LINES = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
     [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -306,6 +320,7 @@ exports.getScratchcardConfig = async (req, res) => {
                 let max_win = pack.is_weighted ? pack.price * 1280 : (pack.reward_amount || (pack.price * 5)) * 64;
                 return { ...pack, max_win, teams_count: teams.length, teams: teams.map(t => ({ team_code: t.team_code, position: t.position })) };
             }));
+            scratchcardPacksTimestamp = Date.now();
         }
         const enhancedPacks = await Promise.all(scratchcardPacksCache.map(async (pack) => {
             let userDailyCount = (userId && pack.max_daily_limit > 0) ? await dbLayer.getUserDailyPackCount(userId, pack.id) : 0;
