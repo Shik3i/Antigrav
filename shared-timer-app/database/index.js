@@ -7,15 +7,15 @@ const timers = require('./timers');
 const social = require('./social');
 const external = require('./external');
 const games = require('./games');
-const legacy = require('./legacy');
+const utils = require('./utils');
 
 // 1. Initialize the database schema and migrations
 initializeDatabaseSchema();
 
-// 2. Export everything from the modularized and legacy files
+// 2. Export everything from the modularized files
 module.exports = {
   db,
-  ...legacy,
+  ...utils,
   ...logging,
   ...users,
   ...economy,
