@@ -182,6 +182,15 @@ const getUserUpgrades = (userId) => {
   });
 };
 
+const getUserTotalSpent = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT COALESCE(ABS(SUM(amount)), 0) as total FROM KoalaTransactions WHERE user_id = ? AND amount < 0', [userId], (err, row) => {
+      if (err) reject(err);
+      else resolve(row ? row.total : 0);
+    });
+  });
+};
+
 module.exports = {
   updateUserBalance,
   getTopUsersByCoins,
@@ -196,5 +205,6 @@ module.exports = {
   getUserDailyClaim,
   checkDailyMission,
   completeDailyMission,
-  getUserUpgrades
+  getUserUpgrades,
+  getUserTotalSpent
 };
