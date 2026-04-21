@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = require('../jwtSecret');
 const { safeJson } = require('../utils/safeSerialization');
 
+const externalController = require('./externalController');
+const gameController = require('./gameController');
+
 
 // --- Team Mappings ---
 exports.getAdminMappings = async () => {
@@ -26,18 +29,23 @@ exports.deleteAdminMapping = async (id) => {
 
 // --- Cache Management ---
 exports.getAdminCacheStatus = () => {
-    // Note: oddsApiCache is currently in apiController. It will need to be moved or passed.
-    // For now, we'll delegate the oddsApi part or move the cache.
-    // Let's assume for this atomic step we focus on the functions.
-    // I will move the oddsApiCache to externalController later.
-    // For now, I'll return what apiDataService provides.
     return {
-        ...apiDataService.getAdminCacheStatus()
+        ...apiDataService.getAdminCacheStatus(),
+        oddsApi: externalController.getOddsApiCacheStatus(),
+        scratchcards: gameController.getScratchcardCacheStatus()
     };
 };
 
 exports.flushAdminCache = (target) => {
     apiDataService.flushAdminCache(target);
+    
+    if (target === 'oddsapi' || target === 'all') {
+        externalController.flushOddsApiCache();
+    }
+    if (target === 'scratchcards' || target === 'all') {
+        gameController.flushScratchcardCache();
+    }
+    
     return exports.getAdminCacheStatus();
 };
 
