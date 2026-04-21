@@ -29,10 +29,14 @@ const calculateStats = (unit, slotId = null) => {
 };
 
 exports.syncIdleProgress = async (userId) => {
-    const profile = await dbLayer.getIdleProfile(userId);
+    let profile = await dbLayer.getIdleProfile(userId);
+    if (!profile) {
+        await dbLayer.createIdleProfile(userId);
+        profile = await dbLayer.getIdleProfile(userId);
+    }
     const roster = await dbLayer.getIdleRoster(userId);
     const now = new Date();
-    const lastSync = profile.last_sync_at ? new Date(profile.last_sync_at) : now;
+    const lastSync = (profile && profile.last_sync_at) ? new Date(profile.last_sync_at) : now;
     const diffS = Math.floor((now - lastSync) / 1000);
 
     if (diffS < 10) return; // Sync every 10s min
