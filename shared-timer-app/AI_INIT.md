@@ -17,7 +17,7 @@ Antigrav is a **Full-Stack Monolith** optimized for real-time collaborative prod
 
 ## 🤖 AI Working Directives
 1. **Atomic Iterations**: Perform changes in small, verifiable steps. Never refactor multiple domains simultaneously.
-2. **Context Management**: Be aware of token limits. If a file exceeds **400 lines**, you MUST apply the **Strangler Fig Pattern** to break it down.
+2. **Context Management**: Be aware of token limits. Keep files logically cohesive. Aim for < 800 lines. The 1000-line mark is a soft goal for further decomposition; logic should not be artificially split if it reduces clarity, but anything significantly over 1000 lines should be evaluated for extraction.
 3. **Planning Mode**: For complex features, create an `implementation_plan.md` and wait for user approval before execution.
 
 ---
