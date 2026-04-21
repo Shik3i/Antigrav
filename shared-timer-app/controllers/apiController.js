@@ -11,6 +11,10 @@ const { safeJson } = require('../utils/safeSerialization');
 
 const JWT_SECRET = require('../jwtSecret');
 
+const adminController = require('./adminController');
+const roomController = require('./roomController');
+
+
 // Changelog Cache
 let changelogCache = null;
 
@@ -214,148 +218,7 @@ exports.registerUser = async (req, res, next) => {
     }
 };
 
-exports.getRooms = async (req, res, next) => {
-    let friendIds = new Set();
 
-    // If user is authenticated, fetch their friends to allow them to see "visibleToFriends" rooms
-    if (req.user && req.user.userId) {
-        try {
-            const friendsRaw = await dbLayer.getFriends(req.user.userId);
-            friendsRaw.forEach(f => {
-                if (f.status === 'accepted') {
-                    friendIds.add(f.id);
-                }
-            });
-        } catch (e) {
-            console.error("Failed to fetch friends for getRooms:", e);
-        }
-    }
-
-    const activePublicRooms = Array.from(roomManager.rooms.values())
-        .filter(r => {
-            const isPublic = r.config.isPublic;
-            const isFriendOfOwner = friendIds.has(r.config.ownerId);
-            const isVisibleToFriends = r.config.visibleToFriends;
-
-            // Room must be active (users inside or in timeout)
-            const isActive = r.users.size > 0 || r.timeoutId !== null;
-
-            if (!isActive) return false;
-
-            // Include if public OR if it's protected but visible to friends AND we are a friend
-            return isPublic || (isVisibleToFriends && isFriendOfOwner);
-        })
-        .map(r => {
-            const state = roomManager.getRoomState(r.id);
-            return {
-                id: r.id,
-                name: r.config.name,
-                isPublic: r.config.isPublic,
-                defaultDurationMinutes: r.config.defaultDurationMinutes,
-                activeUsers: state ? state.users.length : 0,
-                isRunning: state ? state.state.isRunning : false
-            };
-        });
-
-    res.json(activePublicRooms);
-};
-
-exports.createRoom = async (req, res, next) => {
-    const { id, name, isPublic, defaultDurationMinutes, ownerId, defaultRole, visibleToFriends } = req.body;
-    try {
-        roomManager.createRoom(
-            id,
-            sanitize(name),
-            defaultDurationMinutes,
-            isPublic,
-            visibleToFriends,
-            ownerId,
-            defaultRole
-        );
-
-        // Generate invite tokens
-        const readToken = jwt.sign({ roomId: id, role: 'read' }, JWT_SECRET);
-        const writeToken = jwt.sign({ roomId: id, role: 'write' }, JWT_SECRET);
-
-        res.json({ success: true, readToken, writeToken });
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.broadcastMediaCommand = async (req, res, next) => {
-    const { id } = req.params;
-    const { action } = req.body;
-
-    // Strict KISS validation
-    if (action !== 'play' && action !== 'pause') {
-        return res.status(400).json({ error: 'Invalid action. Only "play" or "pause" allowed.' });
-    }
-
-    try {
-        const io = req.app.get('io');
-        if (io) {
-            // Broadcast simple event immediately to all clients in this exact room
-            io.to(id).emit('media_command', { action });
-        }
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Media broadcast error:', err);
-        next(err);
-    }
-};
-
-// Debug/Test APIs
-exports.testDbRooms = (req, res) => {
-    // Returns full detailed state of all rooms in memory
-    const roomsList = [];
-    roomManager.rooms.forEach((room, roomId) => {
-        roomsList.push(roomManager.getRoomState(roomId));
-    });
-    res.json(roomsList);
-};
-
-exports.testRoomAction = async (req, res, next) => {
-    // Allows sending an action directly to a room without a socket
-    const { id } = req.params;
-    const { action, payload } = req.body;
-
-    try {
-        let room = roomManager.getRoom(id);
-        if (!room) {
-            return res.status(404).json({ success: false, error: 'Room not found in memory' });
-        }
-
-        let changed = false;
-        switch (action) {
-            case 'START':
-                changed = roomManager.startTimer(id);
-                break;
-            case 'PAUSE':
-                changed = roomManager.pauseTimer(id);
-                break;
-            case 'RESET':
-                changed = roomManager.resetTimer(id);
-                break;
-            case 'SET_DURATION':
-                changed = roomManager.setDuration(id, payload);
-                break;
-        }
-
-        if (changed) {
-            // we will pass io in req.app.get('io') to emit changes
-            const io = req.app.get('io');
-            if (io) {
-                io.to(id).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(id));
-            }
-        }
-
-        res.json({ success: true, changed, state: roomManager.getRoomState(id) });
-    } catch (err) {
-        console.error('API action error:', err);
-        next(err);
-    }
-};
 
 // ─── Test endpoint: cached esports + odds combined ──────────
 exports.testEsports = async (req, res) => {
@@ -368,173 +231,10 @@ exports.testEsports = async (req, res) => {
 };
 
 // ─── Admin Controller Methods ─────────────────────────────────
-exports.getAdminMappings = async () => {
-    return await dbLayer.getTeamMappings();
-};
 
-exports.addAdminMapping = async (originalCode, polymarketCode) => {
-    if (!originalCode || !polymarketCode) throw new Error('Missing originalCode or polymarketCode');
-    await dbLayer.addTeamMapping(originalCode, polymarketCode);
-    apiDataService.invalidatePolymarketCache();
-    return true;
-};
-
-exports.deleteAdminMapping = async (id) => {
-    await dbLayer.deleteTeamMapping(id);
-    apiDataService.invalidatePolymarketCache();
-    return true;
-};
-
-exports.getAdminCacheStatus = () => {
-    return {
-        ...apiDataService.getAdminCacheStatus(),
-        oddsApi: {
-            isCached: !!oddsApiCache.data,
-            items: oddsApiCache.data ? oddsApiCache.data.length : 0,
-            ageSeconds: oddsApiCache.timestamp ? Math.round((Date.now() - oddsApiCache.timestamp) / 1000) : null
-        }
-    };
-};
-
-exports.flushAdminCache = (target) => {
-    if (target === 'oddsapi' || target === 'all') {
-        oddsApiCache = { data: null, timestamp: 0 };
-    }
-    apiDataService.flushAdminCache(target);
-    return exports.getAdminCacheStatus();
-};
-
-exports.getAdminBets = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const bets = await dbLayer.getAllBetsAdmin();
-        res.json(bets);
-    } catch (err) {
-        console.error('[Admin Bets] Fetch error:', err);
-        res.status(500).json({ error: 'Failed to fetch bets' });
-    }
-};
-
-exports.updateAdminBetStatus = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        const { status } = req.body;
-        if (!['open', 'won', 'lost', 'canceled'].includes(status)) {
-            return res.status(400).json({ error: 'Invalid status' });
-        }
-        await dbLayer.updateBetStatusAdmin(id, status);
-        res.json({ success: true, message: `Status updated to ${status}` });
-    } catch (err) {
-        console.error(`[Admin Bets] Error updating bet ${req.params?.id}:`, err);
-        res.status(500).json({ error: 'Failed to update bet status' });
-    }
-};
-
-exports.triggerAdminBetResolver = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { resolveBets } = require('../cron/betResolver');
-        
-        // Execute the cron logic directly and wait for results
-        const stats = await resolveBets();
-
-        res.json({ 
-            success: true, 
-            message: 'Resolver finished', 
-            matchesProcessed: stats?.processedMatches || 0,
-            betsResolved: stats?.resolvedBets || 0,
-            unresolvedFound: stats?.unresolvedCount || 0
-        });
-    } catch (err) {
-        console.error('[Admin Bets] Trigger error:', err);
-        res.status(500).json({ error: 'Failed' });
-    }
-};
 
 // ─── Countdowns ─────────────────────────────────────────────
-exports.getCountdowns = async (req, res) => {
-    try {
-        const userId = req.user?.id || req.user?.userId || null;
-        /*
-        if (req.user) {
-            console.log(`[Countdowns] Fetching for user: ${userId} (${req.user.username || 'unknown'})`);
-        } else {
-            console.log(`[Countdowns] Fetching for guest/unauthenticated user`);
-        }
-        */
-        const countdowns = await dbLayer.getCountdowns(userId);
-        // console.log(`[Countdowns] Returning ${countdowns.length} items for user ${userId}`);
-        res.json(countdowns);
-    } catch (err) {
-        console.error('[Countdowns] Error fetching:', err);
-        res.status(500).json({ error: 'Failed to fetch countdowns' });
-    }
-};
 
-exports.createCountdown = async (req, res) => {
-    try {
-        const { eventName, targetDate, isPublic, isGlobal } = req.body;
-        if (!eventName || !targetDate) {
-            return res.status(400).json({ error: 'eventName and targetDate are required' });
-        }
-
-        const isAdmin = req.user?.is_superadmin || false;
-        const userId = req.user?.id || req.user?.userId || null;
-        const displayName = req.user?.displayName || req.user?.username || 'Unknown';
-
-        // Only superadmins can create global countdowns
-        if (isGlobal && !isAdmin) {
-            console.warn(`[Countdowns] Non-admin ${userId} tried to create global countdown`);
-            return res.status(403).json({ error: 'Only superadmins can create global countdowns' });
-        }
-
-        // console.log(`[Countdowns] Creating: ${eventName} for user ${userId} (isAdmin: ${isAdmin}, isPublic: ${isPublic})`);
-
-        const result = await dbLayer.createCountdown(
-            sanitize(eventName),
-            targetDate,
-            userId,
-            displayName,
-            isPublic || false,
-            isGlobal || false
-        );
-        res.status(201).json({ id: result.id, message: 'Countdown created' });
-    } catch (err) {
-        console.error('[Countdowns] Error creating:', err);
-        res.status(500).json({ error: 'Failed to create countdown' });
-    }
-};
-
-exports.deleteCountdown = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const countdown = await dbLayer.getCountdownById(id);
-        if (!countdown) {
-            return res.status(404).json({ error: 'Countdown not found' });
-        }
-
-        const isAdmin = req.user?.is_superadmin || false;
-        const currentUserId = req.user?.id || req.user?.userId;
-
-        console.log(`[Countdowns] Delete attempt: ID ${id}, Owner ${countdown.userId}, Requester ${currentUserId}, isAdmin ${isAdmin}`);
-
-        // Only the owner or a superadmin can delete
-        const isOwner = countdown.userId === currentUserId && currentUserId !== null && currentUserId !== undefined;
-
-        if (!isOwner && !isAdmin) {
-            console.warn(`[Countdowns] DELETE REJECTED: User ${currentUserId} is not owner or admin`);
-            return res.status(403).json({ error: 'Permission denied' });
-        }
-
-        await dbLayer.deleteCountdown(id);
-        console.log(`[Countdowns] Deleted ID ${id} by ${currentUserId}`);
-        res.json({ message: 'Countdown deleted' });
-    } catch (err) {
-        console.error('[Countdowns] Error deleting:', err);
-        res.status(500).json({ error: 'Failed to delete countdown' });
-    }
-};
 
 // ─── Error Logging ──────────────────────────────────────────
 exports.getAdminActions = async (req, res) => {
@@ -567,57 +267,7 @@ exports.getTwitchStatus = async (req, res) => {
     }
 };
 
-exports.getErrorLogs = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const logs = await dbLayer.getErrorLogs(500);
-        res.json(logs);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch error logs' });
-    }
-};
 
-exports.getSystemLogs = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const logs = await dbLayer.getSystemLogs();
-        res.json(logs);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch system logs' });
-    }
-};
-
-exports.deleteAllSystemLogs = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        await dbLayer.clearSystemLogs();
-        res.json({ success: true });
-    } catch (err) {
-        console.error('deleteAllSystemLogs error:', err);
-        res.status(500).json({ error: 'Failed to clear system logs' });
-    }
-};
-
-exports.deleteErrorLog = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    const { id } = req.params;
-    try {
-        await dbLayer.deleteErrorLog(id);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to delete error log' });
-    }
-};
-
-exports.clearErrorLogs = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        await dbLayer.clearErrorLogs();
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to clear error logs' });
-    }
-};
 
 // ─── Bets ───────────────────────────────────────────────────
 exports.placeBet = async (req, res, next) => {
@@ -699,91 +349,7 @@ exports.getKoalaTransactions = async (req, res, next) => {
 };
 
 // ─── Feature Request Roadmap ─────────────────────────────────────
-exports.getFeatureRequests = async (req, res) => {
-    try {
-        const features = await dbLayer.getFeatureRequests();
-        res.json(features);
-    } catch (err) {
-        console.error('[Features] Error fetching:', err);
-        res.status(500).json({ error: 'Failed to fetch feature requests' });
-    }
-};
 
-exports.createFeatureRequest = async (req, res) => {
-    try {
-        const { title, description, type } = req.body;
-        if (!title) return res.status(400).json({ error: 'Title is required' });
-
-        const userId = req.user?.id || req.user?.userId;
-        const userName = req.user?.displayName || req.user?.username || 'Unknown';
-
-        const id = await dbLayer.createFeatureRequest(userId, userName, sanitize(title), sanitize(description || ''), sanitize(type || 'Feature'));
-        res.status(201).json({ id, message: 'Feature request created' });
-    } catch (err) {
-        console.error('[Features] Error creating:', err);
-        res.status(500).json({ error: 'Failed to create feature request' });
-    }
-};
-
-exports.voteFeatureRequest = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { value, guestId } = req.body; // 1 or -1
-        const userId = req.user?.id || req.user?.userId || guestId;
-
-        if (!userId) {
-            return res.status(401).json({ error: 'Login required or guest identification missing' });
-        }
-
-        if (value !== 1 && value !== -1) {
-            return res.status(400).json({ error: 'Invalid vote value' });
-        }
-
-        await dbLayer.voteFeatureRequest(id, userId, value);
-        res.json({ success: true });
-    } catch (err) {
-        console.error('[Features] Error voting:', err);
-        res.status(500).json({ error: 'Failed to vote' });
-    }
-};
-
-exports.updateFeatureStatus = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        const { status } = req.body;
-        await dbLayer.updateFeatureStatus(id, status);
-        res.json({ success: true });
-    } catch (err) {
-        console.error('[Features] Error updating status:', err);
-        res.status(500).json({ error: 'Failed to update feature status' });
-    }
-};
-
-exports.updateFeatureAdminComment = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        const { comment } = req.body;
-        await dbLayer.updateFeatureAdminComment(id, sanitize(comment || ''));
-        res.json({ success: true });
-    } catch (err) {
-        console.error('[Features] Error updating admin comment:', err);
-        res.status(500).json({ error: 'Failed to update admin comment' });
-    }
-};
-
-exports.deleteFeatureRequest = async (req, res) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        await dbLayer.deleteFeatureRequest(id);
-        res.json({ success: true });
-    } catch (err) {
-        console.error('[Features] Error deleting:', err);
-        res.status(500).json({ error: 'Failed to delete feature request' });
-    }
-};
 
 exports.submitKoalaFlapScore = async (req, res, next) => {
     try {
@@ -1064,23 +630,7 @@ exports.deleteAdminGameScore = async (req, res) => {
     }
 };
 
-exports.getChangelog = async (req, res, next) => {
-    try {
-        if (changelogCache) return res.json(changelogCache);
 
-        const changelogPath = path.resolve(process.cwd(), 'src/data/changelog.json');
-        if (fs.existsSync(changelogPath)) {
-            const fileData = fs.readFileSync(changelogPath, 'utf8');
-            changelogCache = JSON.parse(fileData);
-        } else {
-            changelogCache = [];
-        }
-
-        res.json(changelogCache);
-    } catch (err) {
-        next(err);
-    }
-};
 
 exports.getMissionStatus = async (req, res) => {
     try {
@@ -1439,59 +989,7 @@ exports.buyScratchcard = async (req, res, next) => {
 };
 
 // Admin Pack Management
-exports.adminCreateScratchPack = async (req, res) => {
-    try {
-        const { pack, teams } = req.body; // teams as [code1, code2, ...] in order
-        const newPack = await dbLayer.createScratchcardPack(pack);
-        if (teams && Array.isArray(teams)) {
-            await dbLayer.setScratchcardPackTeams(newPack.id, teams);
-        }
-        scratchcardPacksCache = null; // Invalidate cache
-        res.json({ success: true, pack: newPack });
-    } catch (err) {
-        console.error('adminCreateScratchPack error:', err);
-        res.status(500).json({ error: err.message });
-    }
-};
 
-exports.adminUpdateScratchPack = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { pack, teams } = req.body;
-        await dbLayer.updateScratchcardPack(id, pack);
-        if (teams && Array.isArray(teams)) {
-            await dbLayer.setScratchcardPackTeams(id, teams);
-        }
-        scratchcardPacksCache = null; // Invalidate cache
-        res.json({ success: true });
-    } catch (err) {
-        console.error('adminUpdateScratchPack error:', err);
-        res.status(500).json({ error: err.message });
-    }
-};
-
-exports.adminDeleteScratchPack = async (req, res) => {
-    try {
-        const { id } = req.params;
-        await dbLayer.deleteScratchcardPack(id);
-        scratchcardPacksCache = null; // Invalidate cache
-        res.json({ success: true });
-    } catch (err) {
-        console.error('adminDeleteScratchPack error:', err);
-        res.status(500).json({ error: err.message });
-    }
-};
-
-exports.getScratchcardPackFull = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const pack = await dbLayer.getScratchcardPack(id);
-        const teams = await dbLayer.getScratchcardPackTeams(id);
-        res.json({ pack, teams });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
 
 exports.claimScratchcard = async (req, res, next) => {
     try {
@@ -1517,62 +1015,11 @@ exports.claimScratchcard = async (req, res, next) => {
     }
 };
 
-// Navbar Settings
-exports.getPublicNavbarSettings = async (req, res, next) => {
-    try {
-        const { data } = await apiDataService.getNavbarSettings(false);
-        safeJson(res, data);
-    } catch (err) {
-        next(err);
-    }
-};
 
-exports.getAdminNavbarSettings = async (req, res, next) => {
-    try {
-        const { data } = await apiDataService.getNavbarSettings(true);
-        safeJson(res, data);
-    } catch (err) {
-        next(err);
-    }
-};
 
-exports.updateNavbarSettings = async (req, res, next) => {
-    try {
-        const { settings } = req.body;
-        if (!settings || !Array.isArray(settings)) {
-            return res.status(400).json({ error: 'Settings must be an array' });
-        }
 
-        // Backend-side normalization for extra robustness
-        const normalizedSettings = settings.map((item, index) => ({
-            ...item,
-            sortOrder: index + 1
-        }));
 
-        await dbLayer.updateNavbarSettings(normalizedSettings);
-        apiDataService.invalidateNavbarSettingsCache();
-        res.json({ success: true });
-    } catch (err) {
-        next(err);
-    }
-};
 
-exports.unlockAdmin = async (req, res) => {
-    const { password } = req.body;
-    const adminPwd = process.env.ADMIN_PASSWORD || 'Entangled-Napping7-Custodian';
-
-    if (password === adminPwd) {
-        const token = jwt.sign({ 
-            is_superadmin: true,
-            username: 'admin_session',
-            role: 'global_admin'
-        }, JWT_SECRET, { expiresIn: '6h' });
-        
-        return res.json({ token });
-    } else {
-        return res.status(401).json({ error: 'Falsches Passwort' });
-    }
-};
 
 exports.getPokemonData = async (req, res, next) => {
     try {
@@ -1583,40 +1030,7 @@ exports.getPokemonData = async (req, res, next) => {
     }
 };
 
-exports.getPokemonConfigs = async (req, res, next) => {
-    try {
-        if (!req.user || !req.user.is_superadmin) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        const { data } = await apiDataService.getPokemonConfigs();
-        safeJson(res, data);
-    } catch (err) {
-        next(err);
-    }
-};
 
-exports.getPublicPokemonConfigs = async (req, res, next) => {
-    try {
-        const { data } = await apiDataService.getPokemonConfigs();
-        safeJson(res, data);
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.updatePokemonConfigs = async (req, res, next) => {
-    try {
-        if (!req.user || !req.user.is_superadmin) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        const { settings, colors } = req.body;
-        await dbLayer.updatePokemonConfigs(settings, colors);
-        apiDataService.invalidatePokemonConfigsCache();
-        res.json({ success: true });
-    } catch (err) {
-        next(err);
-    }
-};
 
 // ─── Daily Status Aggregation ────────────────────────────────
 exports.getDailyStatus = async (req, res, next) => {
@@ -1755,115 +1169,10 @@ exports.updateRssPreference = async (req, res, next) => {
     }
 };
 
-// RSS Admin
-exports.getAdminRssFeeds = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const feeds = await dbLayer.getRssFeeds();
-        res.json(feeds);
-    } catch (err) {
-        next(err);
-    }
-};
 
-exports.addAdminRssFeed = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { name, url, icon } = req.body;
-        if (!name || !url) return res.status(400).json({ error: 'Name and URL required' });
-        
-        const feed = await dbLayer.addRssFeed(name, url, icon);
-        
-        // Background fetch initial articles
-        const rssService = require('../services/rssService');
-        rssService.refreshFeed(feed.id, feed.url).catch(e => console.error('[Admin RSS] Initial fetch failed:', e.message));
 
-        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'ADD_RSS_FEED', { name, url });
-        res.status(201).json(feed);
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.updateAdminRssFeed = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        const { name, url, icon } = req.body;
-        await dbLayer.updateRssFeed(id, name, url, icon);
-        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'UPDATE_RSS_FEED', { id, name, url });
-        res.json({ success: true });
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.deleteAdminRssFeed = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        await dbLayer.deleteRssFeed(id);
-        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'DELETE_RSS_FEED', { id });
-        res.json({ success: true });
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.getAdminRssStats = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const stats = await dbLayer.getRssCacheStats();
-        res.json(stats);
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.getAdminRssArticles = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const limit = parseInt(req.query.limit) || 50;
-        const offset = parseInt(req.query.offset) || 0;
-        const articles = await dbLayer.getAdminRssArticles(limit, offset);
-        res.json(articles);
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.deleteAdminRssArticle = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { id } = req.params;
-        await dbLayer.deleteRssArticle(id);
-        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'DELETE_RSS_ARTICLE', { id });
-        res.json({ success: true });
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.purgeAdminRssArticles = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { hours } = req.body;
-        const changes = await dbLayer.purgeRssArticles(hours || 24);
-        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'PURGE_RSS_CACHE', { hours });
-        res.json({ success: true, deleted: changes });
-    } catch (err) {
-        next(err);
-    }
-};
-
-exports.manualRefreshAllRss = async (req, res, next) => {
-    if (!req.user || !req.user.is_superadmin) return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const rssService = require('../services/rssService');
-        const stats = await rssService.refreshAllFeeds();
-        await dbLayer.logAdminAction(req.user.userId || req.user.id, req.user.username, 'MANUAL_RSS_REFRESH', stats);
-        res.json({ success: true, stats });
-    } catch (err) {
-        next(err);
-    }
+module.exports = {
+    ...adminController,
+    ...roomController,
+    ...exports
 };
