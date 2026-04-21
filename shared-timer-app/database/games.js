@@ -17,7 +17,7 @@ const getGlobalGameStats = (gameId) => {
 
 const getGameUpgradesConfig = () => {
   return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM GameUpgrades_Config ORDER BY category ASC, sort_order ASC', [], (err, rows) => {
+    db.all('SELECT * FROM GameUpgrades_Config ORDER BY category ASC', [], (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -1291,14 +1291,23 @@ const getRiftDefenseLeaderboards = () => {
 // --- Other Stats ---
 const getUserZeroScoreStreak = (userId) => {
   return new Promise((resolve, reject) => {
-    db.get('SELECT current_streak FROM UserZeroStreaks WHERE userId = ?', [userId], (err, row) => err ? reject(err) : resolve(row ? row.current_streak : 0));
+    db.all(`SELECT score FROM GameScores WHERE userId = ? AND gameId = 'koala_flap' ORDER BY createdAt DESC`, [userId], (err, rows) => {
+      if (err) return reject(err);
+      if (!rows || rows.length === 0) return resolve(0);
+      // Count the current consecutive streak of score=0 from most recent
+      let streak = 0;
+      for (const row of rows) {
+        if (row.score === 0) streak++;
+        else break;
+      }
+      resolve(streak);
+    });
   });
 };
 
 const recordZeroScore = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT INTO UserZeroStreaks (userId, current_streak) VALUES (?, 1) ON CONFLICT(userId) DO UPDATE SET current_streak = current_streak + 1', [userId], function (err) { err ? reject(err) : resolve(this.changes); });
-  });
+  // This function is currently a placeholder as the streak is computed dynamically from GameScores
+  return Promise.resolve(0);
 };
 
 const getUserDailyPackCount = (userId, packId) => {
