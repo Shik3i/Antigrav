@@ -19,7 +19,7 @@ Real-time features are the core of Antigrav.
 
 ### 🗄️ Backend (Node.js + Express + SQLite)
 - **API**: Express handles RESTful endpoints for authentication, historical data fetching, and administrative tasks.
-- **Persistence**: SQLite (via `database.js`) stores users, currency (Koala Coins), achievements, historical logs, and system metrics.
+- **Persistence**: Modular SQLite architecture (in `/database`) stores users, currency (Koala Coins), achievements, and system metrics.
 - **Security**: JWT-based authentication for users and invite links. Admins have elevated privileges verified via tokens.
 - **Background Tasks**: Cron jobs (`cron/`) handle recurring logic like Lotto draws and bet resolutions.
 
@@ -32,11 +32,7 @@ Real-time features are the core of Antigrav.
 ├── cron/             # Scheduled background tasks
 ├── routes/           # REST API route definitions
 ├── src/              # React Frontend source
-│   ├── components/   # Reusable UI elements (Glassmorphic cards, Modals)
-│   ├── pages/        # Main application views (Lotto, Tetris, Wordle)
-│   ├── context/      # React Context providers (Auth, Theme)
-│   └── hooks/        # Custom React hooks (useSocket, useAudio)
-├── database.js       # SQLite schema and operations layer
+├── database/         # Modular database architecture (Schema, Domains, Utils)
 ├── roomManager.js    # Core real-time state engine
 ├── server.js         # Entry point (Express + Socket.io setup)
 └── socketEvents.json # Source of truth for event string names
@@ -57,8 +53,8 @@ Real-time features are the core of Antigrav.
 When working on this codebase, follow these principles:
 
 1.  **State Reactivity**: Ensure frontend changes react to socket events. Use the central `socketEvents.json` for all event strings.
-2.  **Database Pattern**: Use `dbLayer` functions in `database.js`. Most operations require `async/await`. Avoid raw SQL queries outside of `database.js`.
-3.  **Logging**: Fatal errors should be logged via `dbLayer.logError`. Do not just use `console.error`.
+2.  **Database Pattern**: Follow the **[Database Architecture Guide](database/ARCHITECTURE.md)**. Use domain-specific modules in `/database` (e.g., `users.js`, `economy.js`) and never break domain isolation.
+3.  **Logging**: Fatal errors should be logged via `logging.js`. Do not just use `console.error`.
 4.  **Premium UI**: Maintain the "Premium Glassmorphic" design language. Use standard CSS variables for colors and spacing where possible.
 5.  **Sanitization**: Always use the `sanitize.js` utility for user-generated content (like room names or chat) before broadcasting over sockets.
 6.  **DevOps**: Refer to `DEVOPS_ROUTINE.md` for versioning and deployment steps.
