@@ -186,7 +186,7 @@ exports.purchaseGameUpgrade = async (req, res) => {
         if (!upgradeId) return res.status(400).json({ error: 'Upgrade ID required' });
 
         const result = await dbLayer.purchaseUpgrade(userId, upgradeId);
-        const io = req.app?.get('socketio');
+        const io = req.app?.get('io');
         if (io) {
             io.to(userId).emit('COIN_BALANCE_UPDATE', { balance: result.newBalance });
         }

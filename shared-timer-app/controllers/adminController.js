@@ -3,6 +3,8 @@ const apiDataService = require('../services/apiDataService');
 const sanitize = require('../sanitize');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = require('../jwtSecret');
+const { safeJson } = require('../utils/safeSerialization');
+
 
 // --- Team Mappings ---
 exports.getAdminMappings = async () => {
@@ -210,7 +212,7 @@ exports.deleteAdminGameScore = async (req, res) => {
 exports.getPublicNavbarSettings = async (req, res, next) => {
     try {
         const { data } = await apiDataService.getNavbarSettings(false);
-        res.json(data);
+        safeJson(res, data);
     } catch (err) {
         next(err);
     }
@@ -219,7 +221,7 @@ exports.getPublicNavbarSettings = async (req, res, next) => {
 exports.getAdminNavbarSettings = async (req, res, next) => {
     try {
         const { data } = await apiDataService.getNavbarSettings(true);
-        res.json(data);
+        safeJson(res, data);
     } catch (err) {
         next(err);
     }
