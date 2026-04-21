@@ -1,10 +1,7 @@
 const db = require('./connection');
 
 /**
- * Legacy Database Facade
- * 
- * This file formerly contained the entire database logic. 
- * Most functions have been moved to domain-specific modules.
+ * Database Utilities
  */
 
 const safeJsonParse = (value, fallback) => {
