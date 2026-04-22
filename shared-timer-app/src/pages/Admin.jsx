@@ -5,6 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
+import ApiCachesTab from '../components/admin/ApiCachesTab';
+import ActivityLogTab from '../components/admin/ActivityLogTab';
+import ServerRoomsTab from '../components/admin/ServerRoomsTab';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
@@ -1572,112 +1575,18 @@ const Admin = ({ socket }) => {
             )}
 
             {/* TAB: CACHE STATUS */}
-            {activeTab === 'cache' && cacheStatus && (
-                <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-                    <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 style={{ margin: 0 }}>Polymarket API (Esports)</h3>
-                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.polymarketEsports.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.polymarketEsports.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
-                                {cacheStatus.polymarketEsports.isCached ? 'CACHED' : 'EMPTY'}
-                            </span>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Events cached:</span>
-                                <strong>{cacheStatus.polymarketEsports.items} events</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Cache age:</span>
-                                <strong>{formatCacheAge(cacheStatus.polymarketEsports.ageSeconds)}</strong>
-                            </div>
-                        </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('polymarket')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Polymarket (Esports) Cache leeren</button>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 style={{ margin: 0 }}>The Odds API</h3>
-                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.oddsApi.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.oddsApi.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
-                                {cacheStatus.oddsApi.isCached ? 'CACHED' : 'EMPTY'}
-                            </span>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Items fetched:</span>
-                                <strong>{cacheStatus.oddsApi.items} events</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Cache age:</span>
-                                <strong>{formatCacheAge(cacheStatus.oddsApi.ageSeconds)}</strong>
-                            </div>
-                        </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('oddsapi')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>The Odds API Cache leeren</button>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 style={{ margin: 0 }}>Esports Teams DB</h3>
-                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: availableTeams.length > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: availableTeams.length > 0 ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
-                                {availableTeams.length > 0 ? 'POPULATED' : 'EMPTY'}
-                            </span>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Teams cached in DB:</span>
-                                <strong>{availableTeams.length} teams</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Last updated:</span>
-                                <strong>{esportsLastUpdated ? new Date(esportsLastUpdated).toLocaleString() : 'Never'}</strong>
-                            </div>
-                        </div>
-                        <button className="btn-secondary" onClick={() => { setLoading(true); socket.emit(EVENTS.TRIGGER_FETCH_ALL_TEAMS, { token: globalToken }); }} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Esports Teams DB aktualisieren</button>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 style={{ margin: 0 }}>LoLEsports Schedule</h3>
-                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.loleSports.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.loleSports.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
-                                {cacheStatus.loleSports.isCached ? 'CACHED' : 'EMPTY'}
-                            </span>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Matches cached:</span>
-                                <strong>{cacheStatus.loleSports.items} matches</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Cache age:</span>
-                                <strong>{formatCacheAge(cacheStatus.loleSports.ageSeconds)}</strong>
-                            </div>
-                        </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('lolesports')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>LoLEsports Schedule Cache leeren</button>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 style={{ margin: 0 }}>Polymarket API (General Resolution)</h3>
-                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', background: cacheStatus.polymarketGeneral.isCached ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cacheStatus.polymarketGeneral.isCached ? '#22c55e' : '#ef4444', fontWeight: 'bold' }}>
-                                {cacheStatus.polymarketGeneral.isCached ? 'CACHED' : 'EMPTY'}
-                            </span>
-                        </div>
-                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Active General Bets:</span>
-                                <strong>{cacheStatus.polymarketGeneral.items} events</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Cache age:</span>
-                                <strong>{formatCacheAge(cacheStatus.polymarketGeneral.ageSeconds)}</strong>
-                            </div>
-                        </div>
-                        <button className="btn-secondary" onClick={() => handleFlushCache('polymarket')} style={{ marginTop: 'auto', padding: '12px', borderColor: '#ef4444', color: '#ef4444' }}>Polymarket (General) Cache leeren</button>
-                    </div>
-
-
-
-                    <button className="btn-primary" onClick={() => handleFlushCache('all')} style={{ gridColumn: '1 / -1', background: 'rgba(239,68,68,0.2)', color: '#ef4444', borderColor: '#ef4444' }}>Purge All Server Caches</button>
-                </div>
+            {activeTab === 'cache' && (
+                <ApiCachesTab 
+                    cacheStatus={cacheStatus}
+                    availableTeams={availableTeams}
+                    esportsLastUpdated={esportsLastUpdated}
+                    formatCacheAge={formatCacheAge}
+                    onFlush={handleFlushCache}
+                    onRefreshTeams={() => { 
+                        setLoading(true); 
+                        socket.emit(EVENTS.TRIGGER_FETCH_ALL_TEAMS, { token: globalToken }); 
+                    }}
+                />
             )}
 
             {/* TAB: RSS FEEDS MANAGEMENT */}
@@ -1810,86 +1719,21 @@ const Admin = ({ socket }) => {
 
             {/* TAB: ACTIVITY LOG */}
             {activeTab === 'activity' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <h3 style={{ marginBottom: '24px' }}>Global Timer Completions ({activity.length})</h3>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Completed At</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>User Name</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Room Name</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Duration</th>
-                                    <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500 }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {activity.map(row => (
-                                    <tr key={row.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '12px' }}>{formatDate(row.completedAt)}</td>
-                                        <td style={{ padding: '12px', color: 'var(--accent-primary)' }}>{row.userName || 'Anonymous'}</td>
-                                        <td style={{ padding: '12px' }}>{row.roomName || 'Unknown Room'}</td>
-                                        <td style={{ padding: '12px' }}>{row.defaultDurationMinutes} min</td>
-                                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                                            <button className="btn-ghost" style={{ padding: '4px 8px', color: '#ef4444' }} onClick={() => handleDeleteActivity(row.id)}>Delete</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {activity.length === 0 && (
-                                    <tr><td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No completed timers yet.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <ActivityLogTab 
+                    activity={activity}
+                    formatDate={formatDate}
+                    onDelete={handleDeleteActivity}
+                />
             )}
 
             {/* TAB: ROOMS OVERVIEW */}
             {activeTab === 'rooms' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <h3 style={{ marginBottom: '24px' }}>Server Rooms ({rooms.length})</h3>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Created</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Room Name</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Active Users</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Owner</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Vis</th>
-                                    <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 500 }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rooms.map(row => (
-                                    <tr key={row.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '12px' }}>{formatDate(row.createdAt)}</td>
-                                        <td style={{ padding: '12px', fontWeight: 600 }}>{row.name}</td>
-                                        <td style={{ padding: '12px', color: 'var(--text-muted)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.activeUsers > 0 ? '#10b981' : '#ef4444' }} />
-                                                {row.activeUsers} Users
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '12px', color: 'var(--accent-primary)' }}>{row.ownerName || 'Public'}</td>
-                                        <td style={{ padding: '12px' }}>
-                                            <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, background: row.isPublic ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: row.isPublic ? '#22c55e' : '#ef4444' }}>
-                                                {row.isPublic ? 'Public' : 'Private'}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '12px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                            <button className="btn-secondary" style={{ padding: '4px 8px' }} onClick={() => handleEditRoom(row.id, row.name)}>Edit</button>
-                                            <button className="btn-ghost" style={{ padding: '4px 8px', color: '#ef4444' }} onClick={() => handleDeleteRoom(row.id)}>Delete</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {rooms.length === 0 && (
-                                    <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No active rooms in memory.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <ServerRoomsTab 
+                    rooms={rooms}
+                    formatDate={formatDate}
+                    onEdit={handleEditRoom}
+                    onDelete={handleDeleteRoom}
+                />
             )}
 
             {/* TAB: USER MANAGEMENT */}
