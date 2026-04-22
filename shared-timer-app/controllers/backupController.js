@@ -32,9 +32,10 @@ const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
     });
 
     const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + 
+    const timestamp = now.toISOString().split('T')[0] + '_' + 
                       now.getHours().toString().padStart(2, '0') + '-' + 
-                      now.getMinutes().toString().padStart(2, '0');
+                      now.getMinutes().toString().padStart(2, '0') + '-' +
+                      now.getSeconds().toString().padStart(2, '0');
     
     // Sanitize note: remove non-alphanumeric/spaces, truncate
     const sanitizedNote = note.replace(/[^a-z0-9\s-]/gi, '').trim().replace(/\s+/g, '-').slice(0, 30);
@@ -58,11 +59,20 @@ const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
         
         // Only prune automatic backups
         if (type === 'automatic') {
-          pruneBackups().catch(e => console.error('[Backup] Pruning failed:', e));
+          pruneBackups()
+            .then(() => {
+              isBackingUp = false;
+              resolve({ filename, timestamp: now, type });
+            })
+            .catch(e => {
+              console.error('[Backup] Pruning failed:', e);
+              isBackingUp = false; // Still release lock
+              resolve({ filename, timestamp: now, type });
+            });
+        } else {
+          isBackingUp = false;
+          resolve({ filename, timestamp: now, type });
         }
-        
-        isBackingUp = false;
-        resolve({ filename, timestamp: now, type });
       }
     });
   });
@@ -87,19 +97,16 @@ const extractNoteFromFilename = (filename) => {
 };
 
 /**
- * Fetches the list of all available backups partitioned by tier
- */
-/**
  * Fetches the list of all available backups partitioned by tier.
  * Prioritizes date parsing from filename to prevent mtime drift.
  */
 const getBackupsList = async () => {
   const parseDateFromFilename = (file) => {
-    // backup_YYYY-MM-DD_HH-mm.sqlite or manual_YYYY-MM-DD_HH-mm...
-    const match = file.match(/(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2})/);
+    // backup_YYYY-MM-DD_HH-mm-ss.sqlite or manual_YYYY-MM-DD_HH-mm-ss...
+    const match = file.match(/(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})/);
     if (match) {
-      const [datePart, timePart] = [match[1], match[2].replace('-', ':')];
-      return new Date(`${datePart}T${timePart}:00`);
+      const [datePart, timePart] = [match[1], match[2].replace(/-/g, ':')];
+      return new Date(`${datePart}T${timePart}`);
     }
     return null;
   };
