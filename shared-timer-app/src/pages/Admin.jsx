@@ -553,7 +553,7 @@ const Admin = ({ socket }) => {
             addLog('Success', 'Manual database backup created successfully.', 'success');
             handleFetchBackups();
         } catch (err) {
-            addLog('Error', 'Failed to trigger database backup.', 'error');
+            addLog('Error', err.response?.data?.error || 'Failed to trigger database backup.', 'error');
         } finally {
             setIsBackupLoading(false);
         }
@@ -567,7 +567,7 @@ const Admin = ({ socket }) => {
             setAutoBackupEnabled(enabled);
             addLog('Success', `Auto-backup ${enabled ? 'enabled' : 'disabled'}.`, 'success');
         } catch (err) {
-            addLog('Error', 'Failed to toggle auto-backup setting.', 'error');
+            addLog('Error', err.response?.data?.error || 'Failed to toggle auto-backup setting.', 'error');
         }
     };
 
@@ -582,7 +582,7 @@ const Admin = ({ socket }) => {
             setDeleteConfirmationInput('');
             handleFetchBackups();
         } catch (err) {
-            addLog('Error', 'Failed to delete manual backup.', 'error');
+            addLog('Error', err.response?.data?.error || 'Failed to delete manual backup.', 'error');
         } finally {
             setIsBackupLoading(false);
         }
