@@ -68,6 +68,9 @@ router.get('/admin/backups', authController.authenticateToken, async (req, res) 
 });
 router.post('/admin/backups/trigger', authController.authenticateToken, async (req, res) => {
     try {
+        if (backupController.getIsBackingUp()) {
+            return res.status(409).json({ error: 'A backup is already in progress. Please wait.' });
+        }
         const { note } = req.body;
         const result = await backupController.createBackup({ type: 'manual', note });
         res.json({ message: 'Manual backup created successfully', ...result });

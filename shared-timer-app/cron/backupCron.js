@@ -1,4 +1,4 @@
-const { createBackup, getAutoBackupState } = require('../controllers/backupController');
+const { createBackup, getAutoBackupState, getIsBackingUp } = require('../controllers/backupController');
 
 /**
  * Initializes the automatic database backup schedule.
@@ -12,6 +12,10 @@ const startBackupCron = () => {
     try {
       const isEnabled = await getAutoBackupState();
       if (isEnabled) {
+        if (getIsBackingUp()) {
+          console.warn('[Cron] Skipping auto-backup: An operation is already in progress.');
+          return;
+        }
         console.log('[Cron] Auto-backup enabled. Starting daily backup routine...');
         await createBackup({ type: 'automatic' });
       }
