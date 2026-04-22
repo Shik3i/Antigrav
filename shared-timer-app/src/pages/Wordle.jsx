@@ -96,9 +96,9 @@ const Wordle = ({ user, token }) => {
 
     const getKeyStatuses = useCallback(() => {
         const statuses = {};
-        guesses.forEach(guess => {
+        (Array.isArray(guesses) ? guesses : []).forEach(guess => {
             const evaluation = evaluateGuess(guess, solution);
-            guess.split('').forEach((letter, i) => {
+            (guess || '').split('').forEach((letter, i) => {
                 const status = evaluation[i];
                 const currentBest = statuses[letter];
 
@@ -228,7 +228,7 @@ const Wordle = ({ user, token }) => {
 
 
     const memoizedEvaluations = useMemo(() => {
-        return (guesses || []).map(g => evaluateGuess(g, solution));
+        return (Array.isArray(guesses) ? guesses : []).map(g => evaluateGuess(g, solution));
     }, [guesses, solution, evaluateGuess]);
 
     const handleInput = useCallback(async (key) => {
@@ -461,9 +461,9 @@ const Wordle = ({ user, token }) => {
     };
 
     const shareResults = () => {
-        const emojiGrid = (guesses || []).map((guess, i) => {
-            const evaluation = memoizedEvaluations[i] || [];
-            return evaluation.map(status => {
+        const emojiGrid = (Array.isArray(guesses) ? guesses : []).map((guess, i) => {
+            const evaluation = (Array.isArray(memoizedEvaluations) ? memoizedEvaluations[i] : null) || [];
+            return (Array.isArray(evaluation) ? evaluation : []).map(status => {
                 if (status === 'correct') return '🟩';
                 if (status === 'present') return '🟨';
                 return '⬛';
@@ -490,15 +490,15 @@ const Wordle = ({ user, token }) => {
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px' }}>
-                {(rowsToRender || []).map((_, i) => {
-                    const evaluation = serverEvaluations ? serverEvaluations[i] : (userGuesses ? evaluateGuess(userGuesses[i], sol) : null);
-                    const guess = userGuesses ? userGuesses[i] : null;
+                {(Array.isArray(rowsToRender) ? rowsToRender : []).map((_, i) => {
+                    const evaluation = Array.isArray(serverEvaluations) ? serverEvaluations[i] : (Array.isArray(userGuesses) ? evaluateGuess(userGuesses[i], sol) : null);
+                    const guess = Array.isArray(userGuesses) ? userGuesses[i] : null;
                     
                     if (!evaluation || !Array.isArray(evaluation)) return null;
 
                     return (
                         <div key={i} style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                            {evaluation.map((status, j) => (
+                            {(Array.isArray(evaluation) ? evaluation : []).map((status, j) => (
                                 <div key={j} style={{
                                     width: '24px',
                                     height: '24px',
@@ -540,9 +540,9 @@ const Wordle = ({ user, token }) => {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {(dailyLeaderboard || []).map((entry) => {
+                    {(Array.isArray(dailyLeaderboard) ? dailyLeaderboard : []).map((entry) => {
                         const isExpanded = expandedUserId === entry.userId;
-                        const entryGuesses = entry.guesses || entry.evaluations || [];
+                        const entryGuesses = Array.isArray(entry.guesses) ? entry.guesses : (Array.isArray(entry.evaluations) ? entry.evaluations : []);
                         const score = entry.won ? `${entryGuesses.length}/6` : 'X/6';
                         
                         return (
@@ -652,9 +652,9 @@ const Wordle = ({ user, token }) => {
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
-                {rows.map((row, i) => (
+                {(Array.isArray(rows) ? rows : []).map((row, i) => (
                     <div key={i} style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                        {row.map(key => {
+                        {(Array.isArray(row) ? row : []).map(key => {
                             const status = statuses[key] || 'initial';
                             const isSpecial = key === 'Enter' || key === 'Backspace';
                             
