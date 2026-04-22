@@ -292,19 +292,13 @@ const getBannedUsersList = async (req, res) => {
 // Middleware to protect routes that require user to be logged in
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const queryToken = req.query.token;
-    
-    if (!authHeader && !queryToken) return res.status(401).json({ error: 'Authentication required' });
+    if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
  
-    let token = '';
-    if (authHeader) {
-        // Robust token extraction: handle potentially redundant "Bearer " prefixes
-        token = authHeader.replace(/^Bearer\s+/i, '').trim();
-        if (token.startsWith('Bearer ')) {
-            token = token.replace(/^Bearer\s+/i, '').trim();
-        }
-    } else {
-        token = queryToken.trim();
+    // Robust token extraction: handle potentially redundant "Bearer " prefixes
+    // e.g., "Bearer ABC" -> "ABC", "Bearer Bearer ABC" -> "ABC"
+    let token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (token.startsWith('Bearer ')) {
+        token = token.replace(/^Bearer\s+/i, '').trim();
     }
  
     if (!token) return res.status(401).json({ error: 'Authentication required' });
