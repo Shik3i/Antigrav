@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Database, Server, Activity, Monitor, Users, Bug, Dices, History, Gamepad2, LayoutDashboard, ShieldAlert } from 'lucide-react';
+import { Database, Server, Activity, Monitor, Users, Bug, Dices, History, Gamepad2, LayoutDashboard, ShieldAlert, Shield } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -93,6 +93,8 @@ const Admin = ({ socket }) => {
     const [manualBackups, setManualBackups] = useState([]);
     const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
     const [isBackupLoading, setIsBackupLoading] = useState(false);
+    const [deleteModalTarget, setDeleteModalTarget] = useState(null); // { filename, note }
+    const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
 
     // --- Daily Fortune Cookie ---
     const [fortunesDictionary, setFortunesDictionary] = useState([]);
@@ -566,6 +568,23 @@ const Admin = ({ socket }) => {
             addLog('Success', `Auto-backup ${enabled ? 'enabled' : 'disabled'}.`, 'success');
         } catch (err) {
             addLog('Error', 'Failed to toggle auto-backup setting.', 'error');
+        }
+    };
+
+    const handleDeleteBackup = async (filename) => {
+        setIsBackupLoading(true);
+        try {
+            await axios.delete(`/api/admin/backups/manual/${filename}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Manual backup deleted successfully.', 'success');
+            setDeleteModalTarget(null);
+            setDeleteConfirmationInput('');
+            handleFetchBackups();
+        } catch (err) {
+            addLog('Error', 'Failed to delete manual backup.', 'error');
+        } finally {
+            setIsBackupLoading(false);
         }
     };
 
@@ -1766,10 +1785,53 @@ const Admin = ({ socket }) => {
                     autoBackupEnabled={autoBackupEnabled}
                     onTriggerBackup={handleTriggerBackup}
                     onToggleAutoBackup={handleToggleAutoBackup}
+                    onDeleteBackup={(filename) => setDeleteModalTarget(manualBackups.find(b => b.filename === filename))}
                     onRefresh={handleFetchBackups}
                     formatDate={formatDate}
                     isLoading={isBackupLoading}
                 />
+            )}
+
+            {/* Backup Delete Confirmation Modal */}
+            {deleteModalTarget && (
+                <div className="modal-overlay">
+                    <div className="glass-card modal-content animate-pop-in" style={{ maxWidth: '500px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-red)', marginBottom: '16px' }}>
+                            <Shield size={24} />
+                            <h3 style={{ margin: 0 }}>Strict Deletion Required</h3>
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
+                            You are about to permanently delete <strong>{deleteModalTarget.filename}</strong>.
+                            This action is irreversible and the snapshot will be lost forever.
+                        </p>
+                        
+                        <div className="input-group" style={{ marginBottom: '24px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                                To confirm, type the filename exactly:
+                            </label>
+                            <input 
+                                type="text"
+                                className="form-input"
+                                placeholder={deleteModalTarget.filename}
+                                style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                                value={deleteConfirmationInput}
+                                onChange={(e) => setDeleteConfirmationInput(e.target.value)}
+                                autoComplete="off"
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button className="btn-ghost" onClick={() => { setDeleteModalTarget(null); setDeleteConfirmationInput(''); }}>Cancel</button>
+                            <button 
+                                className="btn-danger"
+                                onClick={() => handleDeleteBackup(deleteModalTarget.filename)}
+                                disabled={deleteConfirmationInput !== deleteModalTarget.filename}
+                            >
+                                Confirm Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

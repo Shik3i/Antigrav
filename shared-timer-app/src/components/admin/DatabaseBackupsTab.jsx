@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Plus, RefreshCw, Shield, Clock, FileText, Info } from 'lucide-react';
+import { Database, Plus, RefreshCw, Shield, Clock, FileText, Info, Trash2 } from 'lucide-react';
 
 /**
  * Dumb Component: DatabaseBackupsTab
@@ -11,6 +11,7 @@ const DatabaseBackupsTab = ({
   autoBackupEnabled, 
   onTriggerBackup, 
   onToggleAutoBackup, 
+  onDeleteBackup,
   onRefresh, 
   formatDate,
   isLoading 
@@ -30,7 +31,7 @@ const DatabaseBackupsTab = ({
     setBackupNote('');
   };
 
-  const renderTable = (data, emptyMessage) => (
+  const renderTable = (data, emptyMessage, isManual = false) => (
     <div className="custom-table-container">
       <table className="admin-table">
         <thead>
@@ -38,7 +39,7 @@ const DatabaseBackupsTab = ({
             <th>Creation Date</th>
             <th>Filename</th>
             <th>Size</th>
-            <th style={{ textAlign: 'right' }}>Status</th>
+            <th style={{ textAlign: 'right' }}>{isManual ? 'Actions' : 'Status'}</th>
           </tr>
         </thead>
         <tbody>
@@ -62,20 +63,31 @@ const DatabaseBackupsTab = ({
                 </td>
                 <td>{formatSize(backup.size)}</td>
                 <td style={{ textAlign: 'right' }}>
-                  <span style={{ 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    padding: '4px 10px', 
-                    borderRadius: '20px', 
-                    fontSize: '0.75rem', 
-                    background: 'rgba(34, 197, 94, 0.1)', 
-                    color: '#22c55e',
-                    border: '1px solid rgba(34, 197, 94, 0.2)'
-                  }}>
-                    <Shield size={12} />
-                    Verified
-                  </span>
+                  {isManual ? (
+                    <button 
+                      className="btn-ghost" 
+                      onClick={() => onDeleteBackup(backup.filename)}
+                      style={{ color: '#ef4444', padding: '8px' }}
+                      title="Delete Snapshot"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  ) : (
+                    <span style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      padding: '4px 10px', 
+                      borderRadius: '20px', 
+                      fontSize: '0.75rem', 
+                      background: 'rgba(34, 197, 94, 0.1)', 
+                      color: '#22c55e',
+                      border: '1px solid rgba(34, 197, 94, 0.2)'
+                    }}>
+                      <Shield size={12} />
+                      Verified
+                    </span>
+                  )}
                 </td>
               </tr>
             ))
@@ -170,7 +182,7 @@ const DatabaseBackupsTab = ({
           <Shield size={22} color="var(--accent-primary)" />
           Manual Snapshots (Persistent)
         </h3>
-        {renderTable(manualBackups, "No manual snapshots found. Create one with a note to secure your data state.")}
+        {renderTable(manualBackups, "No manual snapshots found. Create one with a note to secure your data state.", true)}
       </div>
 
       {/* Automatic Table */}

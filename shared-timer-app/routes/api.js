@@ -84,6 +84,15 @@ router.post('/admin/backups/toggle', authController.authenticateToken, async (re
         res.status(500).json({ error: err.message });
     }
 });
+router.delete('/admin/backups/manual/:filename', authController.authenticateToken, async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const result = await backupController.deleteManualBackup(filename);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // Navbar Settings
 router.get('/navbar-settings', apiController.getPublicNavbarSettings);
