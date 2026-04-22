@@ -676,8 +676,8 @@ const Admin = ({ socket }) => {
             if (success) {
                 addLog('Success', 'KoalaCoins adjusted successfully.', 'success');
                 // Refresh transactions for the expanded user if they are currently viewed
-                if (expandedUserFriends) { // Assuming expandedUserFriends is the userId being viewed
-                    socket.emit('ADMIN_GET_KOALA_TRANSACTIONS', { token: globalToken, userId: expandedUserFriends });
+                if (expandedKoalaUser) {
+                    socket.emit('ADMIN_GET_KOALA_TRANSACTIONS', { token: globalToken, userId: expandedKoalaUser });
                 }
             } else {
                 addLog('Error', `Failed to adjust coins: ${error}`, 'error');
@@ -732,7 +732,7 @@ const Admin = ({ socket }) => {
             socket.off('KOALA_TRANSACTIONS_DATA');
             socket.off('KOALA_COINS_ADJUSTED');
         };
-    }, [activeToken, navigate, socket, expandedUserFriends]); // Added expandedUserFriends to dependencies for refreshing transactions
+    }, [activeToken, navigate, socket, expandedKoalaUser]); // Use expandedKoalaUser for refreshing transactions
     useEffect(() => {
         if (activeTab === 'users' && usersList.length === 0) {
         
@@ -1131,18 +1131,12 @@ const Admin = ({ socket }) => {
         if (expandedUserFriends === userId) {
             setExpandedUserFriends(null);
             setUserFriendsList([]);
-            setKoalaTransactions(prev => {
-                const newState = { ...prev };
-                delete newState[userId];
-                return newState;
-            });
             return;
         }
 
         console.log(`[Admin API Debug] Fetching Friends for user ${userId} with token...`);
         setExpandedUserFriends(userId);
         setFriendsLoading(true);
-        socket.emit('ADMIN_GET_KOALA_TRANSACTIONS', { token: globalToken, userId });
 
         try {
             const res = await fetch(`/api/auth/users/${userId}/friends`, {
