@@ -79,7 +79,6 @@ const UserManagementTab = ({
                             color: section.color, 
                             borderBottom: `1px solid ${section.color}40`, 
                             paddingBottom: '8px',
-                            display: 'space-between',
                             justifyContent: 'space-between',
                             alignItems: 'center',
                             cursor: 'pointer',
