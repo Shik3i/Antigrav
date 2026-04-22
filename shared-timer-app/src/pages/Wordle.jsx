@@ -228,7 +228,7 @@ const Wordle = ({ user, token }) => {
 
 
     const memoizedEvaluations = useMemo(() => {
-        return guesses.map(g => evaluateGuess(g, solution));
+        return (guesses || []).map(g => evaluateGuess(g, solution));
     }, [guesses, solution, evaluateGuess]);
 
     const handleInput = useCallback(async (key) => {
@@ -461,8 +461,8 @@ const Wordle = ({ user, token }) => {
     };
 
     const shareResults = () => {
-        const emojiGrid = guesses.map((guess, i) => {
-            const evaluation = memoizedEvaluations[i];
+        const emojiGrid = (guesses || []).map((guess, i) => {
+            const evaluation = memoizedEvaluations[i] || [];
             return evaluation.map(status => {
                 if (status === 'correct') return '🟩';
                 if (status === 'present') return '🟨';
@@ -484,16 +484,17 @@ const Wordle = ({ user, token }) => {
     };
 
     const MiniWordleGrid = ({ entry, solution: sol }) => {
+        if (!entry) return null;
         const { guesses: userGuesses, evaluations: serverEvaluations } = entry;
         const rowsToRender = userGuesses || serverEvaluations || [];
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px' }}>
-                {rowsToRender.map((_, i) => {
+                {(rowsToRender || []).map((_, i) => {
                     const evaluation = serverEvaluations ? serverEvaluations[i] : (userGuesses ? evaluateGuess(userGuesses[i], sol) : null);
                     const guess = userGuesses ? userGuesses[i] : null;
                     
-                    if (!evaluation) return null;
+                    if (!evaluation || !Array.isArray(evaluation)) return null;
 
                     return (
                         <div key={i} style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
@@ -539,9 +540,10 @@ const Wordle = ({ user, token }) => {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {dailyLeaderboard.map((entry) => {
+                    {(dailyLeaderboard || []).map((entry) => {
                         const isExpanded = expandedUserId === entry.userId;
-                        const score = entry.won ? `${(entry.guesses || entry.evaluations).length}/6` : 'X/6';
+                        const entryGuesses = entry.guesses || entry.evaluations || [];
+                        const score = entry.won ? `${entryGuesses.length}/6` : 'X/6';
                         
                         return (
                             <div 
