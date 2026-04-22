@@ -61,7 +61,7 @@ const addKoalaCoins = (userId, amountCents, reason) => {
 };
 
 const getKoalaTransactions = (userId, limit = 5) => {
-  const queryLimit = (limit === 0 || limit === "0") ? 100 : limit;
+  const queryLimit = (limit === 0 || limit === "0") ? 1000 : limit;
   return new Promise((resolve, reject) => {
     db.all(`SELECT * FROM KoalaTransactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`, [userId, queryLimit], (err, rows) => {
       if (err) reject(err);
