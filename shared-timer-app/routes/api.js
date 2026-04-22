@@ -10,6 +10,7 @@ const polymarketController = require('../controllers/polymarketController');
 const wordleController = require('../controllers/wordleController');
 const towerController = require('../controllers/towerController');
 const blackjackController = require('../controllers/blackjackController');
+const backupController = require('../controllers/backupController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -54,6 +55,34 @@ router.get('/admin/bets', authController.authenticateToken, apiController.getAdm
 router.post('/admin/bets/:id/status', authController.authenticateToken, apiController.updateAdminBetStatus);
 router.post('/admin/bets/trigger-resolver', authController.authenticateToken, apiController.triggerAdminBetResolver);
 router.get('/admin/actions', authController.authenticateToken, apiController.getAdminActions);
+
+// Database Backups
+router.get('/admin/backups', authController.authenticateToken, async (req, res) => {
+    try {
+        const backups = await backupController.getBackupsList();
+        const autoBackupEnabled = await backupController.getAutoBackupState();
+        res.json({ backups, autoBackupEnabled });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/admin/backups/trigger', authController.authenticateToken, async (req, res) => {
+    try {
+        const result = await backupController.createBackup();
+        res.json({ message: 'Backup created successfully', ...result });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/admin/backups/toggle', authController.authenticateToken, async (req, res) => {
+    try {
+        const { enabled } = req.body;
+        await backupController.setAutoBackupState(enabled);
+        res.json({ message: `Auto-backup ${enabled ? 'enabled' : 'disabled'}` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // Navbar Settings
 router.get('/navbar-settings', apiController.getPublicNavbarSettings);

@@ -21,6 +21,7 @@ import PokemonConfigTab from '../components/admin/PokemonConfigTab';
 import WordleDictionaryTab from '../components/admin/WordleDictionaryTab';
 import FortuneCookiesTab from '../components/admin/FortuneCookiesTab';
 import RSSFeedsTab from '../components/admin/RSSFeedsTab';
+import DatabaseBackupsTab from '../components/admin/DatabaseBackupsTab';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
@@ -29,6 +30,7 @@ const Admin = ({ socket }) => {
     const { token: authToken, user } = useAuth();
     const sessionToken = sessionStorage.getItem('admin_token');
     const activeToken = (user?.is_superadmin ? authToken : null) || sessionToken;
+    const globalToken = activeToken;
 
     const adminTokenRef = useRef(activeToken);
 
@@ -85,6 +87,11 @@ const Admin = ({ socket }) => {
     const [editingWordId, setEditingWordId] = useState(null);
     const [editWordDef, setEditWordDef] = useState('');
     const [editWordQuote, setEditWordQuote] = useState('');
+
+    // --- Database Backups ---
+    const [backups, setBackups] = useState([]);
+    const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
+    const [isBackupLoading, setIsBackupLoading] = useState(false);
 
     // --- Daily Fortune Cookie ---
     const [fortunesDictionary, setFortunesDictionary] = useState([]);
@@ -517,6 +524,49 @@ const Admin = ({ socket }) => {
         }
     };
 
+    const handleFetchBackups = async () => {
+        setIsBackupLoading(true);
+        try {
+            const res = await axios.get('/api/admin/backups', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setBackups(res.data.backups || []);
+            setAutoBackupEnabled(res.data.autoBackupEnabled);
+        } catch (err) {
+            console.error('[Admin Backups] Fetch failed:', err);
+            addLog('Error', 'Failed to fetch database backups.', 'error');
+        } finally {
+            setIsBackupLoading(false);
+        }
+    };
+
+    const handleTriggerBackup = async () => {
+        setIsBackupLoading(true);
+        try {
+            await axios.post('/api/admin/backups/trigger', {}, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Manual database backup created successfully.', 'success');
+            handleFetchBackups();
+        } catch (err) {
+            addLog('Error', 'Failed to trigger database backup.', 'error');
+        } finally {
+            setIsBackupLoading(false);
+        }
+    };
+
+    const handleToggleAutoBackup = async (enabled) => {
+        try {
+            await axios.post('/api/admin/backups/toggle', { enabled }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setAutoBackupEnabled(enabled);
+            addLog('Success', `Auto-backup ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+        } catch (err) {
+            addLog('Error', 'Failed to toggle auto-backup setting.', 'error');
+        }
+    };
+
     const moveTeam = (index, direction) => {
         const newTeams = [...packTeams];
         const newIndex = index + direction;
@@ -530,7 +580,6 @@ const Admin = ({ socket }) => {
         setLogs(prev => [{ id, title, message, status, timestamp: Date.now() }, ...prev].slice(0, 50));
     };
 
-    const globalToken = activeToken;
 
     // Forms
     const [originalCode, setOriginalCode] = useState('');
@@ -769,6 +818,9 @@ const Admin = ({ socket }) => {
         }
         if (activeTab === 'fortunes') {
             handleFetchFortunes();
+        }
+        if (activeTab === 'backups') {
+            handleFetchBackups();
         }
     }, [activeTab]);
 
@@ -1410,6 +1462,12 @@ const Admin = ({ socket }) => {
                     style={{ flexShrink: 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <LucideIcons.Cookie size={16} /> Fortune Cookies
                 </button>
+                <button
+                    className={activeTab === 'backups' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => setActiveTab('backups')}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <LucideIcons.Save size={16} /> Database Backups
+                </button>
             </div>
 
             {/* TAB: TEAM MAPPINGS */}
@@ -1695,6 +1753,19 @@ const Admin = ({ socket }) => {
                     onDelete={handleDeleteFortune}
                     fortuneDisplayLimit={fortuneDisplayLimit}
                     onSetDisplayLimit={setFortuneDisplayLimit}
+                />
+            )}
+
+            {/* TAB: DATABASE BACKUPS */}
+            {activeTab === 'backups' && (
+                <DatabaseBackupsTab 
+                    backups={backups}
+                    autoBackupEnabled={autoBackupEnabled}
+                    onTriggerBackup={handleTriggerBackup}
+                    onToggleAutoBackup={handleToggleAutoBackup}
+                    onRefresh={handleFetchBackups}
+                    formatDate={formatDate}
+                    isLoading={isBackupLoading}
                 />
             )}
         </div>

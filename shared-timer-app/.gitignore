@@ -32,6 +32,10 @@ data/*.db-wal
 *.sqlite
 *.db
 
+# Database Backups
+database/backups/*.sqlite
+database/backups/*.db
+
 # Logs
 server_log*.txt
 
