@@ -138,7 +138,7 @@ const Admin = ({ socket }) => {
             });
             setPokemonConfigs(res.data);
         } catch (err) {
-            // Error handled by UI
+            addLog('Error', 'Failed to fetch Pokémon configurations.', 'error');
         }
     }, [globalToken]);
 
@@ -575,11 +575,11 @@ const Admin = ({ socket }) => {
         const handleRooms = (data) => { setRooms(data); setLoading(false); };
         const handleAllTeamsData = (data) => {
             if (data && Array.isArray(data.teams)) {
-                const sorted = [...data.teams].sort((a, b) => a.name.localeCompare(b.name));
+                const sorted = [...data.teams].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
                 setAvailableTeams(sorted);
                 setEsportsLastUpdated(data.lastUpdated);
             } else if (Array.isArray(data)) {
-                const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+                const sorted = [...data].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
                 setAvailableTeams(sorted);
             }
             setLoading(false);
@@ -1036,7 +1036,7 @@ const Admin = ({ socket }) => {
 
     const toggleSuperadmin = async (userId, currentStatus) => {
         try {
-            await fetch(`/api/auth/users/${userId}/superadmin`, {
+            const res = await fetch(`/api/auth/users/${userId}/superadmin`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1044,9 +1044,14 @@ const Admin = ({ socket }) => {
                 },
                 body: JSON.stringify({ is_superadmin: !currentStatus })
             });
-            setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_superadmin: !currentStatus } : u));
+            if (res.ok) {
+                setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_superadmin: !u.is_superadmin } : u));
+            } else {
+                addLog('Error', 'Failed to update superadmin status.', 'error');
+            }
         } catch (err) {
             console.error(err);
+            addLog('Error', 'Network error while updating superadmin status.', 'error');
         }
     };
 
@@ -1085,7 +1090,8 @@ const Admin = ({ socket }) => {
             amountCents,
             reason
         });
-        socket.emit('ADMIN_GET_KOALA_TRANSACTIONS', { token: globalToken, userId });
+        // Removed redundant socket.emit('ADMIN_GET_KOALA_TRANSACTIONS') to prevent race condition.
+        // Refresh is handled by 'KOALA_COINS_ADJUSTED' listener.
     };
 
     const handleViewKoalaCoins = (userId) => {
