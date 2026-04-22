@@ -42,13 +42,20 @@ const AuditLogsTab = ({
                                     </span>
                                 </td>
                                 <td style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                                    {typeof log.details === 'string' && log.details.startsWith('{') ? (
-                                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                                            {JSON.stringify(JSON.parse(log.details), null, 2)}
-                                        </pre>
-                                    ) : (
-                                        log.details
-                                    )}
+                                    {(() => {
+                                        if (typeof log.details === 'string' && log.details.startsWith('{')) {
+                                            try {
+                                                return (
+                                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                                                        {JSON.stringify(JSON.parse(log.details), null, 2)}
+                                                    </pre>
+                                                );
+                                            } catch (e) {
+                                                return log.details;
+                                            }
+                                        }
+                                        return log.details;
+                                    })()}
                                 </td>
                             </tr>
                         ))}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Database, Server, Activity, Monitor, Users, Bug, Dices, History, Gamepad2, LayoutDashboard, ShieldAlert } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -131,7 +131,7 @@ const Admin = ({ socket }) => {
         }
     };
 
-    const handleFetchPokemonConfigs = async () => {
+    const handleFetchPokemonConfigs = useCallback(async () => {
         try {
             const res = await axios.get('/api/admin/pokemon-configs', {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -140,7 +140,7 @@ const Admin = ({ socket }) => {
         } catch (err) {
             // Error handled by UI
         }
-    };
+    }, [globalToken]);
 
     const handleFetchPolymarketSettings = async () => {
         try {
@@ -599,7 +599,6 @@ const Admin = ({ socket }) => {
         socket.on(EVENTS.ADMIN_ACTIVITY_DATA, handleActivity);
         socket.on(EVENTS.ADMIN_ROOMS_DATA, handleRooms);
         socket.on(EVENTS.DB_ESPORTS_TEAMS_DATA, handleAllTeamsData);
-        socket.on(EVENTS.DB_ESPORTS_TEAMS_DATA, handleAllTeamsData);
         socket.on(EVENTS.ERROR, handleError);
 
         socket.on('KOALA_BASELINE_DATA', ({ baseline }) => {
@@ -709,7 +708,7 @@ const Admin = ({ socket }) => {
             socket.off('KOALA_TRANSACTIONS_DATA');
             socket.off('KOALA_COINS_ADJUSTED');
         };
-    }, [activeToken, navigate, socket, expandedKoalaUser]);
+    }, [activeToken, navigate, socket, expandedKoalaUser, handleFetchPokemonConfigs]);
 
     useEffect(() => {
         if (activeTab === 'users' && usersList.length === 0) {
