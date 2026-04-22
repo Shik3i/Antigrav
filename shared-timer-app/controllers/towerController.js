@@ -88,10 +88,7 @@ exports.startRound = async (req, res) => {
     const result = await dbLayer.startTowerRound(userId, bet, tilesPerLevel);
     emitBalanceUpdate(req, userId, result.newBalance);
 
-    res.status(201).json({
-      round: result.round,
-      newBalance: result.newBalance
-    });
+    res.status(201).json(result);
   } catch (err) {
     if (err.status) {
       return res.status(err.status).json({
@@ -99,6 +96,15 @@ exports.startRound = async (req, res) => {
         activeRound: err.activeRound || null
       });
     }
+    
+    if (err.message && err.message.includes('UNIQUE constraint failed')) {
+      const activeRound = await dbLayer.getActiveTowerRound(getUserId(req));
+      return res.status(400).json({
+        error: 'You already have an active round.',
+        activeRound
+      });
+    }
+
     console.error('[TowerClimb] Error starting round:', err);
     res.status(500).json({ error: 'Failed to start tower round' });
   }
