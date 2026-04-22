@@ -83,7 +83,7 @@ exports.getKoalaTransactions = async (req, res, next) => {
         const userId = req.user?.id || req.user?.userId;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const transactions = await dbLayer.getKoalaTransactions(userId, 50);
+        const transactions = await dbLayer.getKoalaTransactions(userId, 1000);
         res.json(transactions);
     } catch (err) {
         console.error('Error fetching koala transactions:', err);
