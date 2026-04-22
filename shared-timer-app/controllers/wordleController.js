@@ -202,18 +202,31 @@ exports.getDailyLeaderboard = async (req, res, next) => {
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const dailyWord = await dbLayer.getDailyWord(targetDate);
+        const dailyWordObj = await dbLayer.getDailyWord(targetDate);
         const status = await dbLayer.getWordleStatus(userId, targetDate);
         const isFinished = !!status;
 
         let leaderboard = await dbLayer.getWordleDailyLeaderboard(targetDate);
 
+        // Map and parse the results
+        leaderboard = (leaderboard || []).map(entry => {
+            let parsedGuesses = [];
+            try {
+                parsedGuesses = typeof entry.guesses === 'string' ? JSON.parse(entry.guesses) : (entry.guesses || []);
+            } catch (e) {
+                console.error(`[Wordle] Failed to parse guesses for user ${entry.userId}:`, e);
+                parsedGuesses = [];
+            }
+            return { ...entry, guesses: parsedGuesses };
+        });
+
         // If not finished, mask the actual words (guesses)
-        if (!isFinished && dailyWord) {
+        if (!isFinished && dailyWordObj?.word) {
+            const sol = dailyWordObj.word.toUpperCase();
             leaderboard = leaderboard.map(entry => ({
                 ...entry,
                 guesses: null, // Hide actual strings
-                evaluations: entry.guesses.map(g => evaluateGuessInternal(g, dailyWord.toUpperCase()))
+                evaluations: (entry.guesses || []).map(g => evaluateGuessInternal(g, sol))
             }));
         }
 
