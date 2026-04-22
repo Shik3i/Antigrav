@@ -29,8 +29,6 @@ const Admin = ({ socket }) => {
     const { token: authToken, user } = useAuth();
     const sessionToken = sessionStorage.getItem('admin_token');
     const activeToken = (user?.is_superadmin ? authToken : null) || sessionToken;
-    
-
 
     const adminTokenRef = useRef(activeToken);
 
@@ -68,7 +66,7 @@ const Admin = ({ socket }) => {
     const [globalMessage, setGlobalMessage] = useState('');
     const [navbarSettings, setNavbarSettings] = useState([]);
     const [logs, setLogs] = useState([]);
-    const [systemLogs, setSystemLogs] = useState([]); // [NEW]
+    const [systemLogs, setSystemLogs] = useState([]);
     const [pokemonConfigs, setPokemonConfigs] = useState({ settings: { contrast_threshold: '0.6' }, colors: {} });
     const [polymarketSettings, setPolymarketSettings] = useState({ allowUsersToAdd: false });
     const [rssFeeds, setRssFeeds] = useState([]);
@@ -98,7 +96,6 @@ const Admin = ({ socket }) => {
     const [fortuneDisplayLimit, setFortuneDisplayLimit] = useState(50);
 
     const handleFetchNavbarSettings = async () => {
-    
         try {
             const res = await axios.get('/api/admin/navbar-settings', {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -107,7 +104,6 @@ const Admin = ({ socket }) => {
         } catch (err) {
             // Error logged silently or handled by UI
         }
-
     };
 
     const handleSaveNavbarSettings = async () => {
@@ -136,7 +132,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleFetchPokemonConfigs = async () => {
-    
         try {
             const res = await axios.get('/api/admin/pokemon-configs', {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -145,7 +140,6 @@ const Admin = ({ socket }) => {
         } catch (err) {
             // Error handled by UI
         }
-
     };
 
     const handleFetchPolymarketSettings = async () => {
@@ -174,7 +168,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleSavePokemonConfigs = async () => {
-    
         try {
             await axios.post('/api/admin/pokemon-configs/update', pokemonConfigs, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -191,7 +184,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleFetchPacks = async () => {
-    
         try {
             const res = await axios.get('/api/admin/scratchcards/packs', {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -207,7 +199,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleSavePack = async () => {
-    
         try {
             const payload = {
                 pack: {
@@ -248,7 +239,6 @@ const Admin = ({ socket }) => {
 
     const handleDeletePack = async (id) => {
         if (!window.confirm("Are you sure you want to delete this pack?")) return;
-    
         try {
             await axios.delete(`/api/admin/scratchcards/packs/${id}`, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -258,7 +248,6 @@ const Admin = ({ socket }) => {
         } catch (err) {
             // Quiet fail
         }
-
     };
 
     const handleFetchRssFeeds = async () => {
@@ -381,7 +370,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleEditPack = async (id) => {
-    
         try {
             const res = await axios.get(`/api/admin/scratchcards/packs/${id}`, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -409,6 +397,7 @@ const Admin = ({ socket }) => {
             });
         }
     };
+
     const handleBroadcastMessage = () => {
         if (!globalMessage.trim()) return;
         socket.emit('ADMIN_BROADCAST_MESSAGE', { token: globalToken, message: globalMessage });
@@ -535,6 +524,7 @@ const Admin = ({ socket }) => {
         [newTeams[index], newTeams[newIndex]] = [newTeams[newIndex], newTeams[index]];
         setPackTeams(newTeams);
     };
+
     const addLog = (title, message, status) => {
         const id = Math.random().toString(36).substr(2, 9);
         setLogs(prev => [{ id, title, message, status, timestamp: Date.now() }, ...prev].slice(0, 50));
@@ -685,31 +675,18 @@ const Admin = ({ socket }) => {
         });
 
         const fetchAll = () => {
-
             socket.emit(EVENTS.GET_ADMIN_MAPPINGS, { token: globalToken });
-
             socket.emit(EVENTS.GET_ADMIN_CACHE, { token: globalToken });
-
             socket.emit(EVENTS.GET_ADMIN_ACTIVITY, { token: globalToken });
-
             socket.emit(EVENTS.GET_ADMIN_ROOMS, { token: globalToken });
-
             socket.emit(EVENTS.GET_DB_ESPORTS_TEAMS);
-
             socket.emit('ADMIN_GET_ERRORS', { token: globalToken });
-
             socket.emit('ADMIN_GET_SYSTEM_LOGS', { token: globalToken });
-
             socket.emit('ADMIN_GET_KOALA_BASELINE', { token: globalToken });
-
             socket.emit('GET_ADMIN_SCRATCHCARD_POOLS', { token: globalToken });
-
             socket.emit('GET_ADMIN_SCRATCHCARD_ECONOMY', { token: globalToken });
-
             socket.emit('GET_PUBLIC_NAVBAR_SETTINGS', { token: globalToken });
-
             socket.emit('ADMIN_GET_NAVBAR_SETTINGS', { token: globalToken });
-
             socket.emit('GET_SCRATCHCARD_PACKS', { token: globalToken });
             handleFetchPokemonConfigs();
         };
@@ -732,10 +709,10 @@ const Admin = ({ socket }) => {
             socket.off('KOALA_TRANSACTIONS_DATA');
             socket.off('KOALA_COINS_ADJUSTED');
         };
-    }, [activeToken, navigate, socket, expandedKoalaUser]); // Use expandedKoalaUser for refreshing transactions
+    }, [activeToken, navigate, socket, expandedKoalaUser]);
+
     useEffect(() => {
         if (activeTab === 'users' && usersList.length === 0) {
-        
             setLoading(true);
             fetch('/api/auth/users', {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -797,7 +774,6 @@ const Admin = ({ socket }) => {
     }, [activeTab]);
 
     const handleFetchBets = () => {
-    
         setLoading(true);
         fetch('/api/admin/bets', {
             headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -819,7 +795,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleFetchAuditLogs = () => {
-    
         setLoading(true);
         fetch('/api/admin/actions', {
             headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -876,7 +851,7 @@ const Admin = ({ socket }) => {
             const data = await res.json();
             if (res.ok) {
                 alert("Erfolgreich geupdated!");
-                handleFetchBets(); // Refresh list to get accurate state
+                handleFetchBets();
             } else {
                 alert(data.error || "Error updating bet");
             }
@@ -886,7 +861,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleFetchErrorLogs = () => {
-    
         setLoading(true);
         fetch('/api/errors', {
             headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -923,7 +897,6 @@ const Admin = ({ socket }) => {
     };
 
     const handleFetchSystemLogs = () => {
-    
         setLoading(true);
         fetch('/api/admin/system-logs', {
             headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -1048,7 +1021,7 @@ const Admin = ({ socket }) => {
 
     const handleEditRoom = (id, currentName) => {
         const newName = prompt(`Enter new name for room "${currentName}":`, currentName);
-        if (newName === null) return; // cancelled
+        if (newName === null) return;
 
         let defaultRole = prompt(`Enter default role (read/write):`, "read");
         if (defaultRole === null) return;
@@ -1107,14 +1080,12 @@ const Admin = ({ socket }) => {
 
     const handleAdjustKoalaCoins = (userId, amountCents, reason) => {
         if (!amountCents || amountCents === 0) return;
-        // amountCents is already in cents from the UI input
         socket.emit('ADMIN_ADJUST_KOALA_COINS', {
             token: globalToken,
             userId,
             amountCents,
             reason
         });
-        // Refresh transactions
         socket.emit('ADMIN_GET_KOALA_TRANSACTIONS', { token: globalToken, userId });
     };
 
@@ -1187,7 +1158,7 @@ const Admin = ({ socket }) => {
 
     const handleBanUser = async (userId, username) => {
         const reason = prompt(`Enter a reason for banning ${username} (optional):`, "Violating terms of service");
-        if (reason === null) return; // User cancelled
+        if (reason === null) return;
 
         try {
             const res = await fetch(`/api/auth/users/${userId}/ban`, {
@@ -1242,8 +1213,6 @@ const Admin = ({ socket }) => {
         }
     };
 
-
-
     const handleDeleteGameScore = async (id) => {
         if (!window.confirm("Are you sure you want to delete this highscore entry?")) return;
         try {
@@ -1258,11 +1227,9 @@ const Admin = ({ socket }) => {
         }
     };
 
-
     const formatDate = (isoStr) => {
         if (!isoStr) return '';
         const d = new Date(isoStr);
-        // Ensure valid date
         if (isNaN(d.getTime())) return isoStr;
         return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
     };
@@ -1596,6 +1563,7 @@ const Admin = ({ socket }) => {
                     formatDate={formatDate}
                 />
             )}
+
             {/* TAB: AUDIT LOGS */}
             {activeTab === 'audit' && (
                 <AuditLogsTab 
@@ -1636,6 +1604,7 @@ const Admin = ({ socket }) => {
                     onMoveTeam={moveTeam}
                 />
             )}
+
             {/* TAB: NAVBAR SETTINGS */}
             {activeTab === 'navbar' && (
                 <SidebarSettingsTab 
