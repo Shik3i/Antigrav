@@ -75,10 +75,10 @@ const BetsManagementTab = ({
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <span style={{ fontWeight: 600, color: '#22c55e' }}>{bet.stake}</span>
                                             <span style={{ color: 'var(--text-muted)' }}>@</span>
-                                            <span style={{ fontWeight: 600, color: '#3b82f6' }}>{bet.odds.toFixed(2)}</span>
+                                            <span style={{ fontWeight: 600, color: '#3b82f6' }}>{(bet.odds || 0).toFixed(2)}</span>
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                            Payout: <span style={{ color: '#fbbf24' }}>{Math.floor(bet.stake * bet.odds)}</span>
+                                            Payout: <span style={{ color: '#fbbf24' }}>{Math.floor(bet.stake * (bet.odds || 0))}</span>
                                         </div>
                                     </td>
                                     <td style={{ padding: '12px' }}>
