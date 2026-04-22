@@ -213,8 +213,10 @@ exports.getDailyLeaderboard = async (req, res, next) => {
         const status = await dbLayer.getWordleStatus(userId, targetDate);
         const isFinished = !!status;
 
+        const leaderboardRows = await dbLayer.getWordleDailyLeaderboard(targetDate);
+
         // Map and parse the results with extreme caution
-        leaderboard = (leaderboard || []).map(entry => {
+        let leaderboard = (leaderboardRows || []).map(entry => {
             let parsedGuesses = [];
             try {
                 if (entry.guesses) {
