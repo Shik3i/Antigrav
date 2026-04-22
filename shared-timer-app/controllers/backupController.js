@@ -8,11 +8,19 @@ const BACKUP_BASE_DIR = path.join(path.dirname(DB_PATH), 'backups');
 const BACKUP_AUTO_DIR = path.join(BACKUP_BASE_DIR, 'automatic');
 const BACKUP_MANUAL_DIR = path.join(BACKUP_BASE_DIR, 'manual');
 
+let isBackingUp = false;
+
 /**
  * Creates a backup using VACUUM INTO
  * @param {Object} options - { type: 'automatic' | 'manual', note: string }
  */
 const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
+  if (isBackingUp) {
+    throw new Error('A backup operation is already in progress.');
+  }
+
+  isBackingUp = true;
+
   return new Promise((resolve, reject) => {
     const targetDir = type === 'manual' ? BACKUP_MANUAL_DIR : BACKUP_AUTO_DIR;
     
@@ -37,7 +45,9 @@ const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
     const destPath = path.join(targetDir, filename);
 
     db.run(`VACUUM INTO ?`, [destPath], function(err) {
+      // Ensure we clear the lock regardless of outcome
       if (err) {
+        isBackingUp = false;
         console.error(`[Backup] Failed to create ${type} backup:`, err);
         if (logging && logging.logError) {
           logging.logError(`${type.toUpperCase()} Backup failed`, err, { destPath });
@@ -51,11 +61,17 @@ const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
           pruneBackups().catch(e => console.error('[Backup] Pruning failed:', e));
         }
         
+        isBackingUp = false;
         resolve({ filename, timestamp: now, type });
       }
     });
   });
 };
+
+/**
+ * Returns whether a backup is currently in progress
+ */
+const getIsBackingUp = () => isBackingUp;
 
 /**
  * Helper to extract note from manual backup filename
@@ -253,5 +269,6 @@ module.exports = {
   setAutoBackupState,
   getAutoBackupState,
   pruneBackups,
-  deleteManualBackup
+  deleteManualBackup,
+  getIsBackingUp
 };
