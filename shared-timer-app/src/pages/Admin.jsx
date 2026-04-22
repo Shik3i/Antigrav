@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Database, Plus, Trash2, Save, ShieldAlert, Server, Activity, Monitor, Users, Bug, Dices, History, RefreshCcw, Gamepad2, TrendingUp, LayoutDashboard, ChevronUp, ChevronDown, Rss } from 'lucide-react';
+import { Database, Server, Activity, Monitor, Users, Bug, Dices, History, Gamepad2, LayoutDashboard, ShieldAlert } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -16,6 +16,11 @@ import BetsManagementTab from '../components/admin/BetsManagementTab';
 import AuditLogsTab from '../components/admin/AuditLogsTab';
 import GameHighscoresTab from '../components/admin/GameHighscoresTab';
 import ScratchcardPacksTab from '../components/admin/ScratchcardPacksTab';
+import SidebarSettingsTab from '../components/admin/SidebarSettingsTab';
+import PokemonConfigTab from '../components/admin/PokemonConfigTab';
+import WordleDictionaryTab from '../components/admin/WordleDictionaryTab';
+import FortuneCookiesTab from '../components/admin/FortuneCookiesTab';
+import RSSFeedsTab from '../components/admin/RSSFeedsTab';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
@@ -70,7 +75,6 @@ const Admin = ({ socket }) => {
     const [rssArticles, setRssArticles] = useState([]);
     const [rssStats, setRssStats] = useState([]);
     const [refreshingRss, setRefreshingRss] = useState(false);
-    const [newNavbarItem, setNewNavbarItem] = useState({ key: '', label: '', path: '', category: 'Tools', icon: '' });
     const [wordleDictionary, setWordleDictionary] = useState([]);
     const [wordleSearch, setWordleSearch] = useState('');
     const [wordleFilterNoDef, setWordleFilterNoDef] = useState(false);
@@ -542,7 +546,6 @@ const Admin = ({ socket }) => {
     const [originalCode, setOriginalCode] = useState('');
     const [polymarketCode, setPolymarketCode] = useState('');
     const [availableTeams, setAvailableTeams] = useState([]);
-    const [showDropdown, setShowDropdown] = useState(false);
     const [esportsLastUpdated, setEsportsLastUpdated] = useState(null);
 
     // Scratchcard Pool Admin States
@@ -1473,132 +1476,20 @@ const Admin = ({ socket }) => {
                 />
             )}
 
-            {/* TAB: RSS FEEDS MANAGEMENT */}
+            {/* TAB: RSS FEEDS */}
             {activeTab === 'rss' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                        <div>
-                            <h3 style={{ margin: 0 }}>RSS Feed Quellen</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>Verwalte die globalen News-Quellen für alle User.</p>
-                        </div>
-                        <button className="btn-primary" onClick={() => {
-                            const name = prompt("Name des Feeds (z.B. BBC News):");
-                            const url = prompt("RSS URL:");
-                            const icon = prompt("Icon URL (optional):");
-                            if (name && url) handleAddRssFeed(name, url, icon);
-                        }}>
-                           <Plus size={18} /> Feed hinzufügen
-                        </button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '48px' }}>
-                        {!Array.isArray(rssFeeds) || rssFeeds.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Keine RSS-Feeds konfiguriert oder Fehler beim Laden.</div>
-                        ) : (
-                            rssFeeds.map(feed => (
-                                <div key={feed?.id || Math.random()} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                        <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                                            {(() => {
-                                                const iconUrl = feed?.icon || (feed?.url ? `https://www.google.com/s2/favicons?domain=${new URL(feed.url).hostname}&sz=64` : null);
-                                                return iconUrl ? (
-                                                    <img 
-                                                        src={iconUrl} 
-                                                        alt="" 
-                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                                                        onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.querySelector('.fallback-rss-icon').style.display = 'block'; }}
-                                                    />
-                                                ) : null;
-                                            })()}
-                                            <div className="fallback-rss-icon" style={{ display: feed?.icon || feed?.url ? 'none' : 'block' }}>
-                                                <LucideIcons.Rss size={24} color="var(--text-muted)" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{feed?.name || 'Unbenannter Feed'} {feed?.is_default ? <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px' }}>DEFAULT</span> : null}</div>
-                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '4px' }}>{feed?.url || 'Keine URL'}</div>
-                                            <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '4px' }}>
-                                                {rssStats.find(s => s.id === feed.id)?.articleCount || 0} Artikel im Cache
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '12px' }}>
-                                        <button className="btn-secondary" style={{ padding: '8px 16px' }} onClick={() => {
-                                            const name = prompt("Name:", feed?.name || '');
-                                            const url = prompt("URL:", feed?.url || '');
-                                            const icon = prompt("Icon URL:", feed?.icon || '');
-                                            if (name && url) handleUpdateRssFeed(feed?.id, name, url, icon);
-                                        }}>Edit</button>
-                                        {!feed?.is_default && (
-                                            <button className="btn-ghost" style={{ padding: '8px 16px', color: '#ef4444' }} onClick={() => handleDeleteRssFeed(feed?.id)}>
-                                                <Trash2 size={18} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* NEW SECTION: RSS ARTICLE DATABASE */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '48px', marginTop: '48px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <div>
-                                <h3 style={{ margin: 0 }}>News Artikel-Datenbank</h3>
-                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
-                                    Hier werden alle geladenen Artikel persistiert. Automatischer Cleanup erfolgt alle 7 Tage.
-                                </p>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <button className="btn-secondary" onClick={handleManualRssRefresh} disabled={refreshingRss}>
-                                    <LucideIcons.RefreshCw className={refreshingRss ? "spinning" : ""} size={16} style={{ marginRight: '8px' }} />
-                                    {refreshingRss ? "Aktualisiere..." : "Vollständiger Feed-Refresh"}
-                                </button>
-                                <button className="btn-ghost" style={{ color: '#ef4444', border: '1px solid #ef444420' }} onClick={handlePurgeRssCache}>
-                                    Alles leeren (Purge)
-                                </button>
-                                <button className="btn-ghost" style={{ color: '#f59e0b', border: '1px solid #f59e0b20' }} onClick={() => handlePurgeRssCache(24)}>
-                                    Alles &gt; 24h löschen
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.1)', borderRadius: '12px', padding: '4px' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <th style={{ padding: '16px', color: 'var(--text-muted)' }}>Quelle</th>
-                                        <th style={{ padding: '16px', color: 'var(--text-muted)' }}>Titel</th>
-                                        <th style={{ padding: '16px', color: 'var(--text-muted)' }}>Cached am</th>
-                                        <th style={{ padding: '16px', textAlign: 'right', color: 'var(--text-muted)' }}>Aktion</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rssArticles.length === 0 ? (
-                                        <tr><td colSpan="4" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>Keine Artikel in der Datenbank.</td></tr>
-                                    ) : (
-                                        rssArticles.map(art => (
-                                            <tr key={art.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                                <td style={{ padding: '16px' }}>
-                                                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>{art.feedName}</span>
-                                                </td>
-                                                <td style={{ padding: '16px', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    <a href={art.link} target="_blank" rel="noreferrer" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>{art.title}</a>
-                                                </td>
-                                                <td style={{ padding: '16px', color: 'var(--text-muted)' }}>{new Date(art.cachedAt).toLocaleString()}</td>
-                                                <td style={{ padding: '16px', textAlign: 'right' }}>
-                                                    <button className="btn-ghost" style={{ color: '#ef4444', padding: '4px' }} onClick={() => handleDeleteRssArticle(art.id)}>
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <RSSFeedsTab 
+                    rssFeeds={rssFeeds}
+                    rssStats={rssStats}
+                    rssArticles={rssArticles}
+                    refreshingRss={refreshingRss}
+                    onAddFeed={handleAddRssFeed}
+                    onUpdateFeed={handleUpdateRssFeed}
+                    onDeleteFeed={handleDeleteRssFeed}
+                    onManualRefresh={handleManualRssRefresh}
+                    onPurgeCache={handlePurgeRssCache}
+                    onDeleteArticle={handleDeleteRssArticle}
+                />
             )}
 
             {/* TAB: ACTIVITY LOG */}
@@ -1751,785 +1642,92 @@ const Admin = ({ socket }) => {
                     onMoveTeam={moveTeam}
                 />
             )}
+            {/* TAB: NAVBAR SETTINGS */}
             {activeTab === 'navbar' && (
-                <div className="animate-fade-in">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <div>
-                            <h2 style={{ margin: 0 }}>Navigation Settings</h2>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Steuere die Sichtbarkeit und Reihenfolge der Links in der Sidebar.</p>
-                        </div>
-                        <button className="btn-primary" onClick={handleSaveNavbarSettings} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <LucideIcons.Save size={18} /> Save Changes
-                        </button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        {/* Navigation List organized by Categories */}
-
-                        {['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System', 'Other', ...new Set(navbarSettings.map(n => n.category).filter(c => !['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System', 'Other'].includes(c)))].map(category => {
-                            const categoryItems = navbarSettings.filter(item => item.category === category);
-                            if (categoryItems.length === 0) return null;
-
-                            return (
-                                <div key={category} className="glass-card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <div style={{ width: '8px', height: '24px', background: 'var(--accent-primary)', borderRadius: '4px' }}></div>
-                                        <h3 style={{ margin: 0, fontSize: '1.1rem', letterSpacing: '0.02em' }}>{category}</h3>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{categoryItems.length} Links</span>
-                                    </div>
-
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Icon</th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Category</th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Path</th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Badge</th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                                                            <LucideIcons.Lock size={12} /> Lock
-                                                        </div>
-                                                    </th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Visible</th>
-                                                    <th style={{ padding: '12px 24px', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Order</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {categoryItems.map((item, nestedIndex) => {
-                                                    const globalIndex = navbarSettings.findIndex(n => n.key === item.key);
-                                                    const isFirst = nestedIndex === 0;
-                                                    const isLast = nestedIndex === categoryItems.length - 1;
-
-                                                    return (
-                                                        <tr key={item.key} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
-                                                            <td style={{ padding: '14px 24px', fontWeight: 600 }}>
-                                                                <input 
-                                                                    type="text" 
-                                                                    value={item.label} 
-                                                                    style={{ width: '130px', padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-color)', color: 'inherit', borderRadius: '4px' }}
-                                                                    onChange={(e) => {
-                                                                        const newSettings = [...navbarSettings];
-                                                                        const idx = newSettings.findIndex(n => n.key === item.key);
-                                                                        newSettings[idx].label = e.target.value;
-                                                                        setNavbarSettings(newSettings);
-                                                                    }}
-                                                                />
-                                                            </td>
-                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                                    <div style={{ padding: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex' }}>
-                                                                        {(() => {
-                                                                            const IconComp = LucideIcons[item.icon];
-                                                                            return IconComp ? <IconComp size={16} /> : <LucideIcons.HelpCircle size={16} opacity={0.3} />;
-                                                                        })()}
-                                                                    </div>
-                                                                    <input 
-                                                                        type="text"
-                                                                        value={item.icon || ''}
-                                                                        placeholder="Icon Name"
-                                                                        style={{ width: '80px', fontSize: '0.7rem', padding: '2px 4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'inherit', borderRadius: '4px' }}
-                                                                        onChange={(e) => {
-                                                                            const newSettings = [...navbarSettings];
-                                                                            const idx = newSettings.findIndex(n => n.key === item.key);
-                                                                            newSettings[idx].icon = e.target.value;
-                                                                            setNavbarSettings(newSettings);
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                            <td style={{ padding: '14px 24px' }}>
-                                                                <select 
-                                                                    value={item.category || 'Other'} 
-                                                                    className="input-primary"
-                                                                    style={{ width: '130px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer' }}
-                                                                    onChange={(e) => {
-                                                                        const newSettings = [...navbarSettings];
-                                                                        const idx = newSettings.findIndex(n => n.key === item.key);
-                                                                        newSettings[idx].category = e.target.value;
-                                                                        newSettings.sort((a,b) => a.sortOrder - b.sortOrder);
-                                                                        setNavbarSettings(newSettings);
-                                                                    }}
-                                                                >
-                                                                    <option value="Timers">Timers</option>
-                                                                    <option value="Esports">Esports</option>
-                                                                    <option value="Games">Games</option>
-                                                                    <option value="Social">Social</option>
-                                                                    <option value="Tools">Tools</option>
-                                                                    <option value="System">System</option>
-                                                                    <option value="Other">Other</option>
-                                                                </select>
-                                                            </td>
-                                                            <td style={{ padding: '14px 24px', fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.path}</td>
-                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={!!item.has_daily_badge} 
-                                                                    style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                                                                    onChange={(e) => {
-                                                                        const newSettings = [...navbarSettings];
-                                                                        const idx = newSettings.findIndex(n => n.key === item.key);
-                                                                        newSettings[idx].has_daily_badge = e.target.checked ? 1 : 0;
-                                                                        setNavbarSettings(newSettings);
-                                                                    }}
-                                                                />
-                                                            </td>
-                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={!!item.isLocked} 
-                                                                    style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                                                                    onChange={(e) => {
-                                                                        const newSettings = [...navbarSettings];
-                                                                        const idx = newSettings.findIndex(n => n.key === item.key);
-                                                                        newSettings[idx].isLocked = e.target.checked ? 1 : 0;
-                                                                        setNavbarSettings(newSettings);
-                                                                    }}
-                                                                />
-                                                            </td>
-                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
-                                                                {item.key === 'admin' ? (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                                                        <input 
-                                                                            type="checkbox" 
-                                                                            checked={true} 
-                                                                            disabled={true}
-                                                                            style={{ transform: 'scale(1.2)', opacity: 0.5, cursor: 'not-allowed' }}
-                                                                        />
-                                                                        <span style={{ fontSize: '0.65rem', color: '#a855f7', fontWeight: 700 }}>Superadmin only</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <input 
-                                                                        type="checkbox" 
-                                                                        checked={!!item.isVisible} 
-                                                                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                                                                        onChange={(e) => {
-                                                                            const newSettings = [...navbarSettings];
-                                                                            const idx = newSettings.findIndex(n => n.key === item.key);
-                                                                            newSettings[idx].isVisible = e.target.checked ? 1 : 0;
-                                                                            setNavbarSettings(newSettings);
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </td>
-                                                            <td style={{ padding: '14px 24px', textAlign: 'center' }}>
-                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                                                    <button 
-                                                                        className="btn-ghost" 
-                                                                        style={{ padding: '6px', opacity: isFirst ? 0.2 : 1 }}
-                                                                        disabled={isFirst}
-                                                                        title="Move Up"
-                                                                        onClick={() => {
-                                                                            setNavbarSettings(prev => {
-                                                                                const newSettings = [...prev];
-                                                                                const currentCategoryItems = newSettings.filter(n => n.category === category);
-                                                                                const neighbor = currentCategoryItems[nestedIndex - 1];
-                                                                                
-                                                                                if (!neighbor) return prev;
-
-                                                                                const idxSelf = newSettings.findIndex(n => n.key === item.key);
-                                                                                const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
-                                                                                
-                                                                                if (idxSelf === -1 || idxNeighbor === -1) return prev;
-
-                                                                                const tempOrder = newSettings[idxSelf].sortOrder;
-                                                                                newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
-                                                                                newSettings[idxNeighbor].sortOrder = tempOrder;
-                                                                                
-                                                                                return [...newSettings].sort((a,b) => a.sortOrder - b.sortOrder);
-                                                                            });
-                                                                        }}
-                                                                    >
-                                                                        <LucideIcons.ChevronUp size={16} />
-                                                                    </button>
-
-                                                                    <button 
-                                                                        className="btn-ghost" 
-                                                                        style={{ padding: '6px', opacity: isLast ? 0.2 : 1 }}
-                                                                        disabled={isLast}
-                                                                        title="Move Down"
-                                                                        onClick={() => {
-                                                                            setNavbarSettings(prev => {
-                                                                                const newSettings = [...prev];
-                                                                                const currentCategoryItems = newSettings.filter(n => n.category === category);
-                                                                                const neighbor = currentCategoryItems[nestedIndex + 1];
-                                                                                
-                                                                                if (!neighbor) return prev;
-
-                                                                                const idxSelf = newSettings.findIndex(n => n.key === item.key);
-                                                                                const idxNeighbor = newSettings.findIndex(n => n.key === neighbor.key);
-                                                                                
-                                                                                if (idxSelf === -1 || idxNeighbor === -1) return prev;
-
-                                                                                const tempOrder = newSettings[idxSelf].sortOrder;
-                                                                                newSettings[idxSelf].sortOrder = newSettings[idxNeighbor].sortOrder;
-                                                                                newSettings[idxNeighbor].sortOrder = tempOrder;
-                                                                                
-                                                                                return [...newSettings].sort((a,b) => a.sortOrder - b.sortOrder);
-                                                                            });
-                                                                        }}
-                                                                    >
-                                                                        <LucideIcons.ChevronDown size={16} />
-                                                                    </button>
-
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                <SidebarSettingsTab 
+                    navbarSettings={navbarSettings}
+                    onSetNavbarSettings={setNavbarSettings}
+                    onSave={handleSaveNavbarSettings}
+                />
             )}
 
             {/* TAB: POKEMON CONFIG */}
             {activeTab === 'pokemon' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <h3 style={{ margin: 0 }}>Pokémon System Configuration</h3>
-                        <button className="btn-primary" onClick={handleSavePokemonConfigs} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <LucideIcons.Save size={18} /> Save Changes
-                        </button>
-                    </div>
-
-                    <div style={{ marginBottom: '32px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                        <h4 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--accent-primary)' }}>Global Settings</h4>
-                        <div style={{ maxWidth: '400px' }}>
-                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Contrast Threshold (0.0 - 1.0)</label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <input 
-                                    type="range" 
-                                    min="0" max="1" step="0.01" 
-                                    style={{ flex: 1 }}
-                                    value={pokemonConfigs.settings?.contrast_threshold || 0.6}
-                                    onChange={(e) => setPokemonConfigs(prev => ({ 
-                                        ...prev, 
-                                        settings: { ...prev.settings, contrast_threshold: e.target.value } 
-                                    }))}
-                                />
-                                <span style={{ fontWeight: 'bold', minWidth: '40px' }}>{pokemonConfigs.settings?.contrast_threshold || 0.6}</span>
-                            </div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                                Higher value = Pokémon needs to be "lighter" to trigger Light Mode. Default: 0.6.
-                            </p>
-                        </div>
-                    </div>
-
-                    <h4 style={{ marginBottom: '16px' }}>Type Color Mapping</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-                        {POKEMON_TYPES.map(type => (
-                            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                <div style={{ 
-                                    width: '24px', height: '24px', borderRadius: '50%', 
-                                    background: pokemonConfigs.colors?.[type] || '#333',
-                                    border: '2px solid rgba(255,255,255,0.2)'
-                                }} />
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '4px' }}>{type}</div>
-                                    <input 
-                                        type="text" 
-                                        className="input-primary" 
-                                        style={{ padding: '4px 8px', fontSize: '0.85rem' }}
-                                        value={pokemonConfigs.colors?.[type] || ''}
-                                        onChange={(e) => setPokemonConfigs(prev => ({
-                                            ...prev,
-                                            colors: { ...prev.colors, [type]: e.target.value }
-                                        }))}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <PokemonConfigTab 
+                    pokemonConfigs={pokemonConfigs}
+                    onSetPokemonConfigs={setPokemonConfigs}
+                    onSave={handleSavePokemonConfigs}
+                    pokemonTypes={POKEMON_TYPES}
+                />
             )}
 
             {/* TAB: WORDLE DICTIONARY */}
             {activeTab === 'wordle' && (
-                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                    {/* Bulk Actions Section */}
-                    <div className="glass-card" style={{ padding: '24px' }}>
-                        <div 
-                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                            onClick={() => setShowWordleImportExport(!showWordleImportExport)}
-                        >
-                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <LucideIcons.ArrowLeftRight size={20} color="var(--accent-primary)" />
-                                Bulk Import / Export
-                            </h3>
-                            <button className="btn-ghost" style={{ padding: '4px' }}>
-                                {showWordleImportExport ? <LucideIcons.ChevronUp size={24} /> : <LucideIcons.ChevronDown size={24} />}
-                            </button>
-                        </div>
-
-                        {showWordleImportExport && (
-                            <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)', gap: '20px', marginTop: '24px' }}>
-                                <div style={{ padding: '24px', background: 'rgba(16, 185, 129, 0.03)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                                    <h4 style={{ marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <LucideIcons.FileJson size={20} color="#10b981" />
-                                        Bulk Import / Upsert
-                                    </h4>
-                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '16px' }}>
-                                        Paste JSON to update definitions and quotes. Existing words will be updated.
-                                    </p>
-                                    <textarea
-                                        className="input-primary"
-                                        style={{ width: '100%', minHeight: '160px', fontFamily: 'monospace', fontSize: '0.8rem', marginBottom: '16px', padding: '16px', color: '#10b981' }}
-                                        placeholder='[{"word": "APPLE", "definition": "A fruit", "funny_quote": "Keep doctors away"}]'
-                                        value={bulkMetadataInput}
-                                        onChange={(e) => setBulkMetadataInput(e.target.value)}
-                                    />
-                                    <div style={{ display: 'flex', gap: '12px' }}>
-                                        <button 
-                                            className="btn-primary" 
-                                            style={{ flex: 1, justifyContent: 'center' }}
-                                            disabled={isBulkUpdating || !bulkMetadataInput.trim()}
-                                            onClick={handleBulkUpdateWordleMetadata}
-                                        >
-                                            {isBulkUpdating ? 'Processing...' : 'Run Bulk Upsert'}
-                                        </button>
-                                        <button
-                                            className="btn-secondary"
-                                            onClick={() => setBulkMetadataInput('')}
-                                            style={{ padding: '0 16px' }}
-                                        >
-                                            Clear
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div style={{ padding: '24px', background: 'rgba(59, 130, 246, 0.03)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', display: 'flex', flexDirection: 'column' }}>
-                                    <h4 style={{ marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <LucideIcons.Download size={20} color="#3b82f6" />
-                                        Dictionary Export
-                                    </h4>
-                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '16px' }}>
-                                        Download JSON for local enrichment with <code>scripts/wordle_enricher.py</code>.
-                                    </p>
-                                    
-                                    <button 
-                                        className="btn-secondary" 
-                                        style={{ 
-                                            width: '100%', 
-                                            justifyContent: 'center', 
-                                            background: 'rgba(59, 130, 246, 0.1)', 
-                                            color: '#3b82f6', 
-                                            border: 'none', 
-                                            padding: '12px', 
-                                            borderRadius: '8px', 
-                                            cursor: 'pointer', 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            gap: '12px',
-                                            fontWeight: 700,
-                                            marginTop: 'auto'
-                                        }}
-                                        onClick={async () => {
-                                            try {
-                                                const res = await axios.get('/api/admin/wordle/export', {
-                                                    headers: { 'Authorization': `Bearer ${globalToken}` }
-                                                });
-                                                const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
-                                                const url = URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = `wordle_dictionary_export_${new Date().toISOString().split('T')[0]}.json`;
-                                                a.click();
-                                                addLog('Success', 'Full dictionary exported.', 'success');
-                                            } catch (err) {
-                                                addLog('Error', 'Export failed.', 'error');
-                                            }
-                                        }}
-                                    >
-                                        <LucideIcons.Download size={18} />
-                                        Download JSON
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Dictionary Management Section */}
-                    <div className="glass-card" style={{ padding: '32px', width: '100%' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                            <h3 style={{ margin: 0 }}>Wordle Dictionary ({wordleDictionary.length} words)</h3>
-                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px', gap: '4px' }}>
-                                    <button 
-                                        className={wordleFilterNoDef ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                                        onClick={() => setWordleFilterNoDef(!wordleFilterNoDef)}
-                                    >
-                                        No Def
-                                    </button>
-                                    <button 
-                                        className={wordleFilterNoQuote ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                                        onClick={() => setWordleFilterNoQuote(!wordleFilterNoQuote)}
-                                    >
-                                        No Quote
-                                    </button>
-                                    <button 
-                                        className={wordleFilterUsed ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                                        onClick={() => {
-                                            setWordleFilterUsed(!wordleFilterUsed);
-                                            if (!wordleFilterUsed) setWordleFilterUnused(false);
-                                        }}
-                                    >
-                                        Used
-                                    </button>
-                                    <button 
-                                        className={wordleFilterUnused ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                                        onClick={() => {
-                                            setWordleFilterUnused(!wordleFilterUnused);
-                                            if (!wordleFilterUnused) setWordleFilterUsed(false);
-                                        }}
-                                    >
-                                        Unused
-                                    </button>
-                                </div>
-                                <input 
-                                    type="text" 
-                                    className="input-primary" 
-                                    placeholder="Search word..." 
-                                    style={{ width: '160px' }}
-                                    value={wordleSearch}
-                                    onChange={(e) => setWordleSearch(e.target.value.toUpperCase())}
-                                />
-                                <button className="btn-primary" onClick={() => {
-                                    const word = prompt("Enter 5-letter word:");
-                                    if (word) handleAddWordleWord(word.toUpperCase());
-                                }}>
-                                    <LucideIcons.Plus size={18} /> Add Word
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ width: '100%', overflowX: 'auto' }}>
-                            <table className="admin-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: '100px' }}>Word</th>
-                                        <th style={{ width: '80px' }}>Used?</th>
-                                        <th>Definition</th>
-                                        <th>Funny Quote</th>
-                                        <th style={{ width: '120px', textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {wordleDictionary
-                                        .filter(w => !wordleSearch || w.word.includes(wordleSearch))
-                                        .filter(w => !wordleFilterNoDef || !w.definition)
-                                        .filter(w => !wordleFilterNoQuote || !w.funny_quote)
-                                        .filter(w => !wordleFilterUsed || w.is_used === 1)
-                                        .filter(w => !wordleFilterUnused || w.is_used === 0)
-                                        .slice(0, 50) 
-                                        .map(w => {
-                                            const isEditing = editingWordId === w.id;
-                                            return (
-                                                <tr key={w.id}>
-                                                    <td style={{ fontWeight: 800, color: 'var(--accent-primary)' }}>{w.word}</td>
-                                                    <td>
-                                                        <span style={{ 
-                                                            padding: '2px 6px', 
-                                                            borderRadius: '4px', 
-                                                            fontSize: '0.75rem',
-                                                            background: w.is_used ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
-                                                            color: w.is_used ? '#10b981' : 'var(--text-muted)'
-                                                        }}>
-                                                            {w.is_used ? 'Yes' : 'No'}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                className="input-primary"
-                                                                style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                                                                value={editWordDef}
-                                                                onChange={(e) => setEditWordDef(e.target.value)}
-                                                                placeholder="Enter definition..."
-                                                            />
-                                                        ) : (
-                                                            <div style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                {w.definition || <span style={{ opacity: 0.3 }}>- none -</span>}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                className="input-primary"
-                                                                style={{ width: '100%', fontSize: '0.8rem', padding: '4px 8px' }}
-                                                                value={editWordQuote}
-                                                                onChange={(e) => setEditWordQuote(e.target.value)}
-                                                                placeholder="Enter funny quote..."
-                                                            />
-                                                        ) : (
-                                                            <div style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                {w.funny_quote || <span style={{ opacity: 0.3 }}>- none -</span>}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td style={{ textAlign: 'right' }}>
-                                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                            {isEditing ? (
-                                                                <>
-                                                                    <button 
-                                                                        className="btn-ghost" 
-                                                                        style={{ color: '#10b981' }}
-                                                                        onClick={() => handleUpdateWordMetadata(w.id)}
-                                                                    >
-                                                                        <LucideIcons.Check size={18} />
-                                                                    </button>
-                                                                    <button 
-                                                                        className="btn-ghost" 
-                                                                        style={{ color: 'var(--text-muted)' }}
-                                                                        onClick={() => setEditingWordId(null)}
-                                                                    >
-                                                                        <LucideIcons.X size={18} />
-                                                                    </button>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <button 
-                                                                        className="btn-ghost" 
-                                                                        style={{ color: 'var(--accent-primary)' }}
-                                                                        onClick={() => {
-                                                                            setEditingWordId(w.id);
-                                                                            setEditWordDef(w.definition || '');
-                                                                            setEditWordQuote(w.funny_quote || '');
-                                                                        }}
-                                                                    >
-                                                                        <LucideIcons.Edit2 size={16} />
-                                                                    </button>
-                                                                    <button 
-                                                                        className="btn-ghost" 
-                                                                        style={{ color: '#ef4444' }}
-                                                                        onClick={() => handleDeleteWordleWord(w.id)}
-                                                                    >
-                                                                        <LucideIcons.Trash2 size={16} />
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <WordleDictionaryTab 
+                    wordleDictionary={wordleDictionary}
+                    showWordleImportExport={showWordleImportExport}
+                    onToggleShowImportExport={() => setShowWordleImportExport(!showWordleImportExport)}
+                    bulkMetadataInput={bulkMetadataInput}
+                    onSetBulkMetadataInput={setBulkMetadataInput}
+                    isBulkUpdating={isBulkUpdating}
+                    onBulkUpdate={handleBulkUpdateWordleMetadata}
+                    onExport={async () => {
+                        try {
+                            const res = await axios.get('/api/admin/wordle/export', {
+                                headers: { 'Authorization': `Bearer ${globalToken}` }
+                            });
+                            const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `wordle_dictionary_export_${new Date().toISOString().split('T')[0]}.json`;
+                            a.click();
+                            addLog('Success', 'Full dictionary exported.', 'success');
+                        } catch (err) {
+                            addLog('Error', 'Export failed.', 'error');
+                        }
+                    }}
+                    wordleFilterNoDef={wordleFilterNoDef}
+                    onSetWordleFilterNoDef={setWordleFilterNoDef}
+                    wordleFilterNoQuote={wordleFilterNoQuote}
+                    onSetWordleFilterNoQuote={setWordleFilterNoQuote}
+                    wordleFilterUsed={wordleFilterUsed}
+                    onSetWordleFilterUsed={setWordleFilterUsed}
+                    wordleFilterUnused={wordleFilterUnused}
+                    onSetWordleFilterUnused={setWordleFilterUnused}
+                    wordleSearch={wordleSearch}
+                    onSetWordleSearch={setWordleSearch}
+                    onAddWord={handleAddWordleWord}
+                    editingWordId={editingWordId}
+                    onSetEditingWordId={setEditingWordId}
+                    editWordDef={editWordDef}
+                    onSetEditWordDef={setEditWordDef}
+                    editWordQuote={editWordQuote}
+                    onSetEditWordQuote={setEditWordQuote}
+                    onUpdateMetadata={handleUpdateWordMetadata}
+                    onDeleteWord={handleDeleteWordleWord}
+                />
             )}
 
             {/* TAB: FORTUNE COOKIES */}
             {activeTab === 'fortunes' && (
-                <div className="animate-fade-in">
-                    <div className="glass-card" style={{ padding: '32px', marginBottom: '32px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <div>
-                                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex' }}>
-                                        <LucideIcons.Cookie size={24} color="#f59e0b" />
-                                    </div>
-                                    Daily Fortune Cookie Management ({fortunesDictionary.length})
-                                </h3>
-                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '6px' }}>
-                                    Import and manage sarcastic slogans for the daily login feature.
-                                </p>
-                            </div>
-                            <button className="btn-secondary" onClick={handleFetchFortunes}>
-                                <LucideIcons.RefreshCcw size={16} style={{ marginRight: '8px' }} /> Refresh
-                            </button>
-                        </div>
-
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', marginBottom: '32px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
-                                <div style={{ flex: 1 }}>
-                                    <h4 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: 600 }}>Bulk Import (AI Generated JSON)</h4>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                                        Paste the JSON array from the Python script here. New entries will be added instantly.
-                                    </p>
-                                    <textarea 
-                                        className="input-primary"
-                                        style={{ width: '100%', minHeight: '100px', fontFamily: 'monospace', fontSize: '0.85rem', marginBottom: '12px', resize: 'vertical' }}
-                                        placeholder='["Spruch 1", "Spruch 2", ...]'
-                                        value={fortunesBulkInput}
-                                        onChange={(e) => setFortunesBulkInput(e.target.value)}
-                                    />
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                        <button 
-                                            className="btn-primary" 
-                                            onClick={handleBulkImportFortunes}
-                                            disabled={isImportingFortunes || !fortunesBulkInput.trim()}
-                                            style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', padding: '10px 24px', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.2)' }}
-                                        >
-                                            {isImportingFortunes ? 'Importing...' : 'Start Bulk Import'}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div style={{ width: '280px', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <h5 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Inventory Stats</h5>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                                            <span style={{ color: 'var(--text-muted)' }}>Total Pool:</span>
-                                            <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{fortunesDictionary.length}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                                            <span style={{ color: 'var(--text-muted)' }}>Ever Opened:</span>
-                                            <span style={{ fontWeight: 700, color: '#3b82f6' }}>{fortunesDictionary.filter(f => f.usage_count > 0).length}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                                            <span style={{ color: 'var(--text-muted)' }}>Never Used:</span>
-                                            <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>{fortunesDictionary.filter(f => f.usage_count === 0).length}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '20px' }}>
-                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px', gap: '4px' }}>
-                                    <button 
-                                        className={!fortuneFilterUsed && !fortuneFilterUnused ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: '6px' }}
-                                        onClick={() => { setFortuneFilterUsed(false); setFortuneFilterUnused(false); }}
-                                    >
-                                        All
-                                    </button>
-                                    <button 
-                                        className={fortuneFilterUsed ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: '6px' }}
-                                        onClick={() => { setFortuneFilterUsed(true); setFortuneFilterUnused(false); }}
-                                    >
-                                        Used
-                                    </button>
-                                    <button 
-                                        className={fortuneFilterUnused ? 'btn-primary' : 'btn-ghost'} 
-                                        style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: '6px' }}
-                                        onClick={() => { setFortuneFilterUnused(true); setFortuneFilterUsed(false); }}
-                                    >
-                                        Unused
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style={{ position: 'relative', width: '350px' }}>
-                                <LucideIcons.Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.3 }} />
-                                <input 
-                                    type="text" 
-                                    className="input-primary" 
-                                    placeholder="Suche Sprüche oder Keywords..." 
-                                    style={{ width: '100%', paddingLeft: '44px', borderRadius: '10px' }}
-                                    value={fortuneSearch}
-                                    onChange={(e) => setFortuneSearch(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div style={{ width: '100%', overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.1)' }}>
-                            <table className="admin-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                        <th style={{ width: '80px', padding: '16px', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>ID</th>
-                                        <th style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>Slogan Text</th>
-                                        <th style={{ width: '140px', padding: '16px', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Öffnungen</th>
-                                        <th style={{ width: '100px', padding: '16px', borderBottom: '1px solid var(--border-color)', textAlign: 'right' }}>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(() => {
-                                        const filtered = fortunesDictionary
-                                            .filter(f => !fortuneSearch || f.text.toLowerCase().includes(fortuneSearch.toLowerCase()))
-                                            .filter(f => !fortuneFilterUsed || f.usage_count > 0)
-                                            .filter(f => !fortuneFilterUnused || f.usage_count === 0);
-                                        
-                                        const displayed = filtered.slice(0, fortuneDisplayLimit);
-
-                                        return (
-                                            <>
-                                                {displayed.map(f => (
-                                                    <tr key={f.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                                        <td style={{ padding: '16px', opacity: 0.4, fontSize: '0.8rem', fontFamily: 'monospace' }}>#{f.id}</td>
-                                                        <td style={{ padding: '16px', fontWeight: 500, fontSize: '0.95rem', lineHeight: 1.5, color: '#f1f5f9' }}>{f.text}</td>
-                                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                                            <span style={{ 
-                                                                padding: '4px 12px', 
-                                                                borderRadius: '20px', 
-                                                                fontSize: '0.75rem',
-                                                                fontWeight: 800,
-                                                                letterSpacing: '0.02em',
-                                                                background: f.usage_count > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255,255,255,0.03)',
-                                                                color: f.usage_count > 0 ? '#3b82f6' : 'var(--text-muted)',
-                                                                border: f.usage_count > 0 ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent'
-                                                            }}>
-                                                                {f.usage_count} Openings
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '16px', textAlign: 'right' }}>
-                                                            <button 
-                                                                className="btn-ghost" 
-                                                                style={{ color: '#ef4444', padding: '8px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)' }}
-                                                                title="Delete Slogan"
-                                                                onClick={() => handleDeleteFortune(f.id)}
-                                                            >
-                                                                <LucideIcons.Trash2 size={18} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {filtered.length > fortuneDisplayLimit && (
-                                                    <tr>
-                                                        <td colSpan="4" style={{ padding: '24px', textAlign: 'center', background: 'rgba(255,255,255,0.01)' }}>
-                                                            <div style={{ marginBottom: '12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                                                Zeige {fortuneDisplayLimit} von {filtered.length} Ergebnissen
-                                                            </div>
-                                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                                                                <button 
-                                                                    className="btn-secondary" 
-                                                                    style={{ padding: '8px 24px' }}
-                                                                    onClick={() => setFortuneDisplayLimit(prev => prev + 100)}
-                                                                >
-                                                                    + 100 weitere laden
-                                                                </button>
-                                                                <button 
-                                                                    className="btn-ghost" 
-                                                                    style={{ padding: '8px 24px', color: 'var(--accent-primary)' }}
-                                                                    onClick={() => setFortuneDisplayLimit(filtered.length)}
-                                                                >
-                                                                    Alle anzeigen
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                                {filtered.length === 0 && (
-                                                    <tr>
-                                                        <td colSpan="4" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                                            <div style={{ opacity: 0.1, marginBottom: '16px' }}>
-                                                                <LucideIcons.Cookie size={64} />
-                                                            </div>
-                                                            <p style={{ fontSize: '1.1rem', fontWeight: 500 }}>Keine passenden Sprüche gefunden.</p>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <FortuneCookiesTab 
+                    fortunesDictionary={fortunesDictionary}
+                    onFetch={handleFetchFortunes}
+                    fortunesBulkInput={fortunesBulkInput}
+                    onSetBulkInput={setFortunesBulkInput}
+                    onBulkImport={handleBulkImportFortunes}
+                    isImportingFortunes={isImportingFortunes}
+                    fortuneFilterUsed={fortuneFilterUsed}
+                    onSetFilterUsed={setFortuneFilterUsed}
+                    fortuneFilterUnused={fortuneFilterUnused}
+                    onSetFilterUnused={setFortuneFilterUnused}
+                    fortuneSearch={fortuneSearch}
+                    onSetSearch={setFortuneSearch}
+                    onDelete={handleDeleteFortune}
+                    fortuneDisplayLimit={fortuneDisplayLimit}
+                    onSetDisplayLimit={setFortuneDisplayLimit}
+                />
             )}
         </div>
     );
