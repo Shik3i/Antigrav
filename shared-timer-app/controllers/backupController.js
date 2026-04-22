@@ -89,27 +89,53 @@ const extractNoteFromFilename = (filename) => {
 /**
  * Fetches the list of all available backups partitioned by tier
  */
+/**
+ * Fetches the list of all available backups partitioned by tier.
+ * Prioritizes date parsing from filename to prevent mtime drift.
+ */
 const getBackupsList = async () => {
-  const getFilesFromDir = (dir) => {
-    if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir)
-      .filter(file => file.endsWith('.sqlite') || file.endsWith('.db'))
-      .map(file => {
-        const fullPath = path.join(dir, file);
-        const stats = fs.statSync(fullPath);
-        return {
-          filename: file,
-          size: stats.size,
-          createdAt: stats.mtime,
-          note: extractNoteFromFilename(file)
-        };
-      })
-      .sort((a, b) => b.createdAt - a.createdAt);
+  const parseDateFromFilename = (file) => {
+    // backup_YYYY-MM-DD_HH-mm.sqlite or manual_YYYY-MM-DD_HH-mm...
+    const match = file.match(/(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2})/);
+    if (match) {
+      const [datePart, timePart] = [match[1], match[2].replace('-', ':')];
+      return new Date(`${datePart}T${timePart}:00`);
+    }
+    return null;
   };
 
+  const getFilesFromDir = async (dir) => {
+    if (!fs.existsSync(dir)) return [];
+    const files = await fs.promises.readdir(dir);
+    const result = [];
+
+    for (const file of files) {
+      if (!file.endsWith('.sqlite') && !file.endsWith('.db')) continue;
+      const fullPath = path.join(dir, file);
+      const stats = await fs.promises.stat(fullPath);
+      
+      // Authoritative date: Filename first, fallback to mtime
+      const date = parseDateFromFilename(file) || stats.mtime;
+
+      result.push({
+        filename: file,
+        size: stats.size,
+        createdAt: date,
+        note: extractNoteFromFilename(file)
+      });
+    }
+
+    return result.sort((a, b) => b.createdAt - a.createdAt);
+  };
+
+  const [autoFiles, manualFiles] = await Promise.all([
+    getFilesFromDir(BACKUP_AUTO_DIR),
+    getFilesFromDir(BACKUP_MANUAL_DIR)
+  ]);
+
   return {
-    automatic: getFilesFromDir(BACKUP_AUTO_DIR),
-    manual: getFilesFromDir(BACKUP_MANUAL_DIR)
+    automatic: autoFiles,
+    manual: manualFiles
   };
 };
 
@@ -239,28 +265,22 @@ const pruneBackups = async () => {
  * @param {string} filename - The name of the file to delete
  */
 const deleteManualBackup = async (filename) => {
-  return new Promise((resolve, reject) => {
-    try {
-      // 1. Sanitize: path.basename ensures we only have the filename, stripping any ../ or /
-      const safeFilename = path.basename(filename);
-      
-      // 2. Resolve absolute path within the manual directory
-      const fullPath = path.join(BACKUP_MANUAL_DIR, safeFilename);
+  try {
+    const safeFilename = path.basename(filename);
+    const fullPath = path.join(BACKUP_MANUAL_DIR, safeFilename);
 
-      // 3. Security Check: Verify file exists and is actually inside the manual directory
-      if (!fs.existsSync(fullPath)) {
-        return reject(new Error('Backup file not found.'));
-      }
-
-      // 4. Perform deletion
-      fs.unlinkSync(fullPath);
-      console.log(`[Backup] Manually deleted: ${safeFilename}`);
-      resolve({ success: true, filename: safeFilename });
-    } catch (err) {
-      console.error('[Backup] Failed to delete manual backup:', err);
-      reject(err);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error('Backup file not found.');
     }
-  });
+
+    // Use async unlink to prevent blocking the event loop
+    await fs.promises.unlink(fullPath);
+    console.log(`[Backup] Manually deleted: ${safeFilename}`);
+    return { success: true, filename: safeFilename };
+  } catch (err) {
+    console.error('[Backup] Failed to delete manual backup:', err);
+    throw err;
+  }
 };
 
 /**
