@@ -96,7 +96,19 @@ router.delete('/admin/backups/manual/:filename', authController.authenticateToke
         res.status(500).json({ error: err.message });
     }
 });
-router.get('/admin/backups/download/:tier/:filename', authController.authenticateToken, (req, res) => {
+// Secure Backup Download with local token mapping and Superadmin check
+router.get('/admin/backups/download/:tier/:filename', (req, res, next) => {
+    // Map query token to Authorization header for this route only
+    if (req.query.token) {
+        req.headers['authorization'] = `Bearer ${req.query.token}`;
+    }
+    next();
+}, authController.authenticateToken, (req, res) => {
+    // SECURITY FIX: Strictly verify superadmin status
+    if (!req.user || !req.user.is_superadmin) {
+        return res.status(403).json({ error: 'Forbidden: Superadmin access required.' });
+    }
+
     try {
         const { tier, filename } = req.params;
         const filePath = backupController.getBackupPath(tier, filename);
@@ -105,7 +117,13 @@ router.get('/admin/backups/download/:tier/:filename', authController.authenticat
             return res.status(404).json({ error: 'Backup file not found.' });
         }
         
-        res.download(filePath);
+        // Use res.download with error callback to ensure resources are managed
+        res.download(filePath, filename, (err) => {
+            if (err && !res.headersSent) {
+                console.error(`[Download] Stream failed for ${filename}:`, err);
+                res.status(500).json({ error: 'Failed to stream backup file.' });
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

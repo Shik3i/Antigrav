@@ -1,5 +1,11 @@
 [
   {
+    "id": 83,
+    "version": "2.50.0",
+    "date": "2026-04-22",
+    "changes": "- **Admin-Panel Overhaul**: Vollständige Modularisierung des massiven `Admin.jsx` Monolithen in 15 spezialisierte \"Smart Parent / Dumb Child\" React-Komponenten zur Beseitigung von Anti-Patterns und Speicherlecks.\n- **Enterprise Backup-System**: Implementierung einer GFS (Grandfather-Father-Son) auto-rotation Logik, persistenter manueller Snapshots und hochsicherer Download-Funktionalität mit Path-Traversal-Schutz.\n- **Dashboard Stabilität**: Entkoppelung der Backend-Datenlimits (1000 Zeilen) von der Frontend-Visualisierung zur Behebung der Graph-Starvation im Finanz-Dashboard.\n- **Security Hardening**: Behebung kritischer Race-Conditions in den Transaktions-Sockets und Mitigation von Temporal-Dead-Zone Abstürzen während der App-Initialisierung."
+  },
+  {
     "id": 82,
     "version": "2.49.1",
     "date": "2026-04-20",
