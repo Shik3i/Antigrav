@@ -34,8 +34,8 @@ const RSSFeedsTab = ({
                 {!Array.isArray(rssFeeds) || rssFeeds.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Keine RSS-Feeds konfiguriert oder Fehler beim Laden.</div>
                 ) : (
-                    rssFeeds.map(feed => (
-                        <div key={feed?.id || Math.random()} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                    rssFeeds.map((feed, index) => (
+                        <div key={feed?.id || index} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                 <div style={{ width: '48px', height: '48px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                                     {(() => {
