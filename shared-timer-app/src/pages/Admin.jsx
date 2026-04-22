@@ -588,6 +588,21 @@ const Admin = ({ socket }) => {
         }
     };
 
+    const handleDownloadBackup = (tier, filename) => {
+        // Construct the authenticated download URL
+        const url = `/api/admin/backups/download/${tier}/${filename}?token=${globalToken}`;
+        
+        // Use a hidden anchor to trigger download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        addLog('Info', `Starting download for ${filename}...`, 'info');
+    };
+
     const moveTeam = (index, direction) => {
         const newTeams = [...packTeams];
         const newIndex = index + direction;
@@ -1786,6 +1801,7 @@ const Admin = ({ socket }) => {
                     onTriggerBackup={handleTriggerBackup}
                     onToggleAutoBackup={handleToggleAutoBackup}
                     onDeleteBackup={(filename) => setDeleteModalTarget(manualBackups.find(b => b.filename === filename))}
+                    onDownloadBackup={handleDownloadBackup}
                     onRefresh={handleFetchBackups}
                     formatDate={formatDate}
                     isLoading={isBackupLoading}

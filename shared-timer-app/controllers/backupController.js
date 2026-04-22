@@ -263,6 +263,22 @@ const deleteManualBackup = async (filename) => {
   });
 };
 
+/**
+ * Resolves the absolute path for a backup file after validation.
+ * @param {string} tier - 'automatic' or 'manual'
+ * @param {string} filename - The backup filename
+ * @returns {string|null} - Absolute path or null if invalid
+ */
+const getBackupPath = (tier, filename) => {
+  if (tier !== 'automatic' && tier !== 'manual') return null;
+  const baseDir = tier === 'manual' ? BACKUP_MANUAL_DIR : BACKUP_AUTO_DIR;
+  const safeFilename = path.basename(filename);
+  const fullPath = path.join(baseDir, safeFilename);
+  
+  if (fs.existsSync(fullPath)) return fullPath;
+  return null;
+};
+
 module.exports = {
   createBackup,
   getBackupsList,
@@ -270,5 +286,6 @@ module.exports = {
   getAutoBackupState,
   pruneBackups,
   deleteManualBackup,
-  getIsBackingUp
+  getIsBackingUp,
+  getBackupPath
 };

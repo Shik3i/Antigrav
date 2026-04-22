@@ -96,6 +96,20 @@ router.delete('/admin/backups/manual/:filename', authController.authenticateToke
         res.status(500).json({ error: err.message });
     }
 });
+router.get('/admin/backups/download/:tier/:filename', authController.authenticateToken, (req, res) => {
+    try {
+        const { tier, filename } = req.params;
+        const filePath = backupController.getBackupPath(tier, filename);
+        
+        if (!filePath) {
+            return res.status(404).json({ error: 'Backup file not found.' });
+        }
+        
+        res.download(filePath);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // Navbar Settings
 router.get('/navbar-settings', apiController.getPublicNavbarSettings);

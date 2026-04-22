@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Plus, RefreshCw, Shield, Clock, FileText, Info, Trash2 } from 'lucide-react';
+import { Database, Plus, RefreshCw, Shield, Clock, FileText, Info, Trash2, Download } from 'lucide-react';
 
 /**
  * Dumb Component: DatabaseBackupsTab
@@ -12,6 +12,7 @@ const DatabaseBackupsTab = ({
   onTriggerBackup, 
   onToggleAutoBackup, 
   onDeleteBackup,
+  onDownloadBackup,
   onRefresh, 
   formatDate,
   isLoading 
@@ -62,32 +63,42 @@ const DatabaseBackupsTab = ({
                   </div>
                 </td>
                 <td>{formatSize(backup.size)}</td>
-                <td style={{ textAlign: 'right' }}>
-                  {isManual ? (
+                 <td style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                     <button 
                       className="btn-ghost" 
-                      onClick={() => onDeleteBackup(backup.filename)}
-                      style={{ color: '#ef4444', padding: '8px' }}
-                      title="Delete Snapshot"
+                      onClick={() => onDownloadBackup(isManual ? 'manual' : 'automatic', backup.filename)}
+                      style={{ color: 'var(--accent-primary)', padding: '8px' }}
+                      title="Download Backup"
                     >
-                      <Trash2 size={18} />
+                      <Download size={18} />
                     </button>
-                  ) : (
-                    <span style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      padding: '4px 10px', 
-                      borderRadius: '20px', 
-                      fontSize: '0.75rem', 
-                      background: 'rgba(34, 197, 94, 0.1)', 
-                      color: '#22c55e',
-                      border: '1px solid rgba(34, 197, 94, 0.2)'
-                    }}>
-                      <Shield size={12} />
-                      Verified
-                    </span>
-                  )}
+                    {isManual ? (
+                      <button 
+                        className="btn-ghost" 
+                        onClick={() => onDeleteBackup(backup.filename)}
+                        style={{ color: '#ef4444', padding: '8px' }}
+                        title="Delete Snapshot"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    ) : (
+                      <span style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        padding: '4px 10px', 
+                        borderRadius: '20px', 
+                        fontSize: '0.75rem', 
+                        background: 'rgba(34, 197, 94, 0.1)', 
+                        color: '#22c55e',
+                        border: '1px solid rgba(34, 197, 94, 0.2)'
+                      }}>
+                        <Shield size={12} />
+                        Verified
+                      </span>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))
