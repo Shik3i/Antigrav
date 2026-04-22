@@ -8,6 +8,10 @@ import { useAuth } from '../context/AuthContext';
 import ApiCachesTab from '../components/admin/ApiCachesTab';
 import ActivityLogTab from '../components/admin/ActivityLogTab';
 import ServerRoomsTab from '../components/admin/ServerRoomsTab';
+import UserManagementTab from '../components/admin/UserManagementTab';
+import TeamMappingsTab from '../components/admin/TeamMappingsTab';
+import ErrorLogsTab from '../components/admin/ErrorLogsTab';
+import SystemLogsTab from '../components/admin/SystemLogsTab';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
@@ -1437,141 +1441,17 @@ const Admin = ({ socket }) => {
 
             {/* TAB: TEAM MAPPINGS */}
             {activeTab === 'mappings' && (
-                <div className="animate-fade-in">
-                    <div className="glass-card" style={{ padding: '32px', marginBottom: '32px', borderLeft: '4px solid var(--accent-primary)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <h3 style={{ margin: '0 0 8px 0' }}>Polymarket Global Permissions</h3>
-                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
-                                    Steuere, wer neue Polymarket-Wetten über einen Link hinzufügen darf.
-                                </p>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '12px 20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                                <span style={{ fontSize: '0.95rem', fontWeight: 600, color: polymarketSettings.allowUsersToAdd ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-                                    {polymarketSettings.allowUsersToAdd ? 'Alle registrierten User' : 'Nur Superadmins'}
-                                </span>
-                                <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={polymarketSettings.allowUsersToAdd}
-                                        onChange={handleTogglePolymarketAdd}
-                                        style={{ opacity: 0, width: 0, height: 0 }}
-                                    />
-                                    <span className="slider round" style={{
-                                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-                                        backgroundColor: polymarketSettings.allowUsersToAdd ? 'var(--accent-primary)' : '#444',
-                                        transition: '.4s', borderRadius: '34px'
-                                    }}>
-                                        <span style={{
-                                            position: 'absolute', content: '""', height: '18px', width: '18px', left: '4px', bottom: '4px',
-                                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
-                                            transform: polymarketSettings.allowUsersToAdd ? 'translateX(24px)' : 'translateX(0)'
-                                        }}></span>
-                                    </span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: '32px', marginBottom: '32px', position: 'relative', zIndex: 100 }}>
-                        <h3 style={{ marginBottom: '16px' }}>Add Team Code Mapping</h3>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                            Map a League of Legends official team acronym to the custom acronym used by Polymarket.<br />
-                            Example: Map <strong style={{ color: 'white' }}>EINS</strong> to target Polymarket code <strong style={{ color: 'white' }}>ES1</strong>.
-                        </p>
-                        <form onSubmit={handleAddMapping} style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                            <div style={{ flex: 1, minWidth: '200px', position: 'relative', zIndex: 50 }}>
-                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem' }}>Official LoL Code / Team Name</label>
-                                <input
-                                    type="text"
-                                    className="input-primary"
-                                    style={{ width: '100%' }}
-                                    value={originalCode}
-                                    onChange={(e) => {
-                                        setOriginalCode(e.target.value);
-                                        setShowDropdown(true);
-                                    }}
-                                    onFocus={() => setShowDropdown(true)}
-                                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                                    placeholder="Search e.g. Eintracht Spandau..."
-                                    required
-                                    autoComplete="off"
-                                />
-                                {showDropdown && (
-                                    <div style={{
-                                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                                        background: '#1a1b26', border: '1px solid var(--border-color)', borderRadius: '8px',
-                                        maxHeight: '220px', overflowY: 'auto', marginTop: '4px', boxShadow: '0 8px 16px rgba(0,0,0,0.6)'
-                                    }}>
-                                        {availableTeams
-                                            .filter(t => t.name.toLowerCase().includes(originalCode.toLowerCase()) || t.code.toLowerCase().includes(originalCode.toLowerCase()))
-                                            .map(team => (
-                                                <div
-                                                    key={team.code}
-                                                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                                                    onClick={() => {
-                                                        setOriginalCode(team.code);
-                                                        setShowDropdown(false);
-                                                    }}
-                                                    onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.08)'}
-                                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
-                                                >
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        {team.image && <img src={team.image} alt="" width="20" height="20" loading="lazy" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
-                                                        <span style={{ color: 'white' }}>{team.name}</span>
-                                                    </div>
-                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>{team.code}</span>
-                                                </div>
-                                            ))}
-                                        {availableTeams.filter(t => t.name.toLowerCase().includes(originalCode.toLowerCase()) || t.code.toLowerCase().includes(originalCode.toLowerCase())).length === 0 && (
-                                            <div style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center' }}>
-                                                {availableTeams.length === 0 ? "Loading teams from schedule..." : "No matching teams found."}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                            <div style={{ flex: 1, minWidth: '200px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem' }}>Polymarket Code (e.g. ES1)</label>
-                                <input type="text" className="input-primary" value={polymarketCode} onChange={(e) => setPolymarketCode(e.target.value)} placeholder="ES1" required />
-                            </div>
-                            <button type="submit" className="btn-primary" style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Plus size={18} /> Add Mapping
-                            </button>
-                        </form>
-                    </div>
-
-                    <div className="glass-card" style={{ padding: '32px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <h3 style={{ margin: 0 }}>Active Mappings</h3>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{mappings.length} Custom Overrides</span>
-                        </div>
-                        {mappings.length === 0 ? (
-                            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>No mappings added yet.</div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {mappings.map(map => (
-                                    <div key={map.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                                            <div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>LoL API Code</div>
-                                                <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{map.originalCode}</div>
-                                            </div>
-                                            <div style={{ color: 'var(--text-muted)' }}>→</div>
-                                            <div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Polymarket Code</div>
-                                                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-primary)' }}>{map.polymarketCode}</div>
-                                            </div>
-                                        </div>
-                                        <button className="btn-ghost" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '8px' }} onClick={() => handleDeleteMapping(map.id)} title="Delete Mapping">
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <TeamMappingsTab 
+                    mappings={mappings}
+                    originalCode={originalCode}
+                    onOriginalCodeChange={setOriginalCode}
+                    polymarketCode={polymarketCode}
+                    onPolymarketCodeChange={setPolymarketCode}
+                    onAddMapping={handleAddMapping}
+                    onDeleteMapping={handleDeleteMapping}
+                    polymarketSettings={polymarketSettings}
+                    onTogglePolymarketAdd={handleTogglePolymarketAdd}
+                />
             )}
 
             {/* TAB: CACHE STATUS */}
@@ -1738,434 +1618,83 @@ const Admin = ({ socket }) => {
 
             {/* TAB: USER MANAGEMENT */}
             {activeTab === 'users' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                        <h3 style={{ margin: 0 }}>Registered Users ({usersList.length})</h3>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Sort by:</span>
-                            {['username', 'createdAt', 'lastActive'].map(key => (
-                                <button
-                                    key={key}
-                                    className={sortConfig.key === key ? 'btn-primary' : 'btn-ghost'}
-                                    style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', background: sortConfig.key === key ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
-                                    onClick={() => handleSortChange(key)}
-                                >
-                                    {key === 'username' ? 'Name' : key === 'createdAt' ? 'Joined' : 'Last Active'}
-                                    {sortConfig.key === key && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {[
-                        { title: 'Superadmins', count: superadminUsers.length, list: superadminUsers, color: 'var(--accent-primary)' },
-                        { title: 'Regular Users', count: regularUsers.length, list: regularUsers, color: 'var(--text-muted)' },
-                        { title: '👻 Ghost / Guest Accounts', count: guestUsers.length, list: guestUsers, color: '#f97316' }
-                    ].map(section => (
-                        <div key={section.title} style={{ marginBottom: '32px' }}>
-                            <h4 
-                                style={{ 
-                                    marginBottom: '16px', 
-                                    color: section.color, 
-                                    borderBottom: `1px solid ${section.color}40`, 
-                                    paddingBottom: '8px',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    cursor: 'pointer',
-                                    userSelect: 'none'
-                                }}
-                                onClick={() => setCollapsedSections(prev => ({ ...prev, [section.title]: !prev[section.title] }))}
-                            >
-                                <span>{section.title} ({section.count})</span>
-                                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
-                                    {collapsedSections[section.title] ? 'Show [ + ]' : 'Hide [ − ]'}
-                                </span>
-                            </h4>
-                            {!collapsedSections[section.title] && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {section.list.length === 0 ? (
-                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No users found in this category.</div>
-                                ) : section.list.map(u => (
-                                    <div key={u.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: u.is_banned ? '1px solid #ef4444' : '1px solid var(--border-color)', opacity: u.is_banned ? 0.7 : 1 }}>
-                                        <div style={{ flex: '1 1 250px' }}>
-                                            <div style={{ fontWeight: 600, fontSize: '1.1rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ textDecoration: u.is_banned ? 'line-through' : 'none' }}>{u.username || u.displayName || u.id}</span>
-                                                {u.is_guest ? <span style={{ fontSize: '0.65rem', background: '#f97316', color: 'white', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Guest</span> : null}
-                                                {u.is_banned ? <span style={{ fontSize: '0.65rem', background: '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>Banned</span> : null}
-                                            </div>
-                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Display Name: {u.displayName}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>ID: {u.id}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                                <span>Joined: {new Date(u.createdAt).toLocaleDateString()}</span>
-                                                <span>Last Active: {u.lastActive ? new Date(u.lastActive).toLocaleString() : 'Never'}</span>
-                                                <span style={{ color: '#fbbf24', fontWeight: 600 }}>KoalaCoins: {((u.koala_balance || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                            <button
-                                                className="btn-ghost"
-                                                style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)' }}
-                                                onClick={() => handleViewFriends(u.id)}
-                                            >
-                                                {expandedUserFriends === u.id ? 'Hide Friends' : 'See Friends'}
-                                            </button>
-                                            <button
-                                                className="btn-ghost"
-                                                style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}
-                                                onClick={() => handleViewKoalaCoins(u.id)}
-                                            >
-                                                {expandedKoalaUser === u.id ? '⬆ KoalaCoins' : '💰 KoalaCoins'}
-                                            </button>
-                                            <button
-                                                className={u.is_superadmin ? 'btn-primary' : 'btn-ghost'}
-                                                style={{ padding: '8px 16px', fontSize: '0.85rem', borderRadius: '8px', background: u.is_superadmin ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
-                                                onClick={() => toggleSuperadmin(u.id, u.is_superadmin)}
-                                            >
-                                                {u.is_superadmin ? 'Superadmin' : 'Make Superadmin'}
-                                            </button>
-                                            <button
-                                                className="btn-secondary"
-                                                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                                                onClick={() => handlePasswordChange(u.id)}
-                                            >
-                                                Change Password
-                                            </button>
-                                            {u.is_banned ? (
-                                                <button
-                                                    className="btn-primary"
-                                                    style={{ padding: '8px 16px', fontSize: '0.85rem', background: '#3b82f6', color: 'white' }}
-                                                    onClick={() => handleUnbanUser(u.id)}
-                                                >
-                                                    Unban
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    className="btn-ghost"
-                                                    style={{ padding: '8px 16px', fontSize: '0.85rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
-                                                    onClick={() => handleBanUser(u.id, u.username)}
-                                                >
-                                                    Ban
-                                                </button>
-                                            )}
-                                            <button
-                                                className="btn-ghost"
-                                                style={{ padding: '8px 16px', fontSize: '0.85rem', color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}
-                                                onClick={() => handleDeleteUserAccount(u.id, u.username)}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-
-                                        {/* Expandable KoalaCoins Panel */}
-                                        {expandedKoalaUser === u.id && (
-                                            <div style={{ width: '100%', marginTop: '12px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', borderLeft: '4px solid #fbbf24' }}>
-                                                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#fbbf24' }}>💰 KoalaCoins: {((u.koala_balance || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
-                                                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                                                    <input
-                                                        id={`koala-reason-${u.id}`}
-                                                        placeholder="Reason (e.g. Bonus)"
-                                                        style={{ flex: 1, minWidth: '150px', padding: '8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.8rem' }}
-                                                    />
-                                                    <input
-                                                        id={`koala-amount-${u.id}`}
-                                                        type="number"
-                                                        placeholder="Cents (e.g. 500 = 5.00)"
-                                                        style={{ width: '170px', padding: '8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.8rem' }}
-                                                    />
-                                                    <button className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.8rem', background: '#22c55e' }} onClick={() => {
-                                                        const amt = parseInt(document.getElementById(`koala-amount-${u.id}`).value) || 0;
-                                                        const reason = document.getElementById(`koala-reason-${u.id}`).value || 'Admin adjustment';
-                                                        handleAdjustKoalaCoins(u.id, Math.abs(amt), reason);
-                                                    }}>+ Add</button>
-                                                    <button className="btn-ghost" style={{ padding: '8px 14px', fontSize: '0.8rem', color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={() => {
-                                                        const amt = parseInt(document.getElementById(`koala-amount-${u.id}`).value) || 0;
-                                                        const reason = document.getElementById(`koala-reason-${u.id}`).value || 'Admin adjustment';
-                                                        handleAdjustKoalaCoins(u.id, -Math.abs(amt), reason);
-                                                    }}>- Remove</button>
-                                                </div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Last 5 transactions:</div>
-                                                {(koalaTransactions[u.id] || []).length === 0 ? (
-                                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>No transactions yet.</div>
-                                                ) : (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        {(koalaTransactions[u.id] || []).map(tx => (
-                                                            <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.03)', fontSize: '0.8rem' }}>
-                                                                <span style={{ color: 'var(--text-muted)' }}>{new Date(tx.created_at).toLocaleString()} — {tx.reason}</span>
-                                                                <span style={{ color: tx.amount >= 0 ? '#22c55e' : '#ef4444', fontWeight: 700, marginLeft: '12px', flexShrink: 0 }}>{tx.amount >= 0 ? '+' : ''}{(tx.amount / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Expandable Friends List */}
-                                        {expandedUserFriends === u.id && (
-                                            <div style={{ width: '100%', marginTop: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', borderLeft: '4px solid var(--accent-primary)' }}>
-                                                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem' }}>Friends of {u.displayName}</h4>
-                                                {friendsLoading ? (
-                                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading friends...</div>
-                                                ) : userFriendsList.length === 0 ? (
-                                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>This user has no friends.</div>
-                                                ) : (
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
-                                                        {userFriendsList.map(f => (
-                                                            <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem' }}>
-                                                                <div>
-                                                                    <div style={{ fontWeight: 600 }}>{f.displayName}</div>
-                                                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>@{f.username}</div>
-                                                                </div>
-                                                                <span style={{
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '0.65rem',
-                                                                    textTransform: 'uppercase',
-                                                                    background: f.status === 'accepted' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
-                                                                    color: f.status === 'accepted' ? '#22c55e' : '#f59e0b'
-                                                                }}>
-                                                                    {f.status}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-
-                    {/* KoalaCoins Config inside Users tab */}
-                    <div className="glass-card animate-fade-in" style={{ padding: '32px', marginTop: '32px', border: '1px solid rgba(251,191,36,0.3)' }}>
-                        <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#fbbf24' }}>
-                            💰 KoalaCoins Global Configuration
-                        </h3>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
-                            Both values are stored in cents (1/100th of a coin). e.g. 10000 = 100.00 Coins.
-                            Baseline rate = coins per 1 hour of active timer time.
-                        </p>
-
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '250px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Baseline Rate (Coins / Hour)</label>
-                                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>Stored in DB as {koalaBaseline} Cents</div>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input-primary"
-                                    style={{ width: '100%' }}
-                                    value={koalaBaselineStr}
-                                    onChange={(e) => {
-                                        setKoalaBaselineStr(e.target.value);
-                                        const parsed = parseFloat(e.target.value);
-                                        if (!isNaN(parsed)) setKoalaBaseline(Math.round(parsed * 100));
-                                    }}
-                                    min="0"
-                                />
-                            </div>
-                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '250px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Start Balance (Coins)</label>
-                                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>Stored in DB as {koalaStartCoins} Cents</div>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input-primary"
-                                    style={{ width: '100%' }}
-                                    value={koalaStartCoinsStr}
-                                    onChange={(e) => {
-                                        setKoalaStartCoinsStr(e.target.value);
-                                        const parsed = parseFloat(e.target.value);
-                                        if (!isNaN(parsed)) setKoalaStartCoins(Math.round(parsed * 100));
-                                    }}
-                                    min="0"
-                                />
-                            </div>
-                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Game Coin Rate</label>
-                                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>Val: {koalaCoinRate} / Coin</div>
-                                <input
-                                    type="number"
-                                    step="0.001"
-                                    className="input-primary"
-                                    style={{ width: '100%' }}
-                                    value={koalaCoinRateStr}
-                                    onChange={(e) => {
-                                        setKoalaCoinRateStr(e.target.value);
-                                        const parsed = parseFloat(e.target.value);
-                                        if (!isNaN(parsed)) setKoalaCoinRate(parsed);
-                                    }}
-                                    min="0"
-                                />
-                            </div>
-                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Mission Multiplier (x Baseline)</label>
-                                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>Val: {koalaDailyMissionMultiplierStr}x</div>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    className="input-primary"
-                                    style={{ width: '100%' }}
-                                    value={koalaDailyMissionMultiplierStr}
-                                    onChange={(e) => {
-                                        setKoalaDailyMissionMultiplierStr(e.target.value);
-                                        const parsed = parseFloat(e.target.value);
-                                        if (!isNaN(parsed)) setKoalaDailyMissionMultiplier(parsed);
-                                    }}
-                                    min="0"
-                                />
-                            </div>
-                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Achievement Multiplier</label>
-                                <div style={{ fontSize: '0.75rem', color: '#a855f7', marginBottom: '8px' }}>Val: {achievementRewardMultiplierStr}x Stunden</div>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    className="input-primary"
-                                    style={{ width: '100%' }}
-                                    value={achievementRewardMultiplierStr}
-                                    onChange={(e) => {
-                                        setAchievementRewardMultiplierStr(e.target.value);
-                                        const parsed = parseFloat(e.target.value);
-                                        if (!isNaN(parsed)) setAchievementRewardMultiplier(parsed);
-                                    }}
-                                    min="0"
-                                />
-                            </div>
-                            <div style={{ flex: 1, minWidth: '200px', maxWidth: '180px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Minigame Payouts</label>
-                                <div style={{ fontSize: '0.75rem', color: koalaFlapPayoutEnabled ? '#22c55e' : '#ef4444', marginBottom: '8px' }}>{koalaFlapPayoutEnabled ? 'ENABLED' : 'DISABLED'}</div>
-                                <button 
-                                    className={`btn-${koalaFlapPayoutEnabled ? 'primary' : 'secondary'}`}
-                                    style={{ width: '100%', padding: '10px 0', border: '1px solid var(--border-color)', color: koalaFlapPayoutEnabled ? 'white' : 'var(--text-muted)' }}
-                                    onClick={() => setKoalaFlapPayoutEnabled(!koalaFlapPayoutEnabled)}
-                                >
-                                    {koalaFlapPayoutEnabled ? 'ON' : 'OFF'}
-                                </button>
-                            </div>
-                            <button className="btn-primary" style={{ padding: '10px 24px', whiteSpace: 'nowrap' }} onClick={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { token: globalToken, baseline: { koala_points_per_hour: koalaBaseline, koala_start_coins: koalaStartCoins, koala_coin_conversion_rate: koalaCoinRate, koala_daily_mission_multiplier: koalaDailyMissionMultiplier, achievement_reward_multiplier: achievementRewardMultiplier, game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString() } })}>
-                                Save Configuration
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <UserManagementTab 
+                    usersList={usersList}
+                    sortConfig={sortConfig}
+                    onSortChange={handleSortChange}
+                    superadminUsers={superadminUsers}
+                    regularUsers={regularUsers}
+                    guestUsers={guestUsers}
+                    collapsedSections={collapsedSections}
+                    onToggleSection={(title) => setCollapsedSections(prev => ({ ...prev, [title]: !prev[title] }))}
+                    expandedUserFriends={expandedUserFriends}
+                    onViewFriends={handleViewFriends}
+                    friendsLoading={friendsLoading}
+                    userFriendsList={userFriendsList}
+                    expandedKoalaUser={expandedKoalaUser}
+                    onViewKoalaCoins={handleViewKoalaCoins}
+                    koalaTransactions={koalaTransactions}
+                    onAdjustKoalaCoins={handleAdjustKoalaCoins}
+                    onToggleSuperadmin={toggleSuperadmin}
+                    onPasswordChange={handlePasswordChange}
+                    onBanUser={handleBanUser}
+                    onUnbanUser={handleUnbanUser}
+                    onDeleteUser={handleDeleteUserAccount}
+                    koalaBaseline={koalaBaseline}
+                    koalaBaselineStr={koalaBaselineStr}
+                    onKoalaBaselineStrChange={setKoalaBaselineStr}
+                    onKoalaBaselineChange={setKoalaBaseline}
+                    koalaStartCoins={koalaStartCoins}
+                    koalaStartCoinsStr={koalaStartCoinsStr}
+                    onKoalaStartCoinsStrChange={setKoalaStartCoinsStr}
+                    onKoalaStartCoinsChange={setKoalaStartCoins}
+                    koalaCoinRate={koalaCoinRate}
+                    koalaCoinRateStr={koalaCoinRateStr}
+                    onKoalaCoinRateStrChange={setKoalaCoinRateStr}
+                    onKoalaCoinRateChange={setKoalaCoinRate}
+                    koalaDailyMissionMultiplier={koalaDailyMissionMultiplier}
+                    koalaDailyMissionMultiplierStr={koalaDailyMissionMultiplierStr}
+                    onKoalaDailyMissionMultiplierStrChange={setKoalaDailyMissionMultiplierStr}
+                    onKoalaDailyMissionMultiplierChange={setKoalaDailyMissionMultiplier}
+                    achievementRewardMultiplier={achievementRewardMultiplier}
+                    achievementRewardMultiplierStr={achievementRewardMultiplierStr}
+                    onAchievementRewardMultiplierStrChange={setAchievementRewardMultiplierStr}
+                    onAchievementRewardMultiplierChange={setAchievementRewardMultiplier}
+                    koalaFlapPayoutEnabled={koalaFlapPayoutEnabled}
+                    onToggleFlapPayout={() => setKoalaFlapPayoutEnabled(!koalaFlapPayoutEnabled)}
+                    onSaveKoalaConfig={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { 
+                        token: globalToken, 
+                        baseline: { 
+                            koala_points_per_hour: koalaBaseline, 
+                            koala_start_coins: koalaStartCoins, 
+                            koala_coin_conversion_rate: koalaCoinRate, 
+                            koala_daily_mission_multiplier: koalaDailyMissionMultiplier, 
+                            achievement_reward_multiplier: achievementRewardMultiplier, 
+                            game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString() 
+                        } 
+                    })}
+                />
             )}
 
             {/* TAB: ERROR LOGS */}
             {activeTab === 'errors' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <h3 style={{ margin: 0 }}>Server Error Logs ({errorLogs.length})</h3>
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button className="btn-secondary" onClick={handleFetchErrorLogs}>Refresh</button>
-                            <button className="btn-ghost" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={handleClearErrorLogs}>
-                                Clear All Logs
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Timestamp</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Error</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Context</th>
-                                    <th style={{ padding: '12px', textAlign: 'right', color: 'var(--text-muted)' }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {errorLogs.map(log => (
-                                    <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{formatDate(log.timestamp)}</td>
-                                        <td style={{ padding: '12px' }}>
-                                            <div style={{ fontWeight: 600, color: '#ef4444', marginBottom: '4px' }}>{log.message}</div>
-                                            {log.stack && (
-                                                <details style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                    <summary style={{ cursor: 'pointer' }}>Show Stack</summary>
-                                                    <pre style={{ whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', padding: '8px', marginTop: '4px', borderRadius: '4px' }}>
-                                                        {log.stack}
-                                                    </pre>
-                                                </details>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{log.context}</td>
-                                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                                            <button className="btn-ghost" style={{ color: '#ef4444' }} onClick={() => handleDeleteErrorLog(log.id)}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {errorLogs.length === 0 && (
-                                    <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No error logs found.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <ErrorLogsTab 
+                    errorLogs={errorLogs}
+                    onFetch={handleFetchErrorLogs}
+                    onClear={handleClearErrorLogs}
+                    onDelete={handleDeleteErrorLog}
+                    formatDate={formatDate}
+                />
             )}
 
             {/* TAB: SYSTEM LOGS */}
             {activeTab === 'system_logs' && (
-                <div className="glass-card animate-fade-in" style={{ padding: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <Activity size={24} color="var(--accent-primary)" />
-                            System Logs (24h Retention)
-                        </h3>
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button className="btn-secondary" onClick={handleFetchSystemLogs}>Refresh</button>
-                            <button 
-                                className="btn-ghost" 
-                                style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }} 
-                                onClick={handleClearSystemLogs}
-                            >
-                                <Trash2 size={16} />
-                                Logs löschen
-                            </button>
-                        </div>
-                    </div>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Timestamp</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Level</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Context</th>
-                                    <th style={{ padding: '12px', color: 'var(--text-muted)' }}>Message</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {systemLogs && systemLogs.map(log => (
-                                    <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{formatDate(log.createdAt)}</td>
-                                        <td style={{ padding: '12px' }}>
-                                            <span style={{ 
-                                                padding: '2px 8px', 
-                                                borderRadius: '4px', 
-                                                fontSize: '0.75rem', 
-                                                fontWeight: 'bold',
-                                                background: log.level === 'warn' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
-                                                color: log.level === 'warn' ? '#f59e0b' : '#3b82f6'
-                                            }}>
-                                                {log.level?.toUpperCase()}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '12px', fontWeight: 600 }}>{log.context}</td>
-                                        <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{log.message}</td>
-                                    </tr>
-                                ))}
-                                {(!systemLogs || systemLogs.length === 0) && (
-                                    <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No system logs found.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <SystemLogsTab 
+                    systemLogs={systemLogs}
+                    onFetch={handleFetchSystemLogs}
+                    onClear={handleClearSystemLogs}
+                    formatDate={formatDate}
+                />
             )}
 
             {/* TAB: BETS (WETT-VERWALTUNG) */}
