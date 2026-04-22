@@ -13,7 +13,7 @@ const startBackupCron = () => {
       const isEnabled = await getAutoBackupState();
       if (isEnabled) {
         console.log('[Cron] Auto-backup enabled. Starting daily backup routine...');
-        await createBackup();
+        await createBackup({ type: 'automatic' });
       }
     } catch (err) {
       console.error('[Cron] Auto-backup routine failed:', err);
