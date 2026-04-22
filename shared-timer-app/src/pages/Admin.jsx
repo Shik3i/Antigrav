@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Database, Server, Activity, Monitor, Users, Bug, Dices, History, Gamepad2, LayoutDashboard, ShieldAlert } from 'lucide-react';
+import { Database, Server, Activity, Monitor, Users, Bug, Dices, History, Gamepad2, LayoutDashboard, ShieldAlert, Shield } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -21,6 +21,7 @@ import PokemonConfigTab from '../components/admin/PokemonConfigTab';
 import WordleDictionaryTab from '../components/admin/WordleDictionaryTab';
 import FortuneCookiesTab from '../components/admin/FortuneCookiesTab';
 import RSSFeedsTab from '../components/admin/RSSFeedsTab';
+import DatabaseBackupsTab from '../components/admin/DatabaseBackupsTab';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
@@ -29,6 +30,7 @@ const Admin = ({ socket }) => {
     const { token: authToken, user } = useAuth();
     const sessionToken = sessionStorage.getItem('admin_token');
     const activeToken = (user?.is_superadmin ? authToken : null) || sessionToken;
+    const globalToken = activeToken;
 
     const adminTokenRef = useRef(activeToken);
 
@@ -85,6 +87,14 @@ const Admin = ({ socket }) => {
     const [editingWordId, setEditingWordId] = useState(null);
     const [editWordDef, setEditWordDef] = useState('');
     const [editWordQuote, setEditWordQuote] = useState('');
+
+    // --- Database Backups ---
+    const [automaticBackups, setAutomaticBackups] = useState([]);
+    const [manualBackups, setManualBackups] = useState([]);
+    const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
+    const [isBackupLoading, setIsBackupLoading] = useState(false);
+    const [deleteModalTarget, setDeleteModalTarget] = useState(null); // { filename, note }
+    const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
 
     // --- Daily Fortune Cookie ---
     const [fortunesDictionary, setFortunesDictionary] = useState([]);
@@ -517,6 +527,82 @@ const Admin = ({ socket }) => {
         }
     };
 
+    const handleFetchBackups = async () => {
+        setIsBackupLoading(true);
+        try {
+            const res = await axios.get('/api/admin/backups', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setAutomaticBackups(res.data.automatic || []);
+            setManualBackups(res.data.manual || []);
+            setAutoBackupEnabled(res.data.autoBackupEnabled);
+        } catch (err) {
+            console.error('[Admin Backups] Fetch failed:', err);
+            addLog('Error', 'Failed to fetch database backups.', 'error');
+        } finally {
+            setIsBackupLoading(false);
+        }
+    };
+
+    const handleTriggerBackup = async (note = '') => {
+        setIsBackupLoading(true);
+        try {
+            await axios.post('/api/admin/backups/trigger', { note }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Manual database backup created successfully.', 'success');
+            handleFetchBackups();
+        } catch (err) {
+            addLog('Error', err.response?.data?.error || 'Failed to trigger database backup.', 'error');
+        } finally {
+            setIsBackupLoading(false);
+        }
+    };
+
+    const handleToggleAutoBackup = async (enabled) => {
+        try {
+            await axios.post('/api/admin/backups/toggle', { enabled }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setAutoBackupEnabled(enabled);
+            addLog('Success', `Auto-backup ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+        } catch (err) {
+            addLog('Error', err.response?.data?.error || 'Failed to toggle auto-backup setting.', 'error');
+        }
+    };
+
+    const handleDeleteBackup = async (filename) => {
+        setIsBackupLoading(true);
+        try {
+            await axios.delete(`/api/admin/backups/manual/${filename}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            addLog('Success', 'Manual backup deleted successfully.', 'success');
+            setDeleteModalTarget(null);
+            setDeleteConfirmationInput('');
+            handleFetchBackups();
+        } catch (err) {
+            addLog('Error', err.response?.data?.error || 'Failed to delete manual backup.', 'error');
+        } finally {
+            setIsBackupLoading(false);
+        }
+    };
+
+    const handleDownloadBackup = (tier, filename) => {
+        // Construct the authenticated download URL
+        const url = `/api/admin/backups/download/${tier}/${filename}?token=${globalToken}`;
+        
+        // Use a hidden anchor to trigger download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        addLog('Info', `Starting download for ${filename}...`, 'info');
+    };
+
     const moveTeam = (index, direction) => {
         const newTeams = [...packTeams];
         const newIndex = index + direction;
@@ -530,7 +616,6 @@ const Admin = ({ socket }) => {
         setLogs(prev => [{ id, title, message, status, timestamp: Date.now() }, ...prev].slice(0, 50));
     };
 
-    const globalToken = activeToken;
 
     // Forms
     const [originalCode, setOriginalCode] = useState('');
@@ -769,6 +854,9 @@ const Admin = ({ socket }) => {
         }
         if (activeTab === 'fortunes') {
             handleFetchFortunes();
+        }
+        if (activeTab === 'backups') {
+            handleFetchBackups();
         }
     }, [activeTab]);
 
@@ -1410,6 +1498,12 @@ const Admin = ({ socket }) => {
                     style={{ flexShrink: 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <LucideIcons.Cookie size={16} /> Fortune Cookies
                 </button>
+                <button
+                    className={activeTab === 'backups' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => setActiveTab('backups')}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <LucideIcons.Save size={16} /> Database Backups
+                </button>
             </div>
 
             {/* TAB: TEAM MAPPINGS */}
@@ -1696,6 +1790,64 @@ const Admin = ({ socket }) => {
                     fortuneDisplayLimit={fortuneDisplayLimit}
                     onSetDisplayLimit={setFortuneDisplayLimit}
                 />
+            )}
+
+            {/* TAB: DATABASE BACKUPS */}
+            {activeTab === 'backups' && (
+                <DatabaseBackupsTab 
+                    automaticBackups={automaticBackups}
+                    manualBackups={manualBackups}
+                    autoBackupEnabled={autoBackupEnabled}
+                    onTriggerBackup={handleTriggerBackup}
+                    onToggleAutoBackup={handleToggleAutoBackup}
+                    onDeleteBackup={(filename) => setDeleteModalTarget(manualBackups.find(b => b.filename === filename))}
+                    onDownloadBackup={handleDownloadBackup}
+                    onRefresh={handleFetchBackups}
+                    formatDate={formatDate}
+                    isLoading={isBackupLoading}
+                />
+            )}
+
+            {/* Backup Delete Confirmation Modal */}
+            {deleteModalTarget && (
+                <div className="modal-overlay">
+                    <div className="glass-card modal-content animate-pop-in" style={{ maxWidth: '500px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--accent-red)', marginBottom: '16px' }}>
+                            <Shield size={24} />
+                            <h3 style={{ margin: 0 }}>Strict Deletion Required</h3>
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
+                            You are about to permanently delete <strong>{deleteModalTarget.filename}</strong>.
+                            This action is irreversible and the snapshot will be lost forever.
+                        </p>
+                        
+                        <div className="input-group" style={{ marginBottom: '24px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
+                                To confirm, type the filename exactly:
+                            </label>
+                            <input 
+                                type="text"
+                                className="form-input"
+                                placeholder={deleteModalTarget.filename}
+                                style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                                value={deleteConfirmationInput}
+                                onChange={(e) => setDeleteConfirmationInput(e.target.value)}
+                                autoComplete="off"
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button className="btn-ghost" onClick={() => { setDeleteModalTarget(null); setDeleteConfirmationInput(''); }}>Cancel</button>
+                            <button 
+                                className="btn-danger"
+                                onClick={() => handleDeleteBackup(deleteModalTarget.filename)}
+                                disabled={deleteConfirmationInput !== deleteModalTarget.filename}
+                            >
+                                Confirm Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

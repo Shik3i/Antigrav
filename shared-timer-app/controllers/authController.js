@@ -293,14 +293,14 @@ const getBannedUsersList = async (req, res) => {
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
-
+ 
     // Robust token extraction: handle potentially redundant "Bearer " prefixes
     // e.g., "Bearer ABC" -> "ABC", "Bearer Bearer ABC" -> "ABC"
     let token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (token.startsWith('Bearer ')) {
         token = token.replace(/^Bearer\s+/i, '').trim();
     }
-
+ 
     if (!token) return res.status(401).json({ error: 'Authentication required' });
 
     // Hashed admin token bypass

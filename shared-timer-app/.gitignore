@@ -32,6 +32,12 @@ data/*.db-wal
 *.sqlite
 *.db
 
+# Database Backups (Persistent Tiers)
+data/backups/automatic/*.sqlite
+data/backups/automatic/*.db
+data/backups/manual/*.sqlite
+data/backups/manual/*.db
+
 # Logs
 server_log*.txt
 
