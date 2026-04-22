@@ -10,6 +10,7 @@ const polymarketController = require('../controllers/polymarketController');
 const wordleController = require('../controllers/wordleController');
 const towerController = require('../controllers/towerController');
 const blackjackController = require('../controllers/blackjackController');
+const backupController = require('../controllers/backupController');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -54,6 +55,79 @@ router.get('/admin/bets', authController.authenticateToken, apiController.getAdm
 router.post('/admin/bets/:id/status', authController.authenticateToken, apiController.updateAdminBetStatus);
 router.post('/admin/bets/trigger-resolver', authController.authenticateToken, apiController.triggerAdminBetResolver);
 router.get('/admin/actions', authController.authenticateToken, apiController.getAdminActions);
+
+// Database Backups
+router.get('/admin/backups', authController.authenticateToken, async (req, res) => {
+    try {
+        const { automatic, manual } = await backupController.getBackupsList();
+        const autoBackupEnabled = await backupController.getAutoBackupState();
+        res.json({ automatic, manual, autoBackupEnabled });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/admin/backups/trigger', authController.authenticateToken, async (req, res) => {
+    try {
+        if (backupController.getIsBackingUp()) {
+            return res.status(409).json({ error: 'A backup is already in progress. Please wait.' });
+        }
+        const { note } = req.body;
+        const result = await backupController.createBackup({ type: 'manual', note });
+        res.json({ message: 'Manual backup created successfully', ...result });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/admin/backups/toggle', authController.authenticateToken, async (req, res) => {
+    try {
+        const { enabled } = req.body;
+        await backupController.setAutoBackupState(enabled);
+        res.json({ message: `Auto-backup ${enabled ? 'enabled' : 'disabled'}` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.delete('/admin/backups/manual/:filename', authController.authenticateToken, async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const result = await backupController.deleteManualBackup(filename);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// Secure Backup Download with local token mapping and Superadmin check
+router.get('/admin/backups/download/:tier/:filename', (req, res, next) => {
+    // Map query token to Authorization header for this route only
+    if (req.query.token) {
+        req.headers['authorization'] = `Bearer ${req.query.token}`;
+    }
+    next();
+}, authController.authenticateToken, (req, res) => {
+    // SECURITY FIX: Strictly verify superadmin status
+    if (!req.user || !req.user.is_superadmin) {
+        return res.status(403).json({ error: 'Forbidden: Superadmin access required.' });
+    }
+
+    try {
+        const { tier, filename } = req.params;
+        const filePath = backupController.getBackupPath(tier, filename);
+        
+        if (!filePath) {
+            return res.status(404).json({ error: 'Backup file not found.' });
+        }
+        
+        // Use res.download with error callback to ensure resources are managed
+        res.download(filePath, filename, (err) => {
+            if (err && !res.headersSent) {
+                console.error(`[Download] Stream failed for ${filename}:`, err);
+                res.status(500).json({ error: 'Failed to stream backup file.' });
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // Navbar Settings
 router.get('/navbar-settings', apiController.getPublicNavbarSettings);

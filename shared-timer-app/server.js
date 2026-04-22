@@ -60,6 +60,7 @@ const setupSocketHandlers = require('./sockets/socketHandler');
 const { startCron } = require('./cron/betResolver');
 const { startLottoCron } = require('./cron/lottoDrawCron');
 const { startRssCron } = require('./cron/rssCron');
+const { startBackupCron } = require('./cron/backupCron');
 
 const app = express();
 app.disable('x-powered-by');
@@ -172,4 +173,5 @@ server.listen(PORT, () => {
     startCron();
     startLottoCron(io);
     startRssCron();
+    startBackupCron();
 });
