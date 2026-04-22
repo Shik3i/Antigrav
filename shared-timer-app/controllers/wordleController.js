@@ -53,14 +53,21 @@ exports.getDailyGame = async (req, res, next) => {
         }
 
         const status = userId ? await dbLayer.getWordleStatus(userId, targetDate) : null;
-        // A game is only finished if won is true OR guesses length is 6
-        const isFinished = status && (status.won || (status.guesses && status.guesses.length >= 6));
-
-        // Mask metadata if not finished? 
-        // Actually, the user wants to show definition/quote ON SUCCESS.
-        // So we only send them if isFinished is true and won is true?
-        // Let's check status structure.
         
+        // Safe parsing for status guesses
+        if (status && status.guesses) {
+            try {
+                status.guesses = typeof status.guesses === 'string' ? JSON.parse(status.guesses) : status.guesses;
+                if (!Array.isArray(status.guesses)) status.guesses = [];
+            } catch (e) {
+                console.error(`[Wordle] Critical: Failed to parse status guesses for user ${userId}:`, e);
+                status.guesses = [];
+            }
+        }
+
+        // A game is only finished if won is true OR guesses length is 6
+        const isFinished = status && (status.won || (Array.isArray(status.guesses) && status.guesses.length >= 6));
+
         const response = { 
             word: gameData.word, 
             played: isFinished, 
@@ -206,18 +213,30 @@ exports.getDailyLeaderboard = async (req, res, next) => {
         const status = await dbLayer.getWordleStatus(userId, targetDate);
         const isFinished = !!status;
 
-        let leaderboard = await dbLayer.getWordleDailyLeaderboard(targetDate);
-
-        // Map and parse the results
+        // Map and parse the results with extreme caution
         leaderboard = (leaderboard || []).map(entry => {
             let parsedGuesses = [];
             try {
-                parsedGuesses = typeof entry.guesses === 'string' ? JSON.parse(entry.guesses) : (entry.guesses || []);
+                if (entry.guesses) {
+                    parsedGuesses = typeof entry.guesses === 'string' ? JSON.parse(entry.guesses) : entry.guesses;
+                }
+                if (!Array.isArray(parsedGuesses)) parsedGuesses = [];
             } catch (e) {
-                console.error(`[Wordle] Failed to parse guesses for user ${entry.userId}:`, e);
+                console.error(`[Wordle] Critical: Failed to parse leaderboard guesses for user ${entry.userId}:`, e);
                 parsedGuesses = [];
             }
-            return { ...entry, guesses: parsedGuesses };
+            
+            let parsedEvaluations = [];
+            try {
+                if (entry.evaluations) {
+                    parsedEvaluations = typeof entry.evaluations === 'string' ? JSON.parse(entry.evaluations) : entry.evaluations;
+                }
+                if (!Array.isArray(parsedEvaluations)) parsedEvaluations = [];
+            } catch (e) {
+                parsedEvaluations = [];
+            }
+
+            return { ...entry, guesses: parsedGuesses, evaluations: parsedEvaluations };
         });
 
         // If not finished, mask the actual words (guesses)
@@ -226,7 +245,7 @@ exports.getDailyLeaderboard = async (req, res, next) => {
             leaderboard = leaderboard.map(entry => ({
                 ...entry,
                 guesses: null, // Hide actual strings
-                evaluations: (entry.guesses || []).map(g => evaluateGuessInternal(g, sol))
+                evaluations: (Array.isArray(entry.guesses) ? entry.guesses : []).map(g => evaluateGuessInternal(g, sol))
             }));
         }
 
