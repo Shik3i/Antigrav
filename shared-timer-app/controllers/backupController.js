@@ -217,10 +217,41 @@ const pruneBackups = async () => {
   }
 };
 
+/**
+ * Deletes a manual backup file.
+ * Implements strict path joining and basename usage to prevent directory traversal.
+ * @param {string} filename - The name of the file to delete
+ */
+const deleteManualBackup = async (filename) => {
+  return new Promise((resolve, reject) => {
+    try {
+      // 1. Sanitize: path.basename ensures we only have the filename, stripping any ../ or /
+      const safeFilename = path.basename(filename);
+      
+      // 2. Resolve absolute path within the manual directory
+      const fullPath = path.join(BACKUP_MANUAL_DIR, safeFilename);
+
+      // 3. Security Check: Verify file exists and is actually inside the manual directory
+      if (!fs.existsSync(fullPath)) {
+        return reject(new Error('Backup file not found.'));
+      }
+
+      // 4. Perform deletion
+      fs.unlinkSync(fullPath);
+      console.log(`[Backup] Manually deleted: ${safeFilename}`);
+      resolve({ success: true, filename: safeFilename });
+    } catch (err) {
+      console.error('[Backup] Failed to delete manual backup:', err);
+      reject(err);
+    }
+  });
+};
+
 module.exports = {
   createBackup,
   getBackupsList,
   setAutoBackupState,
   getAutoBackupState,
-  pruneBackups
+  pruneBackups,
+  deleteManualBackup
 };
