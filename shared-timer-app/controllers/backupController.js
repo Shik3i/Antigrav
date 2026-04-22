@@ -3,64 +3,98 @@ const fs = require('fs');
 const path = require('path');
 const logging = require('../database/logging');
 
-const BACKUP_DIR = path.join(__dirname, '..', 'database', 'backups');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'timerapp.db');
+const BACKUP_BASE_DIR = path.join(path.dirname(DB_PATH), 'backups');
+const BACKUP_AUTO_DIR = path.join(BACKUP_BASE_DIR, 'automatic');
+const BACKUP_MANUAL_DIR = path.join(BACKUP_BASE_DIR, 'manual');
 
 /**
- * Creates a manual backup using VACUUM INTO
- * This ensures a consistent snapshot of the database.
+ * Creates a backup using VACUUM INTO
+ * @param {Object} options - { type: 'automatic' | 'manual', note: string }
  */
-const createBackup = async () => {
+const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
   return new Promise((resolve, reject) => {
+    const targetDir = type === 'manual' ? BACKUP_MANUAL_DIR : BACKUP_AUTO_DIR;
+    
+    // Ensure directories exist
+    [BACKUP_AUTO_DIR, BACKUP_MANUAL_DIR].forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    });
+
     const now = new Date();
     const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + 
                       now.getHours().toString().padStart(2, '0') + '-' + 
-                      now.getMinutes().toString().padStart(2, '0') + '-' + 
-                      now.getSeconds().toString().padStart(2, '0');
-    const filename = `backup_${timestamp}.sqlite`;
-    const destPath = path.join(BACKUP_DIR, filename);
+                      now.getMinutes().toString().padStart(2, '0');
+    
+    // Sanitize note: remove non-alphanumeric/spaces, truncate
+    const sanitizedNote = note.replace(/[^a-z0-9\s-]/gi, '').trim().replace(/\s+/g, '-').slice(0, 30);
+    const filename = type === 'manual' 
+      ? `manual_${timestamp}${sanitizedNote ? '_' + sanitizedNote : ''}.sqlite`
+      : `backup_${timestamp}.sqlite`;
+      
+    const destPath = path.join(targetDir, filename);
 
-    // Ensure directory exists
-    if (!fs.existsSync(BACKUP_DIR)) {
-      fs.mkdirSync(BACKUP_DIR, { recursive: true });
-    }
-
-    // SQLite "VACUUM INTO" is the cleanest way to backup a running DB without blocking or inconsistency
     db.run(`VACUUM INTO ?`, [destPath], function(err) {
       if (err) {
-        console.error('[Backup] Failed to create backup:', err);
+        console.error(`[Backup] Failed to create ${type} backup:`, err);
         if (logging && logging.logError) {
-          logging.logError('Backup failed', err, { destPath });
+          logging.logError(`${type.toUpperCase()} Backup failed`, err, { destPath });
         }
         reject(err);
       } else {
-        console.log(`[Backup] Successfully created: ${filename}`);
-        // Prune after backup
-        pruneBackups().catch(e => console.error('[Backup] Pruning failed:', e));
-        resolve({ filename, timestamp: now });
+        console.log(`[Backup] Successfully created ${type} backup: ${filename}`);
+        
+        // Only prune automatic backups
+        if (type === 'automatic') {
+          pruneBackups().catch(e => console.error('[Backup] Pruning failed:', e));
+        }
+        
+        resolve({ filename, timestamp: now, type });
       }
     });
   });
 };
 
 /**
- * Fetches the list of all available backups
+ * Helper to extract note from manual backup filename
+ */
+const extractNoteFromFilename = (filename) => {
+  if (!filename.startsWith('manual_')) return null;
+  // manual_YYYY-MM-DD_HH-mm_NOTE.sqlite
+  const parts = filename.replace('.sqlite', '').split('_');
+  if (parts.length > 3) {
+    return parts.slice(3).join(' ').replace(/-/g, ' ');
+  }
+  return null;
+};
+
+/**
+ * Fetches the list of all available backups partitioned by tier
  */
 const getBackupsList = async () => {
-  if (!fs.existsSync(BACKUP_DIR)) return [];
+  const getFilesFromDir = (dir) => {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter(file => file.endsWith('.sqlite') || file.endsWith('.db'))
+      .map(file => {
+        const fullPath = path.join(dir, file);
+        const stats = fs.statSync(fullPath);
+        return {
+          filename: file,
+          size: stats.size,
+          createdAt: stats.mtime,
+          note: extractNoteFromFilename(file)
+        };
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+  };
 
-  const files = fs.readdirSync(BACKUP_DIR)
-    .filter(file => file.endsWith('.sqlite') || file.endsWith('.db'))
-    .map(file => {
-      const fullPath = path.join(BACKUP_DIR, file);
-      const stats = fs.statSync(fullPath);
-      return {
-        filename: file,
-        size: stats.size,
-        createdAt: stats.mtime
-      };
-    });
-
-  return files.sort((a, b) => b.createdAt - a.createdAt);
+  return {
+    automatic: getFilesFromDir(BACKUP_AUTO_DIR),
+    manual: getFilesFromDir(BACKUP_MANUAL_DIR)
+  };
 };
 
 /**
@@ -93,13 +127,14 @@ const getAutoBackupState = async () => {
 
 /**
  * GFS (Grandfather-Father-Son) Pruning Algorithm
+ * Strictly targets BACKUP_AUTO_DIR.
  * Retention Policy:
  * - Daily: Keep 1/day for last 7 days
  * - Weekly: Keep 1/week for last 4 weeks
  * - Monthly: Keep 1/month for last 12 months
  */
 const pruneBackups = async () => {
-  const backups = await getBackupsList();
+  const { automatic: backups } = await getBackupsList();
   if (backups.length === 0) return;
 
   const now = new Date();
@@ -174,8 +209,8 @@ const pruneBackups = async () => {
 
   for (const filename of finalToDelete) {
     try {
-      fs.unlinkSync(path.join(BACKUP_DIR, filename));
-      console.log(`[Backup Prune] Deleted old backup: ${filename}`);
+      fs.unlinkSync(path.join(BACKUP_AUTO_DIR, filename));
+      console.log(`[Backup Prune] Deleted old automatic backup: ${filename}`);
     } catch (err) {
       console.error(`[Backup Prune] Failed to delete ${filename}:`, err);
     }

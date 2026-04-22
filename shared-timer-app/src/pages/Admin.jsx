@@ -89,7 +89,8 @@ const Admin = ({ socket }) => {
     const [editWordQuote, setEditWordQuote] = useState('');
 
     // --- Database Backups ---
-    const [backups, setBackups] = useState([]);
+    const [automaticBackups, setAutomaticBackups] = useState([]);
+    const [manualBackups, setManualBackups] = useState([]);
     const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
     const [isBackupLoading, setIsBackupLoading] = useState(false);
 
@@ -530,7 +531,8 @@ const Admin = ({ socket }) => {
             const res = await axios.get('/api/admin/backups', {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
-            setBackups(res.data.backups || []);
+            setAutomaticBackups(res.data.automatic || []);
+            setManualBackups(res.data.manual || []);
             setAutoBackupEnabled(res.data.autoBackupEnabled);
         } catch (err) {
             console.error('[Admin Backups] Fetch failed:', err);
@@ -540,10 +542,10 @@ const Admin = ({ socket }) => {
         }
     };
 
-    const handleTriggerBackup = async () => {
+    const handleTriggerBackup = async (note = '') => {
         setIsBackupLoading(true);
         try {
-            await axios.post('/api/admin/backups/trigger', {}, {
+            await axios.post('/api/admin/backups/trigger', { note }, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
             addLog('Success', 'Manual database backup created successfully.', 'success');
@@ -1759,7 +1761,8 @@ const Admin = ({ socket }) => {
             {/* TAB: DATABASE BACKUPS */}
             {activeTab === 'backups' && (
                 <DatabaseBackupsTab 
-                    backups={backups}
+                    automaticBackups={automaticBackups}
+                    manualBackups={manualBackups}
                     autoBackupEnabled={autoBackupEnabled}
                     onTriggerBackup={handleTriggerBackup}
                     onToggleAutoBackup={handleToggleAutoBackup}

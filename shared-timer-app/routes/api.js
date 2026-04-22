@@ -59,17 +59,18 @@ router.get('/admin/actions', authController.authenticateToken, apiController.get
 // Database Backups
 router.get('/admin/backups', authController.authenticateToken, async (req, res) => {
     try {
-        const backups = await backupController.getBackupsList();
+        const { automatic, manual } = await backupController.getBackupsList();
         const autoBackupEnabled = await backupController.getAutoBackupState();
-        res.json({ backups, autoBackupEnabled });
+        res.json({ automatic, manual, autoBackupEnabled });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 router.post('/admin/backups/trigger', authController.authenticateToken, async (req, res) => {
     try {
-        const result = await backupController.createBackup();
-        res.json({ message: 'Backup created successfully', ...result });
+        const { note } = req.body;
+        const result = await backupController.createBackup({ type: 'manual', note });
+        res.json({ message: 'Manual backup created successfully', ...result });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
