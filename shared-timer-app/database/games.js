@@ -565,10 +565,15 @@ const getUserGameRoundCount = (userId, gameId = null) => {
 // --- Tower Climb ---
 const mapTowerRoundRow = (row) => {
   if (!row) return null;
+  const config = require('../config/towerClimb');
+  const multipliers = config.getTowerMultiplierTable(row.tilesPerLevel);
   return {
     ...row,
     selectedTiles: JSON.parse(row.selectedTiles || '[]'),
-    trapPattern: JSON.parse(row.trapPattern || '[]')
+    trapPattern: JSON.parse(row.trapPattern || '[]'),
+    currentPayout: Math.floor(row.bet * row.currentMultiplier),
+    multiplierTable: multipliers,
+    canCashout: row.status === 'running' && row.currentLevel > 0
   };
 };
 
@@ -608,35 +613,55 @@ const startTowerRound = (userId, bet, tilesPerLevel) => {
           db.run('ROLLBACK');
           return reject(err || new Error('Insufficient balance'));
         }
-        db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [bet, userId], (updErr) => {
-          if (updErr) {
+        
+        // Check for active round
+        db.get('SELECT id FROM TowerClimbRounds WHERE userId = ? AND status = "running"', [userId], (actErr, active) => {
+          if (actErr || active) {
             db.run('ROLLBACK');
-            return reject(updErr);
+            const error = new Error('Already have an active round');
+            error.status = 400;
+            return reject(error);
           }
-          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, -bet, 'Tower Climb Bet'], (txErr) => {
-            if (txErr) {
+
+          db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [bet, userId], (updErr) => {
+            if (updErr) {
               db.run('ROLLBACK');
-              return reject(txErr);
+              return reject(updErr);
             }
-            const trapPattern = [];
-            for (let i = 0; i < 8; i++) {
-              trapPattern.push(Math.floor(Math.random() * tilesPerLevel));
-            }
-            db.run(
-              'INSERT INTO TowerClimbRounds (userId, bet, tilesPerLevel, trapPattern) VALUES (?, ?, ?, ?)',
-              [userId, bet, tilesPerLevel, JSON.stringify(trapPattern)],
-              function (insErr) {
-                if (insErr) {
-                  db.run('ROLLBACK');
-                  return reject(insErr);
-                }
-                const roundId = this.lastID;
-                db.run('COMMIT', (commitErr) => {
-                  if (commitErr) reject(commitErr);
-                  else resolve({ id: roundId, bet, tilesPerLevel, trapPattern });
-                });
+            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, -bet, 'Tower Climb Bet'], (txErr) => {
+              if (txErr) {
+                db.run('ROLLBACK');
+                return reject(txErr);
               }
-            );
+              const trapPattern = [];
+              for (let i = 0; i < 8; i++) {
+                trapPattern.push(Math.floor(Math.random() * tilesPerLevel));
+              }
+              db.run(
+                'INSERT INTO TowerClimbRounds (userId, bet, tilesPerLevel, trapPattern) VALUES (?, ?, ?, ?)',
+                [userId, bet, tilesPerLevel, JSON.stringify(trapPattern)],
+                function (insErr) {
+                  if (insErr) {
+                    db.run('ROLLBACK');
+                    return reject(insErr);
+                  }
+                  const roundId = this.lastID;
+                  db.run('COMMIT', (commitErr) => {
+                    if (commitErr) reject(commitErr);
+                    else {
+                      const newBalance = user.koala_balance - bet;
+                      // Return the freshly created round object
+                      db.get('SELECT * FROM TowerClimbRounds WHERE id = ?', [roundId], (fetchErr, row) => {
+                        resolve({ 
+                          round: mapTowerRoundRow(row), 
+                          newBalance 
+                        });
+                      });
+                    }
+                  });
+                }
+              );
+            });
           });
         });
       });
@@ -653,29 +678,49 @@ const resolveTowerPick = (userId, tileIndex, expectedLevel) => {
         const trapPattern = JSON.parse(row.trapPattern);
         const selectedTiles = JSON.parse(row.selectedTiles);
         const isTrap = trapPattern[row.currentLevel] === tileIndex;
-        selectedTiles.push(tileIndex);
+        selectedTiles.push({ level: row.currentLevel, tileIndex, trapIndex: trapPattern[row.currentLevel], result: isTrap ? 'trap' : 'safe' });
+        
         if (isTrap) {
           db.run('UPDATE TowerClimbRounds SET status = "lost", selectedTiles = ?, resolvedAt = CURRENT_TIMESTAMP WHERE id = ?', [JSON.stringify(selectedTiles), row.id], (updErr) => {
             if (updErr) reject(updErr);
-            else resolve({ status: 'lost', trapIndex: tileIndex });
+            else {
+              db.get('SELECT * FROM TowerClimbRounds WHERE id = ?', [row.id], (fErr, updatedRow) => {
+                db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (bErr, user) => {
+                  resolve({ round: mapTowerRoundRow(updatedRow), newBalance: user?.koala_balance });
+                });
+              });
+            }
           });
         } else {
           const nextLevel = row.currentLevel + 1;
-          const nextMultiplier = require('../config/towerClimb').getTowerMultiplierTable(row.tilesPerLevel)[nextLevel - 1];
+          const nextMultiplier = require('../config/towerClimb').getTowerMultiplierTable(row.tilesPerLevel)[nextLevel];
           if (nextLevel >= 8) {
             const payout = Math.floor(row.bet * nextMultiplier);
             db.run('UPDATE TowerClimbRounds SET status = "won", currentLevel = ?, currentMultiplier = ?, selectedTiles = ?, payout = ?, resolvedAt = CURRENT_TIMESTAMP WHERE id = ?', [nextLevel, nextMultiplier, JSON.stringify(selectedTiles), payout, row.id], (updErr) => {
               if (updErr) reject(updErr);
               else {
-                db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [payout, userId]);
-                db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, payout, 'Tower Climb Win (Max Level)']);
-                resolve({ status: 'won', nextLevel, nextMultiplier, payout });
+                db.serialize(() => {
+                  db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [payout, userId]);
+                  db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, payout, 'Tower Climb Win (Max Level)'], () => {
+                    db.get('SELECT * FROM TowerClimbRounds WHERE id = ?', [row.id], (fErr, updatedRow) => {
+                      db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (bErr, user) => {
+                        resolve({ round: mapTowerRoundRow(updatedRow), newBalance: user?.koala_balance });
+                      });
+                    });
+                  });
+                });
               }
             });
           } else {
             db.run('UPDATE TowerClimbRounds SET currentLevel = ?, currentMultiplier = ?, selectedTiles = ? WHERE id = ?', [nextLevel, nextMultiplier, JSON.stringify(selectedTiles), row.id], (updErr) => {
               if (updErr) reject(updErr);
-              else resolve({ status: 'running', nextLevel, nextMultiplier });
+              else {
+                db.get('SELECT * FROM TowerClimbRounds WHERE id = ?', [row.id], (fErr, updatedRow) => {
+                  db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (bErr, user) => {
+                    resolve({ round: mapTowerRoundRow(updatedRow), newBalance: user?.koala_balance });
+                  });
+                });
+              }
             });
           }
         }
@@ -694,9 +739,16 @@ const cashoutTowerRound = (userId) => {
         db.run('UPDATE TowerClimbRounds SET status = "cashed_out", payout = ?, resolvedAt = CURRENT_TIMESTAMP WHERE id = ?', [payout, row.id], (updErr) => {
           if (updErr) reject(updErr);
           else {
-            db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [payout, userId]);
-            db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, payout, 'Tower Climb Cashout']);
-            resolve({ success: true, payout });
+            db.serialize(() => {
+              db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [payout, userId]);
+              db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, payout, 'Tower Climb Cashout'], () => {
+                db.get('SELECT * FROM TowerClimbRounds WHERE id = ?', [row.id], (fErr, updatedRow) => {
+                  db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (bErr, user) => {
+                    resolve({ round: mapTowerRoundRow(updatedRow), newBalance: user?.koala_balance, payout });
+                  });
+                });
+              });
+            });
           }
         });
       });
