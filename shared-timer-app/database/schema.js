@@ -1,11 +1,41 @@
+const sqlite3 = require('sqlite3').verbose();
 const db = require('./connection');
 const path = require('path');
 const fs = require('fs');
 
+const dbFilePath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'timerapp.db');
+const WORDLE_SEED_MAX_RETRIES = 5;
+const WORDLE_SEED_RETRY_DELAY_MS = 500;
+
+let wordleSeedInFlight = false;
+let wordleSeedRetryTimer = null;
+
+function scheduleWordleSeedRetry(attempt, reason) {
+  if (attempt >= WORDLE_SEED_MAX_RETRIES) {
+    console.error(`[Wordle Migration] Giving up after ${attempt} retries. Last error: ${reason?.message || reason}`);
+    return;
+  }
+
+  const nextAttempt = attempt + 1;
+  const delayMs = WORDLE_SEED_RETRY_DELAY_MS * nextAttempt;
+
+  if (wordleSeedRetryTimer) {
+    clearTimeout(wordleSeedRetryTimer);
+  }
+
+  console.warn(`[Wordle Migration] Retry ${nextAttempt}/${WORDLE_SEED_MAX_RETRIES} scheduled in ${delayMs}ms.`);
+  wordleSeedRetryTimer = setTimeout(() => {
+    wordleSeedRetryTimer = null;
+    seedWordleDictionary(nextAttempt);
+  }, delayMs);
+}
+
 /**
  * Wordle 2.0: Seeds the dictionary from JSON if empty and syncs with history
  */
-function seedWordleDictionary() {
+function seedWordleDictionary(attempt = 0) {
+  if (wordleSeedInFlight) return;
+
   db.get("SELECT COUNT(*) as count FROM wordle_dictionary", (err, row) => {
     if (err) return console.error("[Wordle Migration] Error checking dictionary:", err);
     if (row && row.count > 0) return; // Already seeded
@@ -26,33 +56,91 @@ function seedWordleDictionary() {
       if (!jsonData || !Array.isArray(jsonData.data)) return;
 
       const words = [...new Set(jsonData.data.map(w => w.trim().toUpperCase()).filter(w => w.length === 5))];
-      
-      db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
-        const stmt = db.prepare("INSERT OR IGNORE INTO wordle_dictionary (word) VALUES (?)");
-        words.forEach(word => {
-          stmt.run(word);
-        });
-        stmt.finalize();
+      wordleSeedInFlight = true;
 
-        // Historical Sync: Mark already played words as used
-        const syncQuery = `
-          UPDATE wordle_dictionary 
-          SET is_used = 1, 
-               used_at = (SELECT createdAt FROM Wordle_DailyWords WHERE Wordle_DailyWords.word = wordle_dictionary.word LIMIT 1)
-          WHERE word IN (SELECT word FROM Wordle_DailyWords)
-        `;
-        db.run(syncQuery, (err) => {
-          if (err) {
-            console.error("[Wordle Migration] Error during historical sync:", err);
-            db.run("ROLLBACK");
-          } else {
-            db.run("COMMIT");
-            console.log(`[Wordle Migration] Successfully seeded ${words.length} words and synced history.`);
-          }
+      const seedDb = new sqlite3.Database(dbFilePath, (openErr) => {
+        const closeSeedDb = (onClosed) => {
+          seedDb.close((closeErr) => {
+            wordleSeedInFlight = false;
+            if (closeErr) {
+              console.error("[Wordle Migration] Failed to close dedicated seed connection:", closeErr);
+            }
+            if (onClosed) onClosed(closeErr);
+          });
+        };
+
+        if (openErr) {
+          wordleSeedInFlight = false;
+          console.error("[Wordle Migration] Failed to open dedicated seed connection:", openErr);
+          scheduleWordleSeedRetry(attempt, openErr);
+          return;
+        }
+
+        if (typeof db.applyDatabasePragmas === 'function') {
+          db.applyDatabasePragmas(seedDb);
+        }
+
+        seedDb.serialize(() => {
+          seedDb.run("BEGIN TRANSACTION", (beginErr) => {
+            if (beginErr) {
+              console.error("[Wordle Migration] Failed to start transaction:", beginErr);
+              closeSeedDb(() => scheduleWordleSeedRetry(attempt, beginErr));
+              return;
+            }
+
+            const rollbackWithLog = (message, cause, shouldRetry = false) => {
+              console.error(message, cause);
+              seedDb.run("ROLLBACK", (rollbackErr) => {
+                if (rollbackErr) {
+                  console.error("[Wordle Migration] Rollback failed:", rollbackErr);
+                }
+                closeSeedDb(() => {
+                  if (shouldRetry) {
+                    scheduleWordleSeedRetry(attempt, cause);
+                  }
+                });
+              });
+            };
+
+            const stmt = seedDb.prepare("INSERT OR IGNORE INTO wordle_dictionary (word) VALUES (?)");
+            words.forEach((word) => {
+              stmt.run(word);
+            });
+
+            stmt.finalize((finalizeErr) => {
+              if (finalizeErr) {
+                rollbackWithLog("[Wordle Migration] Error inserting dictionary words:", finalizeErr, true);
+                return;
+              }
+
+              // Historical Sync: Mark already played words as used
+              const syncQuery = `
+                UPDATE wordle_dictionary
+                SET is_used = 1,
+                    used_at = (SELECT createdAt FROM Wordle_DailyWords WHERE Wordle_DailyWords.word = wordle_dictionary.word LIMIT 1)
+                WHERE word IN (SELECT word FROM Wordle_DailyWords)
+              `;
+              seedDb.run(syncQuery, (syncErr) => {
+                if (syncErr) {
+                  rollbackWithLog("[Wordle Migration] Error during historical sync:", syncErr, true);
+                  return;
+                }
+
+                seedDb.run("COMMIT", (commitErr) => {
+                  if (commitErr) {
+                    rollbackWithLog("[Wordle Migration] Commit failed:", commitErr, true);
+                  } else {
+                    console.log(`[Wordle Migration] Successfully seeded ${words.length} words and synced history.`);
+                    closeSeedDb();
+                  }
+                });
+              });
+            });
+          });
         });
       });
     } catch (error) {
+      wordleSeedInFlight = false;
       console.error("[Wordle Migration] Fatal error during seeding:", error);
     }
   });
@@ -1091,14 +1179,12 @@ function initializeDatabaseSchema() {
       definition TEXT,
       funny_quote TEXT,
       used_at DATETIME
-    )`, () => {
-      // Automatic migration/seeding on startup
-      seedWordleDictionary();
-    });
+    )`);
 
     // Signal database is ready
     db.run("SELECT 1", () => {
       console.log('Database initialized and ready.');
+      seedWordleDictionary();
     });
   });
 }

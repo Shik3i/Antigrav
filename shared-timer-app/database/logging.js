@@ -6,10 +6,14 @@ const db = require('./connection');
 
 const logError = (message, stack = null, context = null) => {
   return new Promise((resolve, reject) => {
-    db.run('INSERT INTO ErrorLogs (message, stack, context) VALUES (?, ?, ?)', [message, stack, context], function (err) {
-      if (err) reject(err);
-      else resolve(this.lastID);
-    });
+    try {
+      db.run('INSERT INTO ErrorLogs (message, stack, context) VALUES (?, ?, ?)', [message, stack, context], function (err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
@@ -42,15 +46,25 @@ const clearErrorLogs = () => {
 
 const logSystemEvent = async (level, context, message) => {
   return new Promise((resolve, reject) => {
-    db.run('INSERT INTO SystemLogs (level, context, message) VALUES (?, ?, ?)', [level, context, message], function (err) {
-      if (err) reject(err);
-      else {
+    try {
+      db.run('INSERT INTO SystemLogs (level, context, message) VALUES (?, ?, ?)', [level, context, message], function (err) {
+        if (err) {
+          reject(err);
+          return;
+        }
+
         // Enforce 24h retention
-        db.run("DELETE FROM SystemLogs WHERE createdAt < datetime('now', '-24 hours')", () => {
-          resolve(this.lastID);
-        });
-      }
-    });
+        try {
+          db.run("DELETE FROM SystemLogs WHERE createdAt < datetime('now', '-24 hours')", () => {
+            resolve(this.lastID);
+          });
+        } catch (cleanupErr) {
+          reject(cleanupErr);
+        }
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 

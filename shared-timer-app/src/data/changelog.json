@@ -1,5 +1,11 @@
 [
   {
+    "id": 84,
+    "version": "2.50.1",
+    "date": "2026-04-23",
+    "changes": "- **Wordle Datenbank-Migration gehärtet**: Das Seeding des Wörterbuchs läuft jetzt über eine dedizierte SQLite-Verbindung mit sauberem Transaktions-Handling, Rollback und Commit-Sicherheit.\n- **Retry-Mechanismus**: Temporäre Locking- oder Startprobleme werden über ein begrenztes Retry-System mit Backoff abgefangen, statt die Initialisierung hart scheitern zu lassen.\n- **Logging-Stabilität**: Fehler- und Systemlogs fangen Datenbankzugriffe nun defensiver ab, damit Logging-Fehler keine Folgeabstürze auslösen.\n- **Verbindungs-Metadaten**: Die Datenbankverbindung exportiert die benötigten Pragmas und den DB-Pfad explizit, damit Migrations- und Seed-Prozesse dieselben Runtime-Einstellungen sauber wiederverwenden."
+  },
+  {
     "id": 83,
     "version": "2.50.0",
     "date": "2026-04-22",
