@@ -491,7 +491,7 @@ const Wordle = ({ user, token }) => {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px' }}>
                 {(Array.isArray(rowsToRender) ? rowsToRender : []).map((_, i) => {
-                    const evaluation = Array.isArray(serverEvaluations) ? serverEvaluations[i] : (Array.isArray(userGuesses) ? evaluateGuess(userGuesses[i], sol) : null);
+                    const evaluation = (Array.isArray(serverEvaluations) && serverEvaluations.length > 0) ? serverEvaluations[i] : (Array.isArray(userGuesses) ? evaluateGuess(userGuesses[i], sol) : null);
                     const guess = Array.isArray(userGuesses) ? userGuesses[i] : null;
                     
                     if (!evaluation || !Array.isArray(evaluation)) return null;
