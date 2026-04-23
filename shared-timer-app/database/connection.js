@@ -31,4 +31,7 @@ function applyDatabasePragmas(database) {
   database.run('PRAGMA mmap_size = 536870912;');
 }
 
+db.applyDatabasePragmas = applyDatabasePragmas;
+db.dbFilePath = dbFilePath;
+
 module.exports = db;
