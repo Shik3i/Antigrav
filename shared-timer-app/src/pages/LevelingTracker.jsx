@@ -67,8 +67,8 @@ const formatRelativeTime = (dateStr) => {
 const FwcCountdown = () => {
   const [now, setNow] = useState(Date.now());
   const [spStylerLive, setSpStylerLive] = useState(null);
-  // Target: 24. April 2026, 09:30 UTC
-  const target = new Date('2026-04-24T09:30:00Z').getTime();
+  // Target: 23. April 2026, 09:30 UTC
+  const target = new Date('2026-04-23T09:30:00Z').getTime();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
