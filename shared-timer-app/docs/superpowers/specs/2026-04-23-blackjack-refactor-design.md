@@ -2,13 +2,14 @@
 
 **Date:** 2026-04-23
 
-**Goal:** Split the oversized blackjack backend and frontend files into focused modules without changing the game's external behavior, while making the UI easier to maintain and better on mobile screens.
+**Goal:** Split the oversized blackjack backend and frontend files into focused modules without changing the game's external behavior, while making the UI easier to maintain and better on mobile screens. The backend structure should also establish a reusable pattern for future casino games such as roulette and poker.
 
 **In Scope:**
 - Refactor [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js) into smaller backend modules behind a stable public API.
 - Refactor [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx) into a page shell, hooks, components, and dedicated styles.
 - Make small supporting changes to controller and socket integration where they reduce coupling or preserve a clean boundary.
 - Improve mobile layout and interaction patterns for the blackjack page.
+- Shape the backend module boundaries so roulette and poker can reuse the same casino game patterns instead of creating new monoliths.
 
 **Out of Scope:**
 - Rewriting blackjack game rules or payout rules.
@@ -25,6 +26,8 @@ The current blackjack implementation has two oversized files doing too much:
 
 This makes behavior harder to reason about, increases regression risk, and blocks mobile improvements because layout and state logic are tightly coupled.
 
+There is also a near-term product constraint: blackjack is not the last casino game. Roulette and poker are expected next, so the refactor should create a backend pattern that future table/card games can follow.
+
 ## Design Principles
 
 1. Preserve behavior first. The refactor should keep the current socket events, REST endpoints, and game flow working during the migration.
@@ -32,10 +35,38 @@ This makes behavior harder to reason about, increases regression risk, and block
 3. Keep a stable orchestration boundary. Existing consumers should still import a single backend manager entrypoint and a single page route entrypoint.
 4. Prefer pure logic extraction where possible. Game rules, settlement, and serialization should be testable without requiring socket or timer setup.
 5. Design mobile-first on the frontend. Desktop table positioning can remain rich, but smaller screens need a simpler layout model.
+6. Build for the next casino games. Blackjack-specific modules are fine, but shared table-game concerns should be named and structured so roulette and poker can follow the same pattern.
 
 ## Backend Target Architecture
 
-The backend should move from one stateful monolith to a small stateful facade plus focused modules under `utils/blackjack/`.
+The backend should move from one stateful monolith to a small stateful facade plus focused modules under a casino-oriented structure. The point is not to overgeneralize blackjack today, but to avoid baking in names and seams that make roulette and poker harder tomorrow.
+
+## Casino-Oriented Backend Direction
+
+The refactor should establish a two-level structure:
+
+- shared casino/game-table primitives for concerns that are likely to recur
+- blackjack-specific modules for the actual game rules and state transitions
+
+Recommended direction:
+
+- `utils/casino/`
+  - shared room/table registry helpers
+  - shared seat/player helpers for seated multiplayer games
+  - shared serialization patterns for room summaries and state payloads
+  - shared tick/scheduler helpers where the abstraction is real
+
+- `utils/casino/blackjack/`
+  - blackjack-specific round flow
+  - blackjack-specific dealer behavior
+  - blackjack-specific settlement and payout rules
+  - blackjack-specific bot strategy
+
+This keeps the current task scoped to blackjack while creating a clear landing zone for:
+- `utils/casino/roulette/`
+- `utils/casino/poker/`
+
+The refactor should not attempt to fully design roulette or poker now, but it should avoid a structure like `utils/blackjack/*` if that would force future games into a parallel set of incompatible patterns.
 
 ### Public Entry Point
 
@@ -47,19 +78,20 @@ This file remains the public API used by:
 
 Its job becomes:
 - own the shared `rooms` map
-- compose helper modules
+- compose blackjack modules and any relevant shared casino helpers
 - expose the existing public methods with minimal orchestration glue
 
 It should not continue to own most game logic inline.
 
 ### Internal Backend Modules
 
-- `utils/blackjack/roomState.js`
+- `utils/casino/roomState.js`
   - creates room objects, player objects, hand objects
   - normalizes room ids and table sizes
   - owns small structural helpers like reset state creation
+  - should keep reusable table/room structure separate from blackjack-only hand details where practical
 
-- `utils/blackjack/roomQueries.js`
+- `utils/casino/roomQueries.js`
   - `getRoom`
   - `getPlayerByUserId`
   - `getOrderedPlayers`
@@ -67,13 +99,17 @@ It should not continue to own most game logic inline.
   - `getPlayerRoomId`
   - read-only helpers such as `hasActiveRound`
 
-- `utils/blackjack/serialization.js`
+- `utils/casino/serialization.js`
   - serializes player state
+  - builds room summary payloads for sockets and API consumers
+  - shared helpers should stay generic; blackjack-only payload shaping can live in blackjack modules
+
+- `utils/casino/blackjack/serialization.js`
   - serializes dealer hand visibility
   - serializes settlement entries
-  - builds room state payloads for sockets and API consumers
+  - builds blackjack room state payloads for sockets and API consumers
 
-- `utils/blackjack/tableLifecycle.js`
+- `utils/casino/blackjack/tableLifecycle.js`
   - `createRoom`
   - `joinRoom`
   - `leaveRoom`
@@ -82,7 +118,7 @@ It should not continue to own most game logic inline.
   - `listRooms`
   - auto-start scheduling decisions that are tied to lobby/betting state
 
-- `utils/blackjack/roundActions.js`
+- `utils/casino/blackjack/roundActions.js`
   - `placeBet`
   - `startRound`
   - `hit`
@@ -90,36 +126,37 @@ It should not continue to own most game logic inline.
   - `doubleDown`
   - `split`
 
-- `utils/blackjack/turnEngine.js`
+- `utils/casino/blackjack/turnEngine.js`
   - `advanceTurn`
   - turn deadline updates
   - active hand progression rules
 
-- `utils/blackjack/dealerEngine.js`
+- `utils/casino/blackjack/dealerEngine.js`
   - `beginDealerTurn`
   - `resolveDealerTurn`
 
-- `utils/blackjack/settlement.js`
+- `utils/casino/blackjack/settlement.js`
   - `settleRound`
   - payout calculation
   - end-of-round reset and discard handling
 
-- `utils/blackjack/botEngine.js`
+- `utils/casino/blackjack/botEngine.js`
   - bot betting behavior
   - bot action decision rules
   - scheduling-related bot timing helpers
 
-- `utils/blackjack/tickEngine.js`
+- `utils/casino/blackjack/tickEngine.js`
   - drives periodic room updates
   - delegates to dealer, timeout, bot, settlement, and auto-start handlers
   - returns changed room ids
 
 ### Backend Dependency Rules
 
-- `blackjackRoomManager.js` may import all blackjack modules.
+- `blackjackRoomManager.js` may import blackjack modules and shared casino helpers.
 - Domain modules may import cards/rules utilities and query helpers.
-- Modules should avoid circular imports. Shared helpers belong in `roomState.js`, `roomQueries.js`, or `serialization.js`.
+- Modules should avoid circular imports. Shared helpers belong in `utils/casino/`, while blackjack-only helpers stay under `utils/casino/blackjack/`.
 - `controllers/blackjackController.js` and `sockets/socketHandler.js` should continue to depend only on the facade, not on internal blackjack modules.
+- Do not introduce fake abstractions for roulette or poker before concrete needs exist. Reuse should emerge from real shared concerns already visible in blackjack.
 
 ## Frontend Target Architecture
 
@@ -249,6 +286,31 @@ Small supporting edits are allowed if they reduce coupling:
   - optionally extract blackjack-specific socket handler registration into a focused helper if this can be done with low migration risk
 
 The important constraint is that the blackjack refactor should not spread new coupling into these files.
+
+## Future Game Readiness
+
+The backend should leave room for the next casino games without forcing a rewrite.
+
+### Shared concerns likely reusable by roulette and poker
+
+- room and table registration
+- player presence and connection state
+- seat assignment for seated games
+- room summary serialization for lobby views
+- timer/tick orchestration patterns
+- controller/socket integration conventions
+
+### Concerns that should remain blackjack-specific
+
+- card dealing order
+- dealer hole-card and draw behavior
+- blackjack settlement rules
+- split and double-down rules
+- blackjack bot heuristics
+
+### Constraint
+
+The refactor should produce a structure where adding roulette or poker means creating a new game module tree beside blackjack, not copying the current monolith pattern into new files.
 
 ## Migration Strategy
 
