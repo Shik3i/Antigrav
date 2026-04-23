@@ -506,11 +506,25 @@ const getGameLeaderboards = (gameId) => {
   });
 };
 
-const updateUserGameStats = (userId, gameId, stats) => {
+const updateUserGameStats = (userId, gameId, score, lines, level, sprintTime) => {
   return new Promise((resolve, reject) => {
-    const fields = Object.keys(stats).map(k => `${k} = ?`).join(', ');
-    const values = [...Object.values(stats), userId, gameId];
-    db.run(`UPDATE UserGameStats SET ${fields} WHERE userId = ? AND gameId = ?`, values, function(err) {
+    const q = `
+      INSERT INTO UserGameStats (userId, gameId, highscore, sprintHighscore, totalScore, totalLines, maxLevel, playCount)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+      ON CONFLICT(userId, gameId) DO UPDATE SET
+        highscore = CASE WHEN excluded.highscore > highscore THEN excluded.highscore ELSE highscore END,
+        sprintHighscore = CASE 
+            WHEN excluded.sprintHighscore > 0 AND (sprintHighscore = 0 OR excluded.sprintHighscore < sprintHighscore) 
+            THEN excluded.sprintHighscore 
+            ELSE sprintHighscore 
+        END,
+        totalScore = totalScore + excluded.totalScore,
+        totalLines = totalLines + excluded.totalLines,
+        maxLevel = CASE WHEN excluded.maxLevel > maxLevel THEN excluded.maxLevel ELSE maxLevel END,
+        playCount = playCount + 1,
+        updatedAt = CURRENT_TIMESTAMP
+    `;
+    db.run(q, [userId, gameId, score, sprintTime, score, lines, level], function(err) {
       if (err) reject(err);
       else resolve(this.changes);
     });
@@ -855,7 +869,7 @@ const getWordleStatus = (userId, date) => {
 
 const getWordleDailyLeaderboard = (date) => {
   return new Promise((resolve, reject) => {
-    const q = 'SELECT r.*, u.username, u.displayName, u.preferences, s.maxStreak FROM Wordle_DailyResults r JOIN Users u ON r.userId = u.id LEFT JOIN Wordle_UserStats s ON r.userId = s.userId WHERE r.date = ? ORDER BY r.won DESC, r.earnedCoins DESC, r.guesses ASC LIMIT 50';
+    const q = 'SELECT r.*, u.username, u.displayName, u.preferences, s.totalPlayed, s.totalWins, s.currentStreak, s.maxStreak, s.totalHintsBought FROM Wordle_DailyResults r JOIN Users u ON r.userId = u.id LEFT JOIN Wordle_UserStats s ON r.userId = s.userId WHERE r.date = ? ORDER BY r.won DESC, r.earnedCoins DESC, r.guesses ASC LIMIT 50';
     db.all(q, [date], (err, rows) => err ? reject(err) : resolve(rows || []));
   });
 };

@@ -238,7 +238,18 @@ exports.getDailyLeaderboard = async (req, res, next) => {
                 parsedEvaluations = [];
             }
 
-            return { ...entry, guesses: parsedGuesses, evaluations: parsedEvaluations };
+            return { 
+                ...entry, 
+                guesses: parsedGuesses, 
+                evaluations: parsedEvaluations,
+                stats: {
+                    totalPlayed: entry.totalPlayed || 0,
+                    totalWins: entry.totalWins || 0,
+                    currentStreak: entry.currentStreak || 0,
+                    maxStreak: entry.maxStreak || 0,
+                    totalHintsBought: entry.totalHintsBought || 0
+                }
+            };
         });
 
         // If not finished, mask the actual words (guesses)
