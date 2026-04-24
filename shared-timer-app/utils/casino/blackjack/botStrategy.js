@@ -83,15 +83,14 @@ function processTick(room, roomId, now, helpers) {
   if (['waiting', 'betting'].includes(room.status) && room.autoStartAt && now >= room.autoStartAt) {
     const starterId = room.autoStartQueuedByUserId || helpers.getOrderedPlayers(room).find((player) => player.currentBet > 0)?.userId;
     if (starterId) {
-      try {
-        helpers.startRound(roomId, starterId);
-        changed = true;
-      } catch (err) {
-        helpers.maybeScheduleAutoStart(room, starterId, now);
-      }
+      room.pendingRoundStartByUserId = starterId;
+      room.autoStartAt = null;
+      room.autoStartQueuedByUserId = null;
+      changed = true;
     } else {
       room.autoStartAt = null;
       room.autoStartQueuedByUserId = null;
+      room.pendingRoundStartByUserId = null;
       changed = true;
     }
   }

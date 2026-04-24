@@ -1,9 +1,7 @@
-import { Coins, Crown, ShieldAlert } from 'lucide-react';
+import { Crown, ShieldAlert } from 'lucide-react';
 import EVENTS from '../../../../socketEvents.json';
 import BlackjackDealer from './BlackjackDealer';
 import BlackjackSeat from './BlackjackSeat';
-import { formatKC } from '../utils/formatters';
-
 const STATUS_LABELS = {
   waiting: 'Wartet auf Spieler',
   betting: 'Einsätze werden platziert',
@@ -99,7 +97,7 @@ export default function BlackjackTable({
           <div className="blackjack-table-center blackjack-table-copy">
             <div className="blackjack-table-copy-inner">
               <div>Blackjack pays 3 to 2</div>
-              <div className="blackjack-table-copy-subline">Dealer must stand on 17</div>
+              <div className="blackjack-table-copy-subline">Dealer hits soft 17</div>
             </div>
           </div>
 
@@ -129,43 +127,15 @@ export default function BlackjackTable({
                 onChipAdd={(amt) => setPendingBet((prev) => prev + amt)}
                 onChipSub={() => setPendingBet(0)}
                 onBetSubmit={handleBetSubmit}
+                onLeaveSeat={handleLeaveTable}
                 pendingBet={pendingBet}
+                autoBetEnabled={autoBetEnabled}
+                onToggleAutoBet={() => setAutoBetEnabled((prev) => !prev)}
                 balance={user?.koala_balance || 0}
               />
             );
           })}
         </div>
-
-        {!isGuest && (
-          <div className="blackjack-table-footer">
-            <div className="blackjack-balance-bar">
-              <Coins size={18} color="#fbbf24" />
-              <div className="blackjack-balance-value">{formatKC(user?.koala_balance || 0)}</div>
-            </div>
-
-            <div className="blackjack-auto-bet-bar">
-              <div className="blackjack-auto-bet-meta">
-                <div className="blackjack-auto-bet-label">Auto-Bet</div>
-                <div className="blackjack-auto-bet-value">{formatKC(pendingBet)}</div>
-              </div>
-              <button
-                className={`blackjack-toggle${autoBetEnabled ? ' active' : ''}`}
-                onClick={() => setAutoBetEnabled((prev) => !prev)}
-              />
-            </div>
-
-            {mySeat && (
-              <button
-                onClick={handleLeaveTable}
-                className="blackjack-leave-seat"
-                onMouseEnter={(e) => { e.target.style.background = 'rgba(239, 68, 68, 0.2)'; }}
-                onMouseLeave={(e) => { e.target.style.background = 'rgba(239, 68, 68, 0.12)'; }}
-              >
-                Sitzplatz verlassen
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </section>
   );

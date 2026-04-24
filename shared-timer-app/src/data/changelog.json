@@ -1,5 +1,11 @@
 [
   {
+    "id": 86,
+    "version": "2.52.0",
+    "date": "2026-04-24",
+    "changes": "- **Blackjack Multiplayer-Flow**: Spieler können laufenden Tischen jetzt während aktiver Runden beitreten und werden sauber für die nächste Hand markiert, ohne die aktuelle Runde oder Timer zu stören.\n- **Blackjack Leave-Phasen**: Verlassen funktioniert phasengerecht: wartende Spieler werden sofort entfernt, aktive Spieler bleiben bis zum Settlement disconnected im Round-State und werden danach bereinigt.\n- **Blackjack Economy**: Einsätze werden erst beim tatsächlichen Rundenstart persistiert, inklusive stabiler Buy-In-, Double-Down- und Split-Balance-Updates.\n- **Blackjack UI-Fixes**: Lobby-Join, Sitzplatz-X, Auto-Bet im Spielerbereich, Chip-Stacks pro Wert und klare Einsatz-/Nächste-Runde-Anzeigen wurden stabilisiert."
+  },
+  {
     "id": 85,
     "version": "2.51.0",
     "date": "2026-04-24",

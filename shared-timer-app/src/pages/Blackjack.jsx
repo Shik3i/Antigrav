@@ -16,6 +16,7 @@ export default function Blackjack({ socket }) {
   const { showToast } = useToast();
   const {
     actionBusy,
+    autoJoinRoom,
     autoBetEnabled,
     availableRooms,
     config,
@@ -79,26 +80,28 @@ export default function Blackjack({ socket }) {
 
   return (
     <div style={{ display: 'grid', gap: '24px' }}>
-      <BlackjackTable
-        actionBusy={actionBusy}
-        autoBetEnabled={autoBetEnabled}
-        config={config}
-        error={error}
-        handleBetSubmit={handleBetSubmit}
-        handleLeaveTable={handleLeaveTable}
-        handleSmartJoin={handleSmartJoin}
-        handleTurnAction={handleTurnAction}
-        isGuest={isGuest}
-        mySeat={mySeat}
-        pendingBet={pendingBet}
-        roomState={roomState}
-        selectedTable={selectedTable}
-        setAutoBetEnabled={setAutoBetEnabled}
-        setPendingBet={setPendingBet}
-        tableSeats={tableSeats}
-        tableStatusMeta={tableStatusMeta}
-        user={user}
-      />
+      {roomState && (
+        <BlackjackTable
+          actionBusy={actionBusy}
+          autoBetEnabled={autoBetEnabled}
+          config={config}
+          error={error}
+          handleBetSubmit={handleBetSubmit}
+          handleLeaveTable={handleLeaveTable}
+          handleSmartJoin={handleSmartJoin}
+          handleTurnAction={handleTurnAction}
+          isGuest={isGuest}
+          mySeat={mySeat}
+          pendingBet={pendingBet}
+          roomState={roomState}
+          selectedTable={selectedTable}
+          setAutoBetEnabled={setAutoBetEnabled}
+          setPendingBet={setPendingBet}
+          tableSeats={tableSeats}
+          tableStatusMeta={tableStatusMeta}
+          user={user}
+        />
+      )}
 
       <BlackjackLobby
         actionBusy={actionBusy}
@@ -109,7 +112,7 @@ export default function Blackjack({ socket }) {
         handleSwitchRoom={handleSwitchRoom}
         loadRooms={loadRooms}
         roomDraft={roomDraft}
-        roomId={roomId}
+        roomId={autoJoinRoom ? roomId : null}
         selectedTable={selectedTable}
         setCurrentRoomId={setCurrentRoomId}
         setRoomDraft={setRoomDraft}

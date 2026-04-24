@@ -14,8 +14,10 @@ function finishSettlementPhase(room, now, helpers) {
 
   room.players.forEach((player) => {
     player.currentBet = 0;
+    player.waitingForNextRound = false;
     helpers.resetPlayerRoundState(player);
   });
+  room.players = room.players.filter((player) => player.connected !== false);
 
   helpers.advanceRound(room);
   helpers.setPhase(room, room.players.length > 0 ? 'betting' : 'waiting');

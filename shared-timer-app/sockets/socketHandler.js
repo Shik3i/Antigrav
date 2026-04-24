@@ -89,6 +89,59 @@ module.exports = function (io) {
         return Array.isArray(balanceUpdates) ? balanceUpdates : [];
     };
 
+    const getBlackjackPlayer = (roomId, userId) => {
+        const room = blackjackRoomManager.getRoom(roomId);
+        const player = room?.players?.find((entry) => String(entry.userId) === String(userId)) || null;
+        return { room, player };
+    };
+
+    const applyBlackjackBetDeltaAndBroadcast = async (userId, deltaCents, reason) => {
+        const newBalance = await dbLayer.applyBlackjackBetDelta(userId, deltaCents, reason);
+        broadcastCoinUpdate(io, userId, newBalance);
+        return newBalance;
+    };
+
+    const persistBlackjackRoundBuyInIfNeeded = async (roomId) => {
+        const room = blackjackRoomManager.getRoom(roomId);
+        if (!room) {
+            return [];
+        }
+
+        const hasStartedRound = ['dealing', 'player_turns', 'dealer_turn', 'settlement'].includes(room.status);
+        if (!hasStartedRound || room.lastAppliedBuyInRoundId === room.roundId) {
+            return [];
+        }
+
+        const buyInEntries = (room.players || [])
+            .filter((player) => !player?.isBot && Number(player?.currentBet || 0) > 0)
+            .map((player) => ({
+                userId: player.userId,
+                amount: Number(player.currentBet || 0)
+            }));
+
+        const balanceUpdates = await dbLayer.applyBlackjackRoundBuyIn(buyInEntries);
+        room.lastAppliedBuyInRoundId = room.roundId;
+
+        (Array.isArray(balanceUpdates) ? balanceUpdates : []).forEach((entry) => {
+            broadcastCoinUpdate(io, entry.userId, entry.balance);
+        });
+
+        return Array.isArray(balanceUpdates) ? balanceUpdates : [];
+    };
+
+    const startBlackjackRoundWithBuyIn = async (roomId, startedByUserId) => {
+        blackjackRoomManager.startRound(roomId, startedByUserId);
+        try {
+            await persistBlackjackRoundBuyInIfNeeded(roomId);
+        } catch (err) {
+            const room = blackjackRoomManager.getRoom(roomId);
+            if (room) {
+                room.lastAppliedBuyInRoundId = null;
+            }
+            throw err;
+        }
+    };
+
     // Middleware to extract and verify user token
     io.use((socket, next) => {
         const token = socket.handshake.auth?.token;
@@ -821,8 +874,10 @@ module.exports = function (io) {
                     throw new Error('roomId is required.');
                 }
 
+                const nextBet = Number(amount);
                 const userBalance = await dbLayer.getUserBalance(userId);
-                blackjackRoomManager.placeBet(roomId, userId, Number(amount), Number(userBalance || 0));
+                blackjackRoomManager.placeBet(roomId, userId, nextBet, Number(userBalance || 0));
+
                 const state = emitBlackjackState(io, roomId);
                 sendSocketAck(ack, { success: true, state });
             } catch (err) {
@@ -841,32 +896,13 @@ module.exports = function (io) {
                     throw new Error('roomId is required.');
                 }
 
-                blackjackRoomManager.startRound(roomId, userId);
+                await startBlackjackRoundWithBuyIn(roomId, userId);
                 await persistBlackjackSettlementIfNeeded(roomId);
                 const state = emitBlackjackState(io, roomId);
                 sendSocketAck(ack, { success: true, state });
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to start blackjack round.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to start blackjack round.' });
-            }
-        });
-
-        socket.on(EVENTS.BLACKJACK_LEAVE, ({ roomId } = {}, ack) => {
-            try {
-                const userId = socket.user?.userId;
-                if (!userId) {
-                    throw new Error('Authentication required.');
-                }
-                if (!roomId) {
-                    throw new Error('roomId is required.');
-                }
-
-                blackjackRoomManager.leaveRoom(roomId, userId);
-                const state = emitBlackjackStateAndRooms(roomId, userId);
-                sendSocketAck(ack, { success: true, roomId, state });
-            } catch (err) {
-                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to leave blackjack room.');
-                sendSocketAck(ack, { success: false, error: err.message || 'Failed to leave blackjack room.' });
             }
         });
 
@@ -920,8 +956,25 @@ module.exports = function (io) {
                     throw new Error('roomId is required.');
                 }
 
-                const userBalance = await dbLayer.getUserBalance(userId);
-                blackjackRoomManager.doubleDown(roomId, userId, Number(userBalance || 0));
+                const { player } = getBlackjackPlayer(roomId, userId);
+                const activeHand = player?.hands?.[player?.activeHandIndex || 0];
+                const additionalBet = Number(activeHand?.bet || 0);
+                let charged = false;
+
+                try {
+                    const newBalance = await applyBlackjackBetDeltaAndBroadcast(userId, additionalBet, 'Blackjack Double Down');
+                    charged = additionalBet > 0;
+                    blackjackRoomManager.doubleDown(roomId, userId, Number(newBalance || 0) + additionalBet);
+                } catch (err) {
+                    if (charged) {
+                        try {
+                            await applyBlackjackBetDeltaAndBroadcast(userId, -additionalBet, 'Blackjack Double Down Revert');
+                        } catch (rollbackErr) {
+                            console.error('Failed to rollback blackjack double down:', rollbackErr);
+                        }
+                    }
+                    throw err;
+                }
                 
                 await persistBlackjackSettlementIfNeeded(roomId);
                 const state = emitBlackjackState(io, roomId);
@@ -942,8 +995,24 @@ module.exports = function (io) {
                     throw new Error('roomId is required.');
                 }
 
-                const userBalance = await dbLayer.getUserBalance(userId);
-                blackjackRoomManager.split(roomId, userId, Number(userBalance || 0));
+                const { player } = getBlackjackPlayer(roomId, userId);
+                const additionalBet = Number(player?.hands?.[0]?.bet || 0);
+                let charged = false;
+
+                try {
+                    const newBalance = await applyBlackjackBetDeltaAndBroadcast(userId, additionalBet, 'Blackjack Split');
+                    charged = additionalBet > 0;
+                    blackjackRoomManager.split(roomId, userId, Number(newBalance || 0) + additionalBet);
+                } catch (err) {
+                    if (charged) {
+                        try {
+                            await applyBlackjackBetDeltaAndBroadcast(userId, -additionalBet, 'Blackjack Split Revert');
+                        } catch (rollbackErr) {
+                            console.error('Failed to rollback blackjack split:', rollbackErr);
+                        }
+                    }
+                    throw err;
+                }
 
                 await persistBlackjackSettlementIfNeeded(roomId);
                 const state = emitBlackjackState(io, roomId);
@@ -1525,6 +1594,10 @@ module.exports = function (io) {
 
         blackjackChangedRooms.forEach(async (roomId) => {
             try {
+                const room = blackjackRoomManager.getRoom(roomId);
+                if (room?.pendingRoundStartByUserId) {
+                    await startBlackjackRoundWithBuyIn(roomId, room.pendingRoundStartByUserId);
+                }
                 await persistBlackjackSettlementIfNeeded(roomId);
                 emitBlackjackState(io, roomId);
             } catch (err) {

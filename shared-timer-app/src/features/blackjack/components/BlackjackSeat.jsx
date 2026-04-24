@@ -4,6 +4,7 @@ import BlackjackCelebration from './BlackjackCelebration';
 import ChipStack from './ChipStack';
 import PlayingCard from './PlayingCard';
 import SettlementToast from './SettlementToast';
+import { formatKC } from '../utils/formatters';
 
 function getSeatClass(maxPlayers, seat) {
   return `blackjack-seat blackjack-seat-${maxPlayers}-${seat}`;
@@ -79,6 +80,8 @@ function SeatControls({
 }
 
 export default function BlackjackSeat({
+  autoBetEnabled,
+  onToggleAutoBet,
   player,
   selectedTable,
   roomState,
@@ -94,6 +97,7 @@ export default function BlackjackSeat({
   onChipAdd,
   onChipSub,
   onBetSubmit,
+  onLeaveSeat,
   pendingBet,
   balance
 }) {
@@ -120,6 +124,11 @@ export default function BlackjackSeat({
   const activeHand = player.hands?.[player.activeHandIndex] || null;
   const canSplit = player.hands?.length === 1 && player.hands[0].cards?.length === 2 && player.hands[0].cards[0].rank === player.hands[0].cards[1].rank;
   const isBettingPhase = roomState?.status === 'betting' || roomState?.status === 'waiting';
+  const hasCommittedBet = Number(player.currentBet || 0) > 0;
+  const actionLabel = hasCommittedBet ? 'Einsatz aktualisieren' : 'Einsatz setzen';
+  const seatSubline = player.waitingForNextRound
+    ? 'Nächste Runde'
+    : isLocalPlayer ? 'You' : player.isBot ? 'Bot' : 'Player';
 
   return (
     <div className={seatClassName}>
@@ -144,6 +153,16 @@ export default function BlackjackSeat({
           <div className="blackjack-seat-box-actual">
             <BlackjackCelebration active={(player.hands || []).some((hand) => hand.blackjack)} />
             {isCurrentTurn && <div className="blackjack-turn-arrow">{isLocalPlayer ? 'YOUR TURN' : 'TURN'}</div>}
+            {isLocalPlayer && (
+              <button
+                type="button"
+                className="blackjack-seat-close-btn"
+                onClick={onLeaveSeat}
+                aria-label="Sitzplatz verlassen"
+              >
+                ×
+              </button>
+            )}
 
             <div className="blackjack-seat-hands">
               {(player.hands || []).map((hand, handIndex) => {
@@ -177,23 +196,42 @@ export default function BlackjackSeat({
 
             {roomState?.status === 'settlement' && <SettlementToast settlements={settlements} />}
 
-            <div className="blackjack-seat-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="blackjack-seat-footer">
+              <div className="blackjack-seat-user-row">
                 <Avatar user={player} size={38} />
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, lineHeight: 1 }}>
-                  <div className="blackjack-seat-name" style={{ fontSize: '0.9rem', fontWeight: 800, color: '#f8fafc' }}>
+                <div className="blackjack-seat-user-copy">
+                  <div className="blackjack-seat-name seat-identity-name">
                     {player.displayName || player.username}
                   </div>
-                  <div className="blackjack-seat-subline" style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>
-                    {isLocalPlayer ? 'You' : player.isBot ? 'Bot' : 'Player'}
+                  <div className="blackjack-seat-subline seat-identity-subline">
+                    {seatSubline}
                   </div>
                 </div>
               </div>
+
+              {isLocalPlayer && isBettingPhase && (
+                <div className="blackjack-seat-inline-meta">
+                  <div className="blackjack-seat-bet-status">
+                    {hasCommittedBet ? `Gesetzt: ${formatKC(player.currentBet)}` : 'Noch kein Einsatz'}
+                  </div>
+                  <div className="blackjack-seat-auto-bet">
+                    <div className="blackjack-auto-bet-meta">
+                      <div className="blackjack-auto-bet-label">Auto-Bet</div>
+                      <div className="blackjack-auto-bet-value">{formatKC(pendingBet)}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`blackjack-toggle${autoBetEnabled ? ' active' : ''}`}
+                      onClick={onToggleAutoBet}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="blackjack-footer-chips" style={{ minHeight: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px' }}>
-            <div style={{ position: 'relative' }}>
+          <div className="blackjack-footer-chips">
+            <div className="blackjack-seat-bet-zone">
               {isBettingPhase && isLocalPlayer && pendingBet > 0 && (
                 <ChipStack amount={pendingBet} isPending onClick={() => onChipSub(pendingBet)} />
               )}
@@ -203,25 +241,8 @@ export default function BlackjackSeat({
             </div>
 
             {isBettingPhase && isLocalPlayer && pendingBet > 0 && (
-              <button
-                className="blackjack-bet-submit-btn"
-                onClick={() => onBetSubmit(pendingBet)}
-                style={{
-                  background: 'var(--accent-primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '60px',
-                  padding: '8px 20px',
-                  fontSize: '0.8rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(event) => { event.target.style.transform = 'scale(1.08)'; event.target.style.filter = 'brightness(1.1)'; }}
-                onMouseLeave={(event) => { event.target.style.transform = 'scale(1)'; event.target.style.filter = 'none'; }}
-              >
-                DEAL
+              <button className="blackjack-bet-submit-btn" onClick={() => onBetSubmit(pendingBet)}>
+                {actionLabel}
               </button>
             )}
           </div>

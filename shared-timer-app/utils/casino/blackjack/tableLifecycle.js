@@ -1,11 +1,15 @@
 function joinRoom(room, user, helpers) {
   const existing = helpers.getPlayerByUserId(room, user.userId);
+  const activeRound = helpers.hasActiveRound(room);
 
   if (existing) {
     existing.connected = true;
     existing.username = user.username || user.displayName || existing.username;
     existing.displayName = user.displayName || user.username || existing.displayName || existing.username;
     existing.preferences = user.preferences || existing.preferences || {};
+    if (activeRound && existing.currentBet <= 0) {
+      existing.waitingForNextRound = true;
+    }
     return room;
   }
 
@@ -18,8 +22,15 @@ function joinRoom(room, user, helpers) {
     throw new Error('No free blackjack seat is available.');
   }
 
-  room.players.push(helpers.createPlayerState(user, seat));
+  const player = helpers.createPlayerState(user, seat);
+  player.waitingForNextRound = activeRound;
+  room.players.push(player);
   room.players = helpers.getOrderedPlayers(room);
+
+  if (activeRound) {
+    return room;
+  }
+
   helpers.setRoomPhase(room, room.players.length > 0 ? 'betting' : 'waiting');
   helpers.maybeScheduleAutoStart(room);
 
@@ -82,6 +93,7 @@ function removeBot(room, helpers, botUserId = null) {
 function moveSeat(room, user, targetSeat, helpers) {
   const userId = user.userId || user.id;
   let player = helpers.getPlayerByUserId(room, userId);
+  const activeRound = helpers.hasActiveRound(room);
 
   const nextSeat = Number.parseInt(targetSeat, 10);
   if (!Number.isInteger(nextSeat) || nextSeat < 1 || nextSeat > room.maxPlayers) {
@@ -94,18 +106,24 @@ function moveSeat(room, user, targetSeat, helpers) {
 
   if (!player) {
     player = helpers.createPlayerState(user, nextSeat);
+    player.waitingForNextRound = activeRound;
     room.players.push(player);
   } else {
     if (player.seat === nextSeat) {
       return room;
     }
-    if (!helpers.canSwitchSeat(player) || helpers.hasActiveRound(room)) {
+    const canSwitchDuringActiveRound = activeRound && player.currentBet <= 0 && player.waitingForNextRound;
+    if (!helpers.canSwitchSeat(player) || (activeRound && !canSwitchDuringActiveRound)) {
       throw new Error('Seat switching is only available without an active hand.');
     }
     player.seat = nextSeat;
   }
 
   room.players = helpers.getOrderedPlayers(room);
+  if (activeRound) {
+    return room;
+  }
+
   helpers.setRoomPhase(room, room.players.length > 0 ? 'betting' : 'waiting');
   return room;
 }

@@ -1073,6 +1073,177 @@ const applyBlackjackSettlement = (results = []) => {
   });
 };
 
+const applyBlackjackRoundBuyIn = (entries = []) => {
+  return new Promise((resolve, reject) => {
+    const normalizedEntries = Array.isArray(entries)
+      ? entries
+          .filter((entry) => entry?.userId && Number(entry?.amount) > 0)
+          .map((entry) => ({
+            userId: String(entry.userId),
+            amount: Number(entry.amount)
+          }))
+      : [];
+
+    if (normalizedEntries.length === 0) {
+      resolve([]);
+      return;
+    }
+
+    const userIds = [...new Set(normalizedEntries.map((entry) => entry.userId))];
+    const amountByUserId = new Map();
+    normalizedEntries.forEach((entry) => {
+      amountByUserId.set(entry.userId, (amountByUserId.get(entry.userId) || 0) + entry.amount);
+    });
+
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION', (beginErr) => {
+        if (beginErr) {
+          reject(beginErr);
+        }
+      });
+
+      const placeholders = userIds.map(() => '?').join(', ');
+      db.all(
+        `SELECT id, CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id IN (${placeholders})`,
+        userIds,
+        (userErr, rows) => {
+          if (userErr) {
+            db.run('ROLLBACK', () => reject(userErr));
+            return;
+          }
+
+          const balances = new Map((rows || []).map((row) => [String(row.id), Number(row.koala_balance || 0)]));
+          for (const userId of userIds) {
+            if (!balances.has(userId)) {
+              db.run('ROLLBACK', () => reject(new Error('User not found.')));
+              return;
+            }
+            if (balances.get(userId) < (amountByUserId.get(userId) || 0)) {
+              db.run('ROLLBACK', () => reject(new Error('Not enough KoalaCoins.')));
+              return;
+            }
+          }
+
+          let pendingStatements = userIds.length * 2;
+          const onStatementDone = (statementErr) => {
+            if (statementErr) {
+              db.run('ROLLBACK', () => reject(statementErr));
+              return;
+            }
+
+            pendingStatements -= 1;
+            if (pendingStatements > 0) return;
+
+            db.run('COMMIT', (commitErr) => {
+              if (commitErr) {
+                reject(commitErr);
+                return;
+              }
+
+              db.all(
+                `SELECT id AS userId, koala_balance AS balance FROM Users WHERE id IN (${placeholders})`,
+                userIds,
+                (selectErr, updatedRows) => {
+                  if (selectErr) reject(selectErr);
+                  else resolve(updatedRows || []);
+                }
+              );
+            });
+          };
+
+          userIds.forEach((userId) => {
+            const amount = amountByUserId.get(userId) || 0;
+            db.run(
+              'UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?',
+              [amount, userId],
+              onStatementDone
+            );
+            db.run(
+              'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+              [userId, -amount, `Blackjack Round Buy-In (${amount})`],
+              onStatementDone
+            );
+          });
+        }
+      );
+    });
+  });
+};
+
+const applyBlackjackBetDelta = (userId, deltaCents = 0, reason = 'Blackjack Bet') => {
+  return new Promise((resolve, reject) => {
+    const normalizedDelta = Number(deltaCents || 0);
+    if (!userId) {
+      reject(new Error('userId is required'));
+      return;
+    }
+
+    if (!Number.isFinite(normalizedDelta)) {
+      reject(new Error('deltaCents must be a finite number'));
+      return;
+    }
+
+    if (normalizedDelta === 0) {
+      db.get('SELECT CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id = ?', [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? Number(row.koala_balance) : 0);
+      });
+      return;
+    }
+
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION', (beginErr) => {
+        if (beginErr) {
+          reject(beginErr);
+        }
+      });
+
+      db.get('SELECT CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id = ?', [userId], (userErr, user) => {
+        if (userErr || !user) {
+          db.run('ROLLBACK', () => reject(userErr || new Error('User not found')));
+          return;
+        }
+
+        if (normalizedDelta > 0 && Number(user.koala_balance || 0) < normalizedDelta) {
+          db.run('ROLLBACK', () => reject(new Error('Not enough KoalaCoins.')));
+          return;
+        }
+
+        const balanceChange = -normalizedDelta;
+        db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [balanceChange, userId], (updateErr) => {
+          if (updateErr) {
+            db.run('ROLLBACK', () => reject(updateErr));
+            return;
+          }
+
+          db.run(
+            'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+            [userId, balanceChange, reason],
+            (txErr) => {
+              if (txErr) {
+                db.run('ROLLBACK', () => reject(txErr));
+                return;
+              }
+
+              db.run('COMMIT', (commitErr) => {
+                if (commitErr) {
+                  reject(commitErr);
+                  return;
+                }
+
+                db.get('SELECT CAST(koala_balance AS INTEGER) AS koala_balance FROM Users WHERE id = ?', [userId], (balanceErr, row) => {
+                  if (balanceErr) reject(balanceErr);
+                  else resolve(row ? Number(row.koala_balance) : 0);
+                });
+              });
+            }
+          );
+        });
+      });
+    });
+  });
+};
+
 const getBlackjackLeaderboard = (sortBy = 'totalWon', limit = 50) => {
   return new Promise((resolve, reject) => {
     const validSorts = ['totalWon', 'gamesPlayed', 'blackjacksHit', 'totalWagered'];
@@ -1513,6 +1684,8 @@ module.exports = {
   updateWordleWordMetadataById,
   getUserWordleWins,
   getBlackjackStats,
+  applyBlackjackBetDelta,
+  applyBlackjackRoundBuyIn,
   upsertBlackjackStats,
   applyBlackjackSettlement,
   getBlackjackLeaderboard,
