@@ -207,6 +207,7 @@ const Wordle = ({ user, token }) => {
                     setHasDefinition(res.data.hasDefinition || false);
                     setMetadata({ 
                         definition: res.data.definition || null, 
+                        full_definition: res.data.full_definition || null,
                         funny_quote: res.data.funny_quote || null 
                     });
                 }
@@ -311,6 +312,7 @@ const Wordle = ({ user, token }) => {
                 setHasAttempted(true);
                 submitDaily(true);
             } else {
+                setMetadata(prev => ({ ...prev, definition: prev.full_definition || prev.definition }));
                 clearStorage();
             }
         } else if (guesses.length === MAX_GUESSES) {
@@ -319,6 +321,7 @@ const Wordle = ({ user, token }) => {
                 setHasAttempted(true);
                 submitDaily(false);
             } else {
+                setMetadata(prev => ({ ...prev, definition: prev.full_definition || prev.definition }));
                 clearStorage();
             }
         }
@@ -587,7 +590,7 @@ const Wordle = ({ user, token }) => {
                                                 {score}
                                             </div>
                                         </div>
-                                        {entry.hintUsed && <div title="Tipp benutzt" style={{ color: '#f59e0b' }}><Lightbulb size={16} /></div>}
+                                        {!!entry.hintUsed && <div title="Tipp benutzt" style={{ color: '#f59e0b' }}><Lightbulb size={16} /></div>}
                                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                     </div>
                                 </div>
