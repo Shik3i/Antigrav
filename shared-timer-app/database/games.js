@@ -802,7 +802,13 @@ const getUserTowerClimbCount = (userId) => {
 // --- Wordle ---
 const getDailyWord = (date) => {
   return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM Wordle_DailyWords WHERE date = ?', [date], (err, row) => err ? reject(err) : resolve(row));
+    const query = `
+      SELECT dw.date, dw.word, d.definition, d.funny_quote
+      FROM Wordle_DailyWords dw
+      LEFT JOIN wordle_dictionary d ON dw.word = d.word
+      WHERE dw.date = ?
+    `;
+    db.get(query, [date], (err, row) => err ? reject(err) : resolve(row));
   });
 };
 
