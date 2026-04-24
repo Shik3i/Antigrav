@@ -38,7 +38,7 @@ try {
   let room = blackjackRoomManager.getRoom(ROOM_ID);
   assert.strictEqual(room.phase, 'betting', 'table should stay in betting until auto-start deadline expires');
   assert(room.autoStartAt, 'auto-start deadline should be scheduled after all seated players have bet');
-  assert(room.autoStartAt >= beforeFirstBet + 9000, 'auto-start should be roughly 10 seconds out');
+  assert(room.autoStartAt <= beforeFirstBet + 2500, 'auto-start should be short when all seated players have bets');
 
   blackjackRoomManager.tick(room.autoStartAt - 1);
   room = blackjackRoomManager.getRoom(ROOM_ID);

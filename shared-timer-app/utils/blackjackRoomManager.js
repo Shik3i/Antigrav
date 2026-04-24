@@ -40,7 +40,8 @@ const MAX_BET_KC = 1000000;
 const MAX_BET_CENTS = MAX_BET_KC * CENTS_PER_KC;
 const TURN_TIMEOUT_MS = 90 * 1000;
 const AUTO_START_DELAY_MS = 10 * 1000;
-const SETTLEMENT_DISPLAY_MS = 1000;
+const ALL_BETS_READY_AUTO_START_DELAY_MS = 2 * 1000;
+const SETTLEMENT_DISPLAY_MS = 5 * 1000;
 const DEALER_ACTION_DELAY_MS = 1200;
 const BOT_ACTION_DELAY_MS = 1400;
 const BOT_DEFAULT_BET_CENTS = 100 * CENTS_PER_KC;
@@ -407,7 +408,8 @@ function maybeScheduleAutoStart(room, userId = null, now = Date.now()) {
   }
 
   setRoomPhase(room, 'betting');
-  room.autoStartAt = now + AUTO_START_DELAY_MS;
+  const allSeatedPlayersHaveBet = seatedPlayers.length > 0 && activeBettors.length === seatedPlayers.length;
+  room.autoStartAt = now + (allSeatedPlayersHaveBet ? ALL_BETS_READY_AUTO_START_DELAY_MS : AUTO_START_DELAY_MS);
   room.autoStartQueuedByUserId = userId || activeBettors[0]?.userId || null;
 }
 

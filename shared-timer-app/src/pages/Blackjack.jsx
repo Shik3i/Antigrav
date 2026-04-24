@@ -28,6 +28,7 @@ export default function Blackjack({ socket }) {
     handleRemoveBot,
     handleSmartJoin,
     handleSwitchRoom,
+    handleWatchRoom,
     handleTurnAction,
     leaderboard,
     leaderboardLoading,
@@ -110,6 +111,7 @@ export default function Blackjack({ socket }) {
         handleCreateRoom={handleCreateRoom}
         handleRemoveBot={handleRemoveBot}
         handleSwitchRoom={handleSwitchRoom}
+        handleWatchRoom={handleWatchRoom}
         loadRooms={loadRooms}
         roomDraft={roomDraft}
         roomId={autoJoinRoom ? roomId : null}

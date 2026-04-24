@@ -231,6 +231,30 @@ module.exports = function (io) {
             return emitBlackjackStateAndRooms(targetRoomId, userId);
         };
 
+        const watchBlackjackRoomForUser = async ({ userId, targetRoomId }) => {
+            const activeSocketRoomId = socket.data.blackjackRoomId || null;
+            const activePlayerRoomId = blackjackRoomManager.getPlayerRoomId(userId);
+
+            if (activeSocketRoomId && activeSocketRoomId !== targetRoomId) {
+                socket.leave(getBlackjackSocketRoom(activeSocketRoomId));
+            }
+
+            if (activePlayerRoomId && activePlayerRoomId !== targetRoomId) {
+                blackjackRoomManager.leaveRoom(activePlayerRoomId, userId);
+                emitBlackjackState(io, activePlayerRoomId);
+            }
+
+            const state = blackjackRoomManager.getRoomState(targetRoomId, userId);
+            if (!state) {
+                throw new Error('Blackjack room not found.');
+            }
+
+            socket.join(getBlackjackSocketRoom(targetRoomId));
+            socket.data.blackjackRoomId = targetRoomId;
+            emitBlackjackRooms(io);
+            return state;
+        };
+
         socket.on(EVENTS.GET_FRIENDS_STATUS, async () => {
             if (!socket.user) return;
             try {
@@ -743,6 +767,31 @@ module.exports = function (io) {
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to join blackjack table.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to join blackjack table.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_WATCH, async ({ roomId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    const payload = { success: false, error: 'Authentication required.' };
+                    socket.emit(EVENTS.BLACKJACK_ERROR, payload.error);
+                    sendSocketAck(ack, payload);
+                    return;
+                }
+
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                const state = await watchBlackjackRoomForUser({
+                    userId,
+                    targetRoomId: roomId
+                });
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to watch blackjack table.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to watch blackjack table.' });
             }
         });
 

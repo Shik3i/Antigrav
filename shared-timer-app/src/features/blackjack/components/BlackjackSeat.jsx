@@ -10,6 +10,16 @@ function getSeatClass(maxPlayers, seat) {
   return `blackjack-seat blackjack-seat-${maxPlayers}-${seat}`;
 }
 
+function getCommittedBetMotionClass(roomState, settlements) {
+  if (roomState?.status !== 'settlement') return 'is-on-table';
+  if (!settlements?.length) return 'is-on-table';
+
+  const netProfit = settlements.reduce((sum, settlement) => sum + (Number(settlement.netProfit) || 0), 0);
+  if (netProfit > 0) return 'is-won';
+  if (netProfit < 0) return 'is-lost';
+  return 'is-push';
+}
+
 function SeatControls({
   isLocalPlayer,
   roomState,
@@ -32,23 +42,22 @@ function SeatControls({
 
   return (
     <div className="blackjack-seat-controls-wrapper">
-      {isBetting && (
-        <div className="blackjack-chip-tray vertical-side">
-          {[1, 5, 25, 100, 500].map((value) => (
-            <button
-              key={value}
-              className="blackjack-casino-chip"
-              onClick={() => onChipAdd(value * 100)}
-              style={{
-                '--chip-color': value >= 500 ? '#7c3aed' : value >= 100 ? '#dc2626' : value >= 25 ? '#ec4899' : value >= 5 ? '#f59e0b' : '#f8fafc',
-                color: value >= 25 ? '#fff' : '#111827'
-              }}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className={`blackjack-chip-tray vertical-side${!isBetting ? ' is-planning' : ''}`}>
+        {[1, 5, 25, 100, 500].map((value) => (
+          <button
+            key={value}
+            className="blackjack-casino-chip"
+            onClick={() => onChipAdd(value * 100)}
+            title={!isBetting ? 'Auto-Bet fuer die naechste Runde anpassen' : undefined}
+            style={{
+              '--chip-color': value >= 500 ? '#7c3aed' : value >= 100 ? '#dc2626' : value >= 25 ? '#ec4899' : value >= 5 ? '#f59e0b' : '#f8fafc',
+              color: value >= 25 ? '#fff' : '#111827'
+            }}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
 
       {isCurrentTurn && roomState?.status === 'player_turns' && (
         <div className="blackjack-action-column">
@@ -125,6 +134,7 @@ export default function BlackjackSeat({
   const canSplit = player.hands?.length === 1 && player.hands[0].cards?.length === 2 && player.hands[0].cards[0].rank === player.hands[0].cards[1].rank;
   const isBettingPhase = roomState?.status === 'betting' || roomState?.status === 'waiting';
   const hasCommittedBet = Number(player.currentBet || 0) > 0;
+  const committedBetMotionClass = getCommittedBetMotionClass(roomState, settlements);
   const actionLabel = hasCommittedBet ? 'Einsatz aktualisieren' : 'Einsatz setzen';
   const seatSubline = player.waitingForNextRound
     ? 'Nächste Runde'
@@ -150,6 +160,12 @@ export default function BlackjackSeat({
         />
 
         <div className="blackjack-seat-content">
+          {hasCommittedBet && (
+            <div className={`blackjack-committed-bet-zone ${committedBetMotionClass}`}>
+              <ChipStack amount={player.currentBet} title="Gesetzter Einsatz" />
+            </div>
+          )}
+
           <div className="blackjack-seat-box-actual">
             <BlackjackCelebration active={(player.hands || []).some((hand) => hand.blackjack)} />
             {isCurrentTurn && <div className="blackjack-turn-arrow">{isLocalPlayer ? 'YOUR TURN' : 'TURN'}</div>}
@@ -197,23 +213,20 @@ export default function BlackjackSeat({
             {roomState?.status === 'settlement' && <SettlementToast settlements={settlements} />}
 
             <div className="blackjack-seat-footer">
-              <div className="blackjack-seat-user-row">
-                <Avatar user={player} size={38} />
-                <div className="blackjack-seat-user-copy">
-                  <div className="blackjack-seat-name seat-identity-name">
-                    {player.displayName || player.username}
-                  </div>
-                  <div className="blackjack-seat-subline seat-identity-subline">
-                    {seatSubline}
+              <div className="blackjack-seat-footer-main">
+                <div className="blackjack-seat-user-row">
+                  <Avatar user={player} size={38} />
+                  <div className="blackjack-seat-user-copy">
+                    <div className="blackjack-seat-name seat-identity-name">
+                      {player.displayName || player.username}
+                    </div>
+                    <div className="blackjack-seat-subline seat-identity-subline">
+                      {seatSubline}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {isLocalPlayer && isBettingPhase && (
-                <div className="blackjack-seat-inline-meta">
-                  <div className="blackjack-seat-bet-status">
-                    {hasCommittedBet ? `Gesetzt: ${formatKC(player.currentBet)}` : 'Noch kein Einsatz'}
-                  </div>
+                {isLocalPlayer && (
                   <div className="blackjack-seat-auto-bet">
                     <div className="blackjack-auto-bet-meta">
                       <div className="blackjack-auto-bet-label">Auto-Bet</div>
@@ -225,6 +238,12 @@ export default function BlackjackSeat({
                       onClick={onToggleAutoBet}
                     />
                   </div>
+                )}
+              </div>
+
+              {isLocalPlayer && isBettingPhase && (
+                <div className="blackjack-seat-bet-status">
+                  {hasCommittedBet ? `Gesetzt: ${formatKC(player.currentBet)}` : 'Noch kein Einsatz'}
                 </div>
               )}
             </div>
@@ -232,11 +251,13 @@ export default function BlackjackSeat({
 
           <div className="blackjack-footer-chips">
             <div className="blackjack-seat-bet-zone">
-              {isBettingPhase && isLocalPlayer && pendingBet > 0 && (
-                <ChipStack amount={pendingBet} isPending onClick={() => onChipSub(pendingBet)} />
-              )}
-              {(!isLocalPlayer || !isBettingPhase || (isLocalPlayer && pendingBet === 0)) && player.currentBet > 0 && (
-                <ChipStack amount={player.currentBet} />
+              {isLocalPlayer && pendingBet > 0 && (
+                <ChipStack
+                  amount={pendingBet}
+                  isPending
+                  onClick={() => onChipSub(pendingBet)}
+                  title="Geplanten Einsatz reduzieren"
+                />
               )}
             </div>
 

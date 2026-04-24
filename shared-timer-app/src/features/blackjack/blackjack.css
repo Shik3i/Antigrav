@@ -831,6 +831,11 @@
           backdrop-filter: none;
         }
 
+        .blackjack-chip-tray.vertical-side.is-planning {
+          opacity: 0.92;
+          filter: saturate(0.95);
+        }
+
         .blackjack-deal-button.mini {
           padding: 6px 4px;
           font-size: 0.65rem;
@@ -891,10 +896,93 @@
 }
 
 .blackjack-seat-content {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
   gap: 8px;
+}
+
+.blackjack-committed-bet-zone {
+  position: absolute;
+  left: 50%;
+  top: -128px;
+  z-index: 12;
+  transform: translateX(-50%);
+  pointer-events: none;
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.32));
+}
+
+.blackjack-committed-bet-zone .blackjack-realistic-stack {
+  cursor: default;
+}
+
+.blackjack-committed-bet-zone.is-on-table {
+  animation: blackjackBetToTable 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.blackjack-committed-bet-zone.is-won {
+  animation: blackjackBetToPlayer 2.4s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+
+.blackjack-committed-bet-zone.is-lost {
+  animation: blackjackBetToDealer 2.5s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+
+.blackjack-committed-bet-zone.is-push {
+  animation: blackjackBetPush 2.2s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+
+@keyframes blackjackBetToTable {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(32px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes blackjackBetToPlayer {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  55% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(34px) scale(1.04);
+  }
+  100% {
+    opacity: 0.78;
+    transform: translateX(-50%) translateY(148px) scale(0.92);
+  }
+}
+
+@keyframes blackjackBetToDealer {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  55% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-18px) scale(0.98);
+  }
+  100% {
+    opacity: 0.7;
+    transform: translateX(-50%) translateY(-118px) scale(0.82);
+  }
+}
+
+@keyframes blackjackBetPush {
+  0%, 100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(10px) scale(1.02);
+  }
 }
 
 .blackjack-seat-hands {
@@ -971,13 +1059,22 @@
   border-top: 1px solid rgba(255,255,255,0.05);
   padding-top: 8px;
   display: grid;
+  gap: 4px;
+}
+
+.blackjack-seat-footer-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .blackjack-seat-user-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .blackjack-seat-user-copy {
@@ -1003,19 +1100,61 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.blackjack-seat-inline-meta.always-visible {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .blackjack-seat-bet-status {
   font-size: 0.72rem;
   font-weight: 700;
   color: rgba(255,255,255,0.72);
+  min-width: 0;
+  line-height: 1.1;
 }
 
 .blackjack-seat-auto-bet {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.blackjack-seat-auto-bet .blackjack-auto-bet-meta {
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.blackjack-seat-auto-bet .blackjack-auto-bet-label,
+.blackjack-seat-auto-bet .blackjack-auto-bet-value {
+  max-width: 76px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blackjack-seat-auto-bet .blackjack-toggle {
+  width: 38px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.blackjack-seat-auto-bet .blackjack-toggle::after {
+  width: 16px;
+  height: 16px;
+}
+
+.blackjack-seat-auto-bet .blackjack-toggle.active::after {
+  transform: translateX(16px);
 }
 
 .blackjack-seat-close-btn {
@@ -1071,7 +1210,7 @@
 }
 
 .blackjack-realistic-stack.pending {
-  width: 84px;
+  width: 156px;
 }
 
 .chips-container.grouped .casino-chip-layered {
@@ -1110,7 +1249,7 @@
         .chip-val-tiny {
           font-size: 0.55rem;
           font-weight: 950;
-          color: rgba(255,255,255,0.9);
+          color: var(--chip-text-color, rgba(255,255,255,0.9));
           text-shadow: 0 1px 2px rgba(0,0,0,0.5);
           z-index: 2;
         }

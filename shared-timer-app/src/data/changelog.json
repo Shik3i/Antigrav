@@ -1,5 +1,11 @@
 [
   {
+    "id": 87,
+    "version": "2.53.0",
+    "date": "2026-04-24",
+    "changes": "- **Blackjack Spectator-Flow**: Tische können jetzt zuerst beobachtet und anschließend über freie Plätze betreten werden, inklusive stabiler Join-Logik ohne Raum-Duplikate.\n- **Blackjack Auto-Bet UX**: Auto-Bet bleibt dauerhaft sichtbar und kann während laufender Runden für die nächste Hand erhöht oder über den Pending-Chip-Stack reduziert werden.\n- **Blackjack Chip-Animationen**: Gesetzte Einsätze werden visuell vom Spieler Richtung Dealer platziert und bewegen sich im Settlement ruhig je nach Ergebnis zurück zum Spieler oder zum Dealer.\n- **Blackjack Round-Flow**: Ergebnisse bleiben länger sichtbar, vollständig gesetzte Auto-Bet-Runden starten schneller, und Split-Ass-Hände beenden den Turn korrekt ohne im Player-Turn hängen zu bleiben."
+  },
+  {
     "id": 86,
     "version": "2.52.0",
     "date": "2026-04-24",

@@ -27,6 +27,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
   const [error, setError] = useState('');
   const [recentSettlement, setRecentSettlement] = useState({ roundId: null, results: [] });
   const [autoBetEnabled, setAutoBetEnabled] = useState(() => localStorage.getItem('blackjack_auto_bet') === 'true');
+  const [watchOnlyRoom, setWatchOnlyRoom] = useState(() => localStorage.getItem('blackjack_watch_only_room') === 'true');
   const joinedRoomIdRef = useRef(null);
 
   const roomId = useMemo(() => currentRoomId || getRoomId(selectedTable), [currentRoomId, selectedTable]);
@@ -54,6 +55,10 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
   useEffect(() => {
     localStorage.setItem('blackjack_auto_join_room', autoJoinRoom ? 'true' : 'false');
   }, [autoJoinRoom]);
+
+  useEffect(() => {
+    localStorage.setItem('blackjack_watch_only_room', watchOnlyRoom ? 'true' : 'false');
+  }, [watchOnlyRoom]);
 
   useEffect(() => {
     if (roomState?.lastSettlement?.length && roomState?.lastSettlementRoundId) {
@@ -244,7 +249,9 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
         return;
       }
       const previouslyJoinedRoom = joinedRoomIdRef.current;
-      const eventName = previouslyJoinedRoom && previouslyJoinedRoom !== roomId
+      const eventName = watchOnlyRoom
+        ? EVENTS.BLACKJACK_WATCH
+        : previouslyJoinedRoom && previouslyJoinedRoom !== roomId
         ? EVENTS.BLACKJACK_SWITCH_ROOM
         : EVENTS.BLACKJACK_JOIN;
       const payload = eventName === EVENTS.BLACKJACK_SWITCH_ROOM
@@ -253,7 +260,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
 
       runSocketAction(eventName, payload)
         .then((response) => {
-          joinedRoomIdRef.current = response?.roomId || roomId;
+          joinedRoomIdRef.current = watchOnlyRoom ? null : response?.roomId || roomId;
           setError('');
         })
         .catch(async (err) => {
@@ -287,7 +294,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
       socket.off(EVENTS.BLACKJACK_ERROR, handleError);
       socket.off(EVENTS.CONNECT, handleConnect);
     };
-  }, [autoJoinRoom, isGuest, loadFallbackState, roomId, runSocketAction, selectedTable, showToast, socket]);
+  }, [autoJoinRoom, isGuest, loadFallbackState, roomId, runSocketAction, selectedTable, showToast, socket, watchOnlyRoom]);
 
   useEffect(() => {
     const handleCoinUpdate = ({ balance }) => syncBalance(balance);
@@ -364,6 +371,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     setError('');
     try {
       setAutoJoinRoom(true);
+      setWatchOnlyRoom(false);
       setSelectedTable(safeMaxPlayers);
       setCurrentRoomId(nextRoomId);
 
@@ -396,12 +404,36 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     }
   }, [joinRoomByApi, loadRoomStateById, runSocketAction, selectedTable]);
 
+  const handleWatchRoom = useCallback(async (nextRoomId, nextMaxPlayers = selectedTable) => {
+    const safeMaxPlayers = nextMaxPlayers === 3 ? 3 : 5;
+    setActionBusy(true);
+    setError('');
+    try {
+      setAutoJoinRoom(true);
+      setWatchOnlyRoom(true);
+      joinedRoomIdRef.current = null;
+      setSelectedTable(safeMaxPlayers);
+      setCurrentRoomId(nextRoomId);
+      const response = await runSocketAction(EVENTS.BLACKJACK_WATCH, { roomId: nextRoomId, maxPlayers: safeMaxPlayers });
+      setRoomState(response?.state || null);
+    } catch (err) {
+      try {
+        await loadRoomStateById(nextRoomId, safeMaxPlayers);
+      } catch (stateErr) {
+        setError(err.message || stateErr.message || 'Zuschauen fehlgeschlagen.');
+      }
+    } finally {
+      setActionBusy(false);
+    }
+  }, [loadRoomStateById, runSocketAction, selectedTable]);
+
   const handleCreateRoom = useCallback(async () => {
     const nextRoomId = normalizeRoomSlug(roomDraft, selectedTable);
     setActionBusy(true);
     setError('');
     try {
       setAutoJoinRoom(true);
+      setWatchOnlyRoom(false);
       await runSocketAction(EVENTS.BLACKJACK_CREATE_ROOM, { roomId: nextRoomId, maxPlayers: selectedTable });
       setRoomDraft('');
       showToast(`Tisch ${nextRoomId} erstellt.`, 'success');
@@ -418,6 +450,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
       await runSocketAction(EVENTS.BLACKJACK_LEAVE, { roomId });
       joinedRoomIdRef.current = null;
       setAutoJoinRoom(false);
+      setWatchOnlyRoom(false);
       setRoomState(null);
       showToast('Sitzplatz verlassen.', 'success');
     } catch (err) {
@@ -458,21 +491,22 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     setError('');
     try {
       setAutoJoinRoom(true);
-      let activeRoomState = roomState;
-      if (!activeRoomState) {
-        try {
-          setAutoJoinRoom(true);
-          const joinResp = await runSocketAction(EVENTS.BLACKJACK_JOIN, { roomId });
-          activeRoomState = joinResp.state;
-        } catch (err) {
-          if (err.message?.toLowerCase().includes('not found')) {
-            setAutoJoinRoom(true);
-            const createResp = await runSocketAction(EVENTS.BLACKJACK_CREATE_ROOM, { roomId, maxPlayers: selectedTable });
-            await runSocketAction(EVENTS.BLACKJACK_JOIN, { roomId });
-            activeRoomState = createResp.state;
-          } else {
-            throw err;
-          }
+      setWatchOnlyRoom(false);
+      try {
+        const joinResp = await runSocketAction(EVENTS.BLACKJACK_JOIN, { roomId });
+        if (joinResp?.roomId) {
+          joinedRoomIdRef.current = joinResp.roomId;
+        }
+      } catch (err) {
+        const isNotFound = err.message?.toLowerCase().includes('not found');
+        const roomExistsInLobby = (availableRooms || []).some((room) => String(room.roomId) === String(roomId));
+
+        if (isNotFound && !roomState && !roomExistsInLobby) {
+          const createResp = await runSocketAction(EVENTS.BLACKJACK_CREATE_ROOM, { roomId, maxPlayers: selectedTable });
+          await runSocketAction(EVENTS.BLACKJACK_JOIN, { roomId });
+          joinedRoomIdRef.current = createResp?.roomId || roomId;
+        } else {
+          throw err;
         }
       }
 
@@ -487,7 +521,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     } finally {
       setActionBusy(false);
     }
-  }, [roomId, roomState, runSocketAction, selectedTable, showToast]);
+  }, [availableRooms, roomId, roomState, runSocketAction, selectedTable, showToast]);
 
   return {
     actionBusy,
@@ -504,6 +538,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     handleRemoveBot,
     handleSmartJoin,
     handleSwitchRoom,
+    handleWatchRoom,
     handleTurnAction,
     leaderboard,
     leaderboardLoading,

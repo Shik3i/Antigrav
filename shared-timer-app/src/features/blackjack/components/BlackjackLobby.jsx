@@ -10,6 +10,7 @@ export default function BlackjackLobby({
   handleRemoveBot,
   handleCreateRoom,
   handleSwitchRoom,
+  handleWatchRoom,
   loadRooms,
   roomDraft,
   roomId,
@@ -110,9 +111,9 @@ export default function BlackjackLobby({
                 </button>
                 <button
                   className={room.roomId === roomId ? 'btn-primary' : 'btn-ghost'}
-                  onClick={() => handleSwitchRoom(room.roomId, room.maxPlayers)}
+                  onClick={() => handleWatchRoom(room.roomId, room.maxPlayers)}
                 >
-                  {room.roomId === roomId ? 'Aktiv' : 'Beitreten'}
+                  {room.roomId === roomId ? 'Aktiv' : 'Zuschauen'}
                 </button>
               </div>
             </div>
