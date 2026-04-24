@@ -343,10 +343,22 @@ exports.getGlobalScratchcardStats = async (req, res) => {
         ]);
         const formatWinners = (winners) => winners.map(w => ({
             ...w,
+            totalWin: w.totalWon, // Map for frontend consistency
             grid: (typeof w.grid === 'string') ? JSON.parse(w.grid) : (w.grid || []),
             preferences: (typeof w.preferences === 'string') ? JSON.parse(w.preferences) : (w.preferences || {})
         }));
-        res.json({ ...stats, latestWinners: formatWinners(latestWinners), topWinners: formatWinners(topWinners), leaderboard: formatWinners(leaderboard) });
+        
+        // Map stats to frontend expected names
+        const mappedStats = {
+            total_sold: stats.totalPlayed || 0,
+            total_wins: stats.totalWins || 0,
+            total_won: stats.totalPayout || 0,
+            latestWinners: formatWinners(latestWinners),
+            topWinners: formatWinners(topWinners),
+            leaderboard: formatWinners(leaderboard)
+        };
+        
+        res.json(mappedStats);
     } catch (err) {
         console.error('getGlobalScratchcardStats error:', err);
         res.status(500).json({ error: 'Failed to fetch global stats' });
@@ -355,7 +367,7 @@ exports.getGlobalScratchcardStats = async (req, res) => {
 
 exports.getScratchcardLeaderboardData = async (req, res) => {
     try {
-        const data = await dbLayer.getScratchcardLeaderboardData();
+        const data = await dbLayer.getScratchcardChartData();
         res.json(data.map(row => ({ day: row.day, dailyWin: Number(row.dailyWin) })));
     } catch (err) {
         console.error('getScratchcardLeaderboardData error:', err);
