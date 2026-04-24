@@ -82,11 +82,11 @@ module.exports = function (io) {
         const balanceUpdates = await dbLayer.applyBlackjackSettlement(room.lastSettlement.filter((entry) => !entry?.isBot));
         room.lastAppliedSettlementRoundId = room.lastSettlementRoundId;
 
-        balanceUpdates.forEach((entry) => {
+        (Array.isArray(balanceUpdates) ? balanceUpdates : []).forEach((entry) => {
             broadcastCoinUpdate(io, entry.userId, entry.balance);
         });
 
-        return balanceUpdates;
+        return Array.isArray(balanceUpdates) ? balanceUpdates : [];
     };
 
     // Middleware to extract and verify user token
@@ -765,6 +765,25 @@ module.exports = function (io) {
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to add blackjack bot.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to add blackjack bot.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_REMOVE_BOT, ({ roomId, botUserId } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.removeBot(roomId, botUserId || null);
+                const state = emitBlackjackStateAndRooms(roomId, userId);
+                sendSocketAck(ack, { success: true, roomId, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to remove blackjack bot.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to remove blackjack bot.' });
             }
         });
 

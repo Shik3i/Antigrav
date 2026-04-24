@@ -15,7 +15,7 @@ const emitBalanceUpdates = (req, updates = []) => {
   const io = getIo(req);
   if (!io) return;
 
-  updates.forEach((entry) => {
+  (Array.isArray(updates) ? updates : []).forEach((entry) => {
     if (entry?.userId && Number.isFinite(entry?.balance)) {
       io.to(entry.userId).emit('COIN_BALANCE_UPDATE', { balance: entry.balance });
     }
@@ -164,6 +164,26 @@ exports.addBot = async (req, res) => {
   } catch (err) {
     const status = err.message?.includes('full') ? 409 : 400;
     res.status(status).json({ error: err.message || 'Failed to add blackjack bot' });
+  }
+};
+
+exports.removeBot = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { roomId } = resolveRoomRequest(req);
+    const room = blackjackRoomManager.removeBot(roomId, req.body?.botUserId || null);
+    emitBlackjackSync(req, roomId, userId);
+    res.json({
+      success: true,
+      roomId,
+      state: room ? blackjackRoomManager.getRoomState(roomId, userId) : null
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Failed to remove blackjack bot' });
   }
 };
 
