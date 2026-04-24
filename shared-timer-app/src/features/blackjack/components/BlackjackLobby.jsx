@@ -20,8 +20,6 @@ export default function BlackjackLobby({
   setSelectedTable
 }) {
   const filteredRooms = (availableRooms || []).filter((room) => room.maxPlayers === selectedTable);
-  const activeRoom = filteredRooms.find((room) => String(room.roomId) === String(roomId)) || null;
-  const activeRoomHasBot = Boolean(activeRoom?.occupiedSeats?.some((seat) => seat.isBot));
 
   return (
     <section className="blackjack-surface blackjack-surface-dark">
@@ -32,7 +30,7 @@ export default function BlackjackLobby({
             Blackjack Lobby
           </div>
           <div className="blackjack-surface-copy">
-            Mehrere Tische parallel. Aktiv: <strong>{roomId}</strong>
+            Mehrere Tische parallel. Aktiv: <strong>{roomId || 'kein Raum'}</strong>
           </div>
         </div>
         <button className="btn-ghost" onClick={loadRooms} disabled={actionBusy}>Tische aktualisieren</button>
@@ -76,14 +74,6 @@ export default function BlackjackLobby({
         <div className="blackjack-room-list">
           <div className="blackjack-room-list-header">
             <div className="blackjack-panel-title">Offene {selectedTable}er-Tische</div>
-            <div className="blackjack-room-actions">
-              <button className="btn-ghost" onClick={() => handleAddBot(roomId, selectedTable)} disabled={actionBusy}>
-                Bot zum aktiven Tisch
-              </button>
-              <button className="btn-ghost" onClick={() => handleRemoveBot(roomId)} disabled={actionBusy || !activeRoomHasBot}>
-                Bot entfernen
-              </button>
-            </div>
           </div>
           {filteredRooms.length === 0 && (
             <div className="blackjack-room-empty">

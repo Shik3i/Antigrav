@@ -19,6 +19,7 @@ function serializePlayer(player, helpers) {
     })),
     done: player.done,
     connected: player.connected,
+    waitingForNextRound: Boolean(player.waitingForNextRound),
     preferences: player.preferences || {}
   };
 }

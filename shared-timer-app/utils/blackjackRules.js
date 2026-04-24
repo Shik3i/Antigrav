@@ -24,6 +24,25 @@ function calculateHandValue(hand) {
   return total;
 }
 
+function isSoft17(hand) {
+  const cards = Array.isArray(hand) ? hand : [];
+  let total = 0;
+  let aces = 0;
+
+  cards.forEach((card) => {
+    const value = getCardValue(card?.rank);
+    total += value;
+    if (card?.rank === 'A') aces += 1;
+  });
+
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces -= 1;
+  }
+
+  return total === 17 && aces > 0;
+}
+
 function isBust(hand) {
   return calculateHandValue(hand) > 21;
 }
@@ -34,6 +53,7 @@ function isBlackjack(hand) {
 
 module.exports = {
   calculateHandValue,
+  isSoft17,
   isBust,
   isBlackjack
 };

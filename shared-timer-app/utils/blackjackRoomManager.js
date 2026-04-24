@@ -7,7 +7,7 @@ const {
   serializeCard,
   serializeDealerHand
 } = require('./blackjackCards');
-const { calculateHandValue, isBust, isBlackjack } = require('./blackjackRules');
+const { calculateHandValue, isSoft17, isBust, isBlackjack } = require('./blackjackRules');
 const { createBaseTableState, createParticipantState } = require('./casino/core/stateFactories');
 const {
   normalizeRoomId,
@@ -39,7 +39,7 @@ const CENTS_PER_KC = 100;
 const MAX_BET_KC = 1000000;
 const MAX_BET_CENTS = MAX_BET_KC * CENTS_PER_KC;
 const TURN_TIMEOUT_MS = 90 * 1000;
-const AUTO_START_DELAY_MS = 15 * 1000;
+const AUTO_START_DELAY_MS = 10 * 1000;
 const SETTLEMENT_DISPLAY_MS = 1000;
 const DEALER_ACTION_DELAY_MS = 1200;
 const BOT_ACTION_DELAY_MS = 1400;
@@ -60,7 +60,8 @@ function createPlayerState(user, seat) {
     currentBet: 0,
     hands: [],
     activeHandIndex: 0,
-    done: false
+    done: false,
+    waitingForNextRound: false
   };
 }
 
@@ -155,6 +156,8 @@ function createRoom(roomId, maxPlayers = 5) {
     autoStartAt: null,
     autoStartQueuedByUserId: null,
     settlementCompleteAt: null,
+    pendingRoundStartByUserId: null,
+    lastAppliedBuyInRoundId: null,
     dealerPhase: null,
     dealerActionAt: null,
     botActionAt: null,
@@ -232,6 +235,7 @@ const dealerHelpers = {
   calculateHandValue,
   dealerActionDelayMs: DEALER_ACTION_DELAY_MS,
   drawIntoHand,
+  isSoft17,
   setDeadline,
   setPhase,
   settleRound: (room, now) => settlement.settleRound(room, now, settlementHelpers)
@@ -388,31 +392,23 @@ function maybeScheduleAutoStart(room, userId = null, now = Date.now()) {
   if (!['waiting', 'betting'].includes(room.status)) {
     room.autoStartAt = null;
     room.autoStartQueuedByUserId = null;
+    room.pendingRoundStartByUserId = null;
     return;
   }
 
-  const seatedPlayers = getOrderedPlayers(room);
+  const seatedPlayers = getOrderedPlayers(room).filter((player) => player.connected !== false);
   const activeBettors = seatedPlayers.filter((p) => p.currentBet > 0);
 
   if (!activeBettors.length) {
     room.autoStartAt = null;
     room.autoStartQueuedByUserId = null;
-    return;
-  }
-
-  // AUTO-START: If everyone at the table has bet, start the round immediately
-  if (activeBettors.length === seatedPlayers.length && seatedPlayers.length > 0) {
-    room.autoStartAt = null;
-    room.autoStartQueuedByUserId = null;
-    startRound(room.roomId);
+    room.pendingRoundStartByUserId = null;
     return;
   }
 
   setRoomPhase(room, 'betting');
-  if (!room.autoStartAt) {
-    room.autoStartAt = now + AUTO_START_DELAY_MS;
-    room.autoStartQueuedByUserId = userId || activeBettors[0]?.userId || null;
-  }
+  room.autoStartAt = now + AUTO_START_DELAY_MS;
+  room.autoStartQueuedByUserId = userId || activeBettors[0]?.userId || null;
 }
 
 function startRound(roomId, startedByUserId) {
@@ -421,6 +417,7 @@ function startRound(roomId, startedByUserId) {
     throw new Error('Blackjack room not found.');
   }
 
+  room.pendingRoundStartByUserId = null;
   roundFlow.startRound(room, startedByUserId, roundFlowHelpers);
 
   if (!room.currentPlayerTurn) {

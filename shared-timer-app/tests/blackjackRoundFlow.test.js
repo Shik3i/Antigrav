@@ -6,6 +6,11 @@ const USER_ID = 'plan-user-round';
 
 let createdRoom = false;
 
+function card(rank, suit = 'spades') {
+  const suitCode = suit === 'hearts' ? 'H' : suit === 'diamonds' ? 'D' : suit === 'clubs' ? 'C' : 'S';
+  return { rank, suit, code: `${rank}${suitCode}` };
+}
+
 try {
   if (!blackjackRoomManager.getRoom(ROOM_ID)) {
     blackjackRoomManager.createRoom(ROOM_ID, 3);
@@ -23,6 +28,15 @@ try {
   let room = blackjackRoomManager.getRoom(ROOM_ID);
   assert.strictEqual(room.phase, 'betting');
   assert.strictEqual(room.players[0].currentBet, 10000);
+  room.shoe = [
+    card('5'),
+    card('9', 'hearts'),
+    card('6'),
+    card('10', 'hearts'),
+    ...Array.from({ length: 80 }, () => card('2', 'clubs'))
+  ];
+  room.needsShuffle = false;
+  room.reshuffleRemainingPercent = 0;
 
   blackjackRoomManager.startRound(ROOM_ID, USER_ID);
   room = blackjackRoomManager.getRoom(ROOM_ID);

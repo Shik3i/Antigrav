@@ -47,3 +47,14 @@ export function buildRealisticStack(amountCents) {
   }
   return stack.reverse();
 }
+
+export function buildRealisticGroups(amountCents) {
+  const counts = new Map();
+  buildRealisticStack(amountCents).forEach((value) => {
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+
+  return [...counts.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([value, count]) => ({ value, count }));
+}
