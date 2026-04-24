@@ -876,12 +876,15 @@ const buyWordleHint = (userId, date) => {
     db.serialize(() => {
       db.run('BEGIN TRANSACTION');
       db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (err, user) => {
-        if (err || !user || user.koala_balance < 500) return db.run('ROLLBACK', () => reject(err || new Error('Insufficient balance')));
-        db.run('UPDATE Users SET koala_balance = koala_balance - 500 WHERE id = ?', [userId]);
+        if (err || !user) return db.run('ROLLBACK', () => reject(err || new Error('User not found')));
+        if (user.koala_balance < 500) return db.run('ROLLBACK', () => reject(new Error('Insufficient balance')));
+        
+        const newBalance = user.koala_balance - 500;
+        db.run('UPDATE Users SET koala_balance = ? WHERE id = ?', [newBalance, userId]);
         db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, -500, `Wordle Hint (${date})`]);
-        db.run('INSERT INTO Wordle_DailyResults (userId, date, hintUsed) VALUES (?, ?, 1) ON CONFLICT(userId, date) DO UPDATE SET hintUsed = 1', [userId, date]);
+        db.run('INSERT INTO Wordle_DailyResults (userId, date, hintUsed, guesses, won) VALUES (?, ?, 1, "[]", 0) ON CONFLICT(userId, date) DO UPDATE SET hintUsed = 1', [userId, date]);
         db.run('INSERT INTO Wordle_UserStats (userId, totalHintsBought) VALUES (?, 1) ON CONFLICT(userId) DO UPDATE SET totalHintsBought = totalHintsBought + 1', [userId]);
-        db.run('COMMIT', (err) => err ? reject(err) : resolve(true));
+        db.run('COMMIT', (err) => err ? reject(err) : resolve({ success: true, newBalance }));
       });
     });
   });

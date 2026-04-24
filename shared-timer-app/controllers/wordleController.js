@@ -283,6 +283,7 @@ exports.getRandomWord = async (req, res, next) => {
         res.json({ 
             word: wordObj.word, 
             definition: truncated,
+            full_definition: def,
             funny_quote: wordObj.funny_quote,
             hasDefinition: !!def
         });
