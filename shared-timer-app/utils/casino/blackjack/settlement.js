@@ -15,6 +15,7 @@ function finishSettlementPhase(room, now, helpers) {
   room.players.forEach((player) => {
     player.currentBet = 0;
     player.waitingForNextRound = false;
+    helpers.clearRoundSideBets(player);
     helpers.resetPlayerRoundState(player);
   });
   room.players = room.players.filter((player) => player.connected !== false);
@@ -75,6 +76,8 @@ function settleRound(room, now, helpers) {
         totalHands: player.hands.length
       });
     });
+
+    entries.push(...helpers.settleSideBets(room, player, helpers));
   });
 
   room.lastSettlement = entries;
