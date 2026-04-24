@@ -29,6 +29,7 @@ const turns = require('./casino/blackjack/turns');
 const actions = require('./casino/blackjack/actions');
 const dealer = require('./casino/blackjack/dealer');
 const settlement = require('./casino/blackjack/settlement');
+const sideBets = require('./casino/blackjack/sideBets');
 const botStrategy = require('./casino/blackjack/botStrategy');
 const blackjackSerialization = require('./casino/blackjack/serialization');
 
@@ -62,7 +63,10 @@ function createPlayerState(user, seat) {
     hands: [],
     activeHandIndex: 0,
     done: false,
-    waitingForNextRound: false
+    waitingForNextRound: false,
+    pendingSideBets: {},
+    activeSideBets: {},
+    sideBetResults: []
   };
 }
 
@@ -83,6 +87,7 @@ function resetPlayerRoundState(player) {
   player.hands = [createHandState(player.currentBet)];
   player.activeHandIndex = 0;
   player.done = false;
+  player.sideBetResults = [];
 }
 
 function canSwitchSeat(player) {
@@ -217,6 +222,13 @@ const bettingHelpers = {
   validateBetAmount
 };
 
+const sideBetHelpers = {
+  getPlayerByUserId,
+  maybeScheduleAutoStart,
+  setPhase,
+  validateBetAmount
+};
+
 const roundFlowHelpers = {
   botActionDelayMs: BOT_ACTION_DELAY_MS,
   clearDeadline,
@@ -226,6 +238,7 @@ const roundFlowHelpers = {
   resetPlayerRoundState,
   reshuffleShoe,
   setDeadline,
+  lockSideBets: sideBets.lockSideBets,
   setPhase,
   shouldReshuffle,
   syncPlayerState,
@@ -266,7 +279,9 @@ const settlementHelpers = {
   maybeScheduleAutoStart,
   resetPlayerRoundState,
   setDeadline,
+  clearRoundSideBets: sideBets.clearRoundSideBets,
   setPhase,
+  settleSideBets: sideBets.settleSideBets,
   settlementDisplayMs: SETTLEMENT_DISPLAY_MS,
   syncPlayerState,
   updateShuffleFlag
@@ -302,7 +317,8 @@ const stateSerializationHelpers = {
   getDealerPhase,
   getOrderedPlayers,
   serializeCard,
-  serializeDealerHand
+  serializeDealerHand,
+  sideBetDefinitions: sideBets.getSideBetDefinitions()
 };
 
 function joinRoom(roomId, user) {
@@ -386,6 +402,15 @@ function placeBet(roomId, userId, amount, userBalance) {
   }
 
   return bets.placeBet(room, userId, amount, userBalance, bettingHelpers);
+}
+
+function placeSideBet(roomId, userId, sideBetKey, amount, userBalance) {
+  const room = rooms.get(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
+  }
+
+  return sideBets.placeSideBet(room, userId, sideBetKey, amount, userBalance, sideBetHelpers);
 }
 
 function maybeScheduleAutoStart(room, userId = null, now = Date.now()) {
@@ -530,6 +555,7 @@ module.exports = {
   leaveRoom,
   getRoomState,
   placeBet,
+  placeSideBet,
   addBot,
   removeBot,
   moveSeat,

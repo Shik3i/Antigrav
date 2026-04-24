@@ -28,6 +28,7 @@ function startRound(room, startedByUserId, helpers) {
   room.players.forEach((player) => helpers.resetPlayerRoundState(player));
 
   activePlayers.forEach((player) => {
+    helpers.lockSideBets(player);
     helpers.drawIntoHand(room, player.hands[0].cards);
     helpers.syncPlayerState(player);
   });

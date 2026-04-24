@@ -6,6 +6,9 @@ function serializePlayer(player, helpers) {
     isBot: Boolean(player.isBot),
     seat: player.seat,
     currentBet: player.currentBet,
+    pendingSideBets: player.pendingSideBets || {},
+    activeSideBets: player.activeSideBets || {},
+    sideBetResults: player.sideBetResults || [],
     activeHandIndex: player.activeHandIndex,
     hands: (player.hands || []).map((hand) => ({
       cards: (hand.cards || []).map((card) => helpers.serializeCard(card, true)),
@@ -34,6 +37,9 @@ function serializeSettlement(results) {
     blackjack: entry.blackjack,
     busted: entry.busted,
     result: entry.result,
+    settlementType: entry.settlementType || 'main',
+    sideBetKey: entry.sideBetKey || null,
+    label: entry.label || null,
     payout: entry.payout,
     netProfit: entry.netProfit
   }));
@@ -66,6 +72,7 @@ function getRoomState(room, viewerUserId, helpers) {
     deckCount: room.deckCount,
     burnCard: Boolean(room.burnCard),
     allowedBets: helpers.allowedBets,
+    sideBetDefinitions: helpers.sideBetDefinitions || [],
     viewerUserId,
     lastSettlement: serializeSettlement(room.lastSettlement),
     lastSettlementRoundId: room.lastSettlementRoundId
