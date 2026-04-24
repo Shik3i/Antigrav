@@ -45,6 +45,16 @@ try {
   assert.strictEqual(room.players[0].hands.length, 1);
   assert.strictEqual(room.players[0].hands[0].cards.length, 2);
   assert.strictEqual(room.dealerHand.length, 2);
+
+  blackjackRoomManager.settleRound(ROOM_ID);
+  room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert.strictEqual(room.discardPile.length, 0, 'cards should remain in hands while settlement is visible');
+
+  blackjackRoomManager.tick(room.settlementCompleteAt + 1);
+  room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert.strictEqual(room.dealerHand.length, 0, 'dealer hand should be cleared after settlement cleanup');
+  assert.strictEqual(room.players[0].hands[0].cards.length, 0, 'player hand cards should be cleared after settlement cleanup');
+  assert.strictEqual(room.discardPile.length, 4, 'dealer and player cards should all move to the discard pile');
 } finally {
   blackjackRoomManager.leaveRoom(ROOM_ID, USER_ID);
   if (createdRoom) {

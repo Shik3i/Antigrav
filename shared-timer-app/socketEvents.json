@@ -86,6 +86,7 @@
     "BLACKJACK_REMOVE_BOT": "blackjack:remove_bot",
     "BLACKJACK_SWITCH_SEAT": "blackjack:switch_seat",
     "BLACKJACK_BET": "blackjack:bet",
+    "BLACKJACK_SIDE_BET": "blackjack:side_bet",
     "BLACKJACK_START": "blackjack:start",
     "BLACKJACK_HIT": "blackjack:hit",
     "BLACKJACK_STAND": "blackjack:stand",

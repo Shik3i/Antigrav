@@ -87,7 +87,8 @@ function shouldReshuffle(roomState) {
 function reshuffleShoe(roomState) {
   const combinedCards = [
     ...(Array.isArray(roomState?.shoe) ? roomState.shoe : []),
-    ...(Array.isArray(roomState?.discardPile) ? roomState.discardPile : [])
+    ...(Array.isArray(roomState?.discardPile) ? roomState.discardPile : []),
+    ...(roomState?.burnCard ? [roomState.burnCard] : [])
   ];
 
   const shuffled = shuffleCards(combinedCards);

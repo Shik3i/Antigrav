@@ -29,11 +29,11 @@ async function cleanup() {
     const initialBalance = await dbLayer.getUserBalance(USER_ID);
     assert.strictEqual(initialBalance, 100000, 'seeded balance should be available before the round starts');
 
-    const afterRoundBuyIn = await dbLayer.applyBlackjackRoundBuyIn([{ userId: USER_ID, amount: 10000 }]);
-    assert.strictEqual(afterRoundBuyIn[0].balance, 90000, 'starting a round should deduct the reserved wager');
+    const afterRoundBuyIn = await dbLayer.applyBlackjackRoundBuyIn([{ userId: USER_ID, amount: 10000, sideBetAmount: 5000 }]);
+    assert.strictEqual(afterRoundBuyIn[0].balance, 85000, 'starting a round should deduct the reserved wager plus side bets');
 
     const afterDouble = await dbLayer.applyBlackjackBetDelta(USER_ID, 5000, 'Blackjack Double Down');
-    assert.strictEqual(afterDouble, 85000, 'double down should deduct immediately during the active round');
+    assert.strictEqual(afterDouble, 80000, 'double down should deduct immediately during the active round');
 
     let insufficientError = null;
     try {
@@ -45,7 +45,74 @@ async function cleanup() {
     assert(insufficientError, 'oversized round buy-in should be rejected');
 
     const finalBalance = await dbLayer.getUserBalance(USER_ID);
-    assert.strictEqual(finalBalance, 85000, 'rejected round buy-in must not change stored balance');
+    assert.strictEqual(finalBalance, 80000, 'rejected round buy-in must not change stored balance');
+
+    await dbLayer.applyBlackjackSettlement([
+      {
+        userId: USER_ID,
+        username: 'Blackjack Economy',
+        settlementType: 'main',
+        bet: 10000,
+        payout: 20000,
+        netProfit: 10000,
+        blackjack: false
+      },
+      {
+        userId: USER_ID,
+        username: 'Blackjack Economy',
+        settlementType: 'sideBet',
+        sideBetKey: 'twins',
+        bet: 2000,
+        payout: 22000,
+        netProfit: 20000
+      }
+    ]);
+
+    const stats = await new Promise((resolve, reject) => {
+      db.get('SELECT gamesPlayed, totalWagered, totalWon FROM BlackjackStats WHERE userId = ?', [USER_ID], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    assert.strictEqual(stats.gamesPlayed, 1, 'side bet settlement should not count as an extra blackjack hand');
+    assert.strictEqual(stats.totalWagered, 10000, 'side bet wager should not inflate main blackjack wager stats');
+    assert.strictEqual(stats.totalWon, 20000, 'side bet payout should not inflate main blackjack win stats');
+
+    const balanceAfterMixedWin = await dbLayer.getUserBalance(USER_ID);
+    assert.strictEqual(
+      balanceAfterMixedWin,
+      122000,
+      'main payout plus winning side bet payout should be credited after upfront buy-in deductions'
+    );
+
+    await dbLayer.applyBlackjackRoundBuyIn([{ userId: USER_ID, amount: 10000, sideBetAmount: 3000 }]);
+    await dbLayer.applyBlackjackSettlement([
+      {
+        userId: USER_ID,
+        username: 'Blackjack Economy',
+        settlementType: 'main',
+        bet: 10000,
+        payout: 0,
+        netProfit: -10000,
+        blackjack: false
+      },
+      {
+        userId: USER_ID,
+        username: 'Blackjack Economy',
+        settlementType: 'sideBet',
+        sideBetKey: 'bust',
+        bet: 3000,
+        payout: 0,
+        netProfit: -3000
+      }
+    ]);
+
+    const balanceAfterMixedLoss = await dbLayer.getUserBalance(USER_ID);
+    assert.strictEqual(
+      balanceAfterMixedLoss,
+      109000,
+      'losing main bet and losing side bet should stay deducted with no extra settlement credit'
+    );
   } finally {
     await cleanup();
   }

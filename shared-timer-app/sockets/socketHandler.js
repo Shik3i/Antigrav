@@ -116,7 +116,8 @@ module.exports = function (io) {
             .filter((player) => !player?.isBot && Number(player?.currentBet || 0) > 0)
             .map((player) => ({
                 userId: player.userId,
-                amount: Number(player.currentBet || 0)
+                amount: Number(player.currentBet || 0),
+                sideBetAmount: Object.values(player.activeSideBets || {}).reduce((sum, amount) => sum + (Number(amount) || 0), 0)
             }));
 
         const balanceUpdates = await dbLayer.applyBlackjackRoundBuyIn(buyInEntries);
@@ -932,6 +933,28 @@ module.exports = function (io) {
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to place blackjack bet.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to place blackjack bet.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_SIDE_BET, async ({ roomId, sideBetKey, amount } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                const nextBet = Number(amount);
+                const userBalance = await dbLayer.getUserBalance(userId);
+                blackjackRoomManager.placeSideBet(roomId, userId, sideBetKey, nextBet, Number(userBalance || 0));
+
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to place blackjack side bet.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to place blackjack side bet.' });
             }
         });
 

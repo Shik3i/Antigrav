@@ -12,9 +12,10 @@ function getSeatClass(maxPlayers, seat) {
 
 function getCommittedBetMotionClass(roomState, settlements) {
   if (roomState?.status !== 'settlement') return 'is-on-table';
-  if (!settlements?.length) return 'is-on-table';
+  const mainSettlements = (settlements || []).filter((settlement) => settlement.settlementType !== 'sideBet');
+  if (!mainSettlements.length) return 'is-on-table';
 
-  const netProfit = settlements.reduce((sum, settlement) => sum + (Number(settlement.netProfit) || 0), 0);
+  const netProfit = mainSettlements.reduce((sum, settlement) => sum + (Number(settlement.netProfit) || 0), 0);
   if (netProfit > 0) return 'is-won';
   if (netProfit < 0) return 'is-lost';
   return 'is-push';
@@ -99,6 +100,7 @@ export default function BlackjackSeat({
   isLocalPlayer,
   canSelectEmptySeat,
   onSelectEmptySeat,
+  onSideBetSubmit,
   onHit,
   onStand,
   onDouble,
@@ -135,6 +137,9 @@ export default function BlackjackSeat({
   const isBettingPhase = roomState?.status === 'betting' || roomState?.status === 'waiting';
   const hasCommittedBet = Number(player.currentBet || 0) > 0;
   const committedBetMotionClass = getCommittedBetMotionClass(roomState, settlements);
+  const canEditSideBets = isLocalPlayer && isBettingPhase;
+  const pendingSideBets = player.pendingSideBets || {};
+  const activeSideBets = player.activeSideBets || {};
   const actionLabel = hasCommittedBet ? 'Einsatz aktualisieren' : 'Einsatz setzen';
   const seatSubline = player.waitingForNextRound
     ? 'Nächste Runde'
@@ -163,6 +168,38 @@ export default function BlackjackSeat({
           {hasCommittedBet && (
             <div className={`blackjack-committed-bet-zone ${committedBetMotionClass}`}>
               <ChipStack amount={player.currentBet} title="Gesetzter Einsatz" />
+            </div>
+          )}
+
+          {isLocalPlayer && (
+            <div className="blackjack-side-bet-row">
+              {['twins', 'bust'].map((sideBetKey) => {
+                const pendingAmount = Number(pendingSideBets[sideBetKey] || 0);
+                const activeAmount = Number(activeSideBets[sideBetKey] || 0);
+                const amount = pendingAmount || activeAmount;
+                const label = sideBetKey === 'twins' ? 'Twins' : 'Bust';
+                const isLocked = activeAmount > 0 && !isBettingPhase;
+                const canToggleSideBet = canEditSideBets && (pendingAmount > 0 || pendingBet > 0);
+                return (
+                  <button
+                    key={sideBetKey}
+                    type="button"
+                    className={`blackjack-side-bet-zone ${amount > 0 ? 'active' : ''}${isLocked ? ' is-locked' : ''}`}
+                    disabled={!canToggleSideBet}
+                    onClick={() => onSideBetSubmit?.(sideBetKey, pendingAmount > 0 ? 0 : pendingBet)}
+                    title={isLocked ? `${label} Side-Bet aktiv: ${formatKC(activeAmount)}` : canEditSideBets ? `${label} Side-Bet mit geplantem Einsatz setzen` : 'Side-Bets nur vor Rundenstart'}
+                  >
+                    {amount > 0 && (
+                      <div className="blackjack-side-bet-chip">
+                        <ChipStack amount={amount} title={`${label} Side-Bet`} />
+                      </div>
+                    )}
+                    {amount > 0 && <span className="blackjack-side-bet-dot" />}
+                    <span>{label}</span>
+                    <strong>{amount > 0 ? formatKC(amount) : 'Side Bet'}</strong>
+                  </button>
+                );
+              })}
             </div>
           )}
 

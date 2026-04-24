@@ -9,6 +9,15 @@ const RESULT_META = {
   bust: { label: 'Bust', color: '#fb7185', bg: 'rgba(244,63,94,0.18)' }
 };
 
+function getEntryCopy(entry) {
+  if (entry.settlementType === 'sideBet') {
+    return `${entry.label || entry.sideBetKey || 'Side Bet'} Side Bet`;
+  }
+  if (entry.blackjack) return 'Natural Blackjack';
+  if (entry.busted) return 'Bust';
+  return `Hand ${entry.handValue}`;
+}
+
 export default function BlackjackSettlement({ recentSettlement, settlementRows }) {
   if (!settlementRows?.length) {
     return null;
@@ -36,18 +45,18 @@ export default function BlackjackSettlement({ recentSettlement, settlementRows }
           const meta = RESULT_META[entry.result] || RESULT_META.push;
           return (
             <div
-              key={`${entry.userId}-${recentSettlement?.roundId || index}`}
+              key={`${entry.userId}-${entry.settlementType || 'main'}-${entry.handIndex ?? entry.sideBetKey ?? index}-${recentSettlement?.roundId || index}`}
               className="blackjack-settlement-card blackjack-settlement-row"
               style={{ animationDelay: `${index * 70}ms` }}
             >
               <div>
                 <div className="blackjack-entry-name">{entry.username}</div>
                 <div className="blackjack-entry-copy">
-                  {entry.blackjack ? 'Natural Blackjack' : entry.busted ? 'Bust' : `Hand ${entry.handValue}`}
+                  {getEntryCopy(entry)}
                 </div>
               </div>
               <div className="blackjack-value-cell">{formatKC(entry.bet)}</div>
-              <div className="blackjack-value-cell">{entry.handValue}</div>
+              <div className="blackjack-value-cell">{entry.settlementType === 'sideBet' ? '-' : entry.handValue}</div>
               <div className="blackjack-value-cell">
                 <span className="blackjack-result-pill" style={{ background: meta.bg, color: meta.color }}>
                   {meta.label}

@@ -10,7 +10,8 @@ function placeBet(room, userId, amount, userBalance, helpers) {
 
   helpers.validateBetAmount(amount);
 
-  if (!player.isBot && (!Number.isFinite(userBalance) || userBalance < amount)) {
+  const sideBetAmount = helpers.getTotalSideBetAmount ? helpers.getTotalSideBetAmount(player.pendingSideBets) : 0;
+  if (!player.isBot && (!Number.isFinite(userBalance) || userBalance < amount + sideBetAmount)) {
     throw new Error('Not enough KoalaCoins for that bet.');
   }
 
