@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { buildRealisticGroups, buildRealisticStack, formatKC } from '../utils/formatters';
 
-export default function ChipStack({ amount, onClick, isPending }) {
+export default function ChipStack({ amount, onClick, isPending, title }) {
   const chips = buildRealisticStack(amount);
   const groupedChips = buildRealisticGroups(amount);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -14,21 +14,25 @@ export default function ChipStack({ amount, onClick, isPending }) {
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       onClick={onClick}
+      title={title}
+      aria-label={title}
     >
       <div className={`chips-container${isPending ? ' grouped' : ''}`}>
         {(isPending ? groupedChips : chips.map((value) => ({ value, count: 1 }))).flatMap((entry, groupIndex) => {
           const count = isPending ? entry.count : 1;
           return Array.from({ length: count }, (_, index) => {
             const absoluteIndex = isPending ? index : groupIndex;
-            const offsetX = isPending ? groupIndex * 16 : absoluteIndex * 0.4;
+            const offsetX = isPending ? groupIndex * 28 : absoluteIndex * 0.4;
             const offsetY = absoluteIndex * 4;
             const value = entry.value;
+            const chipTextColor = value <= 1 ? '#111827' : '#fff';
             return (
               <div
                 key={`${value}-${groupIndex}-${index}`}
                 className="casino-chip-layered"
                 style={{
                   '--chip-color': value >= 1000 ? '#1e1b4b' : value >= 500 ? '#7c3aed' : value >= 100 ? '#dc2626' : value >= 50 ? '#0ea5e9' : value >= 25 ? '#ec4899' : value >= 10 ? '#22c55e' : value >= 5 ? '#f59e0b' : '#f8fafc',
+                  '--chip-text-color': chipTextColor,
                   bottom: `${offsetY}px`,
                   left: `${offsetX}px`,
                   zIndex: absoluteIndex + groupIndex,
@@ -46,7 +50,7 @@ export default function ChipStack({ amount, onClick, isPending }) {
       {showTooltip && (
         <div className="chip-stack-tooltip">
           {formatKC(amount)}
-          {isPending && <span className="pending-tag">PENDING (Click to clear)</span>}
+          {isPending && <span className="pending-tag">{title || 'PENDING (Click to clear)'}</span>}
         </div>
       )}
     </div>

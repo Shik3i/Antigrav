@@ -77,6 +77,7 @@
     "LOTTO_DRAW_RESULT": "lotto_draw_result",
     "UPDATE_PREFERENCES": "update_preferences",
     "BLACKJACK_JOIN": "blackjack:join",
+    "BLACKJACK_WATCH": "blackjack:watch",
     "BLACKJACK_SWITCH_ROOM": "blackjack:switch_room",
     "BLACKJACK_LEAVE": "blackjack:leave",
     "BLACKJACK_CREATE_ROOM": "blackjack:create_room",

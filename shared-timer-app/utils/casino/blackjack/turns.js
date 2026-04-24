@@ -61,7 +61,7 @@ function advanceTurn(room, helpers) {
       currentPlayer.activeHandIndex += 1;
 
       const nextHand = currentPlayer.hands[currentPlayer.activeHandIndex];
-      if (nextHand.blackjack || nextHand.value === 21) {
+      if (nextHand.done || nextHand.blackjack || nextHand.value === 21) {
         nextHand.done = true;
         return advanceTurn(room, helpers);
       }
