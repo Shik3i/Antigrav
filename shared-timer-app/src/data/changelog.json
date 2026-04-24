@@ -1,5 +1,11 @@
 [
   {
+    "id": 85,
+    "version": "2.51.0",
+    "date": "2026-04-24",
+    "changes": "- **Blackjack Architektur-Refactor**: Die Spiellogik wurde aus dem bisherigen Monolithen in einen modularen `casino/core` und `casino/blackjack` Aufbau überführt, damit Blackjack wartbarer wird und Roulette später auf demselben Phase-First-Fundament aufsetzen kann.\n- **Blackjack Frontend-Split**: Die große `Blackjack.jsx` wurde in Feature-Hooks, Komponenten und eigene Styles zerlegt, inklusive besserer Tischstruktur, korrigiertem Kartenlayout und aufgeräumter Bedienlogik.\n- **Bot- und Tischsteuerung**: Doppelte Deal-Aktionen wurden entfernt und die Verwaltung von Bots wurde um eine direkte Kick-Funktion erweitert.\n- **Settlement- und Tick-Stabilität**: Die Persistierung der Blackjack-Abrechnung liefert nun wieder konsistente Balance-Updates, wodurch Tick-Fehler im Live-Betrieb und Folgefehler im Logging behoben wurden."
+  },
+  {
     "id": 84,
     "version": "2.50.1",
     "date": "2026-04-23",
