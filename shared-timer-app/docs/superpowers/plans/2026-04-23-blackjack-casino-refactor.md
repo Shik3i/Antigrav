@@ -2,37 +2,36 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor the blackjack backend and frontend into focused modules, improve mobile usability, and establish a reusable casino game backend pattern for future roulette and poker work.
+**Goal:** Refactor blackjack into a thin facade plus a phase-first casino core, while preserving behavior and leaving clean starting points for later roulette work.
 
-**Architecture:** Keep [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js) and [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx) as stable entrypoints while moving logic into `utils/casino/` and `src/features/blackjack/`. Backend changes should extract reusable table/room primitives plus blackjack-specific engines; frontend changes should split data flow, presentation, and styles so mobile and desktop layouts can diverge cleanly.
+**Architecture:** Keep [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js) and [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx) as stable entrypoints. Move shared table/participant/phase concerns into `utils/casino/core/`, move blackjack rules into `utils/casino/blackjack/`, and shape the core around rounds and phases instead of seats and turns so roulette can later plug into the same base without exceptions.
 
-**Tech Stack:** Node.js, Express, Socket.IO, React 19, Vite, CommonJS backend modules, CSS, existing REST/socket contracts
+**Tech Stack:** Node.js, CommonJS, Express, Socket.IO, React 19, Vite, CSS
 
 ---
 
 ## File Structure
 
-**Backend facade and integration**
+**Shared casino core**
+- Create: `utils/casino/core/stateFactories.js`
+- Create: `utils/casino/core/tableRegistry.js`
+- Create: `utils/casino/core/participants.js`
+- Create: `utils/casino/core/roundLifecycle.js`
+- Create: `utils/casino/core/phaseTimers.js`
+- Create: `utils/casino/core/serialization.js`
+
+**Blackjack backend modules**
 - Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
-- Modify: [`controllers/blackjackController.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/controllers/blackjackController.js)
-- Modify: [`sockets/socketHandler.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/sockets/socketHandler.js)
-
-**Backend shared casino modules**
-- Create: `utils/casino/roomState.js`
-- Create: `utils/casino/roomQueries.js`
-- Create: `utils/casino/serialization.js`
-
-**Backend blackjack modules**
-- Create: `utils/casino/blackjack/serialization.js`
 - Create: `utils/casino/blackjack/tableLifecycle.js`
-- Create: `utils/casino/blackjack/roundActions.js`
-- Create: `utils/casino/blackjack/turnEngine.js`
-- Create: `utils/casino/blackjack/dealerEngine.js`
+- Create: `utils/casino/blackjack/bets.js`
+- Create: `utils/casino/blackjack/roundFlow.js`
+- Create: `utils/casino/blackjack/turns.js`
+- Create: `utils/casino/blackjack/dealer.js`
 - Create: `utils/casino/blackjack/settlement.js`
-- Create: `utils/casino/blackjack/botEngine.js`
-- Create: `utils/casino/blackjack/tickEngine.js`
+- Create: `utils/casino/blackjack/botStrategy.js`
+- Create: `utils/casino/blackjack/serialization.js`
 
-**Frontend route shell and feature modules**
+**Frontend modules**
 - Modify: [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx)
 - Create: `src/features/blackjack/hooks/useBlackjackRoom.js`
 - Create: `src/features/blackjack/hooks/useBlackjackTimers.js`
@@ -50,71 +49,120 @@
 - Create: `src/features/blackjack/utils/layout.js`
 - Create: `src/features/blackjack/blackjack.css`
 
-**Verification and lightweight tests**
+**Verification**
 - Create: `tests/blackjackRoomManager.test.js`
+- Create: `tests/blackjackRoundFlow.test.js`
 - Create: `tests/blackjackSettlement.test.js`
 
-## Task 1: Create Backend Shared Casino Primitives
+### Task 1: Extract Phase-First Shared Core Foundations
 
 **Files:**
-- Create: `utils/casino/roomState.js`
-- Create: `utils/casino/roomQueries.js`
-- Create: `utils/casino/serialization.js`
+- Create: `tests/blackjackRoomManager.test.js`
+- Create: `utils/casino/core/stateFactories.js`
+- Create: `utils/casino/core/tableRegistry.js`
+- Create: `utils/casino/core/participants.js`
+- Create: `utils/casino/core/serialization.js`
 - Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
-- Test: `node tests/blackjackRoomManager.test.js`
 
-- [ ] **Step 1: Write the failing backend smoke test**
+- [ ] **Step 1: Write the failing regression script**
 
 ```js
 const assert = require('assert');
 const blackjackRoomManager = require('../utils/blackjackRoomManager');
 
-const roomId = 'plan-test-room-shared';
-blackjackRoomManager.createRoom(roomId, 5);
+const ROOM_ID = 'plan-blackjack-core';
+const USER_ID = 'plan-user-core';
 
-const rooms = blackjackRoomManager.listRooms();
-assert(rooms.some((room) => room.roomId === roomId), 'room should appear in listRooms');
+const existingRoom = blackjackRoomManager.getRoom(ROOM_ID);
+if (existingRoom) {
+  blackjackRoomManager.leaveRoom(ROOM_ID, USER_ID);
+}
 
-const room = blackjackRoomManager.getRoom(roomId);
-assert(room, 'getRoom should return created room');
-assert.strictEqual(room.maxPlayers, 5);
+blackjackRoomManager.createRoom(ROOM_ID, 5);
+blackjackRoomManager.joinRoom(ROOM_ID, {
+  userId: USER_ID,
+  username: 'planuser',
+  displayName: 'Plan User'
+});
+
+const summary = blackjackRoomManager.listRooms().find((room) => room.roomId === ROOM_ID);
+assert(summary, 'room should appear in listRooms');
+assert.strictEqual(summary.status, 'betting');
+assert.strictEqual(summary.occupiedSeats.length, 1);
+
+const room = blackjackRoomManager.getRoom(ROOM_ID);
+assert(room, 'room should exist');
+assert.strictEqual(room.phase, 'betting');
+assert.strictEqual(room.players[0].seat, 1);
+
+blackjackRoomManager.leaveRoom(ROOM_ID, USER_ID);
 ```
 
-- [ ] **Step 2: Run test to verify it fails because the dedicated test file does not exist yet**
+- [ ] **Step 2: Run the script to verify it fails**
 
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: `Error: Cannot find module` or missing file failure
+Run: `node tests/blackjackRoomManager.test.js`  
+Expected: fail because `tests/blackjackRoomManager.test.js` does not exist yet, and after adding it, fail because `room.phase` is not yet defined on blackjack rooms
 
-- [ ] **Step 3: Add shared room state helpers**
+- [ ] **Step 3: Create shared state factories with roulette-ready base fields**
+
+```js
+function createBaseTableState({ roomId, game, maxPlayers }) {
+  return {
+    roomId,
+    game,
+    status: 'waiting',
+    phase: 'waiting',
+    maxPlayers,
+    roundId: 1,
+    participants: []
+  };
+}
+
+function createParticipantState(user, overrides = {}) {
+  return {
+    userId: String(user.userId || user.id),
+    username: user.username || user.displayName || 'Guest',
+    displayName: user.displayName || user.username || 'Guest',
+    isBot: Boolean(user.isBot),
+    connected: true,
+    seat: null,
+    preferences: user.preferences || {},
+    ...overrides
+  };
+}
+
+module.exports = {
+  createBaseTableState,
+  createParticipantState
+};
+```
+
+- [ ] **Step 4: Create a registry helper that keeps room lookup and id normalization out of the facade**
 
 ```js
 function normalizeRoomId(roomId) {
   return String(roomId || '').trim();
 }
 
-function createPlayerState(user, seat) {
-  return {
-    userId: String(user.userId || user.id),
-    username: user.username || user.displayName || `User ${seat}`,
-    displayName: user.displayName || user.username || `User ${seat}`,
-    isBot: Boolean(user.isBot),
-    seat,
-    currentBet: 0,
-    hands: [],
-    activeHandIndex: 0,
-    done: false,
-    connected: true,
-    preferences: user.preferences || {}
-  };
+function getRoom(rooms, roomId) {
+  const safeRoomId = normalizeRoomId(roomId);
+  if (!safeRoomId) return null;
+  return rooms.get(safeRoomId) || null;
+}
+
+function setRoom(rooms, room) {
+  rooms.set(room.roomId, room);
+  return room;
 }
 
 module.exports = {
   normalizeRoomId,
-  createPlayerState
+  getRoom,
+  setRoom
 };
 ```
 
-- [ ] **Step 4: Add shared room query helpers**
+- [ ] **Step 5: Create participant helpers with optional seat handling**
 
 ```js
 function getOrderedPlayers(room) {
@@ -125,21 +173,31 @@ function getPlayerByUserId(room, userId) {
   return room.players.find((player) => String(player.userId) === String(userId)) || null;
 }
 
+function getNextFreeSeat(room) {
+  const taken = new Set(room.players.map((player) => player.seat));
+  for (let seat = 1; seat <= room.maxPlayers; seat += 1) {
+    if (!taken.has(seat)) return seat;
+  }
+  return null;
+}
+
 module.exports = {
   getOrderedPlayers,
-  getPlayerByUserId
+  getPlayerByUserId,
+  getNextFreeSeat
 };
 ```
 
-- [ ] **Step 5: Add shared room summary serialization**
+- [ ] **Step 6: Create shared lobby serialization that does not depend on blackjack-only logic**
 
 ```js
-function serializeRoomSummary(room, orderedPlayers) {
+function serializeTableSummary(room, orderedPlayers) {
   return {
     roomId: room.roomId,
     game: room.game,
     maxPlayers: room.maxPlayers,
     status: room.status,
+    phase: room.phase || room.status,
     playerCount: room.players.length,
     connectedCount: room.players.filter((player) => player.connected).length,
     occupiedSeats: orderedPlayers.map((player) => ({
@@ -152,732 +210,533 @@ function serializeRoomSummary(room, orderedPlayers) {
     }))
   };
 }
+
+module.exports = {
+  serializeTableSummary
+};
 ```
 
-- [ ] **Step 6: Rewire the manager to import and use the shared helpers without changing exports**
+- [ ] **Step 7: Rewire `blackjackRoomManager.js` to use the new helpers and set `phase` alongside `status`**
 
 ```js
-const { normalizeRoomId, createPlayerState, createHandState, resetPlayerRoundState } = require('./casino/roomState');
-const { getOrderedPlayers, getPlayerByUserId, getNextFreeSeat, hasActiveRound, getPlayerRoomIdFromRooms } = require('./casino/roomQueries');
-const { serializeRoomSummary } = require('./casino/serialization');
+const { createBaseTableState, createParticipantState } = require('./casino/core/stateFactories');
+const { normalizeRoomId, getRoom: getRegisteredRoom, setRoom } = require('./casino/core/tableRegistry');
+const { getOrderedPlayers, getPlayerByUserId, getNextFreeSeat } = require('./casino/core/participants');
+const { serializeTableSummary } = require('./casino/core/serialization');
 ```
 
-- [ ] **Step 7: Add the smoke test file**
+```js
+const tableState = createBaseTableState({
+  roomId: safeRoomId,
+  game: 'blackjack',
+  maxPlayers: safeMaxPlayers
+});
+
+setRoom(rooms, {
+  ...tableState,
+  players: [],
+  dealerHand: [],
+  currentPlayerTurn: null,
+  turnDeadlineAt: null,
+  autoStartAt: null,
+  autoStartQueuedByUserId: null,
+  settlementCompleteAt: null,
+  dealerPhase: null,
+  dealerActionAt: null,
+  botActionAt: null,
+  lastSettlement: [],
+  lastSettlementRoundId: null,
+  lastAppliedSettlementRoundId: null,
+  ...shoeState
+});
+```
+
+```js
+room.status = room.players.length > 0 ? 'betting' : 'waiting';
+room.phase = room.status;
+```
+
+- [ ] **Step 8: Add the regression script file**
 
 ```js
 const assert = require('assert');
 const blackjackRoomManager = require('../utils/blackjackRoomManager');
 
-const roomId = 'plan-test-room-shared';
-const existing = blackjackRoomManager.getRoom(roomId);
-if (!existing) blackjackRoomManager.createRoom(roomId, 5);
+const ROOM_ID = 'plan-blackjack-core';
+const USER_ID = 'plan-user-core';
 
-const rooms = blackjackRoomManager.listRooms();
-assert(rooms.some((room) => room.roomId === roomId));
-assert.strictEqual(blackjackRoomManager.getRoom(roomId).maxPlayers, 5);
+try {
+  if (!blackjackRoomManager.getRoom(ROOM_ID)) {
+    blackjackRoomManager.createRoom(ROOM_ID, 5);
+  }
 
-console.log('blackjackRoomManager shared smoke test passed');
+  blackjackRoomManager.joinRoom(ROOM_ID, {
+    userId: USER_ID,
+    username: 'planuser',
+    displayName: 'Plan User'
+  });
+
+  const summary = blackjackRoomManager.listRooms().find((room) => room.roomId === ROOM_ID);
+  assert(summary);
+  assert.strictEqual(summary.phase, 'betting');
+
+  const room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert(room);
+  assert.strictEqual(room.phase, 'betting');
+  assert.strictEqual(room.players[0].seat, 1);
+} finally {
+  blackjackRoomManager.leaveRoom(ROOM_ID, USER_ID);
+}
+
+console.log('blackjackRoomManager core regression passed');
 ```
 
-- [ ] **Step 8: Run the smoke test**
+- [ ] **Step 9: Run the regression script to verify it passes**
 
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: prints `blackjackRoomManager shared smoke test passed`
+Run: `node tests/blackjackRoomManager.test.js`  
+Expected: prints `blackjackRoomManager core regression passed`
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add utils/casino/roomState.js utils/casino/roomQueries.js utils/casino/serialization.js utils/blackjackRoomManager.js tests/blackjackRoomManager.test.js
-git commit -m "refactor: extract shared casino room primitives"
+git add tests/blackjackRoomManager.test.js utils/casino/core/stateFactories.js utils/casino/core/tableRegistry.js utils/casino/core/participants.js utils/casino/core/serialization.js utils/blackjackRoomManager.js
+git commit -m "refactor: extract shared casino core primitives"
 ```
 
-## Task 2: Extract Blackjack Serialization and Table Lifecycle
+### Task 2: Extract Blackjack Table Lifecycle
 
 **Files:**
-- Create: `utils/casino/blackjack/serialization.js`
 - Create: `utils/casino/blackjack/tableLifecycle.js`
 - Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
-- Test: `node tests/blackjackRoomManager.test.js`
+- Modify: `tests/blackjackRoomManager.test.js`
 
-- [ ] **Step 1: Extend the failing test to cover join and list behavior**
+- [ ] **Step 1: Extend the regression script with reconnect, seat move, and bot coverage**
 
 ```js
-blackjackRoomManager.joinRoom(roomId, {
-  userId: 'plan-user-1',
+blackjackRoomManager.moveSeat(ROOM_ID, {
+  userId: USER_ID,
   username: 'planuser',
   displayName: 'Plan User'
-});
+}, 3);
 
-const state = blackjackRoomManager.getRoomState(roomId, 'plan-user-1');
-assert.strictEqual(state.players.length, 1);
-assert.strictEqual(state.players[0].seat, 1);
+let room = blackjackRoomManager.getRoom(ROOM_ID);
+assert.strictEqual(room.players[0].seat, 3);
+
+blackjackRoomManager.addBot(ROOM_ID);
+room = blackjackRoomManager.getRoom(ROOM_ID);
+assert.strictEqual(room.players.length, 2);
+assert.strictEqual(room.status, 'betting');
+assert.strictEqual(room.phase, 'betting');
 ```
 
-- [ ] **Step 2: Run test to verify the changed assertions fail before extraction is complete**
+- [ ] **Step 2: Run the regression script to verify the new assertions fail first**
 
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: fails on join/state assertions until the test is updated and cleanup is handled
+Run: `node tests/blackjackRoomManager.test.js`  
+Expected: fail until lifecycle logic is moved and the script is updated cleanly
 
-- [ ] **Step 3: Move blackjack room state serialization into a dedicated module**
-
-```js
-function getRoomState(room, viewerUserId = null) {
-  const revealHoleCard = room.status === 'dealer_turn' || room.status === 'settlement';
-  return {
-    roomId: room.roomId,
-    game: room.game,
-    status: room.status,
-    players: getOrderedPlayers(room).map(serializePlayer),
-    dealerHand: serializeDealerHand(room.dealerHand, revealHoleCard),
-    lastSettlement: serializeSettlement(room.lastSettlement),
-    viewerUserId
-  };
-}
-```
-
-- [ ] **Step 4: Move lobby lifecycle operations into `tableLifecycle.js`**
+- [ ] **Step 3: Create `tableLifecycle.js` and move room/join/leave/seat/bot behavior into it**
 
 ```js
-function joinRoom(rooms, roomId, user, helpers) {
-  const room = helpers.getRoom(rooms, roomId);
+function joinRoom(room, user, helpers) {
   const existing = helpers.getPlayerByUserId(room, user.userId);
   if (existing) {
     existing.connected = true;
+    existing.username = user.username || user.displayName || existing.username;
+    existing.displayName = user.displayName || user.username || existing.displayName || existing.username;
+    existing.preferences = user.preferences || existing.preferences || {};
     return room;
   }
-  room.players.push(helpers.createPlayerState(user, helpers.getNextFreeSeat(room)));
+
+  const seat = helpers.getNextFreeSeat(room);
+  room.players.push(helpers.createPlayerState(user, seat));
   room.players = helpers.getOrderedPlayers(room);
+  room.status = 'betting';
+  room.phase = 'betting';
   return room;
 }
-```
 
-- [ ] **Step 5: Keep the facade exports stable**
-
-```js
 module.exports = {
-  rooms,
-  ALLOWED_BET_CHIPS_KC,
-  CENTS_PER_KC,
-  TURN_TIMEOUT_MS,
-  createRoom,
-  getRoom,
-  getPlayerRoomId,
-  listRooms,
-  joinRoom,
-  leaveRoom,
-  getRoomState
+  joinRoom
 };
 ```
 
-- [ ] **Step 6: Update the smoke test with cleanup so repeated runs remain stable**
+- [ ] **Step 4: Reduce the facade to validation plus delegation**
 
 ```js
-const existingPlayerRoom = blackjackRoomManager.getPlayerRoomId('plan-user-1');
-if (existingPlayerRoom) blackjackRoomManager.leaveRoom(existingPlayerRoom, 'plan-user-1');
-```
-
-- [ ] **Step 7: Run the smoke test**
-
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: passes with create, join, and room-state assertions
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add utils/casino/blackjack/serialization.js utils/casino/blackjack/tableLifecycle.js utils/blackjackRoomManager.js tests/blackjackRoomManager.test.js
-git commit -m "refactor: extract blackjack room lifecycle and serialization"
-```
-
-## Task 3: Extract Round Actions and Turn Progression
-
-**Files:**
-- Create: `utils/casino/blackjack/roundActions.js`
-- Create: `utils/casino/blackjack/turnEngine.js`
-- Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
-- Test: `tests/blackjackRoomManager.test.js`
-
-- [ ] **Step 1: Add failing assertions for a simple betting and start-round flow**
-
-```js
-blackjackRoomManager.placeBet(roomId, 'plan-user-1', 10000, 100000);
-const betState = blackjackRoomManager.getRoomState(roomId, 'plan-user-1');
-assert.strictEqual(betState.players[0].currentBet, 10000);
-
-blackjackRoomManager.startRound(roomId, 'plan-user-1');
-const roundState = blackjackRoomManager.getRoomState(roomId, 'plan-user-1');
-assert(['player_turns', 'dealer_turn', 'settlement'].includes(roundState.status));
-```
-
-- [ ] **Step 2: Run test to verify the new assertions fail until extraction and test setup stabilize**
-
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: fails on state or sequencing assumptions
-
-- [ ] **Step 3: Move betting and player action handlers into `roundActions.js`**
-
-```js
-function placeBet(room, player, amount, userBalance, config) {
-  config.validateBetAmount(amount);
-  if (!player.isBot && userBalance < amount) {
-    throw new Error('Not enough KoalaCoins for that bet.');
-  }
-  player.currentBet = amount;
-  return room;
-}
-```
-
-- [ ] **Step 4: Move hand and player turn progression into `turnEngine.js`**
-
-```js
-function advanceTurn(room, helpers) {
-  const orderedPlayers = helpers.getOrderedPlayers(room).filter((player) => player.currentBet > 0);
-  const nextPlayer = orderedPlayers.find((player) => !player.done);
-  room.currentPlayerTurn = nextPlayer ? nextPlayer.userId : null;
-  room.turnDeadlineAt = nextPlayer ? Date.now() + helpers.TURN_TIMEOUT_MS : null;
-  return room;
-}
-```
-
-- [ ] **Step 5: Keep split/double/hit/stand rules behavior-preserving**
-
-```js
-module.exports = {
-  placeBet,
-  startRound,
-  hit,
-  stand,
-  doubleDown,
-  split
-};
-```
-
-- [ ] **Step 6: Make the smoke test deterministic enough for repeated runs**
-
-```js
-if (blackjackRoomManager.getRoom(roomId)?.status !== 'betting') {
-  // create a fresh room id for this phase if needed
-}
-```
-
-- [ ] **Step 7: Run the smoke test**
-
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: passes with betting and round-start assertions
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add utils/casino/blackjack/roundActions.js utils/casino/blackjack/turnEngine.js utils/blackjackRoomManager.js tests/blackjackRoomManager.test.js
-git commit -m "refactor: extract blackjack round actions and turn engine"
-```
-
-## Task 4: Extract Dealer, Settlement, and Tick Engines
-
-**Files:**
-- Create: `utils/casino/blackjack/dealerEngine.js`
-- Create: `utils/casino/blackjack/settlement.js`
-- Create: `utils/casino/blackjack/botEngine.js`
-- Create: `utils/casino/blackjack/tickEngine.js`
-- Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
-- Create: `tests/blackjackSettlement.test.js`
-
-- [ ] **Step 1: Write the failing settlement-focused test**
-
-```js
-const assert = require('assert');
-const { evaluateSettlementEntry } = require('../utils/casino/blackjack/settlement');
-
-const entry = evaluateSettlementEntry({
-  hand: { value: 20, bet: 10000, blackjack: false, busted: false },
-  dealerValue: 18,
-  dealerBust: false,
-  dealerBlackjack: false
-});
-
-assert.strictEqual(entry.result, 'win');
-assert.strictEqual(entry.payout, 20000);
-```
-
-- [ ] **Step 2: Run test to verify it fails before the module exports exist**
-
-Run: `node tests/blackjackSettlement.test.js`
-Expected: missing module or missing export failure
-
-- [ ] **Step 3: Extract dealer sequencing**
-
-```js
-function resolveDealerTurn(room, now, helpers) {
-  const dealerValue = helpers.calculateHandValue(room.dealerHand);
-  if (room.dealerPhase === 'reveal') {
-    room.dealerPhase = dealerValue < 17 ? 'draw' : dealerValue > 21 ? 'bust' : 'stand';
-    room.dealerActionAt = now + helpers.DEALER_ACTION_DELAY_MS;
-  }
-  return room;
-}
-```
-
-- [ ] **Step 4: Extract settlement entry evaluation as a pure helper**
-
-```js
-function evaluateSettlementEntry({ hand, dealerValue, dealerBust, dealerBlackjack }) {
-  let result = 'push';
-  if (hand.busted) result = 'bust';
-  else if (hand.blackjack && dealerBlackjack) result = 'push';
-  else if (hand.blackjack) result = 'blackjack';
-  else if (dealerBust || hand.value > dealerValue) result = 'win';
-  else if (hand.value < dealerValue) result = 'lose';
-
-  const payout = result === 'blackjack' ? Math.floor(hand.bet * 2.5) : result === 'win' ? hand.bet * 2 : result === 'push' ? hand.bet : 0;
-  return { result, payout, netProfit: payout - hand.bet };
-}
-```
-
-- [ ] **Step 5: Extract bot actions and periodic tick orchestration**
-
-```js
-function tickRoom(room, now, helpers) {
-  if (room.status === 'dealer_turn' && room.dealerActionAt && now >= room.dealerActionAt) {
-    helpers.resolveDealerTurn(room.roomId, now);
-    return true;
-  }
-  return false;
-}
-```
-
-- [ ] **Step 6: Add the settlement test file**
-
-```js
-const assert = require('assert');
-const { evaluateSettlementEntry } = require('../utils/casino/blackjack/settlement');
-
-const win = evaluateSettlementEntry({
-  hand: { value: 20, bet: 10000, blackjack: false, busted: false },
-  dealerValue: 18,
-  dealerBust: false,
-  dealerBlackjack: false
-});
-
-assert.strictEqual(win.result, 'win');
-assert.strictEqual(win.payout, 20000);
-console.log('blackjack settlement test passed');
-```
-
-- [ ] **Step 7: Run the dedicated settlement test and smoke test**
-
-Run: `node tests/blackjackSettlement.test.js`
-Expected: prints `blackjack settlement test passed`
-
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: still passes after the extraction
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add utils/casino/blackjack/dealerEngine.js utils/casino/blackjack/settlement.js utils/casino/blackjack/botEngine.js utils/casino/blackjack/tickEngine.js utils/blackjackRoomManager.js tests/blackjackSettlement.test.js tests/blackjackRoomManager.test.js
-git commit -m "refactor: extract blackjack dealer settlement and tick engines"
-```
-
-## Task 5: Keep Controller and Socket Boundaries Thin
-
-**Files:**
-- Modify: [`controllers/blackjackController.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/controllers/blackjackController.js)
-- Modify: [`sockets/socketHandler.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/sockets/socketHandler.js)
-- Test: `npm run build`
-
-- [ ] **Step 1: Identify repeated blackjack sync logic and extract a helper if needed**
-
-```js
-function emitBlackjackSync(req, roomId, viewerUserId = null) {
-  const io = getIo(req);
-  if (!io) return;
-  const state = roomId ? blackjackRoomManager.getRoomState(roomId, viewerUserId) : null;
-  if (roomId && state) io.to(getBlackjackSocketRoom(roomId)).emit(EVENTS.BLACKJACK_STATE, state);
-  io.emit(EVENTS.BLACKJACK_ROOMS, blackjackRoomManager.listRooms());
-}
-```
-
-- [ ] **Step 2: If socket blackjack code can be isolated cheaply, extract a registration helper instead of growing `socketHandler.js`**
-
-```js
-function registerBlackjackHandlers({ socket, io, dbLayer, blackjackRoomManager, EVENTS }) {
-  socket.on(EVENTS.BLACKJACK_HIT, async (payload, ack) => {
-    // existing logic moved without behavior changes
-  });
-}
-```
-
-- [ ] **Step 3: Keep event names, ack payloads, and manager method usage stable**
-
-```js
-sendSocketAck(ack, { success: true, state: blackjackRoomManager.getRoomState(roomId, userId) });
-```
-
-- [ ] **Step 4: Run frontend build to catch import or syntax regressions from shared contract changes**
-
-Run: `npm run build`
-Expected: Vite build completes with `Exit code: 0`
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add controllers/blackjackController.js sockets/socketHandler.js
-git commit -m "refactor: keep blackjack controller and socket boundaries thin"
-```
-
-## Task 6: Extract Frontend Utilities and Leaf Components
-
-**Files:**
-- Create: `src/features/blackjack/utils/formatters.js`
-- Create: `src/features/blackjack/utils/layout.js`
-- Create: `src/features/blackjack/components/PlayingCard.jsx`
-- Create: `src/features/blackjack/components/SettlementToast.jsx`
-- Create: `src/features/blackjack/components/BlackjackCelebration.jsx`
-- Modify: [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx)
-- Test: `npm run build`
-
-- [ ] **Step 1: Write the failing import move by replacing one inline helper at a time**
-
-```js
-import { formatKC, buildChipBreakdown, getVisualSeat, getActualSeat } from '../features/blackjack/utils/formatters';
-import { getSeatClass } from '../features/blackjack/utils/layout';
-```
-
-- [ ] **Step 2: Run the build to verify missing modules fail before they are created**
-
-Run: `npm run build`
-Expected: module resolution failure for the new feature files
-
-- [ ] **Step 3: Move pure helpers into feature-local utilities**
-
-```js
-export function formatKC(cents) {
-  return `${(cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KC`;
-}
-
-export function getVisualSeat(seat, mySeat, maxPlayers) {
-  if (!mySeat || !maxPlayers) return seat;
-  return ((seat - mySeat + maxPlayers) % maxPlayers) + 1;
-}
-```
-
-- [ ] **Step 4: Move leaf presentation components out of the page file**
-
-```jsx
-export default function PlayingCard({ card, index = 0, compact = false }) {
-  return (
-    <div className={`blackjack-card${compact ? ' compact' : ''}${card?.visible === false ? ' hidden-card' : ''}`}>
-      {/* existing card markup */}
-    </div>
-  );
-}
-```
-
-- [ ] **Step 5: Replace in-file component declarations with imports**
-
-```jsx
-import PlayingCard from '../features/blackjack/components/PlayingCard';
-import SettlementToast from '../features/blackjack/components/SettlementToast';
-import BlackjackCelebration from '../features/blackjack/components/BlackjackCelebration';
-```
-
-- [ ] **Step 6: Run the build**
-
-Run: `npm run build`
-Expected: Vite build completes with `Exit code: 0`
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add src/pages/Blackjack.jsx src/features/blackjack/utils/formatters.js src/features/blackjack/utils/layout.js src/features/blackjack/components/PlayingCard.jsx src/features/blackjack/components/SettlementToast.jsx src/features/blackjack/components/BlackjackCelebration.jsx
-git commit -m "refactor: extract blackjack frontend utilities and leaf components"
-```
-
-## Task 7: Extract Frontend Hooks for Room State and Timers
-
-**Files:**
-- Create: `src/features/blackjack/hooks/useBlackjackRoom.js`
-- Create: `src/features/blackjack/hooks/useBlackjackTimers.js`
-- Modify: [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx)
-- Test: `npm run build`
-
-- [ ] **Step 1: Move socket, fetch, and action orchestration into `useBlackjackRoom`**
-
-```js
-export default function useBlackjackRoom({ socket, selectedTable, currentRoomId, token, onError }) {
-  const [roomState, setRoomState] = useState(null);
-  const [rooms, setRooms] = useState([]);
-
-  async function loadRooms() {
-    const data = await fetchJson('/api/blackjack/rooms', { token: '' });
-    setRooms(data.rooms || []);
+function joinRoom(roomId, user) {
+  if (!user?.userId) {
+    throw new Error('Authenticated user is required.');
   }
 
-  return { roomState, rooms, loadRooms };
-}
-```
-
-- [ ] **Step 2: Use a dedicated timer hook for countdown behavior**
-
-```js
-export default function useBlackjackTimers({ turnDeadlineAt, autoStartAt }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  return {
-    turnCountdownSeconds: turnDeadlineAt ? Math.max(0, Math.ceil((turnDeadlineAt - now) / 1000)) : null,
-    autoStartSeconds: autoStartAt ? Math.max(0, Math.ceil((autoStartAt - now) / 1000)) : null
-  };
-}
-```
-
-- [ ] **Step 3: Reduce the route file to page-level composition**
-
-```jsx
-const {
-  roomState,
-  rooms,
-  leaderboard,
-  actions
-} = useBlackjackRoom({ socket, selectedTable, currentRoomId, token, onError: showToast });
-```
-
-- [ ] **Step 4: Run the build**
-
-Run: `npm run build`
-Expected: Vite build completes with `Exit code: 0`
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/pages/Blackjack.jsx src/features/blackjack/hooks/useBlackjackRoom.js src/features/blackjack/hooks/useBlackjackTimers.js
-git commit -m "refactor: move blackjack data flow into hooks"
-```
-
-## Task 8: Split the Main Blackjack UI into Feature Components
-
-**Files:**
-- Create: `src/features/blackjack/components/BlackjackPageShell.jsx`
-- Create: `src/features/blackjack/components/BlackjackTable.jsx`
-- Create: `src/features/blackjack/components/BlackjackDealer.jsx`
-- Create: `src/features/blackjack/components/BlackjackSeat.jsx`
-- Create: `src/features/blackjack/components/BlackjackControls.jsx`
-- Create: `src/features/blackjack/components/BlackjackLobby.jsx`
-- Create: `src/features/blackjack/components/BlackjackLeaderboard.jsx`
-- Modify: [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx)
-- Test: `npm run build`
-
-- [ ] **Step 1: Move the highest-level JSX composition into a page shell**
-
-```jsx
-export default function BlackjackPageShell(props) {
-  return (
-    <>
-      <BlackjackLobby {...props} />
-      <BlackjackTable {...props} />
-      <BlackjackLeaderboard {...props} />
-    </>
-  );
-}
-```
-
-- [ ] **Step 2: Extract the dealer region**
-
-```jsx
-export default function BlackjackDealer({ roomState }) {
-  return (
-    <div className="blackjack-dealer-zone">
-      {/* existing dealer header and card markup */}
-    </div>
-  );
-}
-```
-
-- [ ] **Step 3: Extract seat rendering into a focused component**
-
-```jsx
-export default function BlackjackSeat({ player, isCurrentTurn, isLocalPlayer, onSelectSeat, onClearPendingBet }) {
-  return (
-    <div className={/* existing seat classes */}>
-      {/* existing seat header, hands, and bet stack */}
-    </div>
-  );
-}
-```
-
-- [ ] **Step 4: Extract controls and lobby panels**
-
-```jsx
-export default function BlackjackControls({ pendingBet, onAddChip, onHit, onStand, onDouble, onSplit }) {
-  return (
-    <div className="blackjack-control-deck">
-      {/* existing chip and action controls */}
-    </div>
-  );
-}
-```
-
-- [ ] **Step 5: Make the route file a thin entrypoint**
-
-```jsx
-import BlackjackPageShell from '../features/blackjack/components/BlackjackPageShell';
-
-export default function Blackjack({ socket }) {
-  return <BlackjackPageShell socket={socket} />;
-}
-```
-
-- [ ] **Step 6: Run the build**
-
-Run: `npm run build`
-Expected: Vite build completes with `Exit code: 0`
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add src/pages/Blackjack.jsx src/features/blackjack/components/BlackjackPageShell.jsx src/features/blackjack/components/BlackjackTable.jsx src/features/blackjack/components/BlackjackDealer.jsx src/features/blackjack/components/BlackjackSeat.jsx src/features/blackjack/components/BlackjackControls.jsx src/features/blackjack/components/BlackjackLobby.jsx src/features/blackjack/components/BlackjackLeaderboard.jsx
-git commit -m "refactor: split blackjack page into feature components"
-```
-
-## Task 9: Move Styles to a Dedicated Stylesheet and Add Mobile-First Layout
-
-**Files:**
-- Create: `src/features/blackjack/blackjack.css`
-- Modify: [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx)
-- Modify: `src/features/blackjack/components/BlackjackTable.jsx`
-- Modify: `src/features/blackjack/components/BlackjackControls.jsx`
-- Modify: `src/features/blackjack/components/BlackjackSeat.jsx`
-- Test: `npm run build`
-
-- [ ] **Step 1: Move embedded CSS out of the page component**
-
-```jsx
-import '../features/blackjack/blackjack.css';
-```
-
-- [ ] **Step 2: Create mobile-first layout rules**
-
-```css
-.blackjack-page {
-  display: grid;
-  gap: 16px;
-}
-
-.blackjack-table-layout {
-  display: grid;
-  gap: 16px;
-}
-
-@media (max-width: 767px) {
-  .blackjack-seat-region {
-    display: grid;
-    gap: 12px;
+  const room = getRoom(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
   }
 
-  .blackjack-controls-sticky {
-    position: sticky;
-    bottom: 0;
-    z-index: 20;
-  }
+  return lifecycle.joinRoom(room, user, lifecycleHelpers);
 }
 ```
 
-- [ ] **Step 3: Keep desktop absolute positioning only for desktop breakpoints**
+- [ ] **Step 5: Run the regression script to verify it passes**
 
-```css
-@media (min-width: 1024px) {
-  .blackjack-seat-5-1 { --seat-transform: translateX(-50%); bottom: 70px; left: 50%; }
-  .blackjack-seat-5-2 { bottom: 240px; left: 3.2%; }
-}
-```
-
-- [ ] **Step 4: Wire components to the new responsive class structure**
-
-```jsx
-<div className="blackjack-table-layout">
-  <BlackjackDealer roomState={roomState} />
-  <div className="blackjack-seat-region">{seatNodes}</div>
-  <div className="blackjack-controls-sticky">
-    <BlackjackControls {...controlProps} />
-  </div>
-</div>
-```
-
-- [ ] **Step 5: Run the build**
-
-Run: `npm run build`
-Expected: Vite build completes with `Exit code: 0`
+Run: `node tests/blackjackRoomManager.test.js`  
+Expected: prints `blackjackRoomManager core regression passed`
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/features/blackjack/blackjack.css src/pages/Blackjack.jsx src/features/blackjack/components/BlackjackTable.jsx src/features/blackjack/components/BlackjackControls.jsx src/features/blackjack/components/BlackjackSeat.jsx
-git commit -m "feat: add mobile-first blackjack layout"
+git add tests/blackjackRoomManager.test.js utils/casino/blackjack/tableLifecycle.js utils/blackjackRoomManager.js
+git commit -m "refactor: extract blackjack table lifecycle"
 ```
 
-## Task 10: Final Verification and Cleanup
+### Task 3: Extract Phase and Round Transition Helpers
 
 **Files:**
-- Verify: backend and frontend blackjack files changed in previous tasks
-- Verify: [`docs/superpowers/specs/2026-04-23-blackjack-refactor-design.md`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/docs/superpowers/specs/2026-04-23-blackjack-refactor-design.md)
-- Verify: this plan file
+- Create: `tests/blackjackRoundFlow.test.js`
+- Create: `utils/casino/core/roundLifecycle.js`
+- Create: `utils/casino/core/phaseTimers.js`
+- Create: `utils/casino/blackjack/bets.js`
+- Create: `utils/casino/blackjack/roundFlow.js`
+- Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
 
-- [ ] **Step 1: Run backend smoke tests**
-
-Run: `node tests/blackjackRoomManager.test.js`
-Expected: pass
-
-Run: `node tests/blackjackSettlement.test.js`
-Expected: pass
-
-- [ ] **Step 2: Run frontend build verification**
-
-Run: `npm run build`
-Expected: Vite build completes with `Exit code: 0`
-
-- [ ] **Step 3: Review the facade and route entrypoints**
+- [ ] **Step 1: Write the failing round-flow regression**
 
 ```js
-// utils/blackjackRoomManager.js should remain the stable public API
+const assert = require('assert');
+const blackjackRoomManager = require('../utils/blackjackRoomManager');
+
+const ROOM_ID = 'plan-blackjack-round-flow';
+const USER_ID = 'plan-user-round';
+
+blackjackRoomManager.createRoom(ROOM_ID, 3);
+blackjackRoomManager.joinRoom(ROOM_ID, {
+  userId: USER_ID,
+  username: 'rounduser',
+  displayName: 'Round User'
+});
+
+blackjackRoomManager.placeBet(ROOM_ID, USER_ID, 10000, 100000);
+let room = blackjackRoomManager.getRoom(ROOM_ID);
+assert.strictEqual(room.phase, 'betting');
+
+blackjackRoomManager.startRound(ROOM_ID, USER_ID);
+room = blackjackRoomManager.getRoom(ROOM_ID);
+assert.strictEqual(room.phase, 'player_turns');
+assert(room.currentPlayerTurn, 'a player turn should be active');
+```
+
+- [ ] **Step 2: Run the regression to verify it fails first**
+
+Run: `node tests/blackjackRoundFlow.test.js`  
+Expected: fail before the phase helpers and round-flow delegation are in place
+
+- [ ] **Step 3: Add shared phase helpers that later roulette can reuse**
+
+```js
+function setPhase(room, phase, fields = {}) {
+  room.phase = phase;
+  room.status = phase;
+  Object.assign(room, fields);
+  return room;
+}
+
+function advanceRound(room) {
+  room.roundId += 1;
+  return room.roundId;
+}
+
 module.exports = {
-  rooms,
-  createRoom,
-  getRoom,
-  listRooms,
-  joinRoom,
-  leaveRoom,
-  getRoomState,
-  placeBet,
-  startRound,
-  hit,
-  stand,
-  doubleDown,
-  split,
-  tick
+  setPhase,
+  advanceRound
 };
 ```
 
-```jsx
-// src/pages/Blackjack.jsx should remain the stable route export
-export default function Blackjack({ socket }) {
-  return <BlackjackPageShell socket={socket} />;
+- [ ] **Step 4: Add timing helpers based on generic deadlines instead of blackjack-only naming**
+
+```js
+function setPhaseDeadline(room, fieldName, now, delayMs) {
+  room[fieldName] = now + delayMs;
+  return room[fieldName];
+}
+
+function clearPhaseDeadline(room, fieldName) {
+  room[fieldName] = null;
+}
+
+module.exports = {
+  setPhaseDeadline,
+  clearPhaseDeadline
+};
+```
+
+- [ ] **Step 5: Move bet placement and round start into blackjack modules**
+
+```js
+function placeBet(room, player, amount, userBalance, helpers) {
+  helpers.validateBetAmount(amount);
+  if (!player.isBot && (!Number.isFinite(userBalance) || userBalance < amount)) {
+    throw new Error('Not enough KoalaCoins for that bet.');
+  }
+  player.currentBet = amount;
+  helpers.setPhase(room, 'betting');
+  return room;
 }
 ```
 
-- [ ] **Step 4: Check that future casino games have a clear landing zone**
-
-```txt
-utils/casino/
-utils/casino/blackjack/
-utils/casino/roulette/
-utils/casino/poker/
+```js
+function startRound(room, startedByUserId, helpers) {
+  helpers.setPhase(room, 'dealing');
+  helpers.preparePlayerHands(room);
+  helpers.dealOpeningCards(room);
+  helpers.setPhase(room, 'player_turns');
+  helpers.selectFirstPlayerTurn(room, startedByUserId);
+  return room;
+}
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Run the round-flow regression to verify it passes**
+
+Run: `node tests/blackjackRoundFlow.test.js`  
+Expected: round creation, bet placement, and round start succeed with `phase === 'player_turns'`
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add utils/blackjackRoomManager.js controllers/blackjackController.js sockets/socketHandler.js src/pages/Blackjack.jsx src/features/blackjack utils/casino tests
-git commit -m "refactor: restructure blackjack for reusable casino architecture"
+git add tests/blackjackRoundFlow.test.js utils/casino/core/roundLifecycle.js utils/casino/core/phaseTimers.js utils/casino/blackjack/bets.js utils/casino/blackjack/roundFlow.js utils/blackjackRoomManager.js
+git commit -m "refactor: extract phase and round flow helpers"
+```
+
+### Task 4: Extract Player Turn, Dealer, Settlement, and Tick Orchestration
+
+**Files:**
+- Create: `tests/blackjackSettlement.test.js`
+- Create: `utils/casino/blackjack/turns.js`
+- Create: `utils/casino/blackjack/dealer.js`
+- Create: `utils/casino/blackjack/settlement.js`
+- Create: `utils/casino/blackjack/botStrategy.js`
+- Modify: [`utils/blackjackRoomManager.js`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/utils/blackjackRoomManager.js)
+
+- [ ] **Step 1: Write the failing settlement regression**
+
+```js
+const assert = require('assert');
+const blackjackRoomManager = require('../utils/blackjackRoomManager');
+
+const ROOM_ID = 'plan-blackjack-settlement';
+const USER_ID = 'plan-user-settlement';
+
+blackjackRoomManager.createRoom(ROOM_ID, 3);
+blackjackRoomManager.joinRoom(ROOM_ID, {
+  userId: USER_ID,
+  username: 'settler',
+  displayName: 'Settler'
+});
+blackjackRoomManager.placeBet(ROOM_ID, USER_ID, 10000, 100000);
+blackjackRoomManager.startRound(ROOM_ID, USER_ID);
+
+let guard = 0;
+while (blackjackRoomManager.getRoom(ROOM_ID)?.status === 'player_turns' && guard < 10) {
+  blackjackRoomManager.stand(ROOM_ID, USER_ID);
+  guard += 1;
+}
+
+while (blackjackRoomManager.getRoom(ROOM_ID)?.status !== 'betting' && guard < 30) {
+  blackjackRoomManager.tick(Date.now() + guard * 5000);
+  guard += 1;
+}
+
+const room = blackjackRoomManager.getRoom(ROOM_ID);
+assert(room, 'room should still exist');
+assert.strictEqual(room.phase, 'betting');
+assert(Array.isArray(room.lastSettlement), 'settlement should be recorded');
+```
+
+- [ ] **Step 2: Run the settlement regression to verify it fails first**
+
+Run: `node tests/blackjackSettlement.test.js`  
+Expected: fail before dealer/settlement/tick extraction is complete
+
+- [ ] **Step 3: Move player action logic into `turns.js`**
+
+```js
+function stand(room, userId, helpers) {
+  const player = helpers.getPlayerByUserId(room, userId);
+  const activeHand = player?.hands?.[player.activeHandIndex];
+  activeHand.stood = true;
+  helpers.syncPlayerState(player);
+  helpers.advanceTurn(room);
+  return room;
+}
+```
+
+- [ ] **Step 4: Move dealer and settlement resolution into dedicated modules**
+
+```js
+function resolveDealerTurn(room, helpers) {
+  while (helpers.getDealerValue(room) < 17) {
+    helpers.drawDealerCard(room);
+  }
+  helpers.setPhase(room, 'settlement');
+  return room;
+}
+```
+
+```js
+function settleRound(room, helpers) {
+  room.lastSettlement = helpers.buildSettlementEntries(room);
+  helpers.resetRoundState(room);
+  helpers.setPhase(room, 'betting');
+  return room;
+}
+```
+
+- [ ] **Step 5: Keep `tick()` as orchestration only**
+
+```js
+function tick(now = Date.now()) {
+  const changedRoomIds = [];
+
+  rooms.forEach((room, roomId) => {
+    const changed = tickHelpers.processRoom(room, roomId, now);
+    if (changed) changedRoomIds.push(roomId);
+  });
+
+  return changedRoomIds;
+}
+```
+
+- [ ] **Step 6: Run all backend regression scripts**
+
+Run: `node tests/blackjackRoomManager.test.js && node tests/blackjackRoundFlow.test.js && node tests/blackjackSettlement.test.js`  
+Expected: all three scripts exit with code `0`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add tests/blackjackRoomManager.test.js tests/blackjackRoundFlow.test.js tests/blackjackSettlement.test.js utils/casino/blackjack/turns.js utils/casino/blackjack/dealer.js utils/casino/blackjack/settlement.js utils/casino/blackjack/botStrategy.js utils/blackjackRoomManager.js
+git commit -m "refactor: extract blackjack gameplay engines"
+```
+
+### Task 5: Split the Frontend Feature and Mobile Layout
+
+**Files:**
+- Modify: [`src/pages/Blackjack.jsx`](/Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app/src/pages/Blackjack.jsx)
+- Create: all `src/features/blackjack/**` files listed in File Structure
+
+- [ ] **Step 1: Write a minimal manual verification checklist before moving JSX**
+
+```txt
+1. Join table
+2. Place bet
+3. Start round
+4. Perform hit/stand
+5. Verify countdown stays visible on mobile-width viewport
+```
+
+- [ ] **Step 2: Extract formatting and layout helpers first**
+
+```js
+export function formatKC(cents) {
+  return `${(cents / 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })} KC`;
+}
+```
+
+- [ ] **Step 3: Extract hooks for room state and timers**
+
+```js
+export function useBlackjackTimers(roomState) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return {
+    turnCountdownSeconds: roomState?.turnDeadlineAt ? Math.max(0, Math.ceil((roomState.turnDeadlineAt - now) / 1000)) : null,
+    autoStartSeconds: roomState?.autoStartAt ? Math.max(0, Math.ceil((roomState.autoStartAt - now) / 1000)) : null
+  };
+}
+```
+
+- [ ] **Step 4: Extract leaf UI components and move CSS into `blackjack.css`**
+
+```jsx
+export default function SettlementToast({ settlements }) {
+  if (!settlements?.length) return null;
+  return <div className="blackjack-settlement-toast">...</div>;
+}
+```
+
+- [ ] **Step 5: Reduce `Blackjack.jsx` to a route shell**
+
+```jsx
+export default function BlackjackPage() {
+  return <BlackjackPageShell />;
+}
+```
+
+- [ ] **Step 6: Run frontend verification**
+
+Run: `npm run build`  
+Expected: Vite build exits with code `0`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/pages/Blackjack.jsx src/features/blackjack
+git commit -m "refactor: split blackjack frontend feature modules"
+```
+
+### Task 6: Define Roulette Starting Points Without Implementing Roulette
+
+**Files:**
+- Modify: `utils/casino/core/stateFactories.js`
+- Modify: `utils/casino/core/roundLifecycle.js`
+- Modify: `utils/casino/core/serialization.js`
+- Create: `docs/superpowers/specs/roulette-starting-points.md`
+
+- [ ] **Step 1: Add explicit comments and neutral field names where the core still leans blackjack**
+
+```js
+// Phase-first core: can support both sequential turns (blackjack/poker)
+// and simultaneous betting windows (roulette).
+function createBaseTableState({ roomId, game, maxPlayers }) {
+  return {
+    roomId,
+    game,
+    status: 'waiting',
+    phase: 'waiting',
+    maxPlayers,
+    roundId: 1,
+    participants: []
+  };
+}
+```
+
+- [ ] **Step 2: Write the roulette starting-points note**
+
+```md
+# Roulette Starting Points
+
+- Reuse `tableRegistry.js` for roulette room management.
+- Reuse `roundLifecycle.js` for `betting_open`, `betting_closed`, `spin`, `settlement`.
+- Keep roulette bets as per-player arrays keyed by round id.
+- Do not introduce seats or `currentPlayerTurn` in roulette room state.
+- Add a `utils/casino/roulette/` tree when roulette implementation starts.
+```
+
+- [ ] **Step 3: Verify the backend scripts still pass**
+
+Run: `node tests/blackjackRoomManager.test.js && node tests/blackjackRoundFlow.test.js && node tests/blackjackSettlement.test.js`  
+Expected: all scripts exit with code `0`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add utils/casino/core/stateFactories.js utils/casino/core/roundLifecycle.js utils/casino/core/serialization.js docs/superpowers/specs/roulette-starting-points.md
+git commit -m "docs: define roulette starting points for casino core"
 ```

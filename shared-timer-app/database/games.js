@@ -1001,16 +1001,74 @@ const upsertBlackjackStats = (userId, username, statDelta = {}) => {
 
 const applyBlackjackSettlement = (results = []) => {
   return new Promise((resolve, reject) => {
+    if (!Array.isArray(results) || results.length === 0) {
+      resolve([]);
+      return;
+    }
+
+    const statsQuery = `
+      INSERT INTO BlackjackStats (userId, username, gamesPlayed, blackjacksHit, totalWagered, totalWon, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(userId) DO UPDATE SET
+        username = excluded.username,
+        gamesPlayed = gamesPlayed + excluded.gamesPlayed,
+        blackjacksHit = blackjacksHit + excluded.blackjacksHit,
+        totalWagered = totalWagered + excluded.totalWagered,
+        totalWon = totalWon + excluded.totalWon,
+        updatedAt = CURRENT_TIMESTAMP
+    `;
+
     db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
+      db.run('BEGIN TRANSACTION', (beginErr) => {
+        if (beginErr) {
+          reject(beginErr);
+        }
+      });
+
       for (const res of results) {
         if (res.payout > 0) {
           db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [res.payout, res.userId]);
-          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [res.userId, res.payout, `Blackjack Win (Bet: ${res.stake})`]);
+          db.run(
+            'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
+            [res.userId, res.payout, `Blackjack Win (Bet: ${res.bet})`]
+          );
         }
-        upsertBlackjackStats(res.userId, res.username, { gamesPlayed: 1, blackjacksHit: res.isBlackjack ? 1 : 0, totalWagered: res.stake, totalWon: res.payout });
+
+        db.run(statsQuery, [
+          res.userId,
+          res.username,
+          1,
+          res.blackjack ? 1 : 0,
+          res.bet || 0,
+          res.payout || 0
+        ]);
       }
-      db.run('COMMIT', (err) => err ? reject(err) : resolve(true));
+
+      db.run('COMMIT', (commitErr) => {
+        if (commitErr) {
+          reject(commitErr);
+          return;
+        }
+
+        const affectedUserIds = [...new Set(results.map((entry) => entry?.userId).filter(Boolean))];
+        if (affectedUserIds.length === 0) {
+          resolve([]);
+          return;
+        }
+
+        const placeholders = affectedUserIds.map(() => '?').join(', ');
+        db.all(
+          `SELECT id AS userId, koala_balance AS balance FROM Users WHERE id IN (${placeholders})`,
+          affectedUserIds,
+          (selectErr, rows) => {
+            if (selectErr) {
+              reject(selectErr);
+              return;
+            }
+            resolve(rows || []);
+          }
+        );
+      });
     });
   });
 };
