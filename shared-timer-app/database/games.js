@@ -318,7 +318,10 @@ const getTopScratchcardWinners = (limit = 10) => {
 const getScratchcardLeaderboard = () => {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT u.displayName, u.username, u.preferences, SUM(s.winAmount) as totalWon
+      SELECT u.displayName, u.username, u.preferences, 
+             SUM(s.winAmount) as totalWon,
+             COUNT(s.id) as totalBought,
+             SUM(CASE WHEN s.winAmount > 0 THEN 1 ELSE 0 END) as ticketsWon
       FROM Scratchcards s
       JOIN Users u ON s.userId = u.id
       WHERE s.status = 'claimed'
@@ -350,6 +353,23 @@ const getScratchcardLeaderboardData = (limit = 10) => {
     db.all(query, [limit], (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
+    });
+  });
+};
+
+const getScratchcardChartData = (limit = 14) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT date(createdAt) as day, SUM(winAmount) as dailyWin
+      FROM Scratchcards
+      WHERE status = 'claimed'
+      GROUP BY day
+      ORDER BY day DESC
+      LIMIT ?
+    `;
+    db.all(query, [limit], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows ? rows.reverse() : []);
     });
   });
 };
@@ -1248,7 +1268,14 @@ const getBlackjackLeaderboard = (sortBy = 'totalWon', limit = 50) => {
   return new Promise((resolve, reject) => {
     const validSorts = ['totalWon', 'gamesPlayed', 'blackjacksHit', 'totalWagered'];
     const sortColumn = validSorts.includes(sortBy) ? sortBy : 'totalWon';
-    db.all(`SELECT * FROM BlackjackStats ORDER BY ${sortColumn} DESC LIMIT ?`, [limit], (err, rows) => {
+    const query = `
+      SELECT bs.*, u.displayName, u.preferences
+      FROM BlackjackStats bs
+      JOIN Users u ON bs.userId = u.id
+      ORDER BY bs.${sortColumn} DESC
+      LIMIT ?
+    `;
+    db.all(query, [limit], (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -1725,5 +1752,6 @@ module.exports = {
   getUserZeroScoreStreak,
   recordZeroScore,
   getUserTowerClimbCount,
-  getUserDailyPackCount
+  getUserDailyPackCount,
+  getScratchcardChartData
 };

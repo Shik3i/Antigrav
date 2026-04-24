@@ -76,7 +76,6 @@ const GameLeaderboards = () => {
 
                 const scratchList = (scratchRes.data.leaderboard || []).map(row => ({
                     ...row,
-                    displayName: row.username,
                     totalEarned: row.totalWin,
                     totalBought: row.totalBought || 0
                 }));
