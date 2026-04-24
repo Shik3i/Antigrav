@@ -207,7 +207,7 @@ const Wordle = ({ user, token }) => {
                     setHasDefinition(res.data.hasDefinition || false);
                     setMetadata({ 
                         definition: res.data.definition || null, 
-                        funny_quote: null 
+                        funny_quote: res.data.funny_quote || null 
                     });
                 }
             }
