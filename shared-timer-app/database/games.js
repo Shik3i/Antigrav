@@ -1059,18 +1059,20 @@ const applyBlackjackSettlement = (results = []) => {
           db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [res.payout, res.userId]);
           db.run(
             'INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)',
-            [res.userId, res.payout, `Blackjack Win (Bet: ${res.bet})`]
+            [res.userId, res.payout, res.settlementType === 'sideBet' ? `Blackjack Side Bet Win (${res.sideBetKey || 'sideBet'}: ${res.bet})` : `Blackjack Win (Bet: ${res.bet})`]
           );
         }
 
-        db.run(statsQuery, [
-          res.userId,
-          res.username,
-          1,
-          res.blackjack ? 1 : 0,
-          res.bet || 0,
-          res.payout || 0
-        ]);
+        if (res.settlementType !== 'sideBet') {
+          db.run(statsQuery, [
+            res.userId,
+            res.username,
+            1,
+            res.blackjack ? 1 : 0,
+            res.bet || 0,
+            res.payout || 0
+          ]);
+        }
       }
 
       db.run('COMMIT', (commitErr) => {
@@ -1109,7 +1111,7 @@ const applyBlackjackRoundBuyIn = (entries = []) => {
           .filter((entry) => entry?.userId && Number(entry?.amount) > 0)
           .map((entry) => ({
             userId: String(entry.userId),
-            amount: Number(entry.amount)
+            amount: Number(entry.amount) + Math.max(0, Number(entry.sideBetAmount || 0))
           }))
       : [];
 

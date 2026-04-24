@@ -27,6 +27,7 @@ export default function Blackjack({ socket }) {
     handleLeaveTable,
     handleRemoveBot,
     handleSmartJoin,
+    handleSideBetSubmit,
     handleSwitchRoom,
     handleWatchRoom,
     handleTurnAction,
@@ -90,6 +91,7 @@ export default function Blackjack({ socket }) {
           handleBetSubmit={handleBetSubmit}
           handleLeaveTable={handleLeaveTable}
           handleSmartJoin={handleSmartJoin}
+          handleSideBetSubmit={handleSideBetSubmit}
           handleTurnAction={handleTurnAction}
           isGuest={isGuest}
           mySeat={mySeat}

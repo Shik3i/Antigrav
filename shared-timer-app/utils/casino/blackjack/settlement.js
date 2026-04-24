@@ -1,7 +1,9 @@
 function finishSettlementPhase(room, now, helpers) {
   helpers.discardCards(room, room.dealerHand);
   room.players.forEach((player) => {
-    helpers.discardCards(room, player.hand);
+    (player.hands || []).forEach((hand) => {
+      helpers.discardCards(room, hand.cards);
+    });
   });
 
   room.dealerHand = [];

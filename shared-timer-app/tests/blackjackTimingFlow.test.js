@@ -17,11 +17,19 @@ try {
   blackjackRoomManager.joinRoom(ROOM_ID, { userId: USER_A, username: 'timinga' });
   blackjackRoomManager.joinRoom(ROOM_ID, { userId: USER_B, username: 'timingb' });
 
+  const beforeFirstBet = Date.now();
   blackjackRoomManager.placeBet(ROOM_ID, USER_A, 10000, 100000);
+  let room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert(room.autoStartAt, 'auto-start should be scheduled after the first player bets');
+  assert(
+    room.autoStartAt >= beforeFirstBet + 29000 && room.autoStartAt <= beforeFirstBet + 30500,
+    'partially-ready tables should give remaining players about 30 seconds to place bets'
+  );
+
   const beforeAllReady = Date.now();
   blackjackRoomManager.placeBet(ROOM_ID, USER_B, 10000, 100000);
 
-  let room = blackjackRoomManager.getRoom(ROOM_ID);
+  room = blackjackRoomManager.getRoom(ROOM_ID);
   assert(room.autoStartAt, 'auto-start should be scheduled once seated players have bets');
   assert(
     room.autoStartAt <= beforeAllReady + 2500,

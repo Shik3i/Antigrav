@@ -26,6 +26,14 @@ function FeltPile({ label, count, side = 'left', accent = '#f8fafc' }) {
   );
 }
 
+function sortPlayerSettlements(a, b) {
+  const aIsSideBet = a.settlementType === 'sideBet';
+  const bIsSideBet = b.settlementType === 'sideBet';
+  if (aIsSideBet !== bIsSideBet) return aIsSideBet ? 1 : -1;
+  if (aIsSideBet && bIsSideBet) return String(a.sideBetKey || '').localeCompare(String(b.sideBetKey || ''));
+  return Number(a.handIndex || 0) - Number(b.handIndex || 0);
+}
+
 export default function BlackjackTable({
   actionBusy,
   autoBetEnabled,
@@ -34,6 +42,7 @@ export default function BlackjackTable({
   handleBetSubmit,
   handleLeaveTable,
   handleSmartJoin,
+  handleSideBetSubmit,
   handleTurnAction,
   isGuest,
   mySeat,
@@ -108,7 +117,7 @@ export default function BlackjackTable({
 
           {tableSeats.map((player) => {
             const isCurrentTurn = String(roomState?.currentPlayerTurn) === String(player.userId);
-            const settlements = (roomState?.lastSettlement || []).filter((entry) => String(entry.userId) === String(player.userId)).sort((a, b) => a.handIndex - b.handIndex);
+            const settlements = (roomState?.lastSettlement || []).filter((entry) => String(entry.userId) === String(player.userId)).sort(sortPlayerSettlements);
             return (
               <BlackjackSeat
                 key={player.userId || `seat-${player.seat}`}
@@ -120,6 +129,7 @@ export default function BlackjackTable({
                 isLocalPlayer={String(player.userId) === String(user?.id)}
                 canSelectEmptySeat={!actionBusy && (!mySeat || roomState?.status === 'waiting' || roomState?.status === 'betting')}
                 onSelectEmptySeat={handleSmartJoin}
+                onSideBetSubmit={handleSideBetSubmit}
                 onHit={() => handleTurnAction(EVENTS.BLACKJACK_HIT)}
                 onStand={() => handleTurnAction(EVENTS.BLACKJACK_STAND)}
                 onDouble={() => handleTurnAction(EVENTS.BLACKJACK_DOUBLE)}

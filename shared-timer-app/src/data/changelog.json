@@ -1,5 +1,11 @@
 [
   {
+    "id": 88,
+    "version": "2.54.0",
+    "date": "2026-04-25",
+    "changes": "- **Blackjack Sidebets Phase 1**: Twins- und Bust-Sidebets wurden inklusive Socket-Flow, Balance-Validierung, Round-Buy-In, Settlement-Auszahlung und separater Ergebnisanzeige integriert.\n- **Blackjack Sidebet UI**: Aktive Sidebets bleiben während der Runde sichtbar und werden mit eigenem Chip-Stack direkt auf dem Sidebet-Feld dargestellt.\n- **Blackjack Shoe Accounting**: Discard- und Burn-Card-Zählung wurde korrigiert, damit Spielerhände nach dem Settlement nicht verloren gehen und Reshuffles den 6-Deck-Shoe nicht schrumpfen lassen.\n- **Blackjack Bet-Timer**: Spieler haben jetzt 30 Sekunden Zeit, ihren Einsatz zu platzieren, bevor eine Runde automatisch startet."
+  },
+  {
     "id": 87,
     "version": "2.53.0",
     "date": "2026-04-24",

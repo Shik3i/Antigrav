@@ -68,13 +68,79 @@ try {
     validationError = err;
   }
   assert(validationError, 'side bets should not be editable after round start');
-} finally {
-  const room = blackjackRoomManager.getRoom(ROOM_ID);
-  if (room) {
-    room.players.slice().forEach((player) => {
-      blackjackRoomManager.leaveRoom(ROOM_ID, player.userId);
+
+  const balanceRoomId = `${ROOM_ID}-balance`;
+  const existingBalanceRoom = blackjackRoomManager.getRoom(balanceRoomId);
+  if (existingBalanceRoom) {
+    existingBalanceRoom.players.slice().forEach((playerEntry) => {
+      blackjackRoomManager.leaveRoom(balanceRoomId, playerEntry.userId);
     });
   }
+  blackjackRoomManager.createRoom(balanceRoomId, 3);
+  blackjackRoomManager.joinRoom(balanceRoomId, {
+    userId: USER_ID,
+    username: 'sidebettor',
+    displayName: 'Side Bettor'
+  });
+  blackjackRoomManager.placeBet(balanceRoomId, USER_ID, 9000, 10000);
+  blackjackRoomManager.placeSideBet(balanceRoomId, USER_ID, 'twins', 1000, 10000);
+
+  let overBudgetError = null;
+  try {
+    blackjackRoomManager.placeBet(balanceRoomId, USER_ID, 10000, 10000);
+  } catch (err) {
+    overBudgetError = err;
+  }
+  assert(overBudgetError, 'main bet changes should include pending side bets in balance validation');
+
+  const losingRoomId = `${ROOM_ID}-losing`;
+  const existingLosingRoom = blackjackRoomManager.getRoom(losingRoomId);
+  if (existingLosingRoom) {
+    existingLosingRoom.players.slice().forEach((playerEntry) => {
+      blackjackRoomManager.leaveRoom(losingRoomId, playerEntry.userId);
+    });
+  }
+  blackjackRoomManager.createRoom(losingRoomId, 3);
+  blackjackRoomManager.joinRoom(losingRoomId, {
+    userId: USER_ID,
+    username: 'sidebettor',
+    displayName: 'Side Bettor'
+  });
+  blackjackRoomManager.placeBet(losingRoomId, USER_ID, 10000, 100000);
+  blackjackRoomManager.placeSideBet(losingRoomId, USER_ID, 'twins', 2000, 100000);
+  blackjackRoomManager.placeSideBet(losingRoomId, USER_ID, 'bust', 3000, 100000);
+
+  let losingRoom = blackjackRoomManager.getRoom(losingRoomId);
+  // Draw order: player 8/9 is not twins, dealer 10/7 stands on 17 and does not bust.
+  losingRoom.shoe = [card('8', 'S'), card('10', 'C'), card('9', 'D'), card('7', 'H')];
+  for (let index = 0; index < 90; index += 1) {
+    losingRoom.shoe.push(card('2', 'H'));
+  }
+
+  blackjackRoomManager.startRound(losingRoomId, USER_ID);
+  blackjackRoomManager.stand(losingRoomId, USER_ID);
+  blackjackRoomManager.resolveDealerTurn(losingRoomId, Date.now() + 2000);
+  blackjackRoomManager.resolveDealerTurn(losingRoomId, Date.now() + 4000);
+  losingRoom = blackjackRoomManager.getRoom(losingRoomId);
+
+  const losingSideBetResults = losingRoom.lastSettlement.filter((entry) => entry.settlementType === 'sideBet');
+  const losingTwins = losingSideBetResults.find((entry) => entry.sideBetKey === 'twins');
+  const losingBust = losingSideBetResults.find((entry) => entry.sideBetKey === 'bust');
+  assert.strictEqual(losingTwins.result, 'lose');
+  assert.strictEqual(losingTwins.payout, 0, 'losing twins side bet should not pay out');
+  assert.strictEqual(losingTwins.netProfit, -2000, 'losing twins side bet should keep the stake deducted');
+  assert.strictEqual(losingBust.result, 'lose');
+  assert.strictEqual(losingBust.payout, 0, 'losing bust side bet should not pay out');
+  assert.strictEqual(losingBust.netProfit, -3000, 'losing bust side bet should keep the stake deducted');
+} finally {
+  [ROOM_ID, `${ROOM_ID}-balance`, `${ROOM_ID}-losing`].forEach((roomId) => {
+    const room = blackjackRoomManager.getRoom(roomId);
+    if (room) {
+      room.players.slice().forEach((player) => {
+        blackjackRoomManager.leaveRoom(roomId, player.userId);
+      });
+    }
+  });
 }
 
 console.log('blackjack side bets regression passed');

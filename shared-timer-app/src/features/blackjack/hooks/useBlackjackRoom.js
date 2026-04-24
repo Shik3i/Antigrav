@@ -323,6 +323,24 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     }
   }, [pendingBet, roomId, runSocketAction, showToast]);
 
+  const handleSideBetSubmit = useCallback(async (sideBetKey, amount) => {
+    const nextAmount = Number(amount || 0);
+    const sideBetLabel = sideBetKey === 'twins' ? 'Twins' : sideBetKey === 'bust' ? 'Bust' : 'Side-Bet';
+    setActionBusy(true);
+    setError('');
+    try {
+      const response = await runSocketAction(EVENTS.BLACKJACK_SIDE_BET, { roomId, sideBetKey, amount: nextAmount });
+      if (response?.state) {
+        setRoomState(response.state);
+      }
+      showToast(nextAmount > 0 ? `${sideBetLabel} Side-Bet gesetzt.` : `${sideBetLabel} Side-Bet entfernt.`, 'success');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }, [roomId, runSocketAction, showToast]);
+
   useEffect(() => {
     if (
       isGuest
@@ -537,6 +555,7 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     handleLeaveTable,
     handleRemoveBot,
     handleSmartJoin,
+    handleSideBetSubmit,
     handleSwitchRoom,
     handleWatchRoom,
     handleTurnAction,
