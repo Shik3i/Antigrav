@@ -1,5 +1,11 @@
 [
   {
+    "id": 92,
+    "version": "2.56.0",
+    "date": "2026-04-25",
+    "changes": "- **Database Refactoring**: `database/games.js` (1.779 Zeilen) in 10 domänenspezifische Module unter `database/games/` aufgeteilt — scores, scratchcards, tower, speedcube, upgrades, wordle, blackjack, lotto, fortune, idle. Keine Änderungen an Call-Sites.\n- **EPIPE Crash Fix**: Server stürzte fatal ab wenn stdout-Pipe nach Neustart geschlossen wurde. `console.log` in Cron-Jobs warf EPIPE → `uncaughtException` → `process.exit(1)`. Behoben mit expliziten EPIPE-Handlern auf stdout/stderr und Early-Exit in `uncaughtException`."
+  },
+  {
     "id": 91,
     "version": "2.55.1",
     "date": "2026-04-25",
