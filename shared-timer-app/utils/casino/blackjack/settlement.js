@@ -23,6 +23,11 @@ function finishSettlementPhase(room, now, helpers) {
   room.players = room.players.filter((player) => player.connected !== false);
 
   helpers.advanceRound(room);
+  if (room.pendingTimerConfig) {
+    room.timerConfig = room.pendingTimerConfig;
+    room.pendingTimerConfig = null;
+  }
+  room.activeTimerConfig = null;
   helpers.setPhase(room, room.players.length > 0 ? 'betting' : 'waiting');
   helpers.updateShuffleFlag(room);
   helpers.maybeScheduleAutoStart(room, null, now);

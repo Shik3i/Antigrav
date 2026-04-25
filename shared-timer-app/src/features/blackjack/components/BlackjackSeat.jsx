@@ -21,6 +21,19 @@ function getCommittedBetMotionClass(roomState, settlements) {
   return 'is-push';
 }
 
+const SIDE_BET_COPY = {
+  twins: {
+    label: 'Twins',
+    payout: '10:1',
+    description: 'Erste 2 Karten gleich'
+  },
+  bust: {
+    label: 'Bust',
+    payout: '5:2',
+    description: 'Dealer bustet'
+  }
+};
+
 function SeatControls({
   isLocalPlayer,
   roomState,
@@ -144,10 +157,11 @@ export default function BlackjackSeat({
   const seatSubline = player.waitingForNextRound
     ? 'Nächste Runde'
     : isLocalPlayer ? 'You' : player.isBot ? 'Bot' : 'Player';
+  const compactControls = roomState?.tableUiMode === 'compact' || roomState?.tableUiMode === 'stacked';
 
   return (
     <div className={seatClassName}>
-      <div className="blackjack-seat-layout-horizontal">
+      <div className={`blackjack-seat-layout-horizontal${compactControls ? ' compact-controls' : ''}`}>
         <SeatControls
           isLocalPlayer={isLocalPlayer}
           roomState={roomState}
@@ -177,7 +191,8 @@ export default function BlackjackSeat({
                 const pendingAmount = Number(pendingSideBets[sideBetKey] || 0);
                 const activeAmount = Number(activeSideBets[sideBetKey] || 0);
                 const amount = pendingAmount || activeAmount;
-                const label = sideBetKey === 'twins' ? 'Twins' : 'Bust';
+                const copy = SIDE_BET_COPY[sideBetKey];
+                const label = copy.label;
                 const isLocked = activeAmount > 0 && !isBettingPhase;
                 const canToggleSideBet = canEditSideBets && (pendingAmount > 0 || pendingBet > 0);
                 return (
@@ -185,9 +200,10 @@ export default function BlackjackSeat({
                     key={sideBetKey}
                     type="button"
                     className={`blackjack-side-bet-zone ${amount > 0 ? 'active' : ''}${isLocked ? ' is-locked' : ''}`}
+                    data-bj-anchor={`player-${player.userId}-sidebet-${sideBetKey}`}
                     disabled={!canToggleSideBet}
                     onClick={() => onSideBetSubmit?.(sideBetKey, pendingAmount > 0 ? 0 : pendingBet)}
-                    title={isLocked ? `${label} Side-Bet aktiv: ${formatKC(activeAmount)}` : canEditSideBets ? `${label} Side-Bet mit geplantem Einsatz setzen` : 'Side-Bets nur vor Rundenstart'}
+                    title={`${label}: ${copy.description}. Auszahlung ${copy.payout}${isLocked ? `. Aktiv: ${formatKC(activeAmount)}` : ''}`}
                   >
                     {amount > 0 && (
                       <div className="blackjack-side-bet-chip">
@@ -196,7 +212,9 @@ export default function BlackjackSeat({
                     )}
                     {amount > 0 && <span className="blackjack-side-bet-dot" />}
                     <span>{label}</span>
-                    <strong>{amount > 0 ? formatKC(amount) : 'Side Bet'}</strong>
+                    <em>{copy.description}</em>
+                    <strong>{copy.payout}</strong>
+                    {amount > 0 && <small>{formatKC(amount)}</small>}
                   </button>
                 );
               })}
@@ -220,10 +238,12 @@ export default function BlackjackSeat({
             <div className="blackjack-seat-hands">
               {(player.hands || []).map((hand, handIndex) => {
                 const isActive = isCurrentTurn && player.activeHandIndex === handIndex;
+                const handAnchorId = `player-${player.userId}-hand-${handIndex}`;
                 return (
                   <div
                     key={`hand-${handIndex}`}
                     className={`blackjack-hand-card-slot ${isActive ? 'active' : ''}`}
+                    data-bj-anchor={handAnchorId}
                   >
                     <div className="blackjack-hand-header">
                       <div className="blackjack-value-badge blackjack-hand-value-badge">
@@ -233,7 +253,13 @@ export default function BlackjackSeat({
 
                     <div className="blackjack-hand-wrap blackjack-hand-cards">
                       {(hand.cards || []).map((card, index) => (
-                        <PlayingCard key={`${handIndex}-${card.code}-${index}`} card={card} index={index} compact />
+                        <PlayingCard
+                          key={`${handIndex}-${card.code}-${index}`}
+                          card={card}
+                          index={index}
+                          compact
+                          motionAnchorId={`${handAnchorId}-card-${index}`}
+                        />
                       ))}
                     </div>
 
@@ -287,7 +313,7 @@ export default function BlackjackSeat({
           </div>
 
           <div className="blackjack-footer-chips">
-            <div className="blackjack-seat-bet-zone">
+            <div className="blackjack-seat-bet-zone" data-bj-anchor={isLocalPlayer ? 'pending-bet' : undefined}>
               {isLocalPlayer && pendingBet > 0 && (
                 <ChipStack
                   amount={pendingBet}

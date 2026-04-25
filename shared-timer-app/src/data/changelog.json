@@ -1,5 +1,11 @@
 [
   {
+    "id": 91,
+    "version": "2.55.1",
+    "date": "2026-04-25",
+    "changes": "- **Blackjack Responsive Fix**: Fehlende CSS Container Queries, responsive 980px Stacked-Mode und 5-Seat-Layout-Variablen nachgeliefert, die im vorherigen Commit im Stash verblieben waren.\n- **Motion Layer Integration**: BlackjackMotionLayer und useBlackjackMotion korrekt in BlackjackTable eingebunden.\n- **Blackjack Stabilität**: Socket-Handler, RoomManager, Turn- und Settlement-Logik aus dem fehlenden Stash-Stand übernommen."
+  },
+  {
     "id": 90,
     "version": "2.55.0",
     "date": "2026-04-25",

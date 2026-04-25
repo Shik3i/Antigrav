@@ -22,6 +22,7 @@ export default function Blackjack({ socket }) {
     config,
     error,
     handleAddBot,
+    handleAutoBetToggle,
     handleBetSubmit,
     handleCreateRoom,
     handleLeaveTable,
@@ -29,6 +30,7 @@ export default function Blackjack({ socket }) {
     handleSmartJoin,
     handleSideBetSubmit,
     handleSwitchRoom,
+    handleTimerConfigUpdate,
     handleWatchRoom,
     handleTurnAction,
     leaderboard,
@@ -43,7 +45,6 @@ export default function Blackjack({ socket }) {
     roomId,
     roomState,
     selectedTable,
-    setAutoBetEnabled,
     setCurrentRoomId,
     setLeaderboardSort,
     setPendingBet,
@@ -92,13 +93,14 @@ export default function Blackjack({ socket }) {
           handleLeaveTable={handleLeaveTable}
           handleSmartJoin={handleSmartJoin}
           handleSideBetSubmit={handleSideBetSubmit}
+          handleTimerConfigUpdate={handleTimerConfigUpdate}
           handleTurnAction={handleTurnAction}
           isGuest={isGuest}
           mySeat={mySeat}
           pendingBet={pendingBet}
           roomState={roomState}
           selectedTable={selectedTable}
-          setAutoBetEnabled={setAutoBetEnabled}
+          setAutoBetEnabled={handleAutoBetToggle}
           setPendingBet={setPendingBet}
           tableSeats={tableSeats}
           tableStatusMeta={tableStatusMeta}

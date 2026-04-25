@@ -25,7 +25,7 @@ function processTick(room, roomId, now, helpers) {
   if (room.status === 'player_turns' && room.turnDeadlineAt && room.currentPlayerTurn) {
     const currentPlayer = helpers.getPlayerByUserId(room, room.currentPlayerTurn);
     const isDisconnected = currentPlayer && currentPlayer.connected === false;
-    const effectiveTimeout = isDisconnected ? 10 * 1000 : helpers.turnTimeoutMs;
+    const effectiveTimeout = isDisconnected ? 10 * 1000 : helpers.getTurnTimeoutMs(room);
 
     if (isDisconnected && room.turnDeadlineAt > now + 10000) {
       room.turnDeadlineAt = now + 10000;

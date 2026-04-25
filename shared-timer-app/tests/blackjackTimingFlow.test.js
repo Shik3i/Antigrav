@@ -32,9 +32,22 @@ try {
   room = blackjackRoomManager.getRoom(ROOM_ID);
   assert(room.autoStartAt, 'auto-start should be scheduled once seated players have bets');
   assert(
-    room.autoStartAt <= beforeAllReady + 2500,
-    'all-bets-ready tables should start with a short countdown'
+    room.autoStartAt >= beforeAllReady + 29000 && room.autoStartAt <= beforeAllReady + 30500,
+    'manual all-bets-ready tables should still use the full bet window'
   );
+
+  blackjackRoomManager.updateAutoBet(ROOM_ID, USER_A, true);
+  blackjackRoomManager.updateAutoBet(ROOM_ID, USER_B, true);
+  room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert(
+    room.autoStartAt <= Date.now() + 2500,
+    'tables with all seated players on auto-bet should use the short countdown'
+  );
+
+  blackjackRoomManager.updateTimerConfig(ROOM_ID, USER_A, { betWindowSeconds: 45, turnTimeoutSeconds: 60 });
+  room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert.strictEqual(room.timerConfig.betWindowMs, 30000, 'timer changes should not affect the current betting window');
+  assert.strictEqual(room.pendingTimerConfig.betWindowMs, 45000, 'timer changes should be queued for the next round');
 
   room.shoe = [
     { rank: '5', suit: 'spades', code: '5S' },
@@ -49,6 +62,12 @@ try {
 
   blackjackRoomManager.startRound(ROOM_ID, USER_A);
   room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert(
+    room.turnDeadlineAt >= Date.now() + 59500 && room.turnDeadlineAt <= Date.now() + 60500,
+    'queued turn timeout changes should apply to the next round when it starts'
+  );
+  assert.strictEqual(room.timerConfig.betWindowMs, 45000, 'queued timer config should apply when the next round starts');
+  assert.strictEqual(room.pendingTimerConfig, null, 'pending timer config should clear once the next round starts');
   blackjackRoomManager.settleRound(ROOM_ID);
   room = blackjackRoomManager.getRoom(ROOM_ID);
 
@@ -56,6 +75,11 @@ try {
     room.settlementCompleteAt >= Date.now() + 4500,
     'settlement result should remain visible for several seconds'
   );
+
+  blackjackRoomManager.finishSettlementPhase(room, room.settlementCompleteAt + 1);
+  room = blackjackRoomManager.getRoom(ROOM_ID);
+  assert.strictEqual(room.timerConfig.betWindowMs, 45000, 'next betting window should keep the configured bet window');
+  assert.strictEqual(room.timerConfig.turnTimeoutMs, 60000, 'next betting window should keep the configured turn timeout');
 } finally {
   cleanupRoom();
 }

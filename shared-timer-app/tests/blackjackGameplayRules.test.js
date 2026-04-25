@@ -31,14 +31,15 @@ try {
     displayName: 'Rules B'
   });
 
-  const beforeFirstBet = Date.now();
   blackjackRoomManager.placeBet(ROOM_ID, USER_A, 10000, 100000);
+  blackjackRoomManager.updateAutoBet(ROOM_ID, USER_A, true);
   blackjackRoomManager.placeBet(ROOM_ID, USER_B, 10000, 100000);
+  blackjackRoomManager.updateAutoBet(ROOM_ID, USER_B, true);
 
   let room = blackjackRoomManager.getRoom(ROOM_ID);
   assert.strictEqual(room.phase, 'betting', 'table should stay in betting until auto-start deadline expires');
-  assert(room.autoStartAt, 'auto-start deadline should be scheduled after all seated players have bet');
-  assert(room.autoStartAt <= beforeFirstBet + 2500, 'auto-start should be short when all seated players have bets');
+  assert(room.autoStartAt, 'auto-start deadline should be scheduled after active auto-bet players have bets');
+  assert(room.autoStartAt <= Date.now() + 2500, 'auto-start should be short when all seated players have auto-bet enabled');
 
   blackjackRoomManager.tick(room.autoStartAt - 1);
   room = blackjackRoomManager.getRoom(ROOM_ID);

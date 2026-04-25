@@ -66,7 +66,7 @@ function advanceTurn(room, helpers) {
         return advanceTurn(room, helpers);
       }
 
-      helpers.setDeadline(room, 'turnDeadlineAt', Date.now() + helpers.turnTimeoutMs);
+      helpers.setDeadline(room, 'turnDeadlineAt', Date.now() + helpers.getTurnTimeoutMs(room));
       helpers.setDeadline(
         room,
         'botActionAt',
@@ -98,7 +98,7 @@ function advanceTurn(room, helpers) {
   }
 
   room.currentPlayerTurn = nextPlayer.userId;
-  helpers.setDeadline(room, 'turnDeadlineAt', Date.now() + helpers.turnTimeoutMs);
+  helpers.setDeadline(room, 'turnDeadlineAt', Date.now() + helpers.getTurnTimeoutMs(room));
   helpers.setDeadline(
     room,
     'botActionAt',

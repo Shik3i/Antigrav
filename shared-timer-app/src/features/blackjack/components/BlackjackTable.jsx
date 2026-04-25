@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
 import { Crown, ShieldAlert } from 'lucide-react';
 import EVENTS from '../../../../socketEvents.json';
+import useBlackjackMotion from '../hooks/useBlackjackMotion';
 import BlackjackDealer from './BlackjackDealer';
+import BlackjackMotionLayer from './BlackjackMotionLayer';
 import BlackjackSeat from './BlackjackSeat';
 const STATUS_LABELS = {
   waiting: 'Wartet auf Spieler',
@@ -11,9 +14,16 @@ const STATUS_LABELS = {
   settlement: 'Abrechnung läuft'
 };
 
-function FeltPile({ label, count, side = 'left', accent = '#f8fafc' }) {
+function getTableUiMode(width) {
+  if (width <= 980) return 'stacked';
+  if (width <= 1180) return 'compact';
+  if (width <= 1500) return 'compressed';
+  return 'full';
+}
+
+function FeltPile({ label, count, side = 'left', accent = '#f8fafc', anchorId }) {
   return (
-    <div className={`blackjack-felt-pile ${side}`}>
+    <div className={`blackjack-felt-pile ${side}`} data-bj-anchor={anchorId}>
       <div className="blackjack-felt-pile-cards">
         <div className="blackjack-felt-pile-card shadow" />
         <div className="blackjack-felt-pile-card top" />
@@ -34,6 +44,64 @@ function sortPlayerSettlements(a, b) {
   return Number(a.handIndex || 0) - Number(b.handIndex || 0);
 }
 
+function secondsFromMs(value, fallback) {
+  return Math.round((Number(value) || fallback * 1000) / 1000);
+}
+
+function BlackjackTimerConfig({ actionBusy, canEdit, onUpdate, roomState }) {
+  const activeConfig = roomState?.pendingTimerConfig || roomState?.timerConfig || {};
+  const [betWindowSeconds, setBetWindowSeconds] = useState(() => secondsFromMs(activeConfig.betWindowMs, 30));
+  const [turnTimeoutSeconds, setTurnTimeoutSeconds] = useState(() => secondsFromMs(activeConfig.turnTimeoutMs, 90));
+
+  useEffect(() => {
+    setBetWindowSeconds(secondsFromMs(activeConfig.betWindowMs, 30));
+    setTurnTimeoutSeconds(secondsFromMs(activeConfig.turnTimeoutMs, 90));
+  }, [activeConfig.betWindowMs, activeConfig.turnTimeoutMs]);
+
+  const hasPending = Boolean(roomState?.pendingTimerConfig);
+
+  return (
+    <div className="blackjack-timer-config">
+      <div className="blackjack-timer-config-label">
+        Timer
+        {hasPending && <span>naechste Runde</span>}
+      </div>
+      <label className="blackjack-timer-field">
+        <span>Bet</span>
+        <input
+          type="number"
+          min="5"
+          max="120"
+          value={betWindowSeconds}
+          disabled={!canEdit || actionBusy}
+          onChange={(event) => setBetWindowSeconds(Number.parseInt(event.target.value, 10) || 0)}
+        />
+        <span>s</span>
+      </label>
+      <label className="blackjack-timer-field">
+        <span>Zug</span>
+        <input
+          type="number"
+          min="10"
+          max="180"
+          value={turnTimeoutSeconds}
+          disabled={!canEdit || actionBusy}
+          onChange={(event) => setTurnTimeoutSeconds(Number.parseInt(event.target.value, 10) || 0)}
+        />
+        <span>s</span>
+      </label>
+      <button
+        type="button"
+        className="blackjack-timer-save"
+        disabled={!canEdit || actionBusy}
+        onClick={() => onUpdate({ betWindowSeconds, turnTimeoutSeconds })}
+      >
+        Speichern
+      </button>
+    </div>
+  );
+}
+
 export default function BlackjackTable({
   actionBusy,
   autoBetEnabled,
@@ -43,6 +111,7 @@ export default function BlackjackTable({
   handleLeaveTable,
   handleSmartJoin,
   handleSideBetSubmit,
+  handleTimerConfigUpdate,
   handleTurnAction,
   isGuest,
   mySeat,
@@ -55,8 +124,41 @@ export default function BlackjackTable({
   tableStatusMeta,
   user
 }) {
+  const canEditTimers = Boolean(mySeat?.userId);
+  const tableShellRef = useRef(null);
+  const [tableUiMode, setTableUiMode] = useState('full');
+  const { events: motionEvents, clearEvent } = useBlackjackMotion(roomState);
+
+  useEffect(() => {
+    const tableShell = tableShellRef.current;
+    if (!tableShell) return undefined;
+
+    const updateTableUiMode = (width) => {
+      const nextMode = getTableUiMode(width);
+      setTableUiMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
+    };
+
+    updateTableUiMode(tableShell.getBoundingClientRect().width);
+
+    if (typeof ResizeObserver !== 'function') return undefined;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      updateTableUiMode(entry.contentRect.width);
+    });
+
+    observer.observe(tableShell);
+    return () => observer.disconnect();
+  }, []);
+
+  const seatRoomState = {
+    ...(roomState || {}),
+    tableUiMode
+  };
+
   return (
-    <section className="blackjack-table-shell">
+    <section ref={tableShellRef} className="blackjack-table-shell">
       <div className="blackjack-table-shell-frame" />
 
       <div className="blackjack-table-topbar">
@@ -67,17 +169,25 @@ export default function BlackjackTable({
             </div>
             <div>
               <h1 className="blackjack-page-title">Blackjack Table</h1>
-              <div className="blackjack-title-copy">Live-Raum mit 6-Deck-Shoe, Burn Card und Settlement erst am Ende.</div>
+              <div className="blackjack-title-copy">Live-Raum mit 6-Deck-Shoe, Burn Card, Side-Bets und konfigurierbaren Rundentimern.</div>
             </div>
           </div>
           <div className="blackjack-status-pills">
             <div className="blackjack-status-pill">Status: {STATUS_LABELS[roomState?.status] || 'Unbekannt'}</div>
+            <div className="blackjack-status-pill">Tisch: Min 1 KC / Max 1.000.000 KC</div>
             <div className="blackjack-status-pill">Shoe: {roomState?.shoeRemaining ?? 0} Karten</div>
             <div className={`blackjack-status-pill${roomState?.needsShuffle ? ' is-alert' : ''}`}>
               {roomState?.needsShuffle ? 'Reshuffle vor nächster Hand' : `Reshuffle bei ${config?.reshuffleRemainingPercent || 25}%`}
             </div>
           </div>
         </div>
+
+        <BlackjackTimerConfig
+          actionBusy={actionBusy}
+          canEdit={canEditTimers}
+          onUpdate={handleTimerConfigUpdate}
+          roomState={roomState}
+        />
 
         <div className="blackjack-header-status">
           <div className="blackjack-status-label">
@@ -103,6 +213,8 @@ export default function BlackjackTable({
 
       <div className="blackjack-table-stack">
         <div className="blackjack-stage">
+          <BlackjackMotionLayer events={motionEvents} clearEvent={clearEvent} />
+
           <div className="blackjack-table-center blackjack-table-copy">
             <div className="blackjack-table-copy-inner">
               <div>Blackjack pays 3 to 2</div>
@@ -110,8 +222,8 @@ export default function BlackjackTable({
             </div>
           </div>
 
-          <FeltPile label="Shoe" count={roomState?.shoeRemaining ?? 0} side="right" accent="#fbbf24" />
-          <FeltPile label="Discard" count={roomState?.discardCount ?? 0} side="left" accent="#93c5fd" />
+          <FeltPile label="Shoe" count={roomState?.shoeRemaining ?? 0} side="right" accent="#fbbf24" anchorId="shoe" />
+          <FeltPile label="Discard" count={roomState?.discardCount ?? 0} side="left" accent="#93c5fd" anchorId="discard" />
 
           <BlackjackDealer roomState={roomState} />
 
@@ -123,7 +235,7 @@ export default function BlackjackTable({
                 key={player.userId || `seat-${player.seat}`}
                 player={player}
                 selectedTable={selectedTable}
-                roomState={roomState}
+                roomState={seatRoomState}
                 settlements={settlements}
                 isCurrentTurn={isCurrentTurn}
                 isLocalPlayer={String(player.userId) === String(user?.id)}

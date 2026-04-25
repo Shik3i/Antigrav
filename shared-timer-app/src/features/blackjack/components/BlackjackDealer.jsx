@@ -5,16 +5,13 @@ function getDealerStatusText(roomState) {
   if (roomState?.status === 'betting' || roomState?.status === 'waiting') return 'Waiting for bets';
   if (roomState?.status === 'dealing') return 'Dealing';
   if (roomState?.status === 'dealer_turn') {
-    if (roomState?.dealerPhase === 'reveal') return 'Dealer reveals hole card';
-    if (roomState?.dealerPhase === 'draw') return 'Dealer draws';
-    if (roomState?.dealerPhase === 'stand') return 'Dealer stands';
-    if (roomState?.dealerPhase === 'bust') return 'Dealer busts';
-    return 'Dealer turn';
+    if (roomState?.dealerPhase === 'reveal') return 'Reveal';
+    if (roomState?.dealerPhase === 'draw') return 'Draw';
+    if (roomState?.dealerPhase === 'stand') return 'Stand';
+    if (roomState?.dealerPhase === 'bust') return 'Bust';
+    return 'Waiting for bets';
   }
-  if (roomState?.status === 'settlement') {
-    if ((roomState?.dealerHandValue || 0) > 21) return 'Dealer busts';
-    return 'Dealer stands';
-  }
+  if (roomState?.status === 'settlement') return 'Settling bets';
 
   return 'Waiting for bets';
 }
@@ -26,7 +23,7 @@ export default function BlackjackDealer({ roomState }) {
     <div className="blackjack-dealer-zone">
       <BlackjackCelebration active={isBlackjack} />
       <div className="blackjack-dealer-header" style={{ marginBottom: (roomState?.dealerHand?.length || 0) > 0 ? '10px' : '0' }}>
-        <div className="blackjack-dealer-status" style={{ fontWeight: 800, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.75rem' }}>
+        <div className="blackjack-dealer-status">
           {getDealerStatusText(roomState)}
         </div>
         {(roomState?.dealerHand?.length || 0) > 0 && (
@@ -34,9 +31,14 @@ export default function BlackjackDealer({ roomState }) {
         )}
       </div>
 
-      <div className="blackjack-dealer-cards">
+      <div className="blackjack-dealer-cards" data-bj-anchor="dealer-hand">
         {(roomState?.dealerHand || []).map((card, index) => (
-          <PlayingCard key={`${card.code}-${index}`} card={card} index={index} />
+          <PlayingCard
+            key={`${card.code}-${index}`}
+            card={card}
+            index={index}
+            motionAnchorId={`dealer-hand-card-${index}`}
+          />
         ))}
       </div>
     </div>
