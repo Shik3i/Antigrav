@@ -26,10 +26,11 @@ function cardStyle(card) {
   };
 }
 
-export default function PlayingCard({ card, index = 0, compact = false }) {
+export default function PlayingCard({ card, index = 0, compact = false, motionAnchorId }) {
   return (
     <div
       className={`blackjack-card${compact ? ' compact' : ''}${card?.visible === false ? ' hidden-card' : ''}`}
+      data-bj-anchor={motionAnchorId}
       style={{
         ...cardStyle(card),
         animation: 'blackjackDealIn 460ms cubic-bezier(0.16, 1, 0.3, 1) both',

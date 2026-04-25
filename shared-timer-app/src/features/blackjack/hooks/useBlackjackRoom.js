@@ -341,6 +341,39 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     }
   }, [roomId, runSocketAction, showToast]);
 
+  const handleAutoBetToggle = useCallback(async () => {
+    const nextEnabled = !autoBetEnabled;
+    setAutoBetEnabled(nextEnabled);
+
+    if (!mySeat?.userId) {
+      return;
+    }
+
+    try {
+      await runSocketAction(EVENTS.BLACKJACK_AUTO_BET, { roomId, enabled: nextEnabled });
+    } catch (err) {
+      setAutoBetEnabled(!nextEnabled);
+      setError(err.message || 'Auto-Bet konnte nicht aktualisiert werden.');
+    }
+  }, [autoBetEnabled, mySeat?.userId, roomId, runSocketAction, setAutoBetEnabled]);
+
+  const handleTimerConfigUpdate = useCallback(async ({ betWindowSeconds, turnTimeoutSeconds }) => {
+    setActionBusy(true);
+    setError('');
+    try {
+      await runSocketAction(EVENTS.BLACKJACK_UPDATE_TIMER_CONFIG, {
+        roomId,
+        betWindowSeconds,
+        turnTimeoutSeconds
+      });
+      showToast('Timer gelten ab der naechsten Runde.', 'success');
+    } catch (err) {
+      setError(err.message || 'Timer konnten nicht aktualisiert werden.');
+    } finally {
+      setActionBusy(false);
+    }
+  }, [roomId, runSocketAction, showToast]);
+
   useEffect(() => {
     if (
       isGuest
@@ -369,6 +402,15 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     roomState?.status,
     runSocketAction
   ]);
+
+  useEffect(() => {
+    if (isGuest || !mySeat?.userId || mySeat.autoBetEnabled === autoBetEnabled || !roomId) {
+      return;
+    }
+
+    runSocketAction(EVENTS.BLACKJACK_AUTO_BET, { roomId, enabled: autoBetEnabled })
+      .catch((err) => setError(err.message || 'Auto-Bet konnte nicht synchronisiert werden.'));
+  }, [autoBetEnabled, isGuest, mySeat?.autoBetEnabled, mySeat?.userId, roomId, runSocketAction]);
 
   const handleTurnAction = useCallback(async (eventName) => {
     setActionBusy(true);
@@ -551,11 +593,13 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     error,
     handleAddBot,
     handleBetSubmit,
+    handleAutoBetToggle,
     handleCreateRoom,
     handleLeaveTable,
     handleRemoveBot,
     handleSmartJoin,
     handleSideBetSubmit,
+    handleTimerConfigUpdate,
     handleSwitchRoom,
     handleWatchRoom,
     handleTurnAction,

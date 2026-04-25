@@ -23,6 +23,7 @@ function serializePlayer(player, helpers) {
     done: player.done,
     connected: player.connected,
     waitingForNextRound: Boolean(player.waitingForNextRound),
+    autoBetEnabled: Boolean(player.autoBetEnabled),
     preferences: player.preferences || {}
   };
 }
@@ -71,6 +72,8 @@ function getRoomState(room, viewerUserId, helpers) {
     reshuffleRemainingPercent: room.reshuffleRemainingPercent,
     deckCount: room.deckCount,
     burnCard: Boolean(room.burnCard),
+    timerConfig: room.timerConfig || null,
+    pendingTimerConfig: room.pendingTimerConfig || null,
     allowedBets: helpers.allowedBets,
     sideBetDefinitions: helpers.sideBetDefinitions || [],
     viewerUserId,

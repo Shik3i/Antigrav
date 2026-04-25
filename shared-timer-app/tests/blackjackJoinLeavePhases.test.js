@@ -24,6 +24,13 @@ try {
     displayName: 'Active User'
   });
   blackjackRoomManager.placeBet(ROOM_ID, ACTIVE_USER, 10000, 100000);
+  blackjackRoomManager.getRoom(ROOM_ID).shoe = [
+    { rank: '9', suit: 'spades', code: '9S' },
+    { rank: '2', suit: 'hearts', code: '2H' },
+    { rank: '5', suit: 'clubs', code: '5C' },
+    { rank: '3', suit: 'diamonds', code: '3D' },
+    ...Array.from({ length: 80 }, () => ({ rank: '2', suit: 'clubs', code: '2C' }))
+  ];
   blackjackRoomManager.startRound(ROOM_ID, ACTIVE_USER);
 
   let room = blackjackRoomManager.getRoom(ROOM_ID);

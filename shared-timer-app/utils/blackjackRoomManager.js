@@ -46,6 +46,15 @@ const SETTLEMENT_DISPLAY_MS = 5 * 1000;
 const DEALER_ACTION_DELAY_MS = 1200;
 const BOT_ACTION_DELAY_MS = 1400;
 const BOT_DEFAULT_BET_CENTS = 100 * CENTS_PER_KC;
+const DEFAULT_TIMER_CONFIG = {
+  betWindowMs: AUTO_START_DELAY_MS,
+  allAutoBetReadyMs: ALL_BETS_READY_AUTO_START_DELAY_MS,
+  turnTimeoutMs: TURN_TIMEOUT_MS
+};
+const TIMER_CONFIG_LIMITS = {
+  betWindowSeconds: { min: 5, max: 120 },
+  turnTimeoutSeconds: { min: 10, max: 180 }
+};
 
 function normalizeMaxPlayers(maxPlayers = 5) {
   return ALLOWED_MAX_PLAYERS.has(Number(maxPlayers)) ? Number(maxPlayers) : 5;
@@ -64,6 +73,7 @@ function createPlayerState(user, seat) {
     activeHandIndex: 0,
     done: false,
     waitingForNextRound: false,
+    autoBetEnabled: false,
     pendingSideBets: {},
     activeSideBets: {},
     sideBetResults: []
@@ -164,6 +174,9 @@ function createRoom(roomId, maxPlayers = 5) {
     settlementCompleteAt: null,
     pendingRoundStartByUserId: null,
     lastAppliedBuyInRoundId: null,
+    timerConfig: { ...DEFAULT_TIMER_CONFIG },
+    pendingTimerConfig: null,
+    activeTimerConfig: null,
     dealerPhase: null,
     dealerActionAt: null,
     botActionAt: null,
@@ -243,7 +256,7 @@ const roundFlowHelpers = {
   setPhase,
   shouldReshuffle,
   syncPlayerState,
-  turnTimeoutMs: TURN_TIMEOUT_MS
+  getTurnTimeoutMs
 };
 
 const dealerHelpers = {
@@ -267,7 +280,7 @@ const turnsHelpers = {
   setDeadline,
   setPhase,
   syncPlayerState,
-  turnTimeoutMs: TURN_TIMEOUT_MS
+  getTurnTimeoutMs
 };
 
 const settlementHelpers = {
@@ -300,7 +313,7 @@ const tickHelpers = {
   split,
   stand: (room, userId) => turns.stand(room, userId, turnsHelpers),
   startRound,
-  turnTimeoutMs: TURN_TIMEOUT_MS
+  getTurnTimeoutMs
 };
 
 const actionHelpers = {
@@ -372,6 +385,77 @@ function getRoomState(roomId, viewerUserId = null) {
   return blackjackSerialization.getRoomState(room, viewerUserId, stateSerializationHelpers);
 }
 
+function getActiveTimerConfig(room) {
+  return room?.activeTimerConfig || room?.timerConfig || DEFAULT_TIMER_CONFIG;
+}
+
+function getTurnTimeoutMs(room) {
+  return getActiveTimerConfig(room).turnTimeoutMs;
+}
+
+function normalizeTimerConfigPatch(patch = {}) {
+  const normalized = {};
+  const betWindowSeconds = Number(patch.betWindowSeconds);
+  const turnTimeoutSeconds = Number(patch.turnTimeoutSeconds);
+
+  if (Number.isFinite(betWindowSeconds)) {
+    const { min, max } = TIMER_CONFIG_LIMITS.betWindowSeconds;
+    if (!Number.isInteger(betWindowSeconds) || betWindowSeconds < min || betWindowSeconds > max) {
+      throw new Error(`Bet window must be between ${min} and ${max} seconds.`);
+    }
+    normalized.betWindowMs = betWindowSeconds * 1000;
+  }
+
+  if (Number.isFinite(turnTimeoutSeconds)) {
+    const { min, max } = TIMER_CONFIG_LIMITS.turnTimeoutSeconds;
+    if (!Number.isInteger(turnTimeoutSeconds) || turnTimeoutSeconds < min || turnTimeoutSeconds > max) {
+      throw new Error(`Turn timeout must be between ${min} and ${max} seconds.`);
+    }
+    normalized.turnTimeoutMs = turnTimeoutSeconds * 1000;
+  }
+
+  if (Object.keys(normalized).length === 0) {
+    throw new Error('No blackjack timer changes provided.');
+  }
+
+  return normalized;
+}
+
+function updateAutoBet(roomId, userId, enabled) {
+  const room = rooms.get(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
+  }
+
+  const player = getPlayerByUserId(room, userId);
+  if (!player) {
+    throw new Error('Only seated players can update auto-bet.');
+  }
+
+  player.autoBetEnabled = Boolean(enabled);
+  maybeScheduleAutoStart(room, userId);
+  return room;
+}
+
+function updateTimerConfig(roomId, userId, patch = {}) {
+  const room = rooms.get(roomId);
+  if (!room) {
+    throw new Error('Blackjack room not found.');
+  }
+
+  const player = getPlayerByUserId(room, userId);
+  if (!player) {
+    throw new Error('Only seated players can update blackjack timers.');
+  }
+
+  room.pendingTimerConfig = {
+    ...(room.pendingTimerConfig || room.timerConfig || DEFAULT_TIMER_CONFIG),
+    ...normalizeTimerConfigPatch(patch)
+  };
+
+  return room;
+}
+
 function validateBetAmount(amount) {
   if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
     throw new Error('Bet must be a valid whole-KC amount.');
@@ -434,8 +518,10 @@ function maybeScheduleAutoStart(room, userId = null, now = Date.now()) {
   }
 
   setRoomPhase(room, 'betting');
-  const allSeatedPlayersHaveBet = seatedPlayers.length > 0 && activeBettors.length === seatedPlayers.length;
-  room.autoStartAt = now + (allSeatedPlayersHaveBet ? ALL_BETS_READY_AUTO_START_DELAY_MS : AUTO_START_DELAY_MS);
+  const timerConfig = room.timerConfig || DEFAULT_TIMER_CONFIG;
+  const allAutoBetPlayersReady = seatedPlayers.length > 0
+    && seatedPlayers.every((player) => player.autoBetEnabled && player.currentBet > 0);
+  room.autoStartAt = now + (allAutoBetPlayersReady ? timerConfig.allAutoBetReadyMs : timerConfig.betWindowMs);
   room.autoStartQueuedByUserId = userId || activeBettors[0]?.userId || null;
 }
 
@@ -446,6 +532,11 @@ function startRound(roomId, startedByUserId) {
   }
 
   room.pendingRoundStartByUserId = null;
+  if (room.pendingTimerConfig) {
+    room.timerConfig = room.pendingTimerConfig;
+    room.pendingTimerConfig = null;
+  }
+  room.activeTimerConfig = { ...(room.timerConfig || DEFAULT_TIMER_CONFIG) };
   roundFlow.startRound(room, startedByUserId, roundFlowHelpers);
 
   if (!room.currentPlayerTurn) {
@@ -548,6 +639,7 @@ module.exports = {
   ALLOWED_BET_CHIPS_KC,
   CENTS_PER_KC,
   TURN_TIMEOUT_MS,
+  DEFAULT_TIMER_CONFIG,
   createRoom,
   getRoom,
   getPlayerRoomId,
@@ -557,6 +649,9 @@ module.exports = {
   getRoomState,
   placeBet,
   placeSideBet,
+  updateAutoBet,
+  updateTimerConfig,
+  finishSettlementPhase,
   addBot,
   removeBot,
   moveSeat,

@@ -53,7 +53,7 @@ function startRound(room, startedByUserId, helpers) {
 
   helpers.setPhase(room, 'player_turns');
   room.currentPlayerTurn = activePlayers.find((player) => !player.done)?.userId || null;
-  helpers.setDeadline(room, 'turnDeadlineAt', room.currentPlayerTurn ? Date.now() + helpers.turnTimeoutMs : null);
+  helpers.setDeadline(room, 'turnDeadlineAt', room.currentPlayerTurn ? Date.now() + helpers.getTurnTimeoutMs(room) : null);
   helpers.setDeadline(
     room,
     'botActionAt',

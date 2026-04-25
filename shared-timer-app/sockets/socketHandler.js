@@ -914,6 +914,44 @@ module.exports = function (io) {
             }
         });
 
+        socket.on(EVENTS.BLACKJACK_AUTO_BET, ({ roomId, enabled } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.updateAutoBet(roomId, userId, Boolean(enabled));
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to update auto-bet.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to update auto-bet.' });
+            }
+        });
+
+        socket.on(EVENTS.BLACKJACK_UPDATE_TIMER_CONFIG, ({ roomId, betWindowSeconds, turnTimeoutSeconds } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    throw new Error('Authentication required.');
+                }
+                if (!roomId) {
+                    throw new Error('roomId is required.');
+                }
+
+                blackjackRoomManager.updateTimerConfig(roomId, userId, { betWindowSeconds, turnTimeoutSeconds });
+                const state = emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true, state });
+            } catch (err) {
+                socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to update blackjack timers.');
+                sendSocketAck(ack, { success: false, error: err.message || 'Failed to update blackjack timers.' });
+            }
+        });
+
         socket.on(EVENTS.BLACKJACK_BET, async ({ roomId, amount } = {}, ack) => {
             try {
                 const userId = socket.user?.userId;
