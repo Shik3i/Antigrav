@@ -18,7 +18,18 @@ The database logic is divided into domain-specific modules located in the `/data
 | `timers.js` | **Timers & Rooms**: Room state persistence, timer history, and session tracking. |
 | `social.js` | **Social**: Friends list, requests, and social interactions. |
 | `external.js` | **Integrations**: RSS, Esports, Countdowns, and Feature Requests. |
-| `games.js` | **Games**: All minigame logic (Wordle, Blackjack, Lotto, Tower Climb, etc.). |
+| `games/` | **Games**: All minigame logic, decomposed into domain modules (see below). |
+| `games/index.js` | **Games Facade**: Re-exports all game sub-modules. Replaces `games.js`. |
+| `games/scores.js` | GameScores, leaderboards, UserGameStats, zero-score streak. |
+| `games/scratchcards.js` | All scratchcard DB logic. |
+| `games/tower.js` | Tower Climb rounds and logic. |
+| `games/speedcube.js` | SpeedcubeTimes CRUD. |
+| `games/upgrades.js` | GameUpgrades_Config, UserUpgrades, leaderboard settings. |
+| `games/wordle.js` | Wordle DB queries. |
+| `games/blackjack.js` | Blackjack stats and settlement transactions. |
+| `games/lotto.js` | Lotto draw and ticket queries. |
+| `games/fortune.js` | Fortune cookie DB logic. |
+| `games/idle.js` | Idle Game and Rift Defense DB logic. |
 
 ---
 
@@ -50,10 +61,12 @@ Use `logging.js` for all significant events and errors. Avoid using `console.log
 
 ## 🛠️ How to Add a New Feature
 
-1.  **Identify the Domain**: Decide which file (e.g., `games.js`) the function belongs in.
+1.  **Identify the Domain**: Decide which file (e.g., `games/wordle.js`) the function belongs in.
 2.  **Implement the Function**: Add the function using the `db` singleton. Use Promises for all asynchronous operations.
 3.  **Export the Function**: Add the function name to the `module.exports` object at the bottom of the domain file.
-4.  **Automatic Exposure**: The function is automatically available via `require('./database')` because `index.js` uses the spread operator (`...games`).
+4.  **Export from sub-module**: Add the function name to `module.exports` at the bottom of the domain file.
+5.  **Re-export from games/index.js**: The spread in `games/index.js` automatically picks it up.
+6.  **Automatic Exposure**: The function is available via `require('./database')` because `database/index.js` spreads `...games`.
 
 ## 📁 How to Add a New Domain
 
