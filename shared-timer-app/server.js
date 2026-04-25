@@ -32,7 +32,13 @@ console.error = function(...args) {
     originalConsoleError.apply(console, args);
 };
 
+// EPIPE means the stdout/stderr pipe was closed by the parent process — not an app bug.
+// Exit 0 silently instead of crashing with a false FATAL.
+process.stdout.on('error', (err) => { if (err.code === 'EPIPE') process.exit(0); });
+process.stderr.on('error', (err) => { if (err.code === 'EPIPE') process.exit(0); });
+
 process.on('uncaughtException', (err) => {
+    if (err.code === 'EPIPE') { process.exit(0); return; }
     originalConsoleError('FATAL UNCAUGHT EXCEPTION:', err);
     if (dbLayer && dbLayer.logError) {
         dbLayer.logError('FATAL UNCAUGHT EXCEPTION: ' + err.message, err.stack, 'process.on').finally(() => {
