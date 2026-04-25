@@ -188,7 +188,6 @@ const pruneBackups = async () => {
 
   const now = new Date();
   const toDelete = [];
-  const keptFiles = new Set();
 
   // Helper to get date strings
   const getDayStr = (date) => date.toISOString().split('T')[0];
@@ -248,17 +247,17 @@ const pruneBackups = async () => {
 
     if (!keep) {
       toDelete.push(backup.filename);
-    } else {
-      keptFiles.add(backup.filename);
     }
   }
 
-  // Final check: don't delete files that are in multiple buckets
-  const finalToDelete = toDelete.filter(f => !keptFiles.has(f));
+  // Iterate the delete list. Each entry failed to claim a slot in any GFS
+  // bucket (daily/weekly/monthly) and is safe to remove.
 
-  for (const filename of finalToDelete) {
+  for (const filename of toDelete) {
     try {
-      fs.unlinkSync(path.join(BACKUP_AUTO_DIR, filename));
+      // Use async unlink — blocking unlinkSync would stall the event loop
+      // while pruning multiple files, violating the non-blocking cron rule.
+      await fs.promises.unlink(path.join(BACKUP_AUTO_DIR, filename));
       console.log(`[Backup Prune] Deleted old automatic backup: ${filename}`);
     } catch (err) {
       console.error(`[Backup Prune] Failed to delete ${filename}:`, err);

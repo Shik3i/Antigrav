@@ -1,5 +1,11 @@
 [
   {
+    "id": 89,
+    "version": "2.54.1",
+    "date": "2026-04-25",
+    "changes": "- **Automated Backup Reliability**: Fixed a critical design flaw where server restarts would reset the 24h backup timer. The system now uses wall-clock polling and a startup catch-up check to ensure daily backups occur regardless of uptime frequency.\n- **Async System Maintenance**: Refactored the GFS pruning logic to use non-blocking async operations, ensuring system maintenance doesn't freeze the real-time engine or active game sessions.\n- **Architecture Guard**: Restored correct guard ordering in the backup cron and eliminated orphaned variables for better code maintainability."
+  },
+  {
     "id": 88,
     "version": "2.54.0",
     "date": "2026-04-25",
