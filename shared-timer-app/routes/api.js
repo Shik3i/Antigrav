@@ -278,6 +278,7 @@ router.post('/blackjack/table/switch-seat', authController.authenticateToken, bl
 router.get('/polymarket/settings', polymarketController.getSettings);
 router.post('/polymarket/general', authController.authenticateToken, polymarketController.addGeneralBet);
 router.get('/polymarket/general', polymarketController.getAllGeneralBets);
+router.get('/polymarket/my-bets', authController.authenticateToken, polymarketController.getUserBets);
 router.post('/polymarket/general/bet', authController.authenticateToken, polymarketController.placeGeneralBet);
 router.post('/polymarket/general/resolve', authController.authenticateToken, polymarketController.resolveGeneralBet);
 router.delete('/polymarket/general/:id', authController.authenticateToken, polymarketController.deleteGeneralBet);

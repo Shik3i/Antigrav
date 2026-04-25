@@ -423,7 +423,13 @@ const addPolymarketGeneralBet = (userId, title, slug, url, outcomes) => {
 
 const getAllPolymarketGeneralBets = () => {
   return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM PolymarketGeneralBets ORDER BY createdAt DESC', [], (err, rows) => {
+    const query = `
+      SELECT b.*, u.displayName
+      FROM PolymarketGeneralBets b
+      LEFT JOIN Users u ON b.userId = u.id
+      ORDER BY b.createdAt DESC
+    `;
+    db.all(query, [], (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -432,7 +438,13 @@ const getAllPolymarketGeneralBets = () => {
 
 const getPolymarketGeneralBetById = (id) => {
   return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM PolymarketGeneralBets WHERE id = ?', [id], (err, row) => {
+    const query = `
+      SELECT b.*, u.displayName
+      FROM PolymarketGeneralBets b
+      LEFT JOIN Users u ON b.userId = u.id
+      WHERE b.id = ?
+    `;
+    db.get(query, [id], (err, row) => {
       if (err) reject(err);
       else resolve(row);
     });
@@ -498,6 +510,40 @@ const getPolymarketUserBets = (userId) => {
       ORDER BY ub.createdAt DESC
     `;
     db.all(query, [userId], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getPolymarketUserBetsByBetId = (betId) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT ub.*, u.displayName, u.username
+      FROM PolymarketUserBets ub
+      LEFT JOIN Users u ON ub.userId = u.id
+      WHERE ub.polymarketBetId = ?
+      ORDER BY ub.createdAt ASC
+    `;
+    db.all(query, [betId], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getPolymarketUserBetsByBetIds = (betIds) => {
+  return new Promise((resolve, reject) => {
+    if (!betIds || betIds.length === 0) return resolve([]);
+    const placeholders = betIds.map(() => '?').join(',');
+    const query = `
+      SELECT ub.*, u.displayName, u.username
+      FROM PolymarketUserBets ub
+      LEFT JOIN Users u ON ub.userId = u.id
+      WHERE ub.polymarketBetId IN (${placeholders})
+      ORDER BY ub.createdAt ASC
+    `;
+    db.all(query, betIds, (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -944,6 +990,8 @@ module.exports = {
   deletePolymarketGeneralBet,
   placePolymarketUserBet,
   getPolymarketUserBets,
+  getPolymarketUserBetsByBetId,
+  getPolymarketUserBetsByBetIds,
   logAdminAction,
   getAdminActions,
   createFeatureRequest,

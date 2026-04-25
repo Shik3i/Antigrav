@@ -2,15 +2,30 @@
 logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+server_log*.txt
 
+# Dependencies
 node_modules
+
+# Build
 dist
 dist-ssr
+
+# Environment & Secrets
+.env
 *.local
+data/.jwt_secret
+
+# Database Files (Global)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Data Folder Structure
+data/*
+!data/.gitkeep
+data/backups/
 
 # Editor directories and files
 .vscode/*
@@ -18,28 +33,7 @@ dist-ssr
 .idea
 .DS_Store
 *.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.sw?
-
-# Secrets & Data
-.env
-data/.jwt_secret
-data/*.db
-data/*.db-shm
-data/*.db-wal
-*.sqlite
-*.db
-
-# Database Backups (Persistent Tiers)
-data/backups/automatic/*.sqlite
-data/backups/automatic/*.db
-data/backups/manual/*.sqlite
-data/backups/manual/*.db
-
-# Logs
-server_log*.txt
 
 # Build / Deploy Artifacts
 *.tar
