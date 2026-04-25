@@ -829,7 +829,12 @@ const completeWordleGame = (userId, date, guesses, won, earnedCoins) => {
     db.serialize(() => {
       db.run('BEGIN TRANSACTION');
       db.run(
-        'INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) VALUES (?, ?, ?, ?, ?)',
+        `INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) 
+         VALUES (?, ?, ?, ?, ?) 
+         ON CONFLICT(userId, date) DO UPDATE SET 
+           guesses = excluded.guesses, 
+           won = excluded.won, 
+           earnedCoins = excluded.earnedCoins`,
         [userId, date, JSON.stringify(guesses), won ? 1 : 0, earnedCoins],
         function(err) {
           if (err) return db.run('ROLLBACK', () => reject(err));
@@ -864,7 +869,12 @@ const completeWordleGame = (userId, date, guesses, won, earnedCoins) => {
 const saveWordleResult = (userId, date, guesses, won, earnedCoins) => {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) VALUES (?, ?, ?, ?, ?)',
+      `INSERT INTO Wordle_DailyResults (userId, date, guesses, won, earnedCoins) 
+       VALUES (?, ?, ?, ?, ?) 
+       ON CONFLICT(userId, date) DO UPDATE SET 
+         guesses = excluded.guesses, 
+         won = excluded.won, 
+         earnedCoins = excluded.earnedCoins`,
       [userId, date, JSON.stringify(guesses), won ? 1 : 0, earnedCoins],
       function(err) { err ? reject(err) : resolve(this.lastID); }
     );
