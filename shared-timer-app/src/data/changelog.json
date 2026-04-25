@@ -1,5 +1,11 @@
 [
   {
+    "id": 90,
+    "version": "2.55.0",
+    "date": "2026-04-25",
+    "changes": "- **Blackjack Responsive Casino Feel**: Umfassende Bewegungs-Integration für Blackjack mit Physics-basierten Kartenflyts, Chip-Animationen und interaktiven Tischeffekten.\n- **Motion Layer Architecture**: Neue dedizierte Motion-Hook-Schicht (useBlackjackMotion) für Entkopplung von Spiellogik und Animationen.\n- **Responsive Layout**: Automatische Anpassung des Tisches an verschiedene Bildschirmgrößen mit Brechen-Punkte für Mobile, Tablet und Desktop.\n- **Animation Refinement**: Flüssige 60fps Kartenbewegungen vom Shoe, Chip-Flüge bei Wetten und Settlement-Animationen für authentisches Casino-Feel."
+  },
+  {
     "id": 89,
     "version": "2.54.1",
     "date": "2026-04-25",
