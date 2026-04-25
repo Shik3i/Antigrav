@@ -103,6 +103,33 @@ exports.addGeneralBet = async (req, res, next) => {
 exports.getAllGeneralBets = async (req, res, next) => {
     try {
         const bets = await dbLayer.getAllPolymarketGeneralBets();
+        if (bets.length === 0) return res.json([]);
+
+        // 1. Parse outcomes
+        for (let bet of bets) {
+            try {
+                bet.outcomes = typeof bet.outcomes === 'string' ? JSON.parse(bet.outcomes) : bet.outcomes;
+            } catch (e) {
+                bet.outcomes = [];
+            }
+        }
+
+        // 2. Fetch all placed bets for these IDs in a single batch to avoid N+1 query pattern
+        const betIds = bets.map(b => b.id);
+        const allPlacedBets = await dbLayer.getPolymarketUserBetsByBetIds(betIds);
+        
+        // Group placed bets by their polymarketBetId
+        const betsMap = allPlacedBets.reduce((acc, ub) => {
+            if (!acc[ub.polymarketBetId]) acc[ub.polymarketBetId] = [];
+            acc[ub.polymarketBetId].push(ub);
+            return acc;
+        }, {});
+
+        // Attach to the main bets array
+        for (let bet of bets) {
+            bet.placedBets = betsMap[bet.id] || [];
+        }
+
         res.json(bets);
     } catch (err) {
         next(err);
@@ -222,7 +249,7 @@ exports.resolveGeneralBet = async (req, res, next) => {
         const winnerName = event.outcomes[winnerIndex].name;
         
         // Payout winners
-        const userBets = await dbLayer.getPolymarketUserBets(id);
+        const userBets = await dbLayer.getPolymarketUserBetsByBetId(id);
         let payoutsCount = 0;
         let totalCentsPaid = 0;
 
@@ -283,6 +310,28 @@ exports.updateSettings = async (req, res, next) => {
         const { allowUsersToAdd } = req.body;
         await dbLayer.updatePolymarketSettings(allowUsersToAdd);
         res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.getUserBets = async (req, res, next) => {
+    try {
+        const userId = req.user?.id || req.user?.userId;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        
+        const bets = await dbLayer.getPolymarketUserBets(userId);
+        
+        // Parse outcomes JSON for each joined bet record
+        for (let bet of bets) {
+            try {
+                bet.outcomes = typeof bet.outcomes === 'string' ? JSON.parse(bet.outcomes) : bet.outcomes;
+            } catch (e) {
+                bet.outcomes = [];
+            }
+        }
+        
+        res.json(bets);
     } catch (err) {
         next(err);
     }
