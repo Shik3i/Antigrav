@@ -1,0 +1,36 @@
+- generic [ref=e3]:
+  - generic [ref=e4]: ⚡ Verbindung unterbrochen — wird wiederhergestellt...
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - img [ref=e8]
+      - generic [ref=e11]: 23:22
+    - generic [ref=e13] [cursor=pointer]:
+      - img [ref=e14]
+      - generic [ref=e19]: 50.029.887,30 KC
+  - complementary [ref=e20]:
+    - link "KoalaSync" [ref=e22] [cursor=pointer]:
+      - /url: /
+      - img [ref=e23]
+      - heading "KoalaSync" [level=2] [ref=e26]
+    - generic [ref=e27]:
+      - navigation
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - link "T test Logged In" [ref=e30] [cursor=pointer]:
+          - /url: /settings
+          - generic [ref=e31]: T
+          - generic [ref=e32]:
+            - generic [ref=e33]: test
+            - generic [ref=e34]: Logged In
+        - button "Logout" [ref=e35] [cursor=pointer]:
+          - img [ref=e36]
+          - text: Logout
+      - generic [ref=e39]:
+        - link "Impressum" [ref=e40] [cursor=pointer]:
+          - /url: /impressum
+        - link "Datenschutz" [ref=e41] [cursor=pointer]:
+          - /url: /datenschutz
+  - main [ref=e43]:
+    - generic [ref=e44]:
+      - img [ref=e46]
+      - generic [ref=e49]: Vorbereiten...

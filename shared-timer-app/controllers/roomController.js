@@ -6,6 +6,11 @@ const sanitize = require('../sanitize');
 const EVENTS = require('../socketEvents.json');
 const fs = require('fs');
 const path = require('path');
+const roulette = require('../utils/casino/roulette');
+
+let _broadcastCoinUpdate = null;
+function initRouletteBroadcast(fn) { _broadcastCoinUpdate = fn; }
+exports.initRouletteBroadcast = initRouletteBroadcast;
 
 // --- Room Management ---
 exports.getRooms = async (req, res, next) => {
@@ -291,6 +296,172 @@ exports.deleteFeatureRequest = async (req, res) => {
         res.status(500).json({ error: 'Failed to delete feature request' });
     }
 };
+
+// --- Roulette ---
+
+const rouletteRooms = new Map();
+
+function getRouletteRoom() {
+  let room = rouletteRooms.get('roulette_main');
+  if (!room) {
+    room = roulette.initializeRoom();
+    rouletteRooms.set('roulette_main', room);
+  }
+  return room;
+}
+
+function setRouletteRoom(room) {
+  rouletteRooms.set(room.roomId, room);
+}
+
+async function rouletteJoinTable(userId, username, balance, skin = 'default') {
+  let room = getRouletteRoom();
+  room = roulette.addParticipant(room, userId, username, balance);
+  if (!room.playerSkins) room.playerSkins = {};
+  room.playerSkins[String(userId)] = skin;
+  setRouletteRoom(room);
+  return { success: true, room: roulette.serializeRoom(room) };
+}
+
+function rouletteSetSkin(userId, skin) {
+  const room = getRouletteRoom();
+  if (!room.playerSkins) room.playerSkins = {};
+  room.playerSkins[String(userId)] = skin;
+  setRouletteRoom(room);
+}
+
+async function rouletteLeaveTable(userId) {
+  let room = getRouletteRoom();
+  room = roulette.removeParticipant(room, userId);
+  setRouletteRoom(room);
+  return { success: true };
+}
+
+async function roulettePlaceBet(userId, betType, amount) {
+  let room = getRouletteRoom();
+
+  const validation = roulette.validateBet(room, userId, betType, amount);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
+  }
+
+  // Deduct balance upfront — amount is KC, addKoalaCoins expects cents
+  const newBalanceCents = await dbLayer.addKoalaCoins(userId, -amount * 100, `roulette_bet:${room.roundId}`);
+  if (_broadcastCoinUpdate) _broadcastCoinUpdate(userId, newBalanceCents);
+
+  // Update participant balance in room state
+  const participant = room.participants.find(p => String(p.userId) === String(userId));
+  if (participant) participant.balance = Math.floor(newBalanceCents / 100);
+
+  roulette.addBet(room, userId, betType, amount);
+  setRouletteRoom(room);
+
+  return { success: true, room: roulette.serializeRoom(room) };
+}
+
+async function rouletteRemoveBet(userId, betType) {
+  let room = getRouletteRoom();
+  if (room.currentPhase !== 'betting_open') {
+    return { success: false, error: 'Betting is not open' };
+  }
+  const removed = roulette.removeLastBet(room, userId, betType);
+  if (!removed) {
+    return { success: false, error: 'No bet to remove on this field' };
+  }
+  const newBalanceCents = await dbLayer.addKoalaCoins(userId, removed.amount * 100, `roulette_remove_bet:${room.roundId}`);
+  if (_broadcastCoinUpdate) _broadcastCoinUpdate(userId, newBalanceCents);
+  const participant = room.participants.find(p => String(p.userId) === String(userId));
+  if (participant) participant.balance = Math.floor(newBalanceCents / 100);
+  setRouletteRoom(room);
+  return { success: true };
+}
+
+function rouletteGetRoom() {
+  return roulette.serializeRoom(getRouletteRoom());
+}
+
+function roulettePlayerReady(userId) {
+  let room = getRouletteRoom();
+  if (room.currentPhase !== 'betting_open') {
+    return { success: false, error: 'Not in betting phase.' };
+  }
+  const isParticipant = room.participants.some(p => String(p.userId) === String(userId) && !p.left);
+  if (!isParticipant) {
+    return { success: false, error: 'Not at the table.' };
+  }
+  if (!room.readyPlayers) room.readyPlayers = new Set();
+  room.readyPlayers.add(String(userId));
+
+  const active = room.participants.filter(p => !p.left);
+  if (active.length > 0 && room.readyPlayers.size >= active.length) {
+    // All players ready — close betting immediately
+    room.deadlineAt = Date.now();
+  }
+  setRouletteRoom(room);
+  return { success: true, readyCount: room.readyPlayers.size, activeCount: active.length };
+}
+
+function rouletteGetParticipants() {
+  return getRouletteRoom().participants.map(({ userId, username, balance, left }) => ({
+    userId, username, balance, left,
+  }));
+}
+
+async function _rouletteSettleRound(room) {
+  const payouts = roulette.calculatePayouts(room);
+  const updates = roulette.prepareSettlementUpdates(payouts);
+
+  for (const update of updates) {
+    const participant = room.participants.find(p => String(p.userId) === String(update.playerId));
+    // Update sessionPnl for every player (winners and losers)
+    if (participant) {
+      participant.sessionPnl = (participant.sessionPnl || 0) + update.displayChange;
+    }
+    if (update.payoutReturn > 0) {
+      // Credit principal + winnings — payoutReturn is KC, addKoalaCoins expects cents
+      const newBalanceCents = await dbLayer.addKoalaCoins(update.playerId, update.payoutReturn * 100, `roulette_settlement:${room.roundId}`);
+      if (_broadcastCoinUpdate) _broadcastCoinUpdate(update.playerId, newBalanceCents);
+      if (participant) participant.balance = Math.floor(newBalanceCents / 100);
+    }
+  }
+
+  room.lastSettlement = updates;
+  room.lastPayouts = payouts; // per-player per-bet win/loss detail
+}
+
+async function _roulettePhaseTickImpl() {
+  let room = getRouletteRoom();
+  if (!room.deadlineAt || Date.now() < room.deadlineAt) return;
+
+  const wasSpinPhase = room.currentPhase === 'spin';
+
+  // Transition FIRST (synchronous) so next tick sees the new deadline — prevents double-fire
+  room = roulette.transitionPhase(room);
+  setRouletteRoom(room);
+
+  // Then settle async; roundId is unchanged after spin→settlement transition
+  if (wasSpinPhase) {
+    await _rouletteSettleRound(room);
+    setRouletteRoom(room); // persist lastSettlement
+  }
+}
+
+function _roulettePhaseTick() {
+  _roulettePhaseTickImpl().catch(err => {
+    console.error('[roulette] phase tick error:', err);
+  });
+}
+
+const _roulettePhaseTimer = setInterval(_roulettePhaseTick, 500);
+
+exports.rouletteJoinTable = rouletteJoinTable;
+exports.rouletteLeaveTable = rouletteLeaveTable;
+exports.roulettePlaceBet = roulettePlaceBet;
+exports.rouletteRemoveBet = rouletteRemoveBet;
+exports.rouletteGetRoom = rouletteGetRoom;
+exports.rouletteGetParticipants = rouletteGetParticipants;
+exports.rouletteSetSkin = rouletteSetSkin;
+exports.roulettePlayerReady = roulettePlayerReady;
 
 // --- Maintenance ---
 let changelogCache = null;

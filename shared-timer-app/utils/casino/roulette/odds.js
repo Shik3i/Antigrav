@@ -19,6 +19,10 @@ const ODDS = {
 };
 
 function getOdds(betType) {
+  if (typeof betType !== 'string' || !betType) {
+    throw new Error(`Invalid bet type: ${betType}`);
+  }
+
   if (betType.includes('_')) {
     const [baseType] = betType.split('_');
     if (ODDS[baseType] !== undefined) {

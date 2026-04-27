@@ -11,6 +11,8 @@ const wordleController = require('../controllers/wordleController');
 const towerController = require('../controllers/towerController');
 const blackjackController = require('../controllers/blackjackController');
 const backupController = require('../controllers/backupController');
+const roomController = require('../controllers/roomController');
+const dbLayer = require('../database');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
 
@@ -262,6 +264,48 @@ router.get('/tower/history', authController.authenticateToken, towerController.g
 router.post('/tower/start', authController.authenticateToken, towerController.startRound);
 router.post('/tower/pick', authController.authenticateToken, towerController.pickTile);
 router.post('/tower/cashout', authController.authenticateToken, towerController.cashoutRound);
+
+// ===== ROULETTE =====
+router.get('/roulette/state', (req, res) => {
+    res.json(roomController.rouletteGetRoom());
+});
+router.get('/roulette/participants', (req, res) => {
+    res.json(roomController.rouletteGetParticipants());
+});
+router.post('/roulette/join', authController.authenticateToken, async (req, res) => {
+    try {
+        const { userId, username } = req.user;
+        const user = await dbLayer.getUser(userId);
+        const balance = user ? (user.koala_balance || 0) : 0;
+        const result = await roomController.rouletteJoinTable(userId, username, balance);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+router.post('/roulette/leave', authController.authenticateToken, async (req, res) => {
+    try {
+        const result = await roomController.rouletteLeaveTable(req.user.userId);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+router.post('/roulette/bet', authController.authenticateToken, async (req, res) => {
+    try {
+        const { betType, amount } = req.body;
+        if (!betType || amount == null) {
+            return res.status(400).json({ success: false, error: 'betType and amount required.' });
+        }
+        const result = await roomController.roulettePlaceBet(req.user.userId, betType, Number(amount));
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 // ─── Blackjack ──────────────────────────────────────────────
 router.get('/blackjack/config', blackjackController.getConfig);

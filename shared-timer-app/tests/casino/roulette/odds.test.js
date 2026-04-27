@@ -27,4 +27,14 @@ describe('odds', () => {
   it('should throw for unknown bet type', () => {
     expect(() => getOdds('unknown_bet')).toThrow();
   });
+
+  it('should throw for null or undefined input', () => {
+    expect(() => getOdds(null)).toThrow();
+    expect(() => getOdds(undefined)).toThrow();
+    expect(() => getOdds('')).toThrow();
+  });
+
+  it('should return correct odds for straight_0 (zero)', () => {
+    expect(getOdds('straight_0')).toBe(35);
+  });
 });

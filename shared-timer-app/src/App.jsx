@@ -15,6 +15,7 @@ import './index.css';
 // Context & Auth
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
+import { ChipSkinProvider } from './features/casino/ChipSkinContext';
 import { PersistentDataProvider } from './context/PersistentDataContext';
 import { NewsProvider } from './context/NewsContext';
 import ToastContainer from './components/ToastContainer';
@@ -78,6 +79,7 @@ const PolymarketGeneral = React.lazy(() => import('./pages/PolymarketGeneral'));
 const Wordle = React.lazy(() => import('./pages/Wordle'));
 const TowerClimb = React.lazy(() => import('./pages/TowerClimb'));
 const Blackjack = React.lazy(() => import('./pages/Blackjack'));
+const Roulette = React.lazy(() => import('./pages/Roulette'));
 const LottoImitat = React.lazy(() => import('./pages/LottoImitat'));
 const NewsTicker = React.lazy(() => import('./components/NewsTicker'));
 const WeatherWidget = React.lazy(() => import('./components/WeatherWidget'));
@@ -471,6 +473,7 @@ function InnerApp() {
                       <Route path="/wordle" element={<Wordle user={user} token={token} />} />
                       <Route path="/games/tower-climb" element={<TowerClimb />} />
                       <Route path="/games/blackjack" element={<Blackjack socket={activeSocket} />} />
+                      <Route path="/games/roulette" element={<Roulette socket={activeSocket} />} />
                       <Route path="/lotto" element={<LottoImitat />} />
                       <Route path="/news" element={<News socket={activeSocket} />} />
                       <Route path="/c" element={<SharedCountdown />} />
@@ -508,7 +511,9 @@ function App() {
     <Router>
       <AuthProvider>
         <ToastProvider>
-          <InnerApp />
+          <ChipSkinProvider>
+            <InnerApp />
+          </ChipSkinProvider>
         </ToastProvider>
       </AuthProvider>
     </Router>

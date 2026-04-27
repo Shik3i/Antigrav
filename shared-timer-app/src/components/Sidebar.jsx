@@ -27,6 +27,7 @@ const iconMap = {
     'game-leaderboards': <LucideIcons.Trophy size={18} color="#f59e0b" />,
     'tower-climb': <LucideIcons.Shield size={18} color="#3b82f6" />,
     'blackjack': <LucideIcons.Crown size={18} color="#f59e0b" />,
+    'roulette': <LucideIcons.CircleDot size={18} color="#c9a84c" />,
     'settings': <LucideIcons.Settings size={18} />,
     'roadmap': <LucideIcons.Lightbulb size={18} color="#fbbf24" />,
     'changelog': <LucideIcons.History size={18} color="#94a3b8" />,

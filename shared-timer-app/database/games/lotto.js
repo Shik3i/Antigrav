@@ -54,7 +54,7 @@ const getUserLottoTicketCountForDraw = (userId, drawDate) => {
 };
 
 const executeLottoDraw = (drawDate, drawnNumbers, drawnSuperzahl) => {
-  const { determineWinClass, getPayoutForClass } = require('../config/lotto.js');
+  const { determineWinClass, getPayoutForClass } = require('../../config/lotto.js');
   return new Promise((resolve, reject) => {
     db.serialize(() => {
       db.run('BEGIN TRANSACTION');

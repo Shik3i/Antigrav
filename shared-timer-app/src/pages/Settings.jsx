@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import axios from 'axios';
-import { Terminal, Volume2, BellRing, Palette, Trophy, Download, Star, Heart, Search, X, ChevronDown, ChevronUp, Dna, Sparkles, RefreshCw, Clock, Shield, User, Lock, Settings as SettingsIcon } from 'lucide-react';
+import { Terminal, Volume2, BellRing, Palette, Trophy, Download, Star, Heart, Search, X, ChevronDown, ChevronUp, Dna, Sparkles, RefreshCw, Clock, Shield, User, Lock, Settings as SettingsIcon, Gem } from 'lucide-react';
+import { useChipSkin } from '../features/casino/ChipSkinContext';
+import { getChipImage, CHIP_SKINS } from '../features/casino/chipConfig';
 import { getNextPokemon } from '../utils/pokemonUtils';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import Friends from './Friends';
@@ -84,6 +86,7 @@ const Settings = ({ user, setUser, socket }) => {
     const [pokemonConfigs, setPokemonConfigs] = useState(null);
     const [pokemonSearch, setPokemonSearch] = useState('');
     const [isPokemonAccordionOpen, setIsPokemonAccordionOpen] = useState(false);
+    const { skin: chipSkin, setSkin: setChipSkin } = useChipSkin();
 
     useEffect(() => {
         fetchJson('/api/esports/teams', { token: '' })
@@ -920,6 +923,44 @@ const Settings = ({ user, setUser, socket }) => {
                         </div>
                     </SettingsSection>
 
+                    <SettingsSection title="Casino Chip Skins" icon={<Gem size={20} />}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                Wähle das Design deiner Casino-Chips. Gilt für Blackjack und Roulette.
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
+                                {[
+                                    { id: 'default', label: 'Classic (Color)' },
+                                    { id: 'classic', label: 'Classic' },
+                                    { id: 'neon', label: 'Neon' },
+                                    { id: 'tropical', label: 'Tropical' },
+                                ].map(({ id, label }) => {
+                                    const img = getChipImage(100, id);
+                                    const isActive = chipSkin === id;
+                                    return (
+                                        <div
+                                            key={id}
+                                            onClick={() => setChipSkin(id)}
+                                            className={`pref-card${isActive ? ' active' : ''}`}
+                                            style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '16px 12px' }}
+                                        >
+                                            {img ? (
+                                                <img src={img} alt={label} style={{ width: '56px', height: '56px', objectFit: 'contain' }} />
+                                            ) : (
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    {Object.values(CHIP_SKINS.default).slice(0, 4).map((color, i) => (
+                                                        <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, border: '1px solid rgba(255,255,255,0.2)' }} />
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <span style={{ fontSize: '0.8rem', fontWeight: isActive ? 700 : 400 }}>{label}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </SettingsSection>
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
                         <button type="submit" className="btn-primary">
                             Save Profile
@@ -1001,7 +1042,7 @@ const Settings = ({ user, setUser, socket }) => {
                     </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.56.0
+                    Version 2.57.0
                 </div>
             </div>
         </div>
