@@ -124,6 +124,7 @@ export default function BlackjackTable({
   tableStatusMeta,
   user
 }) {
+  const playerSkins = roomState?.playerSkins || {};
   const canEditTimers = Boolean(mySeat?.userId);
   const tableShellRef = useRef(null);
   const [tableUiMode, setTableUiMode] = useState('full');
@@ -254,6 +255,7 @@ export default function BlackjackTable({
                 autoBetEnabled={autoBetEnabled}
                 onToggleAutoBet={() => setAutoBetEnabled((prev) => !prev)}
                 balance={user?.koala_balance || 0}
+                playerSkins={playerSkins}
               />
             );
           })}

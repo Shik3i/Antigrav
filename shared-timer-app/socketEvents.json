@@ -96,5 +96,14 @@
     "BLACKJACK_ERROR": "blackjack:error",
     "BLACKJACK_LEADERBOARD": "blackjack:leaderboard",
     "BLACKJACK_DOUBLE": "blackjack:double",
-    "BLACKJACK_SPLIT": "blackjack:split"
+    "BLACKJACK_SPLIT": "blackjack:split",
+    "ROULETTE_STATE": "roulette:state",
+    "ROULETTE_JOIN": "roulette:join",
+    "ROULETTE_LEAVE": "roulette:leave",
+    "ROULETTE_PLACE_BET": "roulette:place_bet",
+    "ROULETTE_ERROR": "roulette:error",
+    "ROULETTE_READY": "roulette:ready",
+    "ROULETTE_REMOVE_BET": "roulette:remove_bet",
+    "ROULETTE_SET_SKIN": "roulette:set_skin",
+    "BLACKJACK_SET_SKIN": "blackjack:set_skin"
 }

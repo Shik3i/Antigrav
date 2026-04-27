@@ -78,7 +78,8 @@ function getRoomState(room, viewerUserId, helpers) {
     sideBetDefinitions: helpers.sideBetDefinitions || [],
     viewerUserId,
     lastSettlement: serializeSettlement(room.lastSettlement),
-    lastSettlementRoundId: room.lastSettlementRoundId
+    lastSettlementRoundId: room.lastSettlementRoundId,
+    playerSkins: room.playerSkins || {},
   };
 }
 

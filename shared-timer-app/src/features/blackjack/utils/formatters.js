@@ -1,12 +1,7 @@
-export const CHIP_VALUES = [1, 5, 10, 50, 100, 500, 1000];
+export { CHIP_VALUES } from '../../casino/chipConfig';
 export const TURN_TIMEOUT_SECONDS = 90;
 
-export function formatKC(cents) {
-  return `${(cents / 100).toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })} KC`;
-}
+export { formatKC } from '../../casino/formatters';
 
 export function normalizeRoomSlug(value, maxPlayers) {
   const trimmed = String(value || '')

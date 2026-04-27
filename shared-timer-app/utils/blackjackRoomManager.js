@@ -183,6 +183,7 @@ function createRoom(roomId, maxPlayers = 5) {
     lastSettlement: [],
     lastSettlementRoundId: null,
     lastAppliedSettlementRoundId: null,
+    playerSkins: {},
     ...shoeState
   });
 
@@ -622,6 +623,13 @@ function settleRound(roomId) {
   return settlement.settleRound(room, Date.now(), settlementHelpers);
 }
 
+function setPlayerSkin(roomId, userId, skin) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  if (!room.playerSkins) room.playerSkins = {};
+  room.playerSkins[String(userId)] = skin;
+}
+
 function tick(now = Date.now()) {
   const changedRoomIds = [];
 
@@ -663,5 +671,6 @@ module.exports = {
   advanceTurn,
   resolveDealerTurn,
   settleRound,
+  setPlayerSkin,
   tick
 };

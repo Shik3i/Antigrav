@@ -5,6 +5,8 @@ import ChipStack from './ChipStack';
 import PlayingCard from './PlayingCard';
 import SettlementToast from './SettlementToast';
 import { formatKC } from '../utils/formatters';
+import { useChipSkin } from '../../casino/ChipSkinContext';
+import { getChipColor, getChipImage, getChipTextColor } from '../../casino/chipConfig';
 
 function getSeatClass(maxPlayers, seat) {
   return `blackjack-seat blackjack-seat-${maxPlayers}-${seat}`;
@@ -54,23 +56,28 @@ function SeatControls({
   const isBetting = roomState?.status === 'betting' || roomState?.status === 'waiting';
   const hasEnoughForSplit = balance >= (roomState?.players?.find((player) => player.userId === roomState?.currentPlayerTurn)?.hands[0]?.bet || 0);
 
+  const { skin } = useChipSkin();
+
   return (
     <div className="blackjack-seat-controls-wrapper">
       <div className={`blackjack-chip-tray vertical-side${!isBetting ? ' is-planning' : ''}`}>
-        {[1, 5, 25, 100, 500].map((value) => (
-          <button
-            key={value}
-            className="blackjack-casino-chip"
-            onClick={() => onChipAdd(value * 100)}
-            title={!isBetting ? 'Auto-Bet fuer die naechste Runde anpassen' : undefined}
-            style={{
-              '--chip-color': value >= 500 ? '#7c3aed' : value >= 100 ? '#dc2626' : value >= 25 ? '#ec4899' : value >= 5 ? '#f59e0b' : '#f8fafc',
-              color: value >= 25 ? '#fff' : '#111827'
-            }}
-          >
-            {value}
-          </button>
-        ))}
+        {[1, 5, 25, 100, 500].map((value) => {
+          const img = getChipImage(value, skin);
+          return (
+            <button
+              key={value}
+              className={`blackjack-casino-chip${img ? ' blackjack-casino-chip--image' : ''}`}
+              onClick={() => onChipAdd(value * 100)}
+              title={!isBetting ? 'Auto-Bet fuer die naechste Runde anpassen' : undefined}
+              style={img ? undefined : {
+                '--chip-color': getChipColor(value),
+                color: getChipTextColor(value),
+              }}
+            >
+              {img ? <img src={img} alt={`${value} KC`} className="chip-skin-img" /> : value}
+            </button>
+          );
+        })}
       </div>
 
       {isCurrentTurn && roomState?.status === 'player_turns' && (
@@ -108,6 +115,7 @@ export default function BlackjackSeat({
   player,
   selectedTable,
   roomState,
+  playerSkins,
   settlements,
   isCurrentTurn,
   isLocalPlayer,
@@ -127,6 +135,7 @@ export default function BlackjackSeat({
 }) {
   const isWinningSeat = (settlements || []).some((settlement) => Number(settlement.netProfit || 0) > 0);
   const seatClassName = `${getSeatClass(roomState?.maxPlayers || selectedTable, player.visualSeat)}${isCurrentTurn ? ' current-turn' : ''}${isWinningSeat ? ' winner-seat' : ''}${isLocalPlayer ? ' local-seat' : ''}`;
+  const playerSkin = playerSkins?.[String(player.userId)];
 
   if (!player.userId) {
     return (
@@ -181,7 +190,7 @@ export default function BlackjackSeat({
         <div className="blackjack-seat-content">
           {hasCommittedBet && (
             <div className={`blackjack-committed-bet-zone ${committedBetMotionClass}`}>
-              <ChipStack amount={player.currentBet} title="Gesetzter Einsatz" />
+              <ChipStack amount={player.currentBet} title="Gesetzter Einsatz" skin={playerSkin} />
             </div>
           )}
 
@@ -207,7 +216,7 @@ export default function BlackjackSeat({
                   >
                     {amount > 0 && (
                       <div className="blackjack-side-bet-chip">
-                        <ChipStack amount={amount} title={`${label} Side-Bet`} />
+                        <ChipStack amount={amount} title={`${label} Side-Bet`} skin={playerSkin} />
                       </div>
                     )}
                     {amount > 0 && <span className="blackjack-side-bet-dot" />}

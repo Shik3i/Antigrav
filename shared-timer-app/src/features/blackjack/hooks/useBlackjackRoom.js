@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import EVENTS from '../../../../socketEvents.json';
 import { fetchJson } from '../../../utils/apiClient';
 import { formatKC, normalizeRoomSlug } from '../utils/formatters';
+import { useCasinoBalance } from '../../casino/hooks/useCasinoBalance';
+import { useChipSkin } from '../../casino/ChipSkinContext';
 
 function getRoomId(maxPlayers) {
   return `blackjack-main-${maxPlayers}`;
@@ -75,10 +77,13 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     }
   }, [recentSettlement?.roundId, roomState?.roundId, roomState?.status]);
 
-  const syncBalance = useCallback((balance) => {
-    if (!Number.isFinite(balance)) return;
-    setUser((prev) => (prev ? { ...prev, koala_balance: balance } : prev));
-  }, [setUser]);
+  useCasinoBalance(socket, setUser);
+  const { skin } = useChipSkin();
+
+  useEffect(() => {
+    if (!socket || !roomState?.roomId) return;
+    socket.emit(EVENTS.BLACKJACK_SET_SKIN, { roomId: roomState.roomId, skin });
+  }, [socket, skin, roomState?.roomId]);
 
   const loadConfig = useCallback(async () => {
     const data = await fetchJson('/api/blackjack/config', { token: '' });
@@ -296,11 +301,6 @@ export function useBlackjackRoom({ socket, user, isGuest, setUser, showToast }) 
     };
   }, [autoJoinRoom, isGuest, loadFallbackState, roomId, runSocketAction, selectedTable, showToast, socket, watchOnlyRoom]);
 
-  useEffect(() => {
-    const handleCoinUpdate = ({ balance }) => syncBalance(balance);
-    socket?.on(EVENTS.COIN_BALANCE_UPDATE, handleCoinUpdate);
-    return () => socket?.off(EVENTS.COIN_BALANCE_UPDATE, handleCoinUpdate);
-  }, [socket, syncBalance]);
 
   const handleBetSubmit = useCallback(async () => {
     if (!pendingBet) {

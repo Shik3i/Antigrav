@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { buildRealisticGroups, buildRealisticStack, formatKC } from '../utils/formatters';
+import { getChipColor, getChipImage, getChipTextColor } from '../../casino/chipConfig';
+import { useChipSkin } from '../../casino/ChipSkinContext';
 
-export default function ChipStack({ amount, onClick, isPending, title }) {
+export default function ChipStack({ amount, onClick, isPending, title, skin: skinProp }) {
+  const { skin: skinCtx } = useChipSkin();
+  const skin = skinProp ?? skinCtx;
   const chips = buildRealisticStack(amount);
   const groupedChips = buildRealisticGroups(amount);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -25,22 +29,32 @@ export default function ChipStack({ amount, onClick, isPending, title }) {
             const offsetX = isPending ? groupIndex * 28 : absoluteIndex * 0.4;
             const offsetY = absoluteIndex * 4;
             const value = entry.value;
-            const chipTextColor = value <= 1 ? '#111827' : '#fff';
             return (
               <div
                 key={`${value}-${groupIndex}-${index}`}
                 className="casino-chip-layered"
                 style={{
-                  '--chip-color': value >= 1000 ? '#1e1b4b' : value >= 500 ? '#7c3aed' : value >= 100 ? '#dc2626' : value >= 50 ? '#0ea5e9' : value >= 25 ? '#ec4899' : value >= 10 ? '#22c55e' : value >= 5 ? '#f59e0b' : '#f8fafc',
-                  '--chip-text-color': chipTextColor,
+                  '--chip-color': getChipColor(value),
+                  '--chip-text-color': getChipTextColor(value),
                   bottom: `${offsetY}px`,
                   left: `${offsetX}px`,
                   zIndex: absoluteIndex + groupIndex,
                   boxShadow: `0 ${2 + absoluteIndex * 0.5}px ${4 + absoluteIndex * 0.5}px rgba(0,0,0,0.4)`
                 }}
               >
-                <div className="chip-inner-ring" />
-                <span className="chip-val-tiny" style={{ opacity: index === count - 1 ? 1 : 0.6 }}>{value}</span>
+                {getChipImage(value, skin) ? (
+                  <img
+                    src={getChipImage(value, skin)}
+                    alt={`${value} KC`}
+                    className="chip-skin-img"
+                    style={{ opacity: index === count - 1 ? 1 : 0.6 }}
+                  />
+                ) : (
+                  <>
+                    <div className="chip-inner-ring" />
+                    <span className="chip-val-tiny" style={{ opacity: index === count - 1 ? 1 : 0.6 }}>{value}</span>
+                  </>
+                )}
               </div>
             );
           });

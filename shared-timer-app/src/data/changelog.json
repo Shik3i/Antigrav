@@ -1,5 +1,11 @@
 [
   {
+    "id": 93,
+    "version": "2.57.0",
+    "date": "2026-04-28",
+    "changes": "- **Casino Chip Skins**: Drei neue PNG-Chip-Skins (Classic, Neon, Tropical) für Blackjack und Roulette. Auswahl unter Settings → \"Casino Chip Skins\".\n- **Geteilte Casino-Module**: `casino/chipConfig.js` als zentrale Chip-Konfiguration für beide Spiele. Gemeinsame Hooks: `useCountdownTimer`, `useSocketAction`, `useCasinoBalance`. Geteilte Komponenten: `SettlementToast`, `CelebrationOverlay`.\n- **Multiplayer Skin-Sync**: Jeder Spieler sieht die Chips anderer Spieler in deren gewähltem Skin — sowohl im Roulette-Tisch als auch im Blackjack-Multiplayer.\n- **Skin-Persistenz**: Gewählter Skin wird in localStorage gespeichert und per Socket an Server gemeldet."
+  },
+  {
     "id": 92,
     "version": "2.56.0",
     "date": "2026-04-25",

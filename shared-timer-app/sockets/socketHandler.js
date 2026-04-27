@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken'); // used for secure invite links
 const dbLayer = require('../database');
 const roomManager = require('../roomManager');
 const blackjackRoomManager = require('../utils/blackjackRoomManager');
+const roomController = require('../controllers/roomController');
 const EVENTS = require('../socketEvents.json');
 const sanitize = require('../sanitize');
 const apiController = require('../controllers/apiController');
@@ -12,6 +13,7 @@ const JWT_SECRET = require('../jwtSecret');
 
 const onlineUsers = new Map(); // userId -> Set of socket.ids
 const BLACKJACK_ROOM_PREFIX = 'blackjack:';
+let _io = null; // set when module.exports function is called
 
 const getBlackjackSocketRoom = (roomId) => `${BLACKJACK_ROOM_PREFIX}${roomId}`;
 
@@ -68,7 +70,18 @@ function emitBlackjackRooms(io, targetSocket = null) {
     return rooms;
 }
 
+function emitRouletteState(io) {
+    const state = roomController.rouletteGetRoom();
+    io.emit(EVENTS.ROULETTE_STATE, state);
+}
+
+roomController.initRouletteBroadcast((userId, newBalanceCents) => {
+    if (_io) broadcastCoinUpdate(_io, userId, newBalanceCents);
+});
+
 module.exports = function (io) {
+    _io = io;
+
     const persistBlackjackSettlementIfNeeded = async (roomId) => {
         const room = blackjackRoomManager.rooms.get(roomId);
         if (!room?.lastSettlement?.length || !room.lastSettlementRoundId) {
@@ -175,6 +188,7 @@ module.exports = function (io) {
         // Send initial list of active rooms to this user only
         broadcastActiveRooms(io, socket);
         emitBlackjackRooms(io, socket);
+        emitRouletteState(io);
 
         const emitBlackjackStateAndRooms = (roomId, viewerUserId = null) => {
             const state = roomId ? blackjackRoomManager.getRoomState(roomId, viewerUserId) : null;
@@ -771,6 +785,19 @@ module.exports = function (io) {
             }
         });
 
+        socket.on(EVENTS.BLACKJACK_SET_SKIN, ({ roomId, skin } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId || !roomId) { sendSocketAck(ack, { success: false, error: 'Missing params.' }); return; }
+                const safeSkin = typeof skin === 'string' ? skin : 'default';
+                blackjackRoomManager.setPlayerSkin(roomId, userId, safeSkin);
+                emitBlackjackState(io, roomId);
+                sendSocketAck(ack, { success: true });
+            } catch (err) {
+                sendSocketAck(ack, { success: false, error: err.message });
+            }
+        });
+
         socket.on(EVENTS.BLACKJACK_WATCH, async ({ roomId } = {}, ack) => {
             try {
                 const userId = socket.user?.userId;
@@ -1130,6 +1157,113 @@ module.exports = function (io) {
             } catch (err) {
                 socket.emit(EVENTS.BLACKJACK_ERROR, err.message || 'Failed to split.');
                 sendSocketAck(ack, { success: false, error: err.message || 'Failed to split.' });
+            }
+        });
+
+        // ===== ROULETTE =====
+
+        socket.on(EVENTS.ROULETTE_JOIN, async (data, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    sendSocketAck(ack, { success: false, error: 'Authentication required.' });
+                    return;
+                }
+                const username = socket.user?.username || socket.user?.displayName || 'Player';
+                const balanceCents = await dbLayer.getUserBalance(userId);
+                const balance = Math.floor(balanceCents / 100);
+                const skin = typeof data?.skin === 'string' ? data.skin : 'default';
+                const result = await roomController.rouletteJoinTable(userId, username, balance, skin);
+                emitRouletteState(io);
+                sendSocketAck(ack, result);
+            } catch (err) {
+                socket.emit(EVENTS.ROULETTE_ERROR, err.message);
+                sendSocketAck(ack, { success: false, error: err.message });
+            }
+        });
+
+        socket.on(EVENTS.ROULETTE_SET_SKIN, (data, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) { sendSocketAck(ack, { success: false, error: 'Authentication required.' }); return; }
+                const skin = typeof data?.skin === 'string' ? data.skin : 'default';
+                roomController.rouletteSetSkin(userId, skin);
+                emitRouletteState(io);
+                sendSocketAck(ack, { success: true });
+            } catch (err) {
+                sendSocketAck(ack, { success: false, error: err.message });
+            }
+        });
+
+        socket.on(EVENTS.ROULETTE_LEAVE, async (data, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    sendSocketAck(ack, { success: false, error: 'Authentication required.' });
+                    return;
+                }
+                const result = await roomController.rouletteLeaveTable(userId);
+                emitRouletteState(io);
+                sendSocketAck(ack, result);
+            } catch (err) {
+                socket.emit(EVENTS.ROULETTE_ERROR, err.message);
+                sendSocketAck(ack, { success: false, error: err.message });
+            }
+        });
+
+        socket.on(EVENTS.ROULETTE_PLACE_BET, async ({ betType, amount } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    sendSocketAck(ack, { success: false, error: 'Authentication required.' });
+                    return;
+                }
+                if (!betType || amount == null) {
+                    sendSocketAck(ack, { success: false, error: 'betType and amount required.' });
+                    return;
+                }
+                const result = await roomController.roulettePlaceBet(userId, betType, Number(amount));
+                if (!result.success) {
+                    socket.emit(EVENTS.ROULETTE_ERROR, result.error);
+                    sendSocketAck(ack, result);
+                    return;
+                }
+                emitRouletteState(io);
+                sendSocketAck(ack, result);
+            } catch (err) {
+                socket.emit(EVENTS.ROULETTE_ERROR, err.message);
+                sendSocketAck(ack, { success: false, error: err.message });
+            }
+        });
+
+        socket.on(EVENTS.ROULETTE_REMOVE_BET, async ({ betType } = {}, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) { sendSocketAck(ack, { success: false, error: 'Authentication required.' }); return; }
+                if (!betType) { sendSocketAck(ack, { success: false, error: 'betType required.' }); return; }
+                const result = await roomController.rouletteRemoveBet(userId, betType);
+                if (!result.success) { socket.emit(EVENTS.ROULETTE_ERROR, result.error); sendSocketAck(ack, result); return; }
+                emitRouletteState(io);
+                sendSocketAck(ack, result);
+            } catch (err) {
+                socket.emit(EVENTS.ROULETTE_ERROR, err.message);
+                sendSocketAck(ack, { success: false, error: err.message });
+            }
+        });
+
+        socket.on(EVENTS.ROULETTE_READY, async (data, ack) => {
+            try {
+                const userId = socket.user?.userId;
+                if (!userId) {
+                    sendSocketAck(ack, { success: false, error: 'Authentication required.' });
+                    return;
+                }
+                const result = roomController.roulettePlayerReady(userId);
+                emitRouletteState(io);
+                sendSocketAck(ack, result);
+            } catch (err) {
+                socket.emit(EVENTS.ROULETTE_ERROR, err.message);
+                sendSocketAck(ack, { success: false, error: err.message });
             }
         });
 
@@ -1716,6 +1850,12 @@ module.exports = function (io) {
         });
         if (blackjackChangedRooms.length > 0) {
             emitBlackjackRooms(io);
+        }
+        // Roulette phase sync
+        try {
+            emitRouletteState(io);
+        } catch (err) {
+            console.error('[roulette] state broadcast error:', err);
         }
     }, 1000); // 1Hz sync is enough since clients will animate the visual themselves
 
