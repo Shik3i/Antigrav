@@ -1,0 +1,279 @@
+<h2>Deathroll Slot Machine — Style Direction</h2>
+<p class="subtitle">Welcher Slot-Stil passt zum Deathroll-Minigame?</p>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Orbitron:wght@700;900&family=Playfair+Display:wght@700&display=swap');
+
+  .slot-preview {
+    padding: 20px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-height: 220px;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Option A — Vintage Chrome */
+  .preview-a {
+    background: linear-gradient(135deg, #2a1a0a 0%, #1a1008 100%);
+    border: 2px solid #c8922a;
+    box-shadow: 0 0 0 1px #8b6020, inset 0 1px 0 rgba(255,200,100,0.15);
+  }
+  .preview-a .reel-frame {
+    background: linear-gradient(180deg, #d4a831 0%, #8b6a1e 50%, #c9921a 100%);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,220,100,0.6), inset 0 -2px 0 rgba(0,0,0,0.3);
+    display: flex;
+    gap: 4px;
+  }
+  .preview-a .reel {
+    width: 52px; height: 72px;
+    background: linear-gradient(180deg, #1a1208 0%, #0d0c08 100%);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Black Ops One', serif;
+    font-size: 2.2rem;
+    color: #f5c842;
+    text-shadow: 0 0 8px rgba(245,200,66,0.6), 0 2px 0 rgba(0,0,0,0.8);
+    border: 1px solid rgba(200,150,40,0.3);
+    position: relative;
+  }
+  .preview-a .reel::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%; height: 1px;
+    background: rgba(245,200,66,0.2);
+  }
+  .preview-a .payline {
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 4%, rgba(255,200,60,0.6) 20%, rgba(255,200,60,0.6) 80%, transparent 96%);
+    transform: translateY(-50%);
+  }
+  .preview-a .slot-title {
+    font-family: 'Black Ops One', serif;
+    color: #f5c842;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-shadow: 0 0 10px rgba(245,200,66,0.4);
+  }
+  .preview-a .lever-btn {
+    background: linear-gradient(180deg, #d4a831 0%, #8b6a1e 100%);
+    border: none;
+    border-radius: 20px;
+    padding: 8px 28px;
+    font-family: 'Black Ops One', serif;
+    font-size: 0.8rem;
+    color: #1a1008;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #5a4010, 0 4px 8px rgba(0,0,0,0.4);
+  }
+
+  /* Option B — Neon Arcade */
+  .preview-b {
+    background: linear-gradient(135deg, #050510 0%, #0a0520 100%);
+    border: 2px solid #7c3aed;
+    box-shadow: 0 0 20px rgba(124,58,237,0.3), 0 0 40px rgba(124,58,237,0.1), inset 0 0 30px rgba(124,58,237,0.05);
+  }
+  .preview-b .reel-row {
+    display: flex; gap: 6px; align-items: center;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(124,58,237,0.4);
+    border-radius: 6px;
+    position: relative;
+  }
+  .preview-b .reel {
+    width: 54px; height: 74px;
+    background: #08040f;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    color: #e879f9;
+    text-shadow: 0 0 10px #e879f9, 0 0 20px rgba(232,121,249,0.5);
+    border: 1px solid rgba(232,121,249,0.2);
+  }
+  .preview-b .separator {
+    width: 2px; height: 40px;
+    background: linear-gradient(180deg, transparent, rgba(124,58,237,0.5), transparent);
+  }
+  .preview-b .payline {
+    position: absolute;
+    left: 8px; right: 8px; top: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #e879f9, #7c3aed, #e879f9, transparent);
+    box-shadow: 0 0 8px rgba(232,121,249,0.8);
+    transform: translateY(-50%);
+  }
+  .preview-b .slot-title {
+    font-family: 'Orbitron', sans-serif;
+    color: #7c3aed;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(124,58,237,0.8);
+  }
+  .preview-b .lever-btn {
+    background: transparent;
+    border: 1px solid #7c3aed;
+    border-radius: 4px;
+    padding: 8px 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    color: #e879f9;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    text-shadow: 0 0 8px rgba(232,121,249,0.6);
+    box-shadow: 0 0 10px rgba(124,58,237,0.3), inset 0 0 10px rgba(124,58,237,0.05);
+  }
+
+  /* Option C — Retro Vegas */
+  .preview-c {
+    background: linear-gradient(135deg, #0f1a0f 0%, #0a140a 100%);
+    border: 2px solid #16a34a;
+    box-shadow: 0 0 15px rgba(22,163,74,0.2);
+    position: relative;
+  }
+  .preview-c::before {
+    content: '★ ★ ★';
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(250,204,21,0.5);
+    font-size: 0.6rem;
+    letter-spacing: 0.5em;
+  }
+  .preview-c .cabinet {
+    background: linear-gradient(180deg, #1a2e1a 0%, #0d1a0d 100%);
+    border: 2px solid #15803d;
+    border-radius: 10px 10px 4px 4px;
+    padding: 10px 10px 8px;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+  }
+  .preview-c .reel-window {
+    background: #050e05;
+    border: 2px solid #166534;
+    border-radius: 4px;
+    display: flex;
+    gap: 3px;
+    padding: 6px;
+    position: relative;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+  }
+  .preview-c .reel {
+    width: 50px; height: 68px;
+    background: linear-gradient(180deg, #0a1a0a 0%, #040c04 100%);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Black Ops One', serif;
+    font-size: 2rem;
+    color: #4ade80;
+    text-shadow: 0 0 6px rgba(74,222,128,0.5);
+    border: 1px solid rgba(22,163,74,0.3);
+  }
+  .preview-c .payline {
+    position: absolute;
+    left: 6px; right: 6px; top: 50%;
+    height: 2px;
+    background: rgba(250,204,21,0.5);
+    box-shadow: 0 0 4px rgba(250,204,21,0.4);
+    transform: translateY(-50%);
+  }
+  .preview-c .slot-title {
+    font-family: 'Black Ops One', serif;
+    color: #4ade80;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    margin-bottom: 4px;
+  }
+  .preview-c .lever-btn {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 24px;
+    font-family: 'Black Ops One', serif;
+    font-size: 0.75rem;
+    color: #fff;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #14532d;
+  }
+</style>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px 16px; display: flex; justify-content: center; background: #0d0a04;">
+      <div class="slot-preview preview-a">
+        <div class="slot-title">☠ DEATHROLL ☠</div>
+        <div class="reel-frame" style="position:relative">
+          <div class="reel">0</div>
+          <div class="reel">4</div>
+          <div class="reel">2</div>
+          <div class="reel">7</div>
+          <div class="payline"></div>
+        </div>
+        <button class="lever-btn">WÜRFELN</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Vintage Gold</h3>
+      <p>Klassisches One-Armed-Bandit-Gefühl. Goldchrom-Rahmen, warme Amber-Töne, schweres Gewicht. Hochwertig & nostalgisch.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px 16px; display: flex; justify-content: center; background: #050510;">
+      <div class="slot-preview preview-b">
+        <div class="slot-title">// DEATHROLL //</div>
+        <div class="reel-row" style="position:relative">
+          <div class="reel">0</div>
+          <div class="separator"></div>
+          <div class="reel">4</div>
+          <div class="separator"></div>
+          <div class="reel">2</div>
+          <div class="separator"></div>
+          <div class="reel">7</div>
+          <div class="payline"></div>
+        </div>
+        <button class="lever-btn">INITIIEREN</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Neon Cyber</h3>
+      <p>Futuristische LED-Ästhetik. Lila/Magenta-Neon, Orbitron-Font, digitale Trennlinien. Cyberpunk trifft Casino.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px 16px; display: flex; justify-content: center; background: #050a05;">
+      <div class="slot-preview preview-c">
+        <div class="slot-title">DEATHROLL</div>
+        <div class="cabinet">
+          <div class="reel-window" style="position:relative">
+            <div class="reel">0</div>
+            <div class="reel">4</div>
+            <div class="reel">2</div>
+            <div class="reel">7</div>
+            <div class="payline"></div>
+          </div>
+        </div>
+        <button class="lever-btn" style="margin-top: 4px;">ROLL IT</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Retro Vegas</h3>
+      <p>Grünes Kabinett im Spielautomaten-Stil, gelbe Payline, sattes Grün. Klassisches Arcade-Feeling mit Grim-Reaper-Twist.</p>
+    </div>
+  </div>
+</div>

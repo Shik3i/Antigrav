@@ -1,0 +1,270 @@
+<h2>Deathroll — Reel Animation</h2>
+<p class="subtitle">Wie sollen die Walzen animiert werden, wenn jemand würfelt?</p>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&display=swap');
+
+  .anim-demo {
+    background: linear-gradient(135deg, #0f1a0f 0%, #0a140a 100%);
+    border: 2px solid #16a34a;
+    border-radius: 12px;
+    padding: 20px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 160px;
+    justify-content: center;
+  }
+
+  .reel-row {
+    display: flex;
+    gap: 4px;
+    background: #050e05;
+    border: 2px solid #166534;
+    border-radius: 6px;
+    padding: 6px;
+    position: relative;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+  }
+
+  .reel-slot {
+    width: 52px; height: 70px;
+    background: #040c04;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid rgba(22,163,74,0.3);
+    position: relative;
+  }
+
+  .reel-digit {
+    font-family: 'Black Ops One', serif;
+    font-size: 2.2rem;
+    color: #4ade80;
+    text-shadow: 0 0 6px rgba(74,222,128,0.5);
+    position: relative;
+    z-index: 1;
+  }
+
+  .payline {
+    position: absolute;
+    left: 6px; right: 6px; top: 50%;
+    height: 2px;
+    background: rgba(250,204,21,0.6);
+    box-shadow: 0 0 6px rgba(250,204,21,0.5);
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  .anim-label {
+    font-family: 'Black Ops One', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: rgba(74,222,128,0.5);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Animation A: Vertical scroll per reel */
+  @keyframes reel-scroll-a {
+    0%   { transform: translateY(0); }
+    20%  { transform: translateY(-140px); }
+    40%  { transform: translateY(-280px); }
+    60%  { transform: translateY(-420px); }
+    75%  { transform: translateY(-490px); }
+    100% { transform: translateY(-490px); }
+  }
+  .demo-a .reel-slot:nth-child(1) .reel-strip { animation: reel-scroll-a 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0s both; }
+  .demo-a .reel-slot:nth-child(2) .reel-strip { animation: reel-scroll-a 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.12s both; }
+  .demo-a .reel-slot:nth-child(3) .reel-strip { animation: reel-scroll-a 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.24s both; }
+  .demo-a .reel-slot:nth-child(4) .reel-strip { animation: reel-scroll-a 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.36s both; }
+
+  .reel-strip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
+  .reel-strip-digit {
+    font-family: 'Black Ops One', serif;
+    font-size: 2.2rem;
+    color: #4ade80;
+    text-shadow: 0 0 6px rgba(74,222,128,0.5);
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  /* Animation B: Scramble blur */
+  @keyframes scramble-blur {
+    0%   { filter: blur(0px); opacity: 1; }
+    10%  { filter: blur(4px); opacity: 0.6; }
+    50%  { filter: blur(6px); opacity: 0.5; }
+    80%  { filter: blur(3px); opacity: 0.7; }
+    100% { filter: blur(0px); opacity: 1; }
+  }
+  @keyframes scramble-num {
+    0%   { content: "7"; }
+    20%  { content: "3"; }
+    40%  { content: "9"; }
+    60%  { content: "1"; }
+    80%  { content: "5"; }
+    100% { content: "4"; }
+  }
+  .demo-b .reel-digit {
+    animation: scramble-blur 1.1s ease-in-out infinite;
+  }
+  .demo-b .reel-slot:nth-child(1) .reel-digit { animation-delay: 0s; }
+  .demo-b .reel-slot:nth-child(2) .reel-digit { animation-delay: 0.07s; }
+  .demo-b .reel-slot:nth-child(3) .reel-digit { animation-delay: 0.14s; }
+  .demo-b .reel-slot:nth-child(4) .reel-digit { animation-delay: 0.21s; }
+
+  /* Animation C: Sequential lock-in */
+  @keyframes lock-in {
+    0%   { transform: translateY(0px); filter: blur(6px); opacity: 0.4; }
+    60%  { transform: translateY(-6px); filter: blur(3px); opacity: 0.7; }
+    80%  { transform: translateY(3px); filter: blur(1px); opacity: 0.9; }
+    90%  { transform: translateY(-1px); filter: blur(0); opacity: 1; }
+    100% { transform: translateY(0); filter: blur(0); opacity: 1; }
+  }
+  @keyframes lock-flash {
+    0%   { box-shadow: inset 0 0 0 rgba(74,222,128,0); }
+    50%  { box-shadow: inset 0 0 20px rgba(74,222,128,0.5), 0 0 10px rgba(74,222,128,0.4); }
+    100% { box-shadow: inset 0 0 0 rgba(74,222,128,0); }
+  }
+  .demo-c .reel-slot:nth-child(1) .reel-digit { animation: lock-in 0.5s cubic-bezier(0.22,1,0.36,1) 0.2s both; }
+  .demo-c .reel-slot:nth-child(1) { animation: lock-flash 0.4s ease 0.5s both; }
+  .demo-c .reel-slot:nth-child(2) .reel-digit { animation: lock-in 0.5s cubic-bezier(0.22,1,0.36,1) 0.5s both; }
+  .demo-c .reel-slot:nth-child(2) { animation: lock-flash 0.4s ease 0.8s both; }
+  .demo-c .reel-slot:nth-child(3) .reel-digit { animation: lock-in 0.5s cubic-bezier(0.22,1,0.36,1) 0.8s both; }
+  .demo-c .reel-slot:nth-child(3) { animation: lock-flash 0.4s ease 1.1s both; }
+  .demo-c .reel-slot:nth-child(4) .reel-digit { animation: lock-in 0.5s cubic-bezier(0.22,1,0.36,1) 1.1s both; }
+  .demo-c .reel-slot:nth-child(4) { animation: lock-flash 0.4s ease 1.4s both; }
+
+  .replay-btn {
+    font-family: 'Black Ops One', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    background: rgba(22,163,74,0.15);
+    border: 1px solid rgba(22,163,74,0.4);
+    color: #4ade80;
+    padding: 4px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+</style>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a140a; padding: 20px; display:flex; justify-content:center;">
+      <div class="anim-demo">
+        <div class="reel-row demo-a" id="demo-a">
+          <div class="reel-slot">
+            <div class="reel-strip">
+              <div class="reel-strip-digit">8</div>
+              <div class="reel-strip-digit">3</div>
+              <div class="reel-strip-digit">6</div>
+              <div class="reel-strip-digit">1</div>
+              <div class="reel-strip-digit">9</div>
+              <div class="reel-strip-digit">0</div>
+              <div class="reel-strip-digit">4</div>
+              <div class="reel-strip-digit">2</div>
+            </div>
+          </div>
+          <div class="reel-slot">
+            <div class="reel-strip">
+              <div class="reel-strip-digit">5</div>
+              <div class="reel-strip-digit">2</div>
+              <div class="reel-strip-digit">7</div>
+              <div class="reel-strip-digit">4</div>
+              <div class="reel-strip-digit">1</div>
+              <div class="reel-strip-digit">8</div>
+              <div class="reel-strip-digit">3</div>
+              <div class="reel-strip-digit">2</div>
+            </div>
+          </div>
+          <div class="reel-slot">
+            <div class="reel-strip">
+              <div class="reel-strip-digit">1</div>
+              <div class="reel-strip-digit">6</div>
+              <div class="reel-strip-digit">9</div>
+              <div class="reel-strip-digit">3</div>
+              <div class="reel-strip-digit">7</div>
+              <div class="reel-strip-digit">5</div>
+              <div class="reel-strip-digit">2</div>
+              <div class="reel-strip-digit">7</div>
+            </div>
+          </div>
+          <div class="reel-slot">
+            <div class="reel-strip">
+              <div class="reel-strip-digit">9</div>
+              <div class="reel-strip-digit">4</div>
+              <div class="reel-strip-digit">2</div>
+              <div class="reel-strip-digit">7</div>
+              <div class="reel-strip-digit">5</div>
+              <div class="reel-strip-digit">1</div>
+              <div class="reel-strip-digit">8</div>
+              <div class="reel-strip-digit">3</div>
+            </div>
+          </div>
+          <div class="payline"></div>
+        </div>
+        <div class="anim-label">Walzen scrollen vertikal</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Echter Slot-Scroll</h3>
+      <p>Jede Walze scrollt vertikal durch Ziffern. Stoppsequenz mit leichtem Versatz. Authentischstes Slot-Feeling.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a140a; padding: 20px; display:flex; justify-content:center;">
+      <div class="anim-demo">
+        <div class="reel-row demo-b">
+          <div class="reel-slot"><div class="reel-digit">7</div></div>
+          <div class="reel-slot"><div class="reel-digit">3</div></div>
+          <div class="reel-slot"><div class="reel-digit">9</div></div>
+          <div class="reel-slot"><div class="reel-digit">4</div></div>
+          <div class="payline"></div>
+        </div>
+        <div class="anim-label">Ziffern flackern & enthüllen</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Scramble Blur</h3>
+      <p>Aktuelle Logik beibehalten — Ziffern wechseln schnell, leichter Blur-Effekt. Weniger Aufwand, trotzdem im neuen Slot-Look.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a140a; padding: 20px; display:flex; justify-content:center;">
+      <div class="anim-demo">
+        <div class="reel-row demo-c">
+          <div class="reel-slot"><div class="reel-digit">0</div></div>
+          <div class="reel-slot"><div class="reel-digit">4</div></div>
+          <div class="reel-slot"><div class="reel-digit">2</div></div>
+          <div class="reel-slot"><div class="reel-digit">7</div></div>
+          <div class="payline"></div>
+        </div>
+        <div class="anim-label">Einrasten von links nach rechts</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Sequential Lock-In</h3>
+      <p>Walzen rasten einzeln ein (links → rechts), jede mit kurzem Grün-Flash. Spannung steigt mit jeder Stelle.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top: 16px; font-size: 0.8rem;">Animationen laufen automatisch — scroll oder warte kurz, um sie zu sehen.</p>
