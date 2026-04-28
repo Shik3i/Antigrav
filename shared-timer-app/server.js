@@ -165,6 +165,12 @@ app.use((err, req, res, next) => {
 
 // Catch-all route to serve the React app for any other URL (client-side routing)
 app.get('*catchall', (req, res) => {
+    // If an asset is requested but not found by express.static, don't serve index.html
+    // This prevents "Unable to preload CSS" errors where the browser tries to parse index.html as CSS.
+    if (req.path.startsWith('/assets/')) {
+        return res.status(404).send('Asset not found');
+    }
+
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
