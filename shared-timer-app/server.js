@@ -75,6 +75,15 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// Explicitly register MIME types for assets to prevent "Unable to preload CSS" errors in Docker/Alpine
+express.static.mime.define({
+    'text/css': ['css'],
+    'application/javascript': ['js', 'mjs'],
+    'application/json': ['json'],
+    'image/svg+xml': ['svg'],
+    'font/woff2': ['woff2']
+});
+
 // Trust proxy so the rate limiter sees the real client IP (X-Forwarded-For) instead of Unraid's internal IP
 app.set('trust proxy', 1);
 
