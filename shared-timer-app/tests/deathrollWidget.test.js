@@ -15,6 +15,7 @@ test('DeathrollWidget uses SlotReels and slot machine cabinet', () => {
   assert(src.includes('2200'), 'isRolling timer must be 2200ms');
   assert(src.includes('Black Ops One'), 'Cabinet title must use Black Ops One font');
   assert(src.includes('DEATHROLL'), 'Cabinet must show DEATHROLL title');
+  assert(src.includes('Bereit für den ersten Wurf'), 'Initial Deathroll state must wait for the first roll');
   assert(src.includes('cabinet--critical'), 'Must apply cabinet-pulse class for critical tier');
   assert(src.includes('isRolling'), 'Must maintain isRolling state for SlotReels');
 });
