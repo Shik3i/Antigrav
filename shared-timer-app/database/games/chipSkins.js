@@ -3,6 +3,7 @@ const db = require('../connection');
 const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
 const VALID_STATUSES = ['draft', 'public', 'restricted', 'disabled'];
 const VALID_RARITIES = ['common', 'rare', 'epic', 'legendary', 'limited', 'exclusive'];
+const SLUG_PATTERN = /^[a-z0-9-]{2,40}$/;
 
 const run = (sql, params = []) => {
   return new Promise((resolve, reject) => {
@@ -43,6 +44,24 @@ const validateRarity = (rarity) => {
   }
 };
 
+const validateName = (name) => {
+  if (typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error('Invalid name');
+  }
+};
+
+const validateSlug = (slug) => {
+  if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug)) {
+    throw new Error(`Invalid slug: ${slug}`);
+  }
+};
+
+const validateReleaseDate = (releaseDate) => {
+  if (typeof releaseDate !== 'string' || Number.isNaN(Date.parse(releaseDate))) {
+    throw new Error(`Invalid release date: ${releaseDate}`);
+  }
+};
+
 const validateChipValue = (chipValue) => {
   if (!CHIP_VALUES.includes(Number(chipValue))) {
     throw new Error(`Invalid chip value: ${chipValue}`);
@@ -64,6 +83,7 @@ const mapChipSkinRow = (row) => {
     updated_at: row.updated_at,
     asset_count: Number(row.asset_count || 0),
     grant_count: Number(row.grant_count || 0),
+    isComplete: Number(row.asset_count || 0) === CHIP_VALUES.length,
     is_complete: Number(row.asset_count || 0) === CHIP_VALUES.length,
   };
 };
@@ -78,11 +98,26 @@ const getChipSkinAssets = (skinId) => {
   );
 };
 
+const toAssetResponse = (asset) => ({
+  value: Number(asset.chip_value),
+  filePath: asset.file_path,
+  originalFilename: asset.original_filename || '',
+  url: asset.file_path.startsWith('/') ? asset.file_path : `/${asset.file_path}`,
+});
+
 const withAssets = async (skin) => {
   if (!skin) return null;
+  const assetRows = await getChipSkinAssets(skin.id);
+  const assets = {};
+
+  for (const asset of assetRows) {
+    assets[asset.chip_value] = toAssetResponse(asset);
+  }
+
   return {
     ...skin,
-    assets: await getChipSkinAssets(skin.id),
+    assets,
+    assetRows,
   };
 };
 
@@ -103,22 +138,46 @@ const createChipSkin = async ({
   rarity = 'common',
   release_date = new Date().toISOString(),
 }) => {
+  validateName(name);
+  validateSlug(slug);
   validateStatus(status);
   validateRarity(rarity);
+  validateReleaseDate(release_date);
 
   const result = await run(
     `INSERT INTO chip_skins (name, slug, description, status, rarity, release_date)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [name, slug, description, status, rarity, release_date]
+    [name.trim(), slug, description, status, rarity, release_date]
   );
 
   return getChipSkinById(result.lastID);
+};
+
+const assertSkinCanPublish = async (skinId) => {
+  const row = await get(
+    `SELECT COUNT(DISTINCT chip_value) as asset_count
+     FROM chip_skin_assets
+     WHERE skin_id = ?`,
+    [skinId]
+  );
+
+  if (Number(row?.asset_count || 0) !== CHIP_VALUES.length) {
+    throw new Error('Cannot publish incomplete chip skin');
+  }
 };
 
 const updateChipSkin = async (skinId, updates = {}) => {
   const allowedFields = ['name', 'slug', 'description', 'status', 'rarity', 'release_date'];
   const fields = [];
   const params = [];
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+    validateName(updates.name);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'slug')) {
+    validateSlug(updates.slug);
+  }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'status')) {
     validateStatus(updates.status);
@@ -128,10 +187,18 @@ const updateChipSkin = async (skinId, updates = {}) => {
     validateRarity(updates.rarity);
   }
 
+  if (Object.prototype.hasOwnProperty.call(updates, 'release_date')) {
+    validateReleaseDate(updates.release_date);
+  }
+
+  if (updates.status === 'public' || updates.status === 'restricted') {
+    await assertSkinCanPublish(skinId);
+  }
+
   for (const field of allowedFields) {
     if (Object.prototype.hasOwnProperty.call(updates, field)) {
       fields.push(`${field} = ?`);
-      params.push(updates[field]);
+      params.push(field === 'name' ? updates[field].trim() : updates[field]);
     }
   }
 
@@ -159,7 +226,7 @@ const getAdminChipSkins = async () => {
 const getAvailableChipSkinsForUser = async (userId, now = new Date().toISOString()) => {
   const rows = await all(
     `${skinSelect}
-     WHERE s.release_date <= ?
+     WHERE datetime(s.release_date) <= datetime(?)
        AND (
          s.status = 'public'
          OR (s.status = 'restricted' AND EXISTS (
@@ -171,7 +238,7 @@ const getAvailableChipSkinsForUser = async (userId, now = new Date().toISOString
        )
      GROUP BY s.id
      HAVING COUNT(DISTINCT a.chip_value) = ?
-     ORDER BY s.release_date DESC, s.id DESC`,
+     ORDER BY datetime(s.release_date) DESC, s.id DESC`,
     [now, userId, CHIP_VALUES.length]
   );
 

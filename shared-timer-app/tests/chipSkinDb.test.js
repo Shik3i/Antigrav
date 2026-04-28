@@ -131,7 +131,7 @@ test('managed chip skins enforce release date, status, completeness, and grants'
   assert(!visible.some((skin) => skin.slug === 'restricted-skin'), 'restricted skin should disappear after revoke');
 });
 
-test('chip skin validation rejects invalid status and rarity', async () => {
+test('chip skin validation rejects invalid create payload fields', async () => {
   await clearChipSkinRows();
 
   await assert.rejects(
@@ -157,4 +157,123 @@ test('chip skin validation rejects invalid status and rarity', async () => {
     }),
     /Invalid rarity/
   );
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: 'Bad Slug',
+      slug: 'Bad_Slug',
+      description: '',
+      status: 'draft',
+      rarity: 'rare',
+      release_date: '2026-01-01T00:00:00.000Z',
+    }),
+    /Invalid slug/
+  );
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: '   ',
+      slug: 'blank-name',
+      description: '',
+      status: 'draft',
+      rarity: 'rare',
+      release_date: '2026-01-01T00:00:00.000Z',
+    }),
+    /Invalid name/
+  );
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: 'Bad Date',
+      slug: 'bad-date',
+      description: '',
+      status: 'draft',
+      rarity: 'rare',
+      release_date: 'not-a-date',
+    }),
+    /Invalid release date/
+  );
+});
+
+test('chip skin validation rejects invalid chip values', async () => {
+  await clearChipSkinRows();
+
+  const skin = await dbLayer.createChipSkin({
+    name: 'Chip Value Test',
+    slug: 'chip-value-test',
+    description: '',
+    status: 'draft',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+
+  await assert.rejects(
+    () => dbLayer.upsertChipSkinAsset(skin.id, 2, 'data/chip-skins/chip-value-test/2.png', '2.png'),
+    /Invalid chip value/
+  );
+});
+
+test('chip skin update validation rejects invalid fields and incomplete publishing', async () => {
+  await clearChipSkinRows();
+
+  const skin = await dbLayer.createChipSkin({
+    name: 'Update Validation',
+    slug: 'update-validation',
+    description: '',
+    status: 'draft',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { slug: 'NOPE' }),
+    /Invalid slug/
+  );
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { name: '' }),
+    /Invalid name/
+  );
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { release_date: 'tomorrowish' }),
+    /Invalid release date/
+  );
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { status: 'public' }),
+    /Cannot publish incomplete chip skin/
+  );
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { status: 'restricted' }),
+    /Cannot publish incomplete chip skin/
+  );
+
+  const draftSkin = await dbLayer.updateChipSkin(skin.id, { status: 'draft' });
+  assert.strictEqual(draftSkin.status, 'draft');
+
+  const disabledSkin = await dbLayer.updateChipSkin(skin.id, { status: 'disabled' });
+  assert.strictEqual(disabledSkin.status, 'disabled');
+});
+
+test('chip skin returns planned complete flag and asset map shape', async () => {
+  await clearChipSkinRows();
+
+  const skin = await dbLayer.createChipSkin({
+    name: 'Shape Test',
+    slug: 'shape-test',
+    description: '',
+    status: 'draft',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+
+  await dbLayer.upsertChipSkinAsset(skin.id, 1, 'data/chip-skins/shape-test/1.png', '1.png');
+
+  const loaded = await dbLayer.getChipSkinById(skin.id);
+  assert.strictEqual(loaded.isComplete, false);
+  assert(loaded.assets, 'assets object is required');
+  assert.deepStrictEqual(loaded.assets[1], {
+    value: 1,
+    filePath: 'data/chip-skins/shape-test/1.png',
+    originalFilename: '1.png',
+    url: '/data/chip-skins/shape-test/1.png',
+  });
 });
