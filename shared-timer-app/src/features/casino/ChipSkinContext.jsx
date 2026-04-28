@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { BUILT_IN_CHIP_SKINS, getChipImageFromCatalog } from './chipConfig';
+import { BUILT_IN_CHIP_SKINS, CHIP_VALUES, getChipImageFromCatalog } from './chipConfig';
 
 const CHIP_SKIN_STORAGE_KEY = 'chipSkin';
 
@@ -20,6 +20,7 @@ function normalizeManagedSkin(skin) {
     label: skin.name,
     type: 'managed',
     builtIn: false,
+    isBuiltIn: false,
   };
 }
 
@@ -29,12 +30,14 @@ export function ChipSkinProvider({ children }) {
     () => localStorage.getItem(CHIP_SKIN_STORAGE_KEY) || 'default'
   );
   const [managedSkins, setManagedSkins] = useState([]);
+  const [managedAssetUrls, setManagedAssetUrls] = useState({});
   const [loadingSkins, setLoadingSkins] = useState(false);
   const [loadedToken, setLoadedToken] = useState(null);
 
   useEffect(() => {
     if (!token) {
       setManagedSkins([]);
+      setManagedAssetUrls({});
       setLoadingSkins(false);
       setLoadedToken(null);
       return;
@@ -73,9 +76,70 @@ export function ChipSkinProvider({ children }) {
     };
   }, [token]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls = [];
+
+    async function loadManagedAssetUrls() {
+      if (!token || managedSkins.length === 0) {
+        setManagedAssetUrls({});
+        return;
+      }
+
+      const nextAssetUrls = {};
+
+      await Promise.all(managedSkins.flatMap((skinEntry) => {
+        const values = Object.keys(skinEntry.assets || {}).length > 0
+          ? Object.keys(skinEntry.assets).map(Number)
+          : CHIP_VALUES;
+
+        return values.map(async (value) => {
+          try {
+            const { data } = await axios.get(`/api/chip-skins/assets/${skinEntry.slug}/${value}.png`, {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: 'blob',
+            });
+            const objectUrl = URL.createObjectURL(data);
+            objectUrls.push(objectUrl);
+            nextAssetUrls[`${skinEntry.slug}:${value}`] = objectUrl;
+          } catch (err) {
+            if (!cancelled) {
+              console.error(`Failed to load chip skin asset ${skinEntry.slug}/${value}:`, err);
+            }
+          }
+        });
+      }));
+
+      if (!cancelled) {
+        setManagedAssetUrls(nextAssetUrls);
+      }
+    }
+
+    loadManagedAssetUrls();
+
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [managedSkins, token]);
+
   const availableSkins = useMemo(
-    () => [...BUILT_IN_CHIP_SKINS, ...managedSkins],
-    [managedSkins]
+    () => [
+      ...BUILT_IN_CHIP_SKINS,
+      ...managedSkins.map((skinEntry) => ({
+        ...skinEntry,
+        assets: Object.fromEntries(
+          Object.entries(skinEntry.assets || {}).map(([value, asset]) => [
+            value,
+            {
+              ...asset,
+              url: managedAssetUrls[`${skinEntry.slug}:${value}`] || asset.url,
+            },
+          ])
+        ),
+      })),
+    ],
+    [managedAssetUrls, managedSkins]
   );
 
   useEffect(() => {
@@ -99,13 +163,12 @@ export function ChipSkinProvider({ children }) {
     if (!catalogSkin) return null;
 
     if (catalogSkin.builtIn) {
-      return getChipImageFromCatalog(catalogSkin, value);
+      return getChipImageFromCatalog(value, catalogSkin.id, availableSkins);
     }
 
-    return catalogSkin.slug
-      ? `/api/chip-skins/assets/${catalogSkin.slug}/${value}.png`
-      : catalogSkin.assets?.[value]?.url || null;
-  }, [availableSkins, skin]);
+    return managedAssetUrls[`${catalogSkin.slug}:${value}`]
+      || getChipImageFromCatalog(value, catalogSkin.slug, availableSkins);
+  }, [availableSkins, managedAssetUrls, skin]);
 
   const contextValue = useMemo(() => ({
     skin,
