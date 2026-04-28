@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import axios from 'axios';
 import { Terminal, Volume2, BellRing, Palette, Trophy, Download, Star, Heart, Search, X, ChevronDown, ChevronUp, Dna, Sparkles, RefreshCw, Clock, Shield, User, Lock, Settings as SettingsIcon, Gem } from 'lucide-react';
 import { useChipSkin } from '../features/casino/ChipSkinContext';
-import { getChipImage, CHIP_SKINS } from '../features/casino/chipConfig';
+import { CHIP_SKINS } from '../features/casino/chipConfig';
 import { getNextPokemon } from '../utils/pokemonUtils';
 import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import Friends from './Friends';
@@ -86,7 +86,7 @@ const Settings = ({ user, setUser, socket }) => {
     const [pokemonConfigs, setPokemonConfigs] = useState(null);
     const [pokemonSearch, setPokemonSearch] = useState('');
     const [isPokemonAccordionOpen, setIsPokemonAccordionOpen] = useState(false);
-    const { skin: chipSkin, setSkin: setChipSkin } = useChipSkin();
+    const { skin: chipSkin, setSkin: setChipSkin, availableSkins, loadingSkins, getSkinImage } = useChipSkin();
 
     useEffect(() => {
         fetchJson('/api/esports/teams', { token: '' })
@@ -929,13 +929,9 @@ const Settings = ({ user, setUser, socket }) => {
                                 Wähle das Design deiner Casino-Chips. Gilt für Blackjack und Roulette.
                             </p>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
-                                {[
-                                    { id: 'default', label: 'Classic (Color)' },
-                                    { id: 'classic', label: 'Classic' },
-                                    { id: 'neon', label: 'Neon' },
-                                    { id: 'tropical', label: 'Tropical' },
-                                ].map(({ id, label }) => {
-                                    const img = getChipImage(100, id);
+                                {availableSkins.map(({ id, label, name, rarity }) => {
+                                    const displayLabel = label || name || id;
+                                    const img = getSkinImage(100, id);
                                     const isActive = chipSkin === id;
                                     return (
                                         <div
@@ -945,7 +941,7 @@ const Settings = ({ user, setUser, socket }) => {
                                             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '16px 12px' }}
                                         >
                                             {img ? (
-                                                <img src={img} alt={label} style={{ width: '56px', height: '56px', objectFit: 'contain' }} />
+                                                <img src={img} alt={displayLabel} style={{ width: '56px', height: '56px', objectFit: 'contain' }} />
                                             ) : (
                                                 <div style={{ display: 'flex', gap: '4px' }}>
                                                     {Object.values(CHIP_SKINS.default).slice(0, 4).map((color, i) => (
@@ -953,11 +949,21 @@ const Settings = ({ user, setUser, socket }) => {
                                                     ))}
                                                 </div>
                                             )}
-                                            <span style={{ fontSize: '0.8rem', fontWeight: isActive ? 700 : 400 }}>{label}</span>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: isActive ? 700 : 400 }}>{displayLabel}</span>
+                                            {rarity && (
+                                                <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                                                    {rarity}
+                                                </span>
+                                            )}
                                         </div>
                                     );
                                 })}
                             </div>
+                            {loadingSkins && (
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    Lade Chip-Skins...
+                                </p>
+                            )}
                         </div>
                     </SettingsSection>
 

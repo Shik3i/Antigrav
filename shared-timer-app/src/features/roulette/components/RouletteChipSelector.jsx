@@ -1,13 +1,13 @@
 import React from 'react';
-import { CHIP_VALUES, getChipColor, getChipImage } from '../../casino/chipConfig';
+import { CHIP_VALUES, getChipColor } from '../../casino/chipConfig';
 import { useChipSkin } from '../../casino/ChipSkinContext';
 
 export default function RouletteChipSelector({ selected, onSelect, disabled, eraseMode, onToggleErase }) {
-  const { skin } = useChipSkin();
+  const { skin, getSkinImage } = useChipSkin();
   return (
     <div className="chip-selector">
       {CHIP_VALUES.map(val => {
-        const img = getChipImage(val, skin);
+        const img = getSkinImage(val, skin);
         return (
           <button
             key={val}

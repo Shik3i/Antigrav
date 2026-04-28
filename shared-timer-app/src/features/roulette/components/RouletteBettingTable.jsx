@@ -1,5 +1,6 @@
 import React from 'react';
-import { getChipImage, CHIP_VALUES } from '../../casino/chipConfig';
+import { CHIP_VALUES } from '../../casino/chipConfig';
+import { useChipSkin } from '../../casino/ChipSkinContext';
 
 const RED_NUMBERS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 
@@ -24,6 +25,8 @@ function getNumColor(n) {
 }
 
 export default function RouletteBettingTable({ onBet, onRemove, canBet, eraseMode, myUserId, playerBets, playerColors, playerSkins }) {
+  const { getSkinImage } = useChipSkin();
+
   const BetZone = ({ type, label, className, children }) => {
     const betsOnField = playerBets?.[type] || {};
     const entries = Object.entries(betsOnField);
@@ -48,7 +51,7 @@ export default function RouletteBettingTable({ onBet, onRemove, canBet, eraseMod
             {entries.map(([uid, amount]) => {
               const skinName = playerSkins?.[uid] || 'default';
               const chipVal = bestChipValue(amount);
-              const img = getChipImage(chipVal, skinName);
+              const img = getSkinImage(chipVal, skinName);
               return img ? (
                 <span key={uid} className="bet-zone-chip bet-zone-chip--image" title={`${amount} KC`}>
                   <img src={img} alt={`${amount} KC`} />

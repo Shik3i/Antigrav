@@ -29,3 +29,22 @@ test('chipConfig exposes built-in skin catalog metadata', () => {
   assert(src.includes('BUILT_IN_CHIP_SKINS'), 'built-in catalog metadata is required');
   assert(src.includes('getChipImageFromCatalog'), 'catalog image helper is required');
 });
+
+test('Settings renders skin options from ChipSkinContext', () => {
+  const src = read('src/pages/Settings.jsx');
+  assert(src.includes('availableSkins'), 'Settings should read availableSkins from context');
+  assert(!src.includes("{ id: 'tropical', label: 'Tropical' }"), 'Settings should not hard-code the skin list');
+});
+
+test('casino chip components use managed skin image lookup', () => {
+  const files = [
+    'src/features/blackjack/components/ChipStack.jsx',
+    'src/features/blackjack/components/BlackjackSeat.jsx',
+    'src/features/roulette/components/RouletteBettingTable.jsx',
+    'src/features/roulette/components/RouletteChipSelector.jsx',
+  ];
+  for (const file of files) {
+    const src = read(file);
+    assert(src.includes('getSkinImage'), `${file} should use context image lookup`);
+  }
+});
