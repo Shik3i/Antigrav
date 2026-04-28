@@ -114,19 +114,12 @@ class RoomManager {
     startDeathroll(roomId, userName) {
         const room = this.getRoom(roomId);
         if (room) {
-            const roll = Math.floor(Math.random() * 1000) + 1;
             room.state.activeDeathroll = {
-                currentMax: roll,
-                lastRoller: userName,
-                history: [{ roller: userName, max: 1000, roll }],
-                isComplete: roll === 1
+                currentMax: 1000,
+                lastRoller: null,
+                history: [],
+                isComplete: false
             };
-            if (roll === 1) {
-                setTimeout(() => {
-                    const r = this.getRoom(roomId);
-                    if (r && r.state.activeDeathroll?.isComplete) r.state.activeDeathroll = null;
-                }, 5000);
-            }
             return room.state.activeDeathroll;
         }
         return null;

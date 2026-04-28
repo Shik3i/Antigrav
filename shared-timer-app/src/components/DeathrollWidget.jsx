@@ -84,6 +84,7 @@ const DeathrollWidget = ({ deathroll, user, roomId, socket, rollEvent }) => {
     const isFirstRenderRef = useRef(true);
     const rollTimerRef = useRef(null);
     const glowTier = getGlowTier(currentMax);
+    const hasRolled = (deathroll?.history?.length || 0) > 0;
     const isWaitingForOthers = deathroll?.lastRoller === user?.displayName || deathroll?.lastRoller === user?.username;
 
     useEffect(() => {
@@ -154,7 +155,13 @@ const DeathrollWidget = ({ deathroll, user, roomId, socket, rollEvent }) => {
             </div>
 
             <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', zIndex: 1 }}>
-                <strong style={{ color: glowTier.accentColor }}>{deathroll?.lastRoller}</strong> hat gewürfelt:
+                {hasRolled ? (
+                    <>
+                        <strong style={{ color: glowTier.accentColor }}>{deathroll?.lastRoller}</strong> hat gewürfelt:
+                    </>
+                ) : (
+                    <strong style={{ color: glowTier.accentColor }}>Bereit für den ersten Wurf</strong>
+                )}
             </div>
 
             <div style={{ position: 'relative', zIndex: 1 }}>
