@@ -61,7 +61,8 @@ function getRequestUserId(req) {
 }
 
 function isChipSkinValidationError(err) {
-  return /^(Invalid (status|rarity|slug|name|release date|chip value)|Cannot publish incomplete chip skin|Only PNG chip assets are supported|Invalid PNG chip asset)/.test(err?.message || '');
+  return /^(Invalid (status|rarity|slug|name|release date|chip value)|Cannot publish incomplete chip skin|Only PNG chip assets are supported|Invalid PNG chip asset)/.test(err?.message || '')
+    || /UNIQUE constraint failed: chip_skins\.slug/.test(err?.message || '');
 }
 
 async function getAdminChipSkinsHandler(req, res) {

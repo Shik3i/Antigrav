@@ -145,6 +145,28 @@ test('createAdminChipSkin returns 400 for DB validation errors', async () => {
   assert.strictEqual(next.mock.calls.length, 0);
 });
 
+test('createAdminChipSkin returns 400 for duplicate slug constraint errors', async () => {
+  dbLayer.createChipSkin.mockRejectedValue(new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed: chip_skins.slug'));
+
+  const req = {
+    user: { is_superadmin: true },
+    body: { slug: 'already-used' },
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+  };
+  const next = jest.fn();
+
+  await controller.createAdminChipSkin(req, res, next);
+
+  assert.strictEqual(res.status.mock.calls[0][0], 400);
+  assert.deepStrictEqual(res.json.mock.calls[0][0], {
+    error: 'SQLITE_CONSTRAINT: UNIQUE constraint failed: chip_skins.slug',
+  });
+  assert.strictEqual(next.mock.calls.length, 0);
+});
+
 test('updateAdminChipSkin returns 400 for DB validation errors', async () => {
   dbLayer.updateChipSkin.mockRejectedValue(new Error('Cannot publish incomplete chip skin'));
 
