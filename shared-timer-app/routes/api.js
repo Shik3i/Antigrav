@@ -69,7 +69,7 @@ router.post('/admin/chip-skins/:id/grants', authController.authenticateToken, ch
 router.delete('/admin/chip-skins/:id/grants/:userId', authController.authenticateToken, chipSkinController.revokeAdminChipSkinGrant);
 router.get('/chip-skins', authController.optionalAuthenticateToken, chipSkinController.getPublicChipSkins);
 router.get('/chip-skins/me', authController.authenticateToken, chipSkinController.getMyChipSkins);
-router.get('/chip-skins/assets/:skinSlug/:fileName', chipSkinController.serveChipSkinAsset);
+router.get('/chip-skins/assets/:skinSlug/:fileName', authController.optionalAuthenticateToken, chipSkinController.serveChipSkinAsset);
 
 // Database Backups
 router.get('/admin/backups', authController.authenticateToken, async (req, res) => {
