@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { buildRealisticGroups, buildRealisticStack, formatKC } from '../utils/formatters';
-import { getChipColor, getChipImage, getChipTextColor } from '../../casino/chipConfig';
+import { getChipColor, getChipTextColor } from '../../casino/chipConfig';
 import { useChipSkin } from '../../casino/ChipSkinContext';
 
 export default function ChipStack({ amount, onClick, isPending, title, skin: skinProp }) {
-  const { skin: skinCtx } = useChipSkin();
+  const { skin: skinCtx, getSkinImage } = useChipSkin();
   const skin = skinProp ?? skinCtx;
   const chips = buildRealisticStack(amount);
   const groupedChips = buildRealisticGroups(amount);
@@ -29,6 +29,7 @@ export default function ChipStack({ amount, onClick, isPending, title, skin: ski
             const offsetX = isPending ? groupIndex * 28 : absoluteIndex * 0.4;
             const offsetY = absoluteIndex * 4;
             const value = entry.value;
+            const img = getSkinImage(value, skin);
             return (
               <div
                 key={`${value}-${groupIndex}-${index}`}
@@ -42,9 +43,9 @@ export default function ChipStack({ amount, onClick, isPending, title, skin: ski
                   boxShadow: `0 ${2 + absoluteIndex * 0.5}px ${4 + absoluteIndex * 0.5}px rgba(0,0,0,0.4)`
                 }}
               >
-                {getChipImage(value, skin) ? (
+                {img ? (
                   <img
-                    src={getChipImage(value, skin)}
+                    src={img}
                     alt={`${value} KC`}
                     className="chip-skin-img"
                     style={{ opacity: index === count - 1 ? 1 : 0.6 }}

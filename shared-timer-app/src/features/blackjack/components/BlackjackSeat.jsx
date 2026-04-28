@@ -6,7 +6,7 @@ import PlayingCard from './PlayingCard';
 import SettlementToast from './SettlementToast';
 import { formatKC } from '../utils/formatters';
 import { useChipSkin } from '../../casino/ChipSkinContext';
-import { getChipColor, getChipImage, getChipTextColor } from '../../casino/chipConfig';
+import { getChipColor, getChipTextColor } from '../../casino/chipConfig';
 
 function getSeatClass(maxPlayers, seat) {
   return `blackjack-seat blackjack-seat-${maxPlayers}-${seat}`;
@@ -51,18 +51,18 @@ function SeatControls({
   canSplit,
   balance
 }) {
+  const { skin, getSkinImage } = useChipSkin();
+
   if (!isLocalPlayer) return null;
 
   const isBetting = roomState?.status === 'betting' || roomState?.status === 'waiting';
   const hasEnoughForSplit = balance >= (roomState?.players?.find((player) => player.userId === roomState?.currentPlayerTurn)?.hands[0]?.bet || 0);
 
-  const { skin } = useChipSkin();
-
   return (
     <div className="blackjack-seat-controls-wrapper">
       <div className={`blackjack-chip-tray vertical-side${!isBetting ? ' is-planning' : ''}`}>
         {[1, 5, 25, 100, 500].map((value) => {
-          const img = getChipImage(value, skin);
+          const img = getSkinImage(value, skin);
           return (
             <button
               key={value}
