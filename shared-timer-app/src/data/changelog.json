@@ -1,5 +1,11 @@
 [
   {
+    "id": 94,
+    "version": "2.58.0",
+    "date": "2026-04-28",
+    "changes": "- **Deathroll Slot Machine**: Deathroll wurde als Retro-Vegas-Slot-Machine mit 4 vertikal scrollenden Reels, Payline, Black-Ops-One-Typografie und kritischem Red-Pulse-Cabinet neu gestaltet.\n- **Deathroll Start-Flow**: Ein neuer Deathroll startet jetzt bei 1000 und wartet auf den ersten Button-Klick, statt sofort beim Start zu würfeln.\n- **Deathroll Verifikation**: Neue Regressionstests sichern SlotReels-Struktur, Widget-Integration und den serverseitigen Startzustand ab."
+  },
+  {
     "id": 93,
     "version": "2.57.0",
     "date": "2026-04-28",
