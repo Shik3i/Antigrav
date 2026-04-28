@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ImagePlus, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 
 const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
@@ -47,6 +47,14 @@ const ChipSkinsTab = ({
         [skins, selectedSkinId]
     );
 
+    useEffect(() => {
+        setPendingUploads({});
+        setGrantUserId('');
+        if (selectedSkinId) {
+            onFetchGrants(selectedSkinId);
+        }
+    }, [selectedSkinId]);
+
     const availableGrantUsers = useMemo(() => {
         const grantedIds = new Set((grants || []).map((grant) => String(grant.user_id)));
         return (users || []).filter((user) => !grantedIds.has(String(user.id)));
@@ -62,8 +70,13 @@ const ChipSkinsTab = ({
             reader.readAsDataURL(file);
         });
 
-        setPendingUploads((prev) => ({ ...prev, [value]: dataUrl }));
-        await onUploadAsset(selectedSkinId, value, file.name, dataUrl);
+        const uploaded = await onUploadAsset(selectedSkinId, value, file.name, dataUrl);
+        if (uploaded) {
+            setPendingUploads((prev) => ({
+                ...prev,
+                [`${selectedSkinId}:${value}`]: dataUrl,
+            }));
+        }
     };
 
     const handleGrant = async () => {
@@ -105,7 +118,6 @@ const ChipSkinsTab = ({
                                     className={isSelected ? 'btn-primary' : 'btn-secondary'}
                                     onClick={() => {
                                         onSelectSkin(skin);
-                                        onFetchGrants(skin.id);
                                     }}
                                     style={{ textAlign: 'left', display: 'grid', gap: '6px', justifyItems: 'stretch' }}
                                 >
@@ -179,7 +191,7 @@ const ChipSkinsTab = ({
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
                                 {CHIP_VALUES.map((value) => {
                                     const asset = getAsset(selectedSkin, value);
-                                    const previewSrc = pendingUploads[value] || asset?.url;
+                                    const previewSrc = pendingUploads[`${selectedSkinId}:${value}`] || asset?.url;
                                     return (
                                         <label key={value} style={{ display: 'grid', gap: '10px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255,255,255,0.03)' }}>
                                             <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{value} KC</span>
