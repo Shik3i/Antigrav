@@ -192,6 +192,47 @@ function initializeDatabaseSchema() {
       db.run(`INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('achievement_reward_multiplier', '2.5')`);
     });
 
+    db.run(`CREATE TABLE IF NOT EXISTS chip_skins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      rarity TEXT NOT NULL DEFAULT 'common',
+      release_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      CHECK(status IN ('draft', 'public', 'restricted', 'disabled')),
+      CHECK(rarity IN ('common', 'rare', 'epic', 'legendary', 'limited', 'exclusive'))
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS chip_skin_assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      skin_id INTEGER NOT NULL,
+      chip_value INTEGER NOT NULL,
+      file_path TEXT NOT NULL,
+      original_filename TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(skin_id) REFERENCES chip_skins(id) ON DELETE CASCADE,
+      UNIQUE(skin_id, chip_value),
+      CHECK(chip_value IN (1, 5, 10, 25, 50, 100, 500, 1000))
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS chip_skin_grants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      skin_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
+      granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      granted_by TEXT,
+      FOREIGN KEY(skin_id) REFERENCES chip_skins(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE,
+      UNIQUE(skin_id, user_id)
+    )`);
+
+    db.run('CREATE INDEX IF NOT EXISTS idx_chip_skins_status_release ON chip_skins(status, release_date)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_chip_skin_grants_user ON chip_skin_grants(user_id)');
+
     // KoalaTransactions: logs coin additions and deductions
     db.run(`CREATE TABLE IF NOT EXISTS KoalaTransactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
