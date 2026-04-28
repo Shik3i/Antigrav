@@ -1563,3 +1563,32 @@ body.zen-mode .news-ticker-wrapper {
   animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ─── Deathroll Slot Machine ─── */
+
+@keyframes reel-spin {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-740px); } /* 10 digits × 74px */
+}
+
+@keyframes reel-lock-flash {
+  0%   { opacity: 1; filter: brightness(1); }
+  35%  { opacity: 0.55; filter: brightness(2.2); }
+  100% { opacity: 1; filter: brightness(1); }
+}
+
+@keyframes cabinet-pulse {
+  0%, 100% { box-shadow: 0 12px 30px rgba(239, 68, 68, 0.18); }
+  50%       { box-shadow: 0 12px 44px rgba(239, 68, 68, 0.46), 0 0 60px rgba(239, 68, 68, 0.18); }
+}
+
+.reel-strip--spinning {
+  animation: reel-spin 0.35s linear infinite;
+}
+
+.reel-column--locking {
+  animation: reel-lock-flash 0.32s ease;
+}
+
+.deathroll-cabinet--critical {
+  animation: cabinet-pulse 1.3s ease-in-out infinite;
+}
