@@ -29,6 +29,10 @@ function parsePngDataUrl(dataUrl) {
     throw new Error('Only PNG chip assets are supported');
   }
 
+  if (buffer.length < pngSignature.length + 8 || buffer.subarray(12, 16).toString('ascii') !== 'IHDR') {
+    throw new Error('Invalid PNG chip asset');
+  }
+
   return buffer;
 }
 
@@ -56,6 +60,10 @@ function getRequestUserId(req) {
   return req.user?.id || req.user?.userId || null;
 }
 
+function isChipSkinValidationError(err) {
+  return /^(Invalid (status|rarity|slug|name|release date|chip value)|Cannot publish incomplete chip skin|Only PNG chip assets are supported|Invalid PNG chip asset)/.test(err?.message || '');
+}
+
 async function getAdminChipSkinsHandler(req, res) {
   if (!requireSuperadmin(req, res)) return;
   const skins = await dbLayer.getAdminChipSkins();
@@ -64,14 +72,28 @@ async function getAdminChipSkinsHandler(req, res) {
 
 async function createAdminChipSkinHandler(req, res) {
   if (!requireSuperadmin(req, res)) return;
-  const skin = await dbLayer.createChipSkin(req.body || {});
-  res.status(201).json({ skin });
+  try {
+    const skin = await dbLayer.createChipSkin(req.body || {});
+    res.status(201).json({ skin });
+  } catch (err) {
+    if (isChipSkinValidationError(err)) {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
 }
 
 async function updateAdminChipSkinHandler(req, res) {
   if (!requireSuperadmin(req, res)) return;
-  const skin = await dbLayer.updateChipSkin(Number(req.params.id), req.body || {});
-  res.json({ skin });
+  try {
+    const skin = await dbLayer.updateChipSkin(Number(req.params.id), req.body || {});
+    res.json({ skin });
+  } catch (err) {
+    if (isChipSkinValidationError(err)) {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
 }
 
 async function uploadAdminChipSkinAssetHandler(req, res) {
@@ -87,15 +109,30 @@ async function uploadAdminChipSkinAssetHandler(req, res) {
     return res.status(400).json({ error: 'Invalid chip value' });
   }
 
-  const buffer = parsePngDataUrl(req.body?.dataUrl);
+  let buffer;
+  try {
+    buffer = parsePngDataUrl(req.body?.dataUrl);
+  } catch (err) {
+    if (isChipSkinValidationError(err)) {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
+
   const assetPath = getChipSkinAssetPath(skin.slug, `${value}.png`);
   fs.mkdirSync(path.dirname(assetPath), { recursive: true });
   fs.writeFileSync(assetPath, buffer);
 
-  const relativePath = path.relative(PROJECT_ROOT, assetPath);
-  await dbLayer.upsertChipSkinAsset(skin.id, value, relativePath, req.body?.fileName || `${value}.png`);
-
-  res.json({ skin: await dbLayer.getChipSkinById(skin.id) });
+  try {
+    const relativePath = path.relative(PROJECT_ROOT, assetPath);
+    await dbLayer.upsertChipSkinAsset(skin.id, value, relativePath, req.body?.fileName || `${value}.png`);
+    res.json({ skin: await dbLayer.getChipSkinById(skin.id) });
+  } catch (err) {
+    if (isChipSkinValidationError(err)) {
+      return res.status(400).json({ error: err.message });
+    }
+    throw err;
+  }
 }
 
 async function getAdminChipSkinGrantsHandler(req, res) {
@@ -139,14 +176,22 @@ async function getMyChipSkinsHandler(req, res) {
   res.json({ skins });
 }
 
-function serveChipSkinAsset(req, res) {
+async function serveChipSkinAssetHandler(req, res) {
+  let assetPath;
   try {
-    const assetPath = getChipSkinAssetPath(req.params.skinSlug, req.params.fileName);
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
-    res.sendFile(assetPath);
+    assetPath = getChipSkinAssetPath(req.params.skinSlug, req.params.fileName);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
+
+  const skins = await dbLayer.getAvailableChipSkinsForUser(getRequestUserId(req));
+  const isAllowed = skins.some((skin) => skin.slug === req.params.skinSlug);
+  if (!isAllowed) {
+    return res.status(404).json({ error: 'Asset not found' });
+  }
+
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+  res.sendFile(assetPath);
 }
 
 function wrap(handler) {
@@ -165,6 +210,6 @@ module.exports = {
   revokeAdminChipSkinGrant: wrap(revokeAdminChipSkinGrantHandler),
   getPublicChipSkins: wrap(getPublicChipSkinsHandler),
   getMyChipSkins: wrap(getMyChipSkinsHandler),
-  serveChipSkinAsset,
+  serveChipSkinAsset: wrap(serveChipSkinAssetHandler),
   wrap,
 };
