@@ -44,6 +44,9 @@ export function ChipSkinProvider({ children }) {
     }
 
     let cancelled = false;
+    setManagedSkins([]);
+    setManagedAssetUrls({});
+    setLoadedToken(null);
 
     async function loadAvailableSkins() {
       setLoadingSkins(true);
@@ -99,6 +102,7 @@ export function ChipSkinProvider({ children }) {
               headers: { Authorization: `Bearer ${token}` },
               responseType: 'blob',
             });
+            if (cancelled) return;
             const objectUrl = URL.createObjectURL(data);
             objectUrls.push(objectUrl);
             nextAssetUrls[`${skinEntry.slug}:${value}`] = objectUrl;
@@ -133,7 +137,7 @@ export function ChipSkinProvider({ children }) {
             value,
             {
               ...asset,
-              url: managedAssetUrls[`${skinEntry.slug}:${value}`] || asset.url,
+              url: managedAssetUrls[`${skinEntry.slug}:${value}`] || null,
             },
           ])
         ),
@@ -166,8 +170,7 @@ export function ChipSkinProvider({ children }) {
       return getChipImageFromCatalog(value, catalogSkin.id, availableSkins);
     }
 
-    return managedAssetUrls[`${catalogSkin.slug}:${value}`]
-      || getChipImageFromCatalog(value, catalogSkin.slug, availableSkins);
+    return managedAssetUrls[`${catalogSkin.slug}:${value}`] || null;
   }, [availableSkins, managedAssetUrls, skin]);
 
   const contextValue = useMemo(() => ({
