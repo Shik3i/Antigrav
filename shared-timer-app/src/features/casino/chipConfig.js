@@ -58,8 +58,51 @@ export const CHIP_IMAGES = {
   },
 };
 
+export const BUILT_IN_CHIP_SKINS = [
+  {
+    id: 'default',
+    slug: 'default',
+    name: 'Classic (Color)',
+    label: 'Classic (Color)',
+    type: 'built-in',
+    builtIn: true,
+  },
+  {
+    id: 'classic',
+    slug: 'classic',
+    name: 'Classic',
+    label: 'Classic',
+    type: 'built-in',
+    builtIn: true,
+  },
+  {
+    id: 'neon',
+    slug: 'neon',
+    name: 'Neon',
+    label: 'Neon',
+    type: 'built-in',
+    builtIn: true,
+  },
+  {
+    id: 'tropical',
+    slug: 'tropical',
+    name: 'Tropical',
+    label: 'Tropical',
+    type: 'built-in',
+    builtIn: true,
+  },
+];
+
 export function getChipImage(value, skin) {
   return CHIP_IMAGES[skin]?.[value] ?? null;
+}
+
+export function getChipImageFromCatalog(skinOrId, value) {
+  const skinId = typeof skinOrId === 'string'
+    ? skinOrId
+    : skinOrId?.id || skinOrId?.slug;
+
+  return getChipImage(value, skinId);
 }
 
 export function getChipColor(value, skin = 'default') {
