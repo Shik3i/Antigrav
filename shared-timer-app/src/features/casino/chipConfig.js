@@ -58,38 +58,67 @@ export const CHIP_IMAGES = {
   },
 };
 
+const buildChipAssetMap = (skinName) => CHIP_VALUES.reduce((assets, value) => ({
+  ...assets,
+  [value]: { value, url: CHIP_IMAGES[skinName][value] },
+}), {});
+
 export const BUILT_IN_CHIP_SKINS = [
   {
     id: 'default',
     slug: 'default',
     name: 'Classic (Color)',
     label: 'Classic (Color)',
+    status: 'public',
+    rarity: 'common',
+    release_date: '2026-01-01T00:00:00.000Z',
+    isBuiltIn: true,
+    isComplete: true,
     type: 'built-in',
     builtIn: true,
+    assets: {},
   },
   {
     id: 'classic',
     slug: 'classic',
     name: 'Classic',
     label: 'Classic',
+    status: 'public',
+    rarity: 'common',
+    release_date: '2026-01-01T00:00:00.000Z',
+    isBuiltIn: true,
+    isComplete: true,
     type: 'built-in',
     builtIn: true,
+    assets: buildChipAssetMap('classic'),
   },
   {
     id: 'neon',
     slug: 'neon',
     name: 'Neon',
     label: 'Neon',
+    status: 'public',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+    isBuiltIn: true,
+    isComplete: true,
     type: 'built-in',
     builtIn: true,
+    assets: buildChipAssetMap('neon'),
   },
   {
     id: 'tropical',
     slug: 'tropical',
     name: 'Tropical',
     label: 'Tropical',
+    status: 'public',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+    isBuiltIn: true,
+    isComplete: true,
     type: 'built-in',
     builtIn: true,
+    assets: buildChipAssetMap('tropical'),
   },
 ];
 
@@ -97,12 +126,12 @@ export function getChipImage(value, skin) {
   return CHIP_IMAGES[skin]?.[value] ?? null;
 }
 
-export function getChipImageFromCatalog(skinOrId, value) {
-  const skinId = typeof skinOrId === 'string'
-    ? skinOrId
-    : skinOrId?.id || skinOrId?.slug;
+export function getChipImageFromCatalog(value, skin, catalog = BUILT_IN_CHIP_SKINS) {
+  const builtIn = getChipImage(value, skin);
+  if (builtIn) return builtIn;
 
-  return getChipImage(value, skinId);
+  const found = catalog.find((entry) => entry.slug === skin || entry.id === skin);
+  return found?.assets?.[value]?.url ?? null;
 }
 
 export function getChipColor(value, skin = 'default') {
