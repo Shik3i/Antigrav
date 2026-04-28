@@ -12,6 +12,7 @@ const towerController = require('../controllers/towerController');
 const blackjackController = require('../controllers/blackjackController');
 const backupController = require('../controllers/backupController');
 const roomController = require('../controllers/roomController');
+const chipSkinController = require('../controllers/chipSkinController');
 const dbLayer = require('../database');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
@@ -57,6 +58,18 @@ router.get('/admin/bets', authController.authenticateToken, apiController.getAdm
 router.post('/admin/bets/:id/status', authController.authenticateToken, apiController.updateAdminBetStatus);
 router.post('/admin/bets/trigger-resolver', authController.authenticateToken, apiController.triggerAdminBetResolver);
 router.get('/admin/actions', authController.authenticateToken, apiController.getAdminActions);
+
+// Chip Skin Catalog
+router.get('/admin/chip-skins', authController.authenticateToken, chipSkinController.getAdminChipSkins);
+router.post('/admin/chip-skins', authController.authenticateToken, chipSkinController.createAdminChipSkin);
+router.put('/admin/chip-skins/:id', authController.authenticateToken, chipSkinController.updateAdminChipSkin);
+router.post('/admin/chip-skins/:id/assets', authController.authenticateToken, chipSkinController.uploadAdminChipSkinAsset);
+router.get('/admin/chip-skins/:id/grants', authController.authenticateToken, chipSkinController.getAdminChipSkinGrants);
+router.post('/admin/chip-skins/:id/grants', authController.authenticateToken, chipSkinController.grantAdminChipSkin);
+router.delete('/admin/chip-skins/:id/grants/:userId', authController.authenticateToken, chipSkinController.revokeAdminChipSkinGrant);
+router.get('/chip-skins', authController.optionalAuthenticateToken, chipSkinController.getPublicChipSkins);
+router.get('/chip-skins/me', authController.authenticateToken, chipSkinController.getMyChipSkins);
+router.get('/chip-skins/assets/:skinSlug/:fileName', chipSkinController.serveChipSkinAsset);
 
 // Database Backups
 router.get('/admin/backups', authController.authenticateToken, async (req, res) => {
