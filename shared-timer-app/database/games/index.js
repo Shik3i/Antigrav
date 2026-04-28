@@ -8,6 +8,7 @@ const blackjack = require('./blackjack');
 const lotto = require('./lotto');
 const fortune = require('./fortune');
 const idle = require('./idle');
+const chipSkins = require('./chipSkins');
 
 module.exports = {
   ...speedcube,
@@ -20,4 +21,5 @@ module.exports = {
   ...lotto,
   ...fortune,
   ...idle,
+  ...chipSkins,
 };

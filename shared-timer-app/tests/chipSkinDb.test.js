@@ -18,3 +18,105 @@ test('chip skin tables exist with required columns', async () => {
   assert(assetsColumns.some((col) => col.name === 'chip_value'), 'chip_skin_assets.chip_value is required');
   assert(grantsColumns.some((col) => col.name === 'user_id'), 'chip_skin_grants.user_id is required');
 });
+
+const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
+
+async function run(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    dbLayer.db.run(sql, params, function onRun(err) {
+      if (err) reject(err);
+      else resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
+async function clearChipSkinRows() {
+  await run('DELETE FROM chip_skin_grants');
+  await run('DELETE FROM chip_skin_assets');
+  await run('DELETE FROM chip_skins');
+  await run("DELETE FROM Users WHERE id IN ('skin-user-1', 'skin-user-2', 'skin-admin-1')");
+}
+
+async function addCompleteAssets(skinId, slug) {
+  for (const value of CHIP_VALUES) {
+    await dbLayer.upsertChipSkinAsset(skinId, value, `data/chip-skins/${slug}/${value}.png`, `${value}.png`);
+  }
+}
+
+test('managed chip skins enforce release date, status, completeness, and grants', async () => {
+  await clearChipSkinRows();
+  await run(
+    "INSERT INTO Users (id, displayName, username, is_superadmin) VALUES ('skin-user-1', 'Skin User', 'skinuser1', 0)"
+  );
+
+  const publicSkin = await dbLayer.createChipSkin({
+    name: 'Released Public',
+    slug: 'released-public',
+    description: 'Visible public skin',
+    status: 'public',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+  await addCompleteAssets(publicSkin.id, publicSkin.slug);
+
+  const futureSkin = await dbLayer.createChipSkin({
+    name: 'Future Public',
+    slug: 'future-public',
+    description: 'Hidden until release date',
+    status: 'public',
+    rarity: 'epic',
+    release_date: '2999-01-01T00:00:00.000Z',
+  });
+  await addCompleteAssets(futureSkin.id, futureSkin.slug);
+
+  const restrictedSkin = await dbLayer.createChipSkin({
+    name: 'Restricted Skin',
+    slug: 'restricted-skin',
+    description: 'Needs grant',
+    status: 'restricted',
+    rarity: 'legendary',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+  await addCompleteAssets(restrictedSkin.id, restrictedSkin.slug);
+
+  let visible = await dbLayer.getAvailableChipSkinsForUser('skin-user-1', '2026-04-28T00:00:00.000Z');
+  assert(visible.some((skin) => skin.slug === 'released-public'), 'released public skin should be visible');
+  assert(!visible.some((skin) => skin.slug === 'future-public'), 'future skin should not be visible');
+  assert(!visible.some((skin) => skin.slug === 'restricted-skin'), 'restricted skin should require a grant');
+
+  await dbLayer.grantChipSkin(restrictedSkin.id, 'skin-user-1', 'skin-admin-1');
+  visible = await dbLayer.getAvailableChipSkinsForUser('skin-user-1', '2026-04-28T00:00:00.000Z');
+  assert(visible.some((skin) => skin.slug === 'restricted-skin'), 'restricted skin should be visible after grant');
+
+  await dbLayer.revokeChipSkinGrant(restrictedSkin.id, 'skin-user-1');
+  visible = await dbLayer.getAvailableChipSkinsForUser('skin-user-1', '2026-04-28T00:00:00.000Z');
+  assert(!visible.some((skin) => skin.slug === 'restricted-skin'), 'restricted skin should disappear after revoke');
+});
+
+test('chip skin validation rejects invalid status and rarity', async () => {
+  await clearChipSkinRows();
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: 'Bad Status',
+      slug: 'bad-status',
+      description: '',
+      status: 'live',
+      rarity: 'rare',
+      release_date: '2026-01-01T00:00:00.000Z',
+    }),
+    /Invalid status/
+  );
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: 'Bad Rarity',
+      slug: 'bad-rarity',
+      description: '',
+      status: 'draft',
+      rarity: 'mythic',
+      release_date: '2026-01-01T00:00:00.000Z',
+    }),
+    /Invalid rarity/
+  );
+});
