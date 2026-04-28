@@ -193,6 +193,40 @@ test('chip skin validation rejects invalid create payload fields', async () => {
     }),
     /Invalid release date/
   );
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: 'Numeric Date',
+      slug: 'numeric-date',
+      description: '',
+      status: 'draft',
+      rarity: 'rare',
+      release_date: '1',
+    }),
+    /Invalid release date/
+  );
+
+  await assert.rejects(
+    () => dbLayer.createChipSkin({
+      name: 'Impossible Date',
+      slug: 'impossible-date',
+      description: '',
+      status: 'draft',
+      rarity: 'rare',
+      release_date: '2026-02-30',
+    }),
+    /Invalid release date/
+  );
+
+  const dateOnlySkin = await dbLayer.createChipSkin({
+    name: 'Date Only',
+    slug: 'date-only',
+    description: '',
+    status: 'draft',
+    rarity: 'rare',
+    release_date: '2026-01-01',
+  });
+  assert.strictEqual(dateOnlySkin.release_date, '2026-01-01T00:00:00.000Z');
 });
 
 test('chip skin validation rejects invalid chip values', async () => {
@@ -235,6 +269,14 @@ test('chip skin update validation rejects invalid fields and incomplete publishi
   );
   await assert.rejects(
     () => dbLayer.updateChipSkin(skin.id, { release_date: 'tomorrowish' }),
+    /Invalid release date/
+  );
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { release_date: '1' }),
+    /Invalid release date/
+  );
+  await assert.rejects(
+    () => dbLayer.updateChipSkin(skin.id, { release_date: '2026-02-30' }),
     /Invalid release date/
   );
   await assert.rejects(

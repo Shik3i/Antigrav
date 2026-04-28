@@ -57,9 +57,31 @@ const validateSlug = (slug) => {
 };
 
 const validateReleaseDate = (releaseDate) => {
-  if (typeof releaseDate !== 'string' || Number.isNaN(Date.parse(releaseDate))) {
+  if (typeof releaseDate !== 'string') {
     throw new Error(`Invalid release date: ${releaseDate}`);
   }
+
+  const trimmedReleaseDate = releaseDate.trim();
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(trimmedReleaseDate);
+  const isIsoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(trimmedReleaseDate);
+
+  if (!isDateOnly && !isIsoTimestamp) {
+    throw new Error(`Invalid release date: ${releaseDate}`);
+  }
+
+  const parsedDate = new Date(isDateOnly ? `${trimmedReleaseDate}T00:00:00.000Z` : trimmedReleaseDate);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error(`Invalid release date: ${releaseDate}`);
+  }
+
+  const normalizedReleaseDate = parsedDate.toISOString();
+
+  if (normalizedReleaseDate.slice(0, 10) !== trimmedReleaseDate.slice(0, 10)) {
+    throw new Error(`Invalid release date: ${releaseDate}`);
+  }
+
+  return normalizedReleaseDate;
 };
 
 const validateChipValue = (chipValue) => {
@@ -142,12 +164,12 @@ const createChipSkin = async ({
   validateSlug(slug);
   validateStatus(status);
   validateRarity(rarity);
-  validateReleaseDate(release_date);
+  const normalizedReleaseDate = validateReleaseDate(release_date);
 
   const result = await run(
     `INSERT INTO chip_skins (name, slug, description, status, rarity, release_date)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [name.trim(), slug, description, status, rarity, release_date]
+    [name.trim(), slug, description, status, rarity, normalizedReleaseDate]
   );
 
   return getChipSkinById(result.lastID);
@@ -188,7 +210,7 @@ const updateChipSkin = async (skinId, updates = {}) => {
   }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'release_date')) {
-    validateReleaseDate(updates.release_date);
+    updates.release_date = validateReleaseDate(updates.release_date);
   }
 
   if (updates.status === 'public' || updates.status === 'restricted') {
