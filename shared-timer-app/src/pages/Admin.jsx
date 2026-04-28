@@ -27,10 +27,15 @@ import ChipSkinsTab from '../components/admin/ChipSkinsTab';
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
 
 const toDateTimeLocal = (value) => {
-    if (!value) return new Date().toISOString().slice(0, 16);
+    const pad = (part) => String(part).padStart(2, '0');
+    const formatLocal = (date) => {
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    if (!value) return formatLocal(new Date());
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 16);
-    return date.toISOString().slice(0, 16);
+    if (Number.isNaN(date.getTime())) return formatLocal(new Date());
+    return formatLocal(date);
 };
 
 const defaultChipSkinForm = () => ({
@@ -40,7 +45,7 @@ const defaultChipSkinForm = () => ({
     description: '',
     status: 'draft',
     rarity: 'common',
-    release_date: new Date().toISOString().slice(0, 16),
+    release_date: toDateTimeLocal(),
 });
 
 const Admin = ({ socket }) => {
@@ -108,6 +113,8 @@ const Admin = ({ socket }) => {
     const [chipSkins, setChipSkins] = useState([]);
     const [chipSkinForm, setChipSkinForm] = useState(defaultChipSkinForm);
     const [chipSkinGrants, setChipSkinGrants] = useState([]);
+    const selectedChipSkinIdRef = useRef(null);
+    selectedChipSkinIdRef.current = chipSkinForm.id || null;
 
     // --- Database Backups ---
     const [automaticBackups, setAutomaticBackups] = useState([]);
@@ -724,6 +731,7 @@ const Admin = ({ socket }) => {
             });
             await handleFetchChipSkins();
             addLog('Success', `Uploaded ${value} KC chip asset.`, 'success');
+            return true;
         } catch (err) {
             console.error('[Admin API Debug] Upload failed for Chip Skin Asset:', {
                 status: err.response?.status,
@@ -731,6 +739,7 @@ const Admin = ({ socket }) => {
                 message: err.message
             });
             addLog('Error', err.response?.data?.error || 'Failed to upload chip skin asset.', 'error');
+            return false;
         }
     };
 
@@ -740,7 +749,10 @@ const Admin = ({ socket }) => {
             const res = await axios.get(`/api/admin/chip-skins/${skinId}/grants`, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
-            setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            setChipSkinGrants((currentGrants) => {
+                if (Number(selectedChipSkinIdRef.current) !== Number(skinId)) return currentGrants;
+                return Array.isArray(res.data?.grants) ? res.data.grants : [];
+            });
         } catch (err) {
             console.error('[Admin API Debug] Request failed for Chip Skin Grants:', {
                 status: err.response?.status,
@@ -756,7 +768,9 @@ const Admin = ({ socket }) => {
             const res = await axios.post(`/api/admin/chip-skins/${skinId}/grants`, { userId }, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
-            setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            if (Number(selectedChipSkinIdRef.current) === Number(skinId)) {
+                setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            }
             addLog('Success', 'Chip skin granted.', 'success');
         } catch (err) {
             console.error('[Admin API Debug] Grant failed for Chip Skin:', {
@@ -773,7 +787,9 @@ const Admin = ({ socket }) => {
             const res = await axios.delete(`/api/admin/chip-skins/${skinId}/grants/${userId}`, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
-            setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            if (Number(selectedChipSkinIdRef.current) === Number(skinId)) {
+                setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            }
             addLog('Success', 'Chip skin grant revoked.', 'success');
         } catch (err) {
             console.error('[Admin API Debug] Revoke failed for Chip Skin:', {
