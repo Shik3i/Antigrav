@@ -59,6 +59,21 @@ test('managed chip skins enforce release date, status, completeness, and grants'
   });
   await addCompleteAssets(publicSkin.id, publicSkin.slug);
 
+  const incompleteSkin = await dbLayer.createChipSkin({
+    name: 'Incomplete Public',
+    slug: 'incomplete-public',
+    description: 'Hidden until every chip value has an asset',
+    status: 'public',
+    rarity: 'rare',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+  await dbLayer.upsertChipSkinAsset(
+    incompleteSkin.id,
+    1,
+    `data/chip-skins/${incompleteSkin.slug}/1.png`,
+    '1.png'
+  );
+
   const futureSkin = await dbLayer.createChipSkin({
     name: 'Future Public',
     slug: 'future-public',
@@ -79,9 +94,32 @@ test('managed chip skins enforce release date, status, completeness, and grants'
   });
   await addCompleteAssets(restrictedSkin.id, restrictedSkin.slug);
 
+  const draftSkin = await dbLayer.createChipSkin({
+    name: 'Draft Skin',
+    slug: 'draft-skin',
+    description: 'Complete but not visible until public',
+    status: 'draft',
+    rarity: 'common',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+  await addCompleteAssets(draftSkin.id, draftSkin.slug);
+
+  const disabledSkin = await dbLayer.createChipSkin({
+    name: 'Disabled Skin',
+    slug: 'disabled-skin',
+    description: 'Complete but disabled',
+    status: 'disabled',
+    rarity: 'limited',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+  await addCompleteAssets(disabledSkin.id, disabledSkin.slug);
+
   let visible = await dbLayer.getAvailableChipSkinsForUser('skin-user-1', '2026-04-28T00:00:00.000Z');
   assert(visible.some((skin) => skin.slug === 'released-public'), 'released public skin should be visible');
+  assert(!visible.some((skin) => skin.slug === 'incomplete-public'), 'incomplete public skin should not be visible');
   assert(!visible.some((skin) => skin.slug === 'future-public'), 'future skin should not be visible');
+  assert(!visible.some((skin) => skin.slug === 'draft-skin'), 'draft skin should not be visible');
+  assert(!visible.some((skin) => skin.slug === 'disabled-skin'), 'disabled skin should not be visible');
   assert(!visible.some((skin) => skin.slug === 'restricted-skin'), 'restricted skin should require a grant');
 
   await dbLayer.grantChipSkin(restrictedSkin.id, 'skin-user-1', 'skin-admin-1');
