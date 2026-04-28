@@ -48,3 +48,15 @@ test('casino chip components use managed skin image lookup', () => {
     assert(src.includes('getSkinImage'), `${file} should use context image lookup`);
   }
 });
+
+test('Admin dashboard exposes Chip-Skins tab and component', () => {
+  const admin = read('src/pages/Admin.jsx');
+  assert(admin.includes('ChipSkinsTab'), 'Admin should import and render ChipSkinsTab');
+  assert(admin.includes("activeTab === 'chip_skins'"), 'Admin should include chip_skins tab state');
+  assert(admin.includes('/api/admin/chip-skins'), 'Admin should call chip skin admin API');
+
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+  assert(tab.includes('release_date'), 'ChipSkinsTab should edit release date');
+  assert(tab.includes('rarity'), 'ChipSkinsTab should edit rarity');
+  assert(tab.includes('FileReader'), 'ChipSkinsTab should upload PNG assets as data URLs');
+});
