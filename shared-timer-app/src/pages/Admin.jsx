@@ -22,8 +22,26 @@ import WordleDictionaryTab from '../components/admin/WordleDictionaryTab';
 import FortuneCookiesTab from '../components/admin/FortuneCookiesTab';
 import RSSFeedsTab from '../components/admin/RSSFeedsTab';
 import DatabaseBackupsTab from '../components/admin/DatabaseBackupsTab';
+import ChipSkinsTab from '../components/admin/ChipSkinsTab';
 
 const POKEMON_TYPES = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
+
+const toDateTimeLocal = (value) => {
+    if (!value) return new Date().toISOString().slice(0, 16);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 16);
+    return date.toISOString().slice(0, 16);
+};
+
+const defaultChipSkinForm = () => ({
+    id: null,
+    name: '',
+    slug: '',
+    description: '',
+    status: 'draft',
+    rarity: 'common',
+    release_date: new Date().toISOString().slice(0, 16),
+});
 
 const Admin = ({ socket }) => {
     const navigate = useNavigate();
@@ -87,6 +105,9 @@ const Admin = ({ socket }) => {
     const [editingWordId, setEditingWordId] = useState(null);
     const [editWordDef, setEditWordDef] = useState('');
     const [editWordQuote, setEditWordQuote] = useState('');
+    const [chipSkins, setChipSkins] = useState([]);
+    const [chipSkinForm, setChipSkinForm] = useState(defaultChipSkinForm);
+    const [chipSkinGrants, setChipSkinGrants] = useState([]);
 
     // --- Database Backups ---
     const [automaticBackups, setAutomaticBackups] = useState([]);
@@ -616,6 +637,154 @@ const Admin = ({ socket }) => {
         setLogs(prev => [{ id, title, message, status, timestamp: Date.now() }, ...prev].slice(0, 50));
     };
 
+    const handleFetchAdminUsers = async () => {
+        try {
+            const res = await axios.get('/api/auth/users', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setUsersList(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error('[Admin API Debug] Request failed for User List:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to fetch users.', 'error');
+        }
+    };
+
+    const handleFetchChipSkins = async () => {
+        try {
+            const res = await axios.get('/api/admin/chip-skins', {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setChipSkins(Array.isArray(res.data?.skins) ? res.data.skins : []);
+        } catch (err) {
+            console.error('[Admin API Debug] Request failed for Chip Skins:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to fetch chip skins.', 'error');
+        }
+    };
+
+    const handleSaveChipSkin = async () => {
+        try {
+            const releaseDate = new Date(chipSkinForm.release_date);
+            if (Number.isNaN(releaseDate.getTime())) {
+                addLog('Error', 'Invalid chip skin release date.', 'error');
+                return;
+            }
+
+            const payload = {
+                ...chipSkinForm,
+                release_date: releaseDate.toISOString()
+            };
+            delete payload.id;
+
+            if (chipSkinForm.id) {
+                await axios.put(`/api/admin/chip-skins/${chipSkinForm.id}`, payload, {
+                    headers: { 'Authorization': `Bearer ${globalToken}` }
+                });
+                addLog('Success', 'Chip skin updated.', 'success');
+            } else {
+                const res = await axios.post('/api/admin/chip-skins', payload, {
+                    headers: { 'Authorization': `Bearer ${globalToken}` }
+                });
+                if (res.data?.skin) {
+                    setChipSkinForm({
+                        id: res.data.skin.id,
+                        name: res.data.skin.name || '',
+                        slug: res.data.skin.slug || '',
+                        description: res.data.skin.description || '',
+                        status: res.data.skin.status || 'draft',
+                        rarity: res.data.skin.rarity || 'common',
+                        release_date: toDateTimeLocal(res.data.skin.release_date),
+                    });
+                }
+                addLog('Success', 'Chip skin created.', 'success');
+            }
+
+            await handleFetchChipSkins();
+        } catch (err) {
+            console.error('[Admin API Debug] Save failed for Chip Skin:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to save chip skin.', 'error');
+        }
+    };
+
+    const handleUploadChipSkinAsset = async (skinId, value, fileName, dataUrl) => {
+        try {
+            await axios.post(`/api/admin/chip-skins/${skinId}/assets`, { value, fileName, dataUrl }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            await handleFetchChipSkins();
+            addLog('Success', `Uploaded ${value} KC chip asset.`, 'success');
+        } catch (err) {
+            console.error('[Admin API Debug] Upload failed for Chip Skin Asset:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to upload chip skin asset.', 'error');
+        }
+    };
+
+    const handleFetchChipSkinGrants = async (skinId) => {
+        if (!skinId) return;
+        try {
+            const res = await axios.get(`/api/admin/chip-skins/${skinId}/grants`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+        } catch (err) {
+            console.error('[Admin API Debug] Request failed for Chip Skin Grants:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to fetch chip skin grants.', 'error');
+        }
+    };
+
+    const handleGrantChipSkin = async (skinId, userId) => {
+        try {
+            const res = await axios.post(`/api/admin/chip-skins/${skinId}/grants`, { userId }, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            addLog('Success', 'Chip skin granted.', 'success');
+        } catch (err) {
+            console.error('[Admin API Debug] Grant failed for Chip Skin:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to grant chip skin.', 'error');
+        }
+    };
+
+    const handleRevokeChipSkin = async (skinId, userId) => {
+        try {
+            const res = await axios.delete(`/api/admin/chip-skins/${skinId}/grants/${userId}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            setChipSkinGrants(Array.isArray(res.data?.grants) ? res.data.grants : []);
+            addLog('Success', 'Chip skin grant revoked.', 'success');
+        } catch (err) {
+            console.error('[Admin API Debug] Revoke failed for Chip Skin:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to revoke chip skin grant.', 'error');
+        }
+    };
+
 
     // Forms
     const [originalCode, setOriginalCode] = useState('');
@@ -798,23 +967,7 @@ const Admin = ({ socket }) => {
     useEffect(() => {
         if (activeTab === 'users' && usersList.length === 0) {
             setLoading(true);
-            fetch('/api/auth/users', {
-                headers: { 'Authorization': `Bearer ${globalToken}` }
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                })
-                .then(data => {
-                    if (Array.isArray(data)) setUsersList(data);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    console.error('[Admin API Debug] Request failed for User List:', {
-                        message: err.message
-                    });
-                    setLoading(false);
-                });
+            handleFetchAdminUsers().finally(() => setLoading(false));
         }
     }, [activeTab, globalToken, usersList.length]);
 
@@ -857,6 +1010,12 @@ const Admin = ({ socket }) => {
         }
         if (activeTab === 'backups') {
             handleFetchBackups();
+        }
+        if (activeTab === 'chip_skins') {
+            handleFetchChipSkins();
+            if (usersList.length === 0) {
+                handleFetchAdminUsers();
+            }
         }
     }, [activeTab]);
 
@@ -1469,6 +1628,12 @@ const Admin = ({ socket }) => {
                     <Dices size={16} /> Scratchcard Pools
                 </button>
                 <button
+                    className={activeTab === 'chip_skins' ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => setActiveTab('chip_skins')}
+                    style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Dices size={16} /> Chip-Skins
+                </button>
+                <button
                     className={activeTab === 'navbar' ? 'btn-primary' : 'btn-secondary'}
                     onClick={() => setActiveTab('navbar')}
                     style={{ flexShrink: 0, display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1701,6 +1866,38 @@ const Admin = ({ socket }) => {
                     onEditPack={handleEditPack}
                     onDeletePack={handleDeletePack}
                     onMoveTeam={moveTeam}
+                />
+            )}
+
+            {/* TAB: CHIP SKINS */}
+            {activeTab === 'chip_skins' && (
+                <ChipSkinsTab
+                    skins={chipSkins}
+                    users={usersList}
+                    form={chipSkinForm}
+                    selectedSkinId={chipSkinForm.id}
+                    grants={chipSkinGrants}
+                    onFormChange={setChipSkinForm}
+                    onSelectSkin={(skin) => {
+                        setChipSkinForm({
+                            id: skin.id,
+                            name: skin.name || '',
+                            slug: skin.slug || '',
+                            description: skin.description || '',
+                            status: skin.status || 'draft',
+                            rarity: skin.rarity || 'common',
+                            release_date: toDateTimeLocal(skin.release_date),
+                        });
+                    }}
+                    onCreateNew={() => {
+                        setChipSkinForm(defaultChipSkinForm());
+                        setChipSkinGrants([]);
+                    }}
+                    onSave={handleSaveChipSkin}
+                    onUploadAsset={handleUploadChipSkinAsset}
+                    onFetchGrants={handleFetchChipSkinGrants}
+                    onGrant={handleGrantChipSkin}
+                    onRevoke={handleRevokeChipSkin}
                 />
             )}
 
