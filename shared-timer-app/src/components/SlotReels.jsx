@@ -48,8 +48,10 @@ const SlotReels = ({ value, tier, isRolling }) => {
         }
 
         return () => clearTimers(timersRef);
+    // digits.forEach uses only the index i, not the digit values — stale closure is safe here
     }, [isRolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // -1 when value is 0000 — all reels show as inactive (dimmed)
     const firstActiveIndex = paddedValue.search(/[1-9]/);
 
     return (
