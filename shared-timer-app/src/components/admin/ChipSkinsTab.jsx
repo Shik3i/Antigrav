@@ -16,6 +16,59 @@ const labelStyle = {
 };
 
 const fieldStyle = { width: '100%' };
+const slugFieldStyle = {
+    ...fieldStyle,
+    color: 'var(--text-muted)',
+    background: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    cursor: 'not-allowed',
+    opacity: 0.78,
+};
+const assetCardStyle = {
+    display: 'grid',
+    gridTemplateRows: 'auto 78px auto',
+    gap: '10px',
+    minWidth: 0,
+    padding: '12px',
+    border: '1px solid var(--border-color)',
+    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.03)',
+};
+const assetPreviewStyle = {
+    width: '100%',
+    height: '78px',
+    display: 'grid',
+    placeItems: 'center',
+    borderRadius: '8px',
+    background: 'rgba(0,0,0,0.18)',
+    overflow: 'hidden',
+};
+const uploadControlStyle = {
+    width: '100%',
+    minHeight: '34px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '7px 10px',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-primary)',
+    background: 'rgba(255,255,255,0.06)',
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+};
+const srOnlyFileInputStyle = {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: 0,
+};
 
 const getAsset = (skin, value) => {
     return skin?.assets?.[value] || skin?.assets?.[String(value)] || null;
@@ -181,7 +234,7 @@ const ChipSkinsTab = ({
                             </div>
                             <div>
                                 <label style={labelStyle}>Slug</label>
-                                <input className="input-primary" style={fieldStyle} value={form.slug || toChipSkinSlug(form.name)} readOnly disabled={selectedIsBuiltIn} />
+                                <input className="input-primary" style={slugFieldStyle} value={form.slug || toChipSkinSlug(form.name)} readOnly disabled={selectedIsBuiltIn} />
                             </div>
                             <div>
                                 <label style={labelStyle}>Status</label>
@@ -221,23 +274,26 @@ const ChipSkinsTab = ({
                                 <ImagePlus size={20} color="var(--accent-primary)" />
                                 PNG Assets
                             </h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
                                 {CHIP_VALUES.map((value) => {
                                     const asset = getAsset(selectedSkin, value);
                                     const catalogPreviewSrc = selectedIsBuiltIn ? asset?.url : getManagedAssetPreviewUrl(selectedSkin, value);
                                     const previewSrc = pendingUploads[`${selectedSkinId}:${value}`] || catalogPreviewSrc;
                                     return (
-                                        <label key={value} style={{ display: 'grid', gap: '10px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255,255,255,0.03)' }}>
+                                        <label key={value} style={assetCardStyle}>
                                             <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{value} KC</span>
-                                            <div style={{ height: '58px', display: 'grid', placeItems: 'center', borderRadius: '8px', background: 'rgba(0,0,0,0.18)' }}>
+                                            <div style={assetPreviewStyle}>
                                                 {previewSrc ? (
-                                                    <img src={previewSrc} alt={`${value} KC chip preview`} style={{ maxWidth: '52px', maxHeight: '52px', objectFit: 'contain' }} />
+                                                    <img src={previewSrc} alt={`${value} KC chip preview`} style={{ display: 'block', width: '64px', height: '64px', objectFit: 'contain', objectPosition: 'center' }} />
                                                 ) : (
                                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Missing</span>
                                                 )}
                                             </div>
                                             {!selectedIsBuiltIn && (
-                                                <input type="file" accept="image/png" onChange={(e) => handleAssetFile(value, e.target.files?.[0])} style={{ fontSize: '0.75rem', maxWidth: '100%' }} />
+                                                <span style={uploadControlStyle}>
+                                                    PNG auswählen
+                                                    <input type="file" accept="image/png" onChange={(e) => handleAssetFile(value, e.target.files?.[0])} style={srOnlyFileInputStyle} />
+                                                </span>
                                             )}
                                         </label>
                                     );

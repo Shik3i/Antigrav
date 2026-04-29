@@ -93,3 +93,12 @@ test('Admin managed skin previews use asset API instead of raw DB file paths', (
   assert(tab.includes('/api/chip-skins/assets/'), 'ChipSkinsTab should preview through the asset API');
   assert(!tab.includes('|| asset?.url'), 'ChipSkinsTab should not fall back to raw DB file paths for managed previews');
 });
+
+test('Admin chip skin asset cards use stable preview and upload control layout', () => {
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+  assert(tab.includes('slugFieldStyle'), 'Slug field should have explicit read-only styling');
+  assert(tab.includes('assetCardStyle'), 'Asset cards should use stable dimensions');
+  assert(tab.includes('assetPreviewStyle'), 'Asset previews should use a stable centered frame');
+  assert(tab.includes('uploadControlStyle'), 'Upload controls should avoid native input overflow');
+  assert(tab.includes('srOnlyFileInputStyle'), 'Native file input should be visually hidden');
+});
