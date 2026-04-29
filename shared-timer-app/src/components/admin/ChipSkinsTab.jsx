@@ -105,6 +105,7 @@ const ChipSkinsTab = ({
     onCreateNew,
     onSave,
     onUploadAsset,
+    onDelete,
     onFetchGrants,
     onGrant,
     onRevoke,
@@ -162,6 +163,13 @@ const ChipSkinsTab = ({
         if (!selectedSkin?.id || !grantUserId) return;
         await onGrant(selectedSkin.id, grantUserId);
         setGrantUserId('');
+    };
+
+    const handleDelete = async () => {
+        if (!selectedSkin?.id || selectedIsBuiltIn) return;
+        const confirmed = window.confirm(`Skin "${selectedSkin.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`);
+        if (!confirmed) return;
+        await onDelete(selectedSkin.id);
     };
 
     return (
@@ -263,7 +271,13 @@ const ChipSkinsTab = ({
                                 />
                             </div>
                         </div>
-                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: form.id && !selectedIsBuiltIn ? 'space-between' : 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                            {form.id && !selectedIsBuiltIn && (
+                                <button type="button" className="btn-ghost" style={{ color: '#ef4444' }} onClick={handleDelete}>
+                                    <Trash2 size={16} style={{ marginRight: '8px' }} />
+                                    Delete Skin
+                                </button>
+                            )}
                             <button type="button" className="btn-primary" onClick={onSave} disabled={selectedIsBuiltIn}>Save Skin</button>
                         </div>
                     </div>

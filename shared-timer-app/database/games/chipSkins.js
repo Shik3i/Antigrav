@@ -337,6 +337,12 @@ const revokeChipSkinGrant = (skinId, userId) => {
   return run('DELETE FROM chip_skin_grants WHERE skin_id = ? AND user_id = ?', [skinId, userId]);
 };
 
+const deleteChipSkin = async (skinId) => {
+  await run('DELETE FROM chip_skin_grants WHERE skin_id = ?', [skinId]);
+  await run('DELETE FROM chip_skin_assets WHERE skin_id = ?', [skinId]);
+  return run('DELETE FROM chip_skins WHERE id = ?', [skinId]);
+};
+
 const upsertChipSkinAsset = async (skinId, chipValue, filePath, originalFilename = null) => {
   validateChipValue(chipValue);
 
@@ -370,5 +376,6 @@ module.exports = {
   getChipSkinGrants,
   grantChipSkin,
   revokeChipSkinGrant,
+  deleteChipSkin,
   upsertChipSkinAsset,
 };

@@ -94,6 +94,18 @@ test('Admin managed skin previews use asset API instead of raw DB file paths', (
   assert(!tab.includes('|| asset?.url'), 'ChipSkinsTab should not fall back to raw DB file paths for managed previews');
 });
 
+test('Admin managed skins can be deleted with confirmation', () => {
+  const admin = read('src/pages/Admin.jsx');
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+
+  assert(admin.includes('handleDeleteChipSkin'), 'Admin should provide a chip skin delete handler');
+  assert(admin.includes('axios.delete(`/api/admin/chip-skins/${skinId}`'), 'Admin should call the chip skin delete API');
+  assert(tab.includes('onDelete'), 'ChipSkinsTab should accept a delete callback');
+  assert(tab.includes('window.confirm'), 'ChipSkinsTab should confirm before deleting');
+  assert(tab.includes('Delete Skin'), 'ChipSkinsTab should render a delete action');
+  assert(tab.includes('!selectedIsBuiltIn'), 'ChipSkinsTab should not delete built-in skins');
+});
+
 test('Admin chip skin asset cards use stable preview and upload control layout', () => {
   const tab = read('src/components/admin/ChipSkinsTab.jsx');
   assert(tab.includes('slugFieldStyle'), 'Slug field should have explicit read-only styling');

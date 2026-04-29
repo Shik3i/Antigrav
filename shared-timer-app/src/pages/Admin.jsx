@@ -754,6 +754,27 @@ const Admin = ({ socket }) => {
         }
     };
 
+    const handleDeleteChipSkin = async (skinId) => {
+        try {
+            await axios.delete(`/api/admin/chip-skins/${skinId}`, {
+                headers: { 'Authorization': `Bearer ${globalToken}` }
+            });
+            if (Number(selectedChipSkinIdRef.current) === Number(skinId)) {
+                setChipSkinForm(defaultChipSkinForm());
+                setChipSkinGrants([]);
+            }
+            await handleFetchChipSkins();
+            addLog('Success', 'Chip skin deleted.', 'success');
+        } catch (err) {
+            console.error('[Admin API Debug] Delete failed for Chip Skin:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message
+            });
+            addLog('Error', err.response?.data?.error || 'Failed to delete chip skin.', 'error');
+        }
+    };
+
     const handleFetchChipSkinGrants = async (skinId) => {
         if (!skinId) return;
         try {
@@ -1922,6 +1943,7 @@ const Admin = ({ socket }) => {
                     }}
                     onSave={handleSaveChipSkin}
                     onUploadAsset={handleUploadChipSkinAsset}
+                    onDelete={handleDeleteChipSkin}
                     onFetchGrants={handleFetchChipSkinGrants}
                     onGrant={handleGrantChipSkin}
                     onRevoke={handleRevokeChipSkin}
