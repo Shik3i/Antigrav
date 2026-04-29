@@ -9,8 +9,16 @@ function read(relativePath) {
 test('ChipSkinContext fetches available managed skins from backend', () => {
   const src = read('src/features/casino/ChipSkinContext.jsx');
   assert(src.includes('/api/chip-skins/me'), 'context should load user-visible skins');
+  assert(src.includes('/api/chip-skins'), 'context should load public skins without auth');
   assert(src.includes('availableSkins'), 'context should expose availableSkins');
   assert(src.includes('getSkinImage'), 'context should expose managed image lookup');
+});
+
+test('ChipSkinContext loads public managed skins for guests', () => {
+  const src = read('src/features/casino/ChipSkinContext.jsx');
+  assert(!src.includes('if (!token) {\\n      setManagedSkins([]);'), 'missing auth token should not suppress public managed skins');
+  assert(src.includes('const catalogEndpoint = token ? \'/api/chip-skins/me\' : \'/api/chip-skins\''), 'context should choose public endpoint when no token exists');
+  assert(src.includes('...(token ? { Authorization: `Bearer ${token}` } : {})'), 'context should only send auth header when token exists');
 });
 
 test('ChipSkinContext fetches managed asset blobs with auth headers', () => {

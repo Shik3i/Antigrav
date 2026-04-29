@@ -35,14 +35,6 @@ export function ChipSkinProvider({ children }) {
   const [loadedToken, setLoadedToken] = useState(null);
 
   useEffect(() => {
-    if (!token) {
-      setManagedSkins([]);
-      setManagedAssetUrls({});
-      setLoadingSkins(false);
-      setLoadedToken(null);
-      return;
-    }
-
     let cancelled = false;
     setManagedSkins([]);
     setManagedAssetUrls({});
@@ -52,8 +44,11 @@ export function ChipSkinProvider({ children }) {
       setLoadingSkins(true);
 
       try {
-        const { data } = await axios.get('/api/chip-skins/me', {
-          headers: { Authorization: `Bearer ${token}` },
+        const catalogEndpoint = token ? '/api/chip-skins/me' : '/api/chip-skins';
+        const { data } = await axios.get(catalogEndpoint, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         });
 
         if (!cancelled) {
@@ -84,7 +79,7 @@ export function ChipSkinProvider({ children }) {
     const objectUrls = [];
 
     async function loadManagedAssetUrls() {
-      if (!token || managedSkins.length === 0) {
+      if (managedSkins.length === 0) {
         setManagedAssetUrls({});
         return;
       }
@@ -99,7 +94,9 @@ export function ChipSkinProvider({ children }) {
         return values.map(async (value) => {
           try {
             const { data } = await axios.get(`/api/chip-skins/assets/${skinEntry.slug}/${value}.png`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
               responseType: 'blob',
             });
             if (cancelled) return;
