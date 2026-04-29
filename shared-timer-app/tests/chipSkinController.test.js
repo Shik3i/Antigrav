@@ -214,3 +214,24 @@ test('updateAdminChipSkin returns 400 for DB validation errors', async () => {
   assert.deepStrictEqual(res.json.mock.calls[0][0], { error: 'Cannot publish incomplete chip skin' });
   assert.strictEqual(next.mock.calls.length, 0);
 });
+
+test('updateAdminChipSkin returns 400 when trying to change immutable slug', async () => {
+  dbLayer.updateChipSkin.mockRejectedValue(new Error('Cannot change chip skin slug'));
+
+  const req = {
+    user: { is_superadmin: true },
+    params: { id: '12' },
+    body: { slug: 'new-slug' },
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+  };
+  const next = jest.fn();
+
+  await controller.updateAdminChipSkin(req, res, next);
+
+  assert.strictEqual(res.status.mock.calls[0][0], 400);
+  assert.deepStrictEqual(res.json.mock.calls[0][0], { error: 'Cannot change chip skin slug' });
+  assert.strictEqual(next.mock.calls.length, 0);
+});

@@ -27,6 +27,20 @@ const getUserLabel = (user) => {
 
 const isBuiltInSkin = (skin) => Boolean(skin?.isBuiltIn || skin?.builtIn || skin?.type === 'built-in');
 
+const toChipSkinSlug = (value) => (
+    String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40)
+);
+
+const getManagedAssetPreviewUrl = (skin, value) => {
+    if (!skin?.slug || isBuiltInSkin(skin)) return null;
+    return `/api/chip-skins/assets/${skin.slug}/${value}.png`;
+};
+
 const ChipSkinsTab = ({
     skins,
     users,
@@ -167,7 +181,7 @@ const ChipSkinsTab = ({
                             </div>
                             <div>
                                 <label style={labelStyle}>Slug</label>
-                                <input className="input-primary" style={fieldStyle} value={form.slug} disabled={selectedIsBuiltIn} onChange={(e) => onFormChange({ ...form, slug: e.target.value })} />
+                                <input className="input-primary" style={fieldStyle} value={form.slug || toChipSkinSlug(form.name)} readOnly disabled={selectedIsBuiltIn} />
                             </div>
                             <div>
                                 <label style={labelStyle}>Status</label>
@@ -210,7 +224,8 @@ const ChipSkinsTab = ({
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
                                 {CHIP_VALUES.map((value) => {
                                     const asset = getAsset(selectedSkin, value);
-                                    const previewSrc = pendingUploads[`${selectedSkinId}:${value}`] || asset?.url;
+                                    const catalogPreviewSrc = selectedIsBuiltIn ? asset?.url : getManagedAssetPreviewUrl(selectedSkin, value);
+                                    const previewSrc = pendingUploads[`${selectedSkinId}:${value}`] || catalogPreviewSrc;
                                     return (
                                         <label key={value} style={{ display: 'grid', gap: '10px', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255,255,255,0.03)' }}>
                                             <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>{value} KC</span>

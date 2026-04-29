@@ -56,6 +56,31 @@ const validateSlug = (slug) => {
   }
 };
 
+const toChipSkinSlug = (value) => {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+};
+
+const generateUniqueSlug = async (name) => {
+  const baseSlug = toChipSkinSlug(name);
+  validateSlug(baseSlug);
+
+  let slug = baseSlug;
+  let suffix = 2;
+
+  while (await get('SELECT id FROM chip_skins WHERE slug = ?', [slug])) {
+    const suffixText = `-${suffix}`;
+    slug = `${baseSlug.slice(0, 40 - suffixText.length)}${suffixText}`;
+    suffix += 1;
+  }
+
+  return slug;
+};
+
 const validateReleaseDate = (releaseDate) => {
   if (typeof releaseDate !== 'string') {
     throw new Error(`Invalid release date: ${releaseDate}`);
@@ -161,7 +186,8 @@ const createChipSkin = async ({
   release_date = new Date().toISOString(),
 }) => {
   validateName(name);
-  validateSlug(slug);
+  const normalizedSlug = slug ? slug : await generateUniqueSlug(name);
+  validateSlug(normalizedSlug);
   validateStatus(status);
   validateRarity(rarity);
   const normalizedReleaseDate = validateReleaseDate(release_date);
@@ -169,7 +195,7 @@ const createChipSkin = async ({
   const result = await run(
     `INSERT INTO chip_skins (name, slug, description, status, rarity, release_date)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [name.trim(), slug, description, status, rarity, normalizedReleaseDate]
+    [name.trim(), normalizedSlug, description, status, rarity, normalizedReleaseDate]
   );
 
   return getChipSkinById(result.lastID);
@@ -192,6 +218,11 @@ const updateChipSkin = async (skinId, updates = {}) => {
   const allowedFields = ['name', 'slug', 'description', 'status', 'rarity', 'release_date'];
   const fields = [];
   const params = [];
+  const existingSkin = await getChipSkinById(skinId);
+
+  if (!existingSkin) {
+    return null;
+  }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
     validateName(updates.name);
@@ -199,6 +230,9 @@ const updateChipSkin = async (skinId, updates = {}) => {
 
   if (Object.prototype.hasOwnProperty.call(updates, 'slug')) {
     validateSlug(updates.slug);
+    if (updates.slug !== existingSkin.slug) {
+      throw new Error('Cannot change chip skin slug');
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'status')) {
@@ -219,6 +253,7 @@ const updateChipSkin = async (skinId, updates = {}) => {
 
   for (const field of allowedFields) {
     if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      if (field === 'slug') continue;
       fields.push(`${field} = ?`);
       params.push(field === 'name' ? updates[field].trim() : updates[field]);
     }
