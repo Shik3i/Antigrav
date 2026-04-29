@@ -60,3 +60,11 @@ test('Admin dashboard exposes Chip-Skins tab and component', () => {
   assert(tab.includes('rarity'), 'ChipSkinsTab should edit rarity');
   assert(tab.includes('FileReader'), 'ChipSkinsTab should upload PNG assets as data URLs');
 });
+
+test('Admin chip skin list includes built-in skins as read-only entries', () => {
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+  assert(tab.includes('BUILT_IN_CHIP_SKINS'), 'ChipSkinsTab should include existing built-in skins in the list');
+  assert(tab.includes('isBuiltInSkin'), 'ChipSkinsTab should detect built-in skins');
+  assert(tab.includes('Built-in'), 'ChipSkinsTab should label built-in skins');
+  assert(tab.includes('Built-in skins are bundled with the app'), 'ChipSkinsTab should explain built-ins are read-only');
+});
