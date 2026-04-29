@@ -76,3 +76,20 @@ test('Admin chip skin list includes built-in skins as read-only entries', () => 
   assert(tab.includes('Built-in'), 'ChipSkinsTab should label built-in skins');
   assert(tab.includes('Built-in skins are bundled with the app'), 'ChipSkinsTab should explain built-ins are read-only');
 });
+
+test('Admin managed skin slug is generated and read-only after creation', () => {
+  const admin = read('src/pages/Admin.jsx');
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+
+  assert(admin.includes('toChipSkinSlug'), 'Admin should generate chip skin slugs from names');
+  assert(admin.includes('delete payload.slug'), 'Admin should not send slug updates for existing skins');
+  assert(tab.includes('value={form.slug || toChipSkinSlug(form.name)}'), 'ChipSkinsTab should show generated slug preview');
+  assert(tab.includes('readOnly'), 'ChipSkinsTab slug display should not be user-editable');
+});
+
+test('Admin managed skin previews use asset API instead of raw DB file paths', () => {
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+  assert(tab.includes('getManagedAssetPreviewUrl'), 'ChipSkinsTab should build managed asset preview URLs');
+  assert(tab.includes('/api/chip-skins/assets/'), 'ChipSkinsTab should preview through the asset API');
+  assert(!tab.includes('|| asset?.url'), 'ChipSkinsTab should not fall back to raw DB file paths for managed previews');
+});

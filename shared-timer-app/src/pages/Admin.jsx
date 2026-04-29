@@ -48,6 +48,15 @@ const defaultChipSkinForm = () => ({
     release_date: toDateTimeLocal(),
 });
 
+const toChipSkinSlug = (value) => (
+    String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40)
+);
+
 const Admin = ({ socket }) => {
     const navigate = useNavigate();
     const { token: authToken, user } = useAuth();
@@ -686,11 +695,13 @@ const Admin = ({ socket }) => {
 
             const payload = {
                 ...chipSkinForm,
+                slug: chipSkinForm.slug || toChipSkinSlug(chipSkinForm.name),
                 release_date: releaseDate.toISOString()
             };
             delete payload.id;
 
             if (chipSkinForm.id) {
+                delete payload.slug;
                 await axios.put(`/api/admin/chip-skins/${chipSkinForm.id}`, payload, {
                     headers: { 'Authorization': `Bearer ${globalToken}` }
                 });

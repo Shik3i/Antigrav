@@ -20,6 +20,27 @@ test('chip skin tables exist with required columns', async () => {
 });
 
 const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
+const TEST_SKIN_SLUGS = [
+  'released-public',
+  'incomplete-public',
+  'future-public',
+  'restricted-skin',
+  'bad-status',
+  'bad-rarity',
+  'bad-slug',
+  'blank-name',
+  'bad-date',
+  'numeric-date',
+  'impossible-date',
+  'date-only',
+  'generated-slug-example',
+  'release-date-test',
+  'release-date-update',
+  'chip-value-test',
+  'update-validation',
+  'renamed-skin',
+  'shape-test',
+];
 
 async function run(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -31,9 +52,10 @@ async function run(sql, params = []) {
 }
 
 async function clearChipSkinRows() {
-  await run('DELETE FROM chip_skin_grants');
-  await run('DELETE FROM chip_skin_assets');
-  await run('DELETE FROM chip_skins');
+  const placeholders = TEST_SKIN_SLUGS.map(() => '?').join(', ');
+  await run(`DELETE FROM chip_skin_grants WHERE skin_id IN (SELECT id FROM chip_skins WHERE slug IN (${placeholders}))`, TEST_SKIN_SLUGS);
+  await run(`DELETE FROM chip_skin_assets WHERE skin_id IN (SELECT id FROM chip_skins WHERE slug IN (${placeholders}))`, TEST_SKIN_SLUGS);
+  await run(`DELETE FROM chip_skins WHERE slug IN (${placeholders})`, TEST_SKIN_SLUGS);
   await run("DELETE FROM Users WHERE id IN ('skin-user-1', 'skin-user-2', 'skin-admin-1')");
 }
 
@@ -229,6 +251,20 @@ test('chip skin validation rejects invalid create payload fields', async () => {
   assert.strictEqual(dateOnlySkin.release_date, '2026-01-01T00:00:00.000Z');
 });
 
+test('chip skin creation generates slug from name when omitted', async () => {
+  await clearChipSkinRows();
+
+  const skin = await dbLayer.createChipSkin({
+    name: 'Generated Slug Example',
+    description: '',
+    status: 'draft',
+    rarity: 'common',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.strictEqual(skin.slug, 'generated-slug-example');
+});
+
 test('chip skin validation rejects invalid chip values', async () => {
   await clearChipSkinRows();
 
@@ -260,8 +296,8 @@ test('chip skin update validation rejects invalid fields and incomplete publishi
   });
 
   await assert.rejects(
-    () => dbLayer.updateChipSkin(skin.id, { slug: 'NOPE' }),
-    /Invalid slug/
+    () => dbLayer.updateChipSkin(skin.id, { slug: 'renamed-skin' }),
+    /Cannot change chip skin slug/
   );
   await assert.rejects(
     () => dbLayer.updateChipSkin(skin.id, { name: '' }),
