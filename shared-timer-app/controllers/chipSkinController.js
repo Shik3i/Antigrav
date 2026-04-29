@@ -56,6 +56,18 @@ function getChipSkinAssetPath(skinSlug, fileName) {
   return resolvedPath;
 }
 
+function getStoredChipSkinAssetPath(filePath) {
+  const relativePath = String(filePath || '');
+  const resolvedPath = path.resolve(PROJECT_ROOT, relativePath);
+  const assetRootWithSep = CHIP_SKIN_ROOT.endsWith(path.sep) ? CHIP_SKIN_ROOT : `${CHIP_SKIN_ROOT}${path.sep}`;
+
+  if (!resolvedPath.startsWith(assetRootWithSep)) {
+    throw new Error('Invalid asset path');
+  }
+
+  return resolvedPath;
+}
+
 function getRequestUserId(req) {
   return req.user?.id || req.user?.userId || null;
 }
@@ -178,17 +190,28 @@ async function getMyChipSkinsHandler(req, res) {
 }
 
 async function serveChipSkinAssetHandler(req, res) {
-  let assetPath;
+  let fallbackAssetPath;
   try {
-    assetPath = getChipSkinAssetPath(req.params.skinSlug, req.params.fileName);
+    fallbackAssetPath = getChipSkinAssetPath(req.params.skinSlug, req.params.fileName);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
   const skins = await dbLayer.getAvailableChipSkinsForUser(getRequestUserId(req));
-  const isAllowed = skins.some((skin) => skin.slug === req.params.skinSlug);
-  if (!isAllowed) {
+  const allowedSkin = skins.find((skin) => skin.slug === req.params.skinSlug);
+  if (!allowedSkin) {
     return res.status(404).json({ error: 'Asset not found' });
+  }
+
+  const chipValue = path.basename(req.params.fileName, '.png');
+  const storedAsset = allowedSkin.assets?.[chipValue] || allowedSkin.assets?.[Number(chipValue)];
+  let assetPath = fallbackAssetPath;
+  if (storedAsset?.filePath) {
+    try {
+      assetPath = getStoredChipSkinAssetPath(storedAsset.filePath);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
   }
 
   res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');

@@ -103,6 +103,33 @@ test('serveChipSkinAsset sends file when skin is available to the user', async (
   assert(res.sendFile.mock.calls[0][0].endsWith(path.join('data', 'chip-skins', 'public-skin', '1.png')));
 });
 
+test('serveChipSkinAsset uses stored DB asset path when slug changed after upload', async () => {
+  dbLayer.getAvailableChipSkinsForUser.mockResolvedValue([{
+    slug: 'new-slug',
+    assets: {
+      100: {
+        filePath: 'data/chip-skins/old-slug/100.png',
+      },
+    },
+  }]);
+
+  const req = {
+    params: { skinSlug: 'new-slug', fileName: '100.png' },
+    user: null,
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+    setHeader: jest.fn(),
+    sendFile: jest.fn(),
+  };
+
+  await controller.serveChipSkinAsset(req, res, jest.fn());
+
+  assert.strictEqual(dbLayer.getAvailableChipSkinsForUser.mock.calls[0][0], null);
+  assert(res.sendFile.mock.calls[0][0].endsWith(path.join('data', 'chip-skins', 'old-slug', '100.png')));
+});
+
 test('uploadAdminChipSkinAsset returns 400 for invalid PNG upload', async () => {
   dbLayer.getChipSkinById.mockResolvedValue({ id: 11, slug: 'public-skin' });
 
