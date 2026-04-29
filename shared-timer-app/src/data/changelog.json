@@ -1,5 +1,11 @@
 [
   {
+    "id": 96,
+    "version": "2.59.1",
+    "date": "2026-04-29",
+    "changes": "- **Chip-Skin Prompt Template**: Im Admin-Bereich der Chip-Skins kann jetzt das Master-Prompt-Template für neue Chip-Skin-Sets direkt heruntergeladen werden.\n- **Template-Versionierung**: Das Markdown-Template liegt nun unter `public/templates/chip_skin_master_prompt_full.md` im Repository und wird mit dem Frontend ausgeliefert.\n- **Admin-Testabdeckung**: Ein Frontend-Regressionstest sichert den sichtbaren Template-Download und den erwarteten Dateinamen ab."
+  },
+  {
     "id": 95,
     "version": "2.59.0",
     "date": "2026-04-29",

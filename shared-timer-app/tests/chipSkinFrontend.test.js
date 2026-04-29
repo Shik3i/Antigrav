@@ -106,6 +106,16 @@ test('Admin managed skins can be deleted with confirmation', () => {
   assert(tab.includes('!selectedIsBuiltIn'), 'ChipSkinsTab should not delete built-in skins');
 });
 
+test('Admin chip skin tab offers prompt template download', () => {
+  const tab = read('src/components/admin/ChipSkinsTab.jsx');
+  const template = read('public/templates/chip_skin_master_prompt_full.md');
+
+  assert(tab.includes('/templates/chip_skin_master_prompt_full.md'), 'ChipSkinsTab should link to the prompt template');
+  assert(tab.includes('download="chip_skin_master_prompt_full.md"'), 'Template link should force the expected filename');
+  assert(tab.includes('Template herunterladen'), 'ChipSkinsTab should render a visible template download action');
+  assert(template.includes('# Master-Prompt: Casino-Chip-Skins'), 'Template file should contain the chip skin master prompt');
+});
+
 test('Admin chip skin asset cards use stable preview and upload control layout', () => {
   const tab = read('src/components/admin/ChipSkinsTab.jsx');
   assert(tab.includes('slugFieldStyle'), 'Slug field should have explicit read-only styling');
