@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ImagePlus, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { BUILT_IN_CHIP_SKINS } from '../../features/casino/chipConfig';
 
 const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
 const RARITIES = ['common', 'rare', 'epic', 'legendary', 'limited', 'exclusive'];
@@ -24,6 +25,8 @@ const getUserLabel = (user) => {
     return user?.username || user?.displayName || user?.id || 'Unknown user';
 };
 
+const isBuiltInSkin = (skin) => Boolean(skin?.isBuiltIn || skin?.builtIn || skin?.type === 'built-in');
+
 const ChipSkinsTab = ({
     skins,
     users,
@@ -42,18 +45,27 @@ const ChipSkinsTab = ({
     const [grantUserId, setGrantUserId] = useState('');
     const [pendingUploads, setPendingUploads] = useState({});
 
+    const displaySkins = useMemo(() => {
+        const managedSlugs = new Set((skins || []).map((skin) => skin.slug));
+        return [
+            ...BUILT_IN_CHIP_SKINS.filter((skin) => !managedSlugs.has(skin.slug)),
+            ...(skins || []),
+        ];
+    }, [skins]);
+
     const selectedSkin = useMemo(
-        () => skins.find((skin) => Number(skin.id) === Number(selectedSkinId)),
-        [skins, selectedSkinId]
+        () => displaySkins.find((skin) => String(skin.id) === String(selectedSkinId)),
+        [displaySkins, selectedSkinId]
     );
+    const selectedIsBuiltIn = isBuiltInSkin(selectedSkin);
 
     useEffect(() => {
         setPendingUploads({});
         setGrantUserId('');
-        if (selectedSkinId) {
+        if (selectedSkinId && !selectedIsBuiltIn) {
             onFetchGrants(selectedSkinId);
         }
-    }, [selectedSkinId]);
+    }, [selectedIsBuiltIn, selectedSkinId]);
 
     const availableGrantUsers = useMemo(() => {
         const grantedIds = new Set((grants || []).map((grant) => String(grant.user_id)));
@@ -61,7 +73,7 @@ const ChipSkinsTab = ({
     }, [grants, users]);
 
     const handleAssetFile = async (value, file) => {
-        if (!file || !selectedSkinId) return;
+        if (!file || !selectedSkinId || selectedIsBuiltIn) return;
 
         const dataUrl = await new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -106,11 +118,12 @@ const ChipSkinsTab = ({
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(360px, 1.4fr)', gap: '24px', alignItems: 'start' }}>
                 <div className="glass-card" style={{ padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h4 style={{ margin: 0 }}>Skins ({skins.length})</h4>
+                        <h4 style={{ margin: 0 }}>Skins ({displaySkins.length})</h4>
                     </div>
                     <div style={{ display: 'grid', gap: '10px' }}>
-                        {skins.map((skin) => {
-                            const isSelected = Number(selectedSkinId) === Number(skin.id);
+                        {displaySkins.map((skin) => {
+                            const isSelected = String(selectedSkinId) === String(skin.id);
+                            const builtIn = isBuiltInSkin(skin);
                             return (
                                 <button
                                     key={skin.id}
@@ -123,7 +136,7 @@ const ChipSkinsTab = ({
                                 >
                                     <span style={{ fontWeight: 800 }}>{skin.name}</span>
                                     <span style={{ fontSize: '0.75rem', opacity: isSelected ? 0.95 : 0.75 }}>
-                                        {skin.slug} · {skin.status} · {skin.rarity}
+                                        {skin.slug} · {skin.status} · {skin.rarity}{builtIn ? ' · Built-in' : ''}
                                     </span>
                                     <span style={{ fontSize: '0.75rem', opacity: isSelected ? 0.95 : 0.75 }}>
                                         Release: {skin.release_date ? new Date(skin.release_date).toLocaleString() : 'Not set'} · Assets: {skin.asset_count || Object.keys(skin.assets || {}).length}/8
@@ -131,7 +144,7 @@ const ChipSkinsTab = ({
                                 </button>
                             );
                         })}
-                        {skins.length === 0 && (
+                        {displaySkins.length === 0 && (
                             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: '8px' }}>
                                 No chip skins yet.
                             </div>
@@ -142,30 +155,35 @@ const ChipSkinsTab = ({
                 <div style={{ display: 'grid', gap: '20px' }}>
                     <div className="glass-card" style={{ padding: '24px' }}>
                         <h4 style={{ margin: '0 0 20px' }}>{form.id ? 'Edit Skin' : 'Create Skin'}</h4>
+                        {selectedIsBuiltIn && (
+                            <div style={{ marginBottom: '16px', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)' }}>
+                                Built-in skins are bundled with the app and cannot be edited here. Create a managed skin to change metadata, upload PNGs, or control user access.
+                            </div>
+                        )}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                             <div>
                                 <label style={labelStyle}>Name</label>
-                                <input className="input-primary" style={fieldStyle} value={form.name} onChange={(e) => onFormChange({ ...form, name: e.target.value })} />
+                                <input className="input-primary" style={fieldStyle} value={form.name} disabled={selectedIsBuiltIn} onChange={(e) => onFormChange({ ...form, name: e.target.value })} />
                             </div>
                             <div>
                                 <label style={labelStyle}>Slug</label>
-                                <input className="input-primary" style={fieldStyle} value={form.slug} onChange={(e) => onFormChange({ ...form, slug: e.target.value })} />
+                                <input className="input-primary" style={fieldStyle} value={form.slug} disabled={selectedIsBuiltIn} onChange={(e) => onFormChange({ ...form, slug: e.target.value })} />
                             </div>
                             <div>
                                 <label style={labelStyle}>Status</label>
-                                <select className="input-primary" style={fieldStyle} value={form.status} onChange={(e) => onFormChange({ ...form, status: e.target.value })}>
+                                <select className="input-primary" style={fieldStyle} value={form.status} disabled={selectedIsBuiltIn} onChange={(e) => onFormChange({ ...form, status: e.target.value })}>
                                     {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label style={labelStyle}>Rarity</label>
-                                <select className="input-primary" style={fieldStyle} value={form.rarity} onChange={(e) => onFormChange({ ...form, rarity: e.target.value })}>
+                                <select className="input-primary" style={fieldStyle} value={form.rarity} disabled={selectedIsBuiltIn} onChange={(e) => onFormChange({ ...form, rarity: e.target.value })}>
                                     {RARITIES.map((rarity) => <option key={rarity} value={rarity}>{rarity}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label style={labelStyle}>Release Date</label>
-                                <input className="input-primary" style={fieldStyle} type="datetime-local" value={form.release_date} onChange={(e) => onFormChange({ ...form, release_date: e.target.value })} />
+                                <input className="input-primary" style={fieldStyle} type="datetime-local" value={form.release_date} disabled={selectedIsBuiltIn} onChange={(e) => onFormChange({ ...form, release_date: e.target.value })} />
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                                 <label style={labelStyle}>Description</label>
@@ -173,12 +191,13 @@ const ChipSkinsTab = ({
                                     className="input-primary"
                                     style={{ ...fieldStyle, minHeight: '92px', resize: 'vertical' }}
                                     value={form.description}
+                                    disabled={selectedIsBuiltIn}
                                     onChange={(e) => onFormChange({ ...form, description: e.target.value })}
                                 />
                             </div>
                         </div>
                         <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                            <button type="button" className="btn-primary" onClick={onSave}>Save Skin</button>
+                            <button type="button" className="btn-primary" onClick={onSave} disabled={selectedIsBuiltIn}>Save Skin</button>
                         </div>
                     </div>
 
@@ -202,7 +221,9 @@ const ChipSkinsTab = ({
                                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Missing</span>
                                                 )}
                                             </div>
-                                            <input type="file" accept="image/png" onChange={(e) => handleAssetFile(value, e.target.files?.[0])} style={{ fontSize: '0.75rem', maxWidth: '100%' }} />
+                                            {!selectedIsBuiltIn && (
+                                                <input type="file" accept="image/png" onChange={(e) => handleAssetFile(value, e.target.files?.[0])} style={{ fontSize: '0.75rem', maxWidth: '100%' }} />
+                                            )}
                                         </label>
                                     );
                                 })}
@@ -210,7 +231,7 @@ const ChipSkinsTab = ({
                         </div>
                     )}
 
-                    {selectedSkin && (
+                    {selectedSkin && !selectedIsBuiltIn && (
                         <div className="glass-card" style={{ padding: '24px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
                                 <h4 style={{ margin: 0 }}>Restricted Grants</h4>
