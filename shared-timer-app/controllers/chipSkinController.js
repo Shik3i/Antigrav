@@ -23,13 +23,42 @@ function parsePngDataUrl(dataUrl) {
   }
 
   const buffer = Buffer.from(match[1], 'base64');
+
+  if (buffer.length > 2 * 1024 * 1024) {
+    throw new Error('PNG chip asset exceeds maximum size (2 MB)');
+  }
+
   const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
   if (buffer.length < pngSignature.length || !buffer.subarray(0, pngSignature.length).equals(pngSignature)) {
     throw new Error('Only PNG chip assets are supported');
   }
 
-  if (buffer.length < pngSignature.length + 8 || buffer.subarray(12, 16).toString('ascii') !== 'IHDR') {
+  // sig(8) + chunk-length(4) + IHDR(4) + IHDR-data(13) + CRC(4) = 33 bytes minimum
+  if (buffer.length < 33 || buffer.subarray(12, 16).toString('ascii') !== 'IHDR') {
+    throw new Error('Invalid PNG chip asset');
+  }
+
+  if (buffer.readUInt32BE(8) !== 13) {
+    throw new Error('Invalid PNG chip asset');
+  }
+
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  if (width === 0 || height === 0) {
+    throw new Error('Invalid PNG chip asset: zero dimensions');
+  }
+  if (width > 4096 || height > 4096) {
+    throw new Error('PNG chip asset dimensions too large (max 4096×4096)');
+  }
+
+  const bitDepth = buffer[24];
+  if (![1, 2, 4, 8, 16].includes(bitDepth)) {
+    throw new Error('Invalid PNG chip asset');
+  }
+
+  const colorType = buffer[25];
+  if (![0, 2, 3, 4, 6].includes(colorType)) {
     throw new Error('Invalid PNG chip asset');
   }
 

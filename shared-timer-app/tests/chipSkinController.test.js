@@ -19,10 +19,20 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-test('parsePngDataUrl accepts PNG data URLs and returns Buffer', () => {
-  const parsed = controller.parsePngDataUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==');
+// Minimal valid 1×1 transparent PNG
+const VALID_1X1_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+test('parsePngDataUrl accepts valid PNG data URLs and returns Buffer', () => {
+  const parsed = controller.parsePngDataUrl(VALID_1X1_PNG);
   assert(Buffer.isBuffer(parsed));
   assert(parsed.length > 0);
+});
+
+test('parsePngDataUrl rejects 16-byte pseudo-PNG with only signature and IHDR type', () => {
+  assert.throws(
+    () => controller.parsePngDataUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='),
+    /Invalid PNG chip asset/
+  );
 });
 
 test('parsePngDataUrl rejects JPEG/non-PNG with expected message', () => {
