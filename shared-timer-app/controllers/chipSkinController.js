@@ -109,6 +109,42 @@ async function updateAdminChipSkinHandler(req, res) {
   }
 }
 
+async function deleteAdminChipSkinHandler(req, res) {
+  if (!requireSuperadmin(req, res)) return;
+
+  const skin = await dbLayer.getChipSkinById(Number(req.params.id));
+  if (!skin) {
+    return res.status(404).json({ error: 'Skin not found' });
+  }
+
+  await dbLayer.deleteChipSkin(skin.id);
+
+  try {
+    const storedAssetDirs = new Set();
+    for (const asset of skin.assetRows || []) {
+      if (!asset.file_path) continue;
+      const storedAssetPath = getStoredChipSkinAssetPath(asset.file_path);
+      storedAssetDirs.add(path.dirname(storedAssetPath));
+      fs.rmSync(storedAssetPath, { force: true });
+    }
+
+    for (const assetDir of [...storedAssetDirs].sort((a, b) => b.length - a.length)) {
+      try {
+        fs.rmdirSync(assetDir);
+      } catch (err) {
+        // Leave non-empty directories in place; another skin may still reference them.
+      }
+    }
+
+    const assetDir = path.dirname(getChipSkinAssetPath(skin.slug, '1.png'));
+    fs.rmSync(assetDir, { recursive: true, force: true });
+  } catch (err) {
+    console.warn(`[Chip Skins] Failed to remove asset directory for ${skin.slug}:`, err.message);
+  }
+
+  res.json({ success: true });
+}
+
 async function uploadAdminChipSkinAssetHandler(req, res) {
   if (!requireSuperadmin(req, res)) return;
 
@@ -228,6 +264,7 @@ module.exports = {
   getAdminChipSkins: wrap(getAdminChipSkinsHandler),
   createAdminChipSkin: wrap(createAdminChipSkinHandler),
   updateAdminChipSkin: wrap(updateAdminChipSkinHandler),
+  deleteAdminChipSkin: wrap(deleteAdminChipSkinHandler),
   uploadAdminChipSkinAsset: wrap(uploadAdminChipSkinAssetHandler),
   getAdminChipSkinGrants: wrap(getAdminChipSkinGrantsHandler),
   grantAdminChipSkin: wrap(grantAdminChipSkinHandler),

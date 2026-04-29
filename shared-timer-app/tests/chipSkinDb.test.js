@@ -25,6 +25,8 @@ const TEST_SKIN_SLUGS = [
   'incomplete-public',
   'future-public',
   'restricted-skin',
+  'draft-skin',
+  'disabled-skin',
   'bad-status',
   'bad-rarity',
   'bad-slug',
@@ -39,6 +41,7 @@ const TEST_SKIN_SLUGS = [
   'chip-value-test',
   'update-validation',
   'renamed-skin',
+  'delete-me',
   'shape-test',
 ];
 
@@ -329,6 +332,29 @@ test('chip skin update validation rejects invalid fields and incomplete publishi
 
   const disabledSkin = await dbLayer.updateChipSkin(skin.id, { status: 'disabled' });
   assert.strictEqual(disabledSkin.status, 'disabled');
+});
+
+test('chip skin delete removes skin metadata and assets', async () => {
+  await clearChipSkinRows();
+
+  const skin = await dbLayer.createChipSkin({
+    name: 'Delete Me',
+    slug: 'delete-me',
+    description: '',
+    status: 'draft',
+    rarity: 'common',
+    release_date: '2026-01-01T00:00:00.000Z',
+  });
+  await dbLayer.upsertChipSkinAsset(skin.id, 1, 'data/chip-skins/delete-me/1.png', '1.png');
+
+  const result = await dbLayer.deleteChipSkin(skin.id);
+  assert.strictEqual(result.changes, 1);
+
+  const loaded = await dbLayer.getChipSkinById(skin.id);
+  assert.strictEqual(loaded, null);
+
+  const assetRows = await all('SELECT * FROM chip_skin_assets WHERE skin_id = ?', [skin.id]);
+  assert.strictEqual(assetRows.length, 0);
 });
 
 test('chip skin returns planned complete flag and asset map shape', async () => {

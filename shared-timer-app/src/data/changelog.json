@@ -1,5 +1,11 @@
 [
   {
+    "id": 95,
+    "version": "2.59.0",
+    "date": "2026-04-29",
+    "changes": "- **Chip-Skin Admin Delete**: Verwaltete Chip-Skins können im Admin-Bereich jetzt nach Bestätigung gelöscht werden; Built-in-Skins bleiben geschützt.\n- **Skin Cleanup**: Beim Löschen werden Skin-Metadaten, Grants, Asset-Zuordnungen und zugehörige PNG-Dateien best-effort entfernt.\n- **Admin-Skin Stabilität**: Regressionstests sichern DB-Löschung, API-Route, Superadmin-Schutz und die neue UI-Aktion ab."
+  },
+  {
     "id": 94,
     "version": "2.58.0",
     "date": "2026-04-28",

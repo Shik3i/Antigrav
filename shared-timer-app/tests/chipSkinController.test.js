@@ -6,6 +6,7 @@ jest.mock('../database', () => ({
   CHIP_VALUES: [1, 5, 10, 25, 50, 100, 500, 1000],
   createChipSkin: jest.fn(),
   updateChipSkin: jest.fn(),
+  deleteChipSkin: jest.fn(),
   getAvailableChipSkinsForUser: jest.fn(),
   getChipSkinById: jest.fn(),
   upsertChipSkinAsset: jest.fn(),
@@ -55,6 +56,13 @@ test('asset route uses optional auth before serving chip skin asset', () => {
   const apiSource = fs.readFileSync(path.resolve(__dirname, '..', 'routes', 'api.js'), 'utf8');
   assert(
     /router\.get\('\/chip-skins\/assets\/:skinSlug\/:fileName',\s*authController\.optionalAuthenticateToken,\s*chipSkinController\.serveChipSkinAsset\)/.test(apiSource)
+  );
+});
+
+test('admin chip skin delete route requires auth', () => {
+  const apiSource = fs.readFileSync(path.resolve(__dirname, '..', 'routes', 'api.js'), 'utf8');
+  assert(
+    /router\.delete\('\/admin\/chip-skins\/:id',\s*authController\.authenticateToken,\s*chipSkinController\.deleteAdminChipSkin\)/.test(apiSource)
   );
 });
 
@@ -233,5 +241,46 @@ test('updateAdminChipSkin returns 400 when trying to change immutable slug', asy
 
   assert.strictEqual(res.status.mock.calls[0][0], 400);
   assert.deepStrictEqual(res.json.mock.calls[0][0], { error: 'Cannot change chip skin slug' });
+  assert.strictEqual(next.mock.calls.length, 0);
+});
+
+test('deleteAdminChipSkin requires superadmin access', async () => {
+  const req = {
+    user: { is_superadmin: false },
+    params: { id: '12' },
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+  };
+  const next = jest.fn();
+
+  await controller.deleteAdminChipSkin(req, res, next);
+
+  assert.strictEqual(res.status.mock.calls[0][0], 403);
+  assert.deepStrictEqual(res.json.mock.calls[0][0], { error: 'Forbidden' });
+  assert.strictEqual(dbLayer.deleteChipSkin.mock.calls.length, 0);
+  assert.strictEqual(next.mock.calls.length, 0);
+});
+
+test('deleteAdminChipSkin removes managed skin and returns success', async () => {
+  dbLayer.getChipSkinById.mockResolvedValue({ id: 12, slug: 'delete-me' });
+  dbLayer.deleteChipSkin.mockResolvedValue({ changes: 1 });
+
+  const req = {
+    user: { is_superadmin: true },
+    params: { id: '12' },
+  };
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+  };
+  const next = jest.fn();
+
+  await controller.deleteAdminChipSkin(req, res, next);
+
+  assert.strictEqual(dbLayer.getChipSkinById.mock.calls[0][0], 12);
+  assert.strictEqual(dbLayer.deleteChipSkin.mock.calls[0][0], 12);
+  assert.deepStrictEqual(res.json.mock.calls[0][0], { success: true });
   assert.strictEqual(next.mock.calls.length, 0);
 });

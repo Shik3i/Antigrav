@@ -63,6 +63,7 @@ router.get('/admin/actions', authController.authenticateToken, apiController.get
 router.get('/admin/chip-skins', authController.authenticateToken, chipSkinController.getAdminChipSkins);
 router.post('/admin/chip-skins', authController.authenticateToken, chipSkinController.createAdminChipSkin);
 router.put('/admin/chip-skins/:id', authController.authenticateToken, chipSkinController.updateAdminChipSkin);
+router.delete('/admin/chip-skins/:id', authController.authenticateToken, chipSkinController.deleteAdminChipSkin);
 router.post('/admin/chip-skins/:id/assets', authController.authenticateToken, chipSkinController.uploadAdminChipSkinAsset);
 router.get('/admin/chip-skins/:id/grants', authController.authenticateToken, chipSkinController.getAdminChipSkinGrants);
 router.post('/admin/chip-skins/:id/grants', authController.authenticateToken, chipSkinController.grantAdminChipSkin);
