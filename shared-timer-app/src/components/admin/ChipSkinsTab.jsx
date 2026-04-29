@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ImagePlus, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { Download, ImagePlus, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import { BUILT_IN_CHIP_SKINS } from '../../features/casino/chipConfig';
 
 const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
@@ -184,10 +184,21 @@ const ChipSkinsTab = ({
                         Manage casino chip skin metadata, PNG assets, release status, and restricted user grants.
                     </p>
                 </div>
-                <button type="button" className="btn-primary" onClick={onCreateNew}>
-                    <Plus size={18} style={{ marginRight: '8px' }} />
-                    New Skin
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <a
+                        className="btn-secondary"
+                        href="/templates/chip_skin_master_prompt_full.md"
+                        download="chip_skin_master_prompt_full.md"
+                        style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                        <Download size={18} style={{ marginRight: '8px' }} />
+                        Template herunterladen
+                    </a>
+                    <button type="button" className="btn-primary" onClick={onCreateNew}>
+                        <Plus size={18} style={{ marginRight: '8px' }} />
+                        New Skin
+                    </button>
+                </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(360px, 1.4fr)', gap: '24px', alignItems: 'start' }}>
