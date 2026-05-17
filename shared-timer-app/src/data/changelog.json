@@ -1,5 +1,11 @@
 [
   {
+    "id": 97,
+    "version": "2.59.2",
+    "date": "2026-05-17",
+    "changes": "- **Security/CSP Fix**: Deaktivierung von Inline-Data-URIs für Base64-Assets im Vite Build (`assetsInlineLimit: 0`). Dies behebt das Problem, dass neu hinzugefügte Schriftarten (wie Black Ops One für den Deathroll Slot) als `data:`-URIs vom strengen `default-src 'self'` Content-Security-Policy (CSP) Filter des Unraid-Proxys blockiert wurden."
+  },
+  {
     "id": 96,
     "version": "2.59.1",
     "date": "2026-04-29",
