@@ -15,12 +15,16 @@ Dieses Dokument ist eine strikte Arbeitsanweisung für den Agenten bei jedem Fea
 - Fasse die Änderungen des aktuellen Tasks kurz und präzise zusammen.
 - Nutze das aktuelle Datum.
 
-### 3. Git-Synchronisation (STRIKTE EINZELBEFEHLE)
+### 3. Git-Synchronisation & Release (STRIKTE EINZELBEFEHLE)
 Führe die Git-Befehle nacheinander aus. Nutze NIEMALS `&&` Verknüpfungen. Warte auf den Erfolg jedes Befehls:
 1. `git add .`
 2. `git commit -m "Release v[VERSION]: [Zusammenfassung]"`
 3. `git pull`
 4. `git push`
+5. `git tag v[VERSION]`
+6. `git push origin v[VERSION]`
+
+Durch den Push des Tags (z.B. `v2.57.0`) wird automatisch die GitHub Actions Pipeline getriggert, welche das Docker-Image baut und auf `ghcr.io` veröffentlicht. Watchtower auf dem Unraid-Server aktualisiert den Container dann automatisch.
 
 ---
 *Hinweis: Diese Routine stellt sicher, dass der Code-Stand, die UI-Anzeige und das Repository immer synchron sind.*

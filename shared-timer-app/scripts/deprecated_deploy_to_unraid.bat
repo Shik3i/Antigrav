@@ -1,7 +1,13 @@
 @echo off
 echo ===================================================
-echo   Deploying CollabTimer to Unraid
+echo   DEPRECATED: This script is no longer used!
+echo   Deployment is now automated via GitHub Actions.
+echo   Push a version tag (e.g., git tag v2.57.0 ^& git push --tags)
+echo   to trigger the ghcr.io build. Watchtower will update Unraid.
 echo ===================================================
+echo.
+echo ===================================================
+echo   Deploying CollabTimer to Unraid
 
 echo [1/4] Building production frontend with Vite...
 call npm run build
