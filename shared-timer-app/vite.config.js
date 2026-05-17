@@ -46,6 +46,7 @@ export default defineConfig(({ mode }) => ({
     bundleAnalysisPlugin(mode === 'analyze')
   ],
   build: {
+    assetsInlineLimit: 0,
     chunkSizeWarningLimit: 1000,
     modulePreload: {
       polyfill: true,
