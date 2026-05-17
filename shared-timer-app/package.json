@@ -18,7 +18,7 @@
     "@fontsource/black-ops-one": "^5.2.8",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/outfit": "^5.2.8",
-    "axios": "^1.15.0",
+    "axios": "^1.15.2",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
