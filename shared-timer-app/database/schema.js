@@ -172,7 +172,6 @@ function initializeDatabaseSchema() {
     db.run("ALTER TABLE Users ADD COLUMN lastActive DATETIME", () => { });
     db.run("ALTER TABLE Users ADD COLUMN koala_balance INTEGER DEFAULT 0", () => { });
     db.run("ALTER TABLE Users ADD COLUMN last_daily_claim DATETIME", () => { });
-    db.run("ALTER TABLE Users ADD COLUMN lastActive DATETIME", () => { });
 
     // LeaderboardSettings: visibility toggle for games
     db.run(`CREATE TABLE IF NOT EXISTS LeaderboardSettings (
