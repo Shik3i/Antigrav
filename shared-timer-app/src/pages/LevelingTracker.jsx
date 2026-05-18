@@ -541,7 +541,7 @@ const LevelingTracker = ({ user, token }) => {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0 }}>Fortschritt & Level-Up Zeiten tracken.</p>
           <div style={{ width: '1px', height: '14px', background: 'var(--border-color)', display: 'inline-block' }}></div>
           <a 
-            href="https://drive.google.com/drive/folders/1azJ08r8eZcf0dO2uxX4s8pIbANifPHaJ?usp=sharing" 
+            href="https://github.com/Shik3i/FlyffUniverseHelper/releases" 
             target="_blank" 
             rel="noopener noreferrer"
             style={{ 
