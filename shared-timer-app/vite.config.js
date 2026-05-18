@@ -73,5 +73,10 @@ export default defineConfig(({ mode }) => ({
         ws: true
       }
     }
+  },
+  test: {
+    globals: true,
+    environment: 'node',
+    setupFiles: ['./testSetup.js']
   }
 }))
