@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  shared-timer:
+  koalaweb:
     build: .
-    container_name: shared-timer-app
+    container_name: koalaweb
     restart: unless-stopped
     ports:
       - "3001:3001"

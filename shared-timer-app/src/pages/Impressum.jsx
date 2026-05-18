@@ -43,8 +43,8 @@ const Impressum = () => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', color: 'var(--text-main)' }}>
                 <section>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>Betreiber & Kontakt</h2>
-                    <p style={{ color: 'var(--text-muted)' }}>Administrator KoalaSync (Privatperson)</p>
-                    <p style={{ color: 'var(--text-muted)' }}>E-Mail: <ProtectedEmail user="koalasync_admin" domain="koalamail.rocks" /></p>
+                    <p style={{ color: 'var(--text-muted)' }}>Administrator KoalaWeb (Privatperson)</p>
+                    <p style={{ color: 'var(--text-muted)' }}>E-Mail: <ProtectedEmail user="koalaweb" domain="koalamail.rocks" /></p>
                 </section>
 
                 <section style={{ opacity: 0.8 }}>

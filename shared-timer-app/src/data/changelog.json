@@ -1,5 +1,11 @@
 [
   {
+    "id": 83,
+    "version": "2.50.0",
+    "date": "2026-05-18",
+    "changes": "- **Rebranding zu KoalaWeb**: Vollständiges Rebranding des Projekts von \"KoalaSync\" zu \"KoalaWeb\" im gesamten Frontend (index.html, appConstants.js, Sidebar, App, Impressum).\n- **Extension-Integration**: Die veraltete lokale Extension-Info-Seite wurde überarbeitet und verweist nun sauber auf das neue, unabhängige KoalaSync-Repository auf GitHub sowie die offizielle Landing Page.\n- **Infrastruktur & Deployments**: Anpassung des Container-Namens zu `koalaweb` in der docker-compose.yml und vollständige Umstellung des deploy_to_unraid.bat Skripts."
+  },
+  {
     "id": 82,
     "version": "2.49.1",
     "date": "2026-04-20",

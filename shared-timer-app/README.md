@@ -1,6 +1,6 @@
-# Shik3i / Antigrav
+# KoalaWeb
 
-A real-time, multi-featured shared timer and minigame platform built with a premium glassmorphic aesthetic. This application supports collaborative productivity (timers, pomodoro) and social engagement (minigames, currency, achievements).
+A real-time social platform with a premium glassmorphic aesthetic. KoalaWeb combines synchronized rooms, games (Wordle, Tetris, KoalaFlap, ...), a Koala Coins economy, Esports data, betting, countdowns, achievements and more in a single full-stack application.
 
 ## 🏗️ Architecture Overview
 

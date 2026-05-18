@@ -410,7 +410,7 @@ function InnerApp() {
               <div className="mobile-header">
                 <button className="btn-ghost" onClick={() => setIsMobileMenuOpen(true)}><Menu size={24} color="var(--text-main)" /></button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'center' }}>
-                  <Clock className="animate-glow" color="var(--accent-primary)" size={24} /><h2 style={{ fontSize: '1.2rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>KoalaSync</h2>
+                  <Clock className="animate-glow" color="var(--accent-primary)" size={24} /><h2 style={{ fontSize: '1.2rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>KoalaWeb</h2>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {(user?.preferences?.showClock ?? true) && <div className="mobile-hide"><ClockWidget /></div>}
