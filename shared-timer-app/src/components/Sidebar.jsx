@@ -188,7 +188,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                 <Link to="/" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}>
                     <LucideIcons.Clock className="animate-glow" color="var(--accent-primary)" size={28} />
                     <h2 style={{ fontSize: '1.25rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                        KoalaSync
+                        KoalaWeb
                     </h2>
                 </Link>
             </div>

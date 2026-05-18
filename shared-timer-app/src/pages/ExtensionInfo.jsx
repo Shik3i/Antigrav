@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Download, ArrowLeft, Settings, CheckCircle, Zap } from 'lucide-react';
+import { ExternalLink, ArrowLeft, Download, Github, Globe, Zap, CheckCircle } from 'lucide-react';
 
 const ExtensionInfo = () => {
     return (
@@ -9,96 +9,91 @@ const ExtensionInfo = () => {
                 <ArrowLeft size={20} /> Back to Settings
             </Link>
 
-            <h1 style={{ marginBottom: '16px' }}>KoalaSync Media Extension</h1>
+            <h1 style={{ marginBottom: '8px' }}>KoalaSync Media Extension</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '32px' }}>
-                Synchronize video playback seamlessly with everyone in your KoalaSync room. Works with YouTube, Netflix, Emby, and almost any HTML5 video player!
+                Synchronize video playback seamlessly with everyone in your KoalaWeb room.
+                The KoalaSync extension is a standalone project — fully open source.
             </p>
 
-            <div className="glass-card animate-fade-in" style={{ padding: '32px', marginBottom: '32px' }}>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                    <Download size={24} color="var(--accent-primary)" />
-                    1. Download Extension
+            {/* Primary CTA: Landing Page */}
+            <div className="glass-card animate-fade-in" style={{ padding: '32px', marginBottom: '24px', border: '1px solid rgba(59,130,246,0.25)' }}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <Globe size={24} color="var(--accent-primary)" />
+                    Get KoalaSync
                 </h2>
-                <p style={{ marginBottom: '12px', color: 'var(--text-main)', lineHeight: '1.5' }}>
-                    Download the latest version (<strong>v2.5</strong>) of the KoalaSync extension as a ZIP file.
-                </p>
-                <p style={{ marginBottom: '24px', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                    Don't worry about missing updates — the extension will notify you automatically when someone in your room has a newer version!
+                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.6' }}>
+                    Visit the official KoalaSync website for installation instructions, release notes, and support.
                 </p>
                 <a
-                    href="https://drive.google.com/drive/folders/10F_rwk_W82lOBiqq0k4XHVSWb4W_iAgj?usp=sharing"
+                    href="https://sync.koalastuff.net"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-primary"
-                    style={{ textDecoration: 'none', display: 'inline-flex' }}
+                    style={{ textDecoration: 'none', display: 'inline-flex', gap: '8px', alignItems: 'center' }}
                 >
-                    Download from Google Drive
+                    <Globe size={18} /> Open sync.koalastuff.net <ExternalLink size={14} />
                 </a>
             </div>
 
-            <div className="glass-card animate-fade-in" style={{ padding: '32px', marginBottom: '32px', animationDelay: '0.1s' }}>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                    <Settings size={24} color="var(--accent-secondary)" />
-                    2. Installation (Chrome / Edge / Opera / Brave)
-                </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                        <div style={{ background: 'var(--bg-sidebar)', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', height: 'fit-content' }}>Step 1</div>
-                        <div style={{ padding: '4px 0', color: 'var(--text-main)', lineHeight: '1.5' }}>Extract the downloaded ZIP file into a new folder on your computer.</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                        <div style={{ background: 'var(--bg-sidebar)', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', height: 'fit-content' }}>Step 2</div>
-                        <div style={{ padding: '4px 0', color: 'var(--text-main)', lineHeight: '1.5' }}>Open your browser's extensions page: <code>chrome://extensions/</code> (or <code>opera://extensions/</code> for Opera).</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                        <div style={{ background: 'var(--bg-sidebar)', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', height: 'fit-content' }}>Step 3</div>
-                        <div style={{ padding: '4px 0', color: 'var(--text-main)', lineHeight: '1.5' }}>Enable <strong>Developer mode</strong> using the toggle switch in the top right corner.</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                        <div style={{ background: 'var(--bg-sidebar)', padding: '6px 14px', borderRadius: '8px', fontWeight: 'bold', height: 'fit-content' }}>Step 4</div>
-                        <div style={{ padding: '4px 0', color: 'var(--text-main)', lineHeight: '1.5' }}>Click <strong>Load unpacked</strong> ("Entpackte Erweiterung laden") and select the extracted folder.</div>
-                    </div>
-                    <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #6366f1', color: 'var(--text-main)', fontSize: '0.9rem' }}>
-                        <strong>💡 Updating:</strong> To update, replace the old folder with the new one and click the reload button (🔄) on your extensions page. No need to uninstall!
-                    </div>
+            {/* Download & GitHub */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+                <div className="glass-card animate-fade-in" style={{ padding: '28px', animationDelay: '0.1s' }}>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', fontSize: '1.2rem' }}>
+                        <Download size={20} color="var(--accent-primary)" />
+                        Download
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: '1.5' }}>
+                        Download the latest release directly from GitHub.
+                    </p>
+                    <a
+                        href="https://github.com/Shik3i/KoalaSync/releases"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-primary"
+                        style={{ textDecoration: 'none', display: 'inline-flex', gap: '8px', alignItems: 'center', fontSize: '0.9rem' }}
+                    >
+                        <Download size={16} /> Latest Release <ExternalLink size={12} />
+                    </a>
+                </div>
+
+                <div className="glass-card animate-fade-in" style={{ padding: '28px', animationDelay: '0.2s' }}>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', fontSize: '1.2rem' }}>
+                        <Github size={20} />
+                        Source Code
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: '1.5' }}>
+                        KoalaSync is fully open source. Contributions and issue reports welcome!
+                    </p>
+                    <a
+                        href="https://github.com/Shik3i/KoalaSync"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-ghost"
+                        style={{ textDecoration: 'none', display: 'inline-flex', gap: '8px', alignItems: 'center', fontSize: '0.9rem' }}
+                    >
+                        <Github size={16} /> View on GitHub <ExternalLink size={12} />
+                    </a>
                 </div>
             </div>
 
-            <div className="glass-card animate-fade-in" style={{ padding: '32px', marginBottom: '32px', animationDelay: '0.2s' }}>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                    <CheckCircle size={24} color="#10b981" />
-                    3. How to Use
-                </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-main)', lineHeight: '1.6' }}>
-                    <p>
-                        <strong>1. Connect passively:</strong> Once installed, simply have this timer website open in one tab and join a room. The extension popup will automatically show "Connected to Room" in green. No setup needed!
-                    </p>
-                    <p>
-                        <strong>2. Select your video:</strong> Open your video (e.g. YouTube, Netflix, Emby). Then open the extension popup and select that specific tab from the <strong>"Target Tab"</strong> dropdown.
-                    </p>
-                    <p>
-                        <strong>3. Sync playback:</strong> Use the Play/Pause buttons in the extension popup, or the global Play/Pause buttons on the Timer page. Commands sync to all users in your room automatically.
-                    </p>
-                </div>
-            </div>
-
+            {/* Features overview */}
             <div className="glass-card animate-fade-in" style={{ padding: '32px', animationDelay: '0.3s' }}>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                     <Zap size={24} color="#f59e0b" />
-                    4. Features
+                    What KoalaSync Does
                 </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', color: 'var(--text-main)', lineHeight: '1.6' }}>
-                    <p style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #10b981' }}>
-                        <strong>✅ Verified ACKs:</strong> See exactly which users successfully executed your play/pause command in real-time under "History".
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <p style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #10b981', color: 'var(--text-main)', lineHeight: '1.6' }}>
+                        <CheckCircle size={14} style={{ display: 'inline', marginRight: '8px', color: '#10b981' }} />
+                        <strong>Video Sync:</strong> Keeps playback in sync for all room members — works with YouTube, Netflix, Emby and any HTML5 video player.
                     </p>
-                    <p style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #6366f1' }}>
-                        <strong>⏱ Force Sync:</strong> One-click button that pauses all users, seeks to the exact same timestamp, waits for buffering, then auto-plays simultaneously.
+                    <p style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #6366f1', color: 'var(--text-main)', lineHeight: '1.6' }}>
+                        <Zap size={14} style={{ display: 'inline', marginRight: '8px', color: '#6366f1' }} />
+                        <strong>Force Sync:</strong> One-click button that pauses all users, seeks to the exact same timestamp, waits for buffering, then auto-plays simultaneously.
                     </p>
-                    <p style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #f59e0b' }}>
-                        <strong>🔔 Auto-Update Check:</strong> The extension compares version numbers with other users in the room and notifies you if an update is available.
-                    </p>
-                    <p style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #8b5cf6' }}>
-                        <strong>🔧 Dev Tab:</strong> Built-in diagnostics showing video detection, playback state, current time, buffer status, and source URL.
+                    <p style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #3b82f6', color: 'var(--text-main)', lineHeight: '1.6' }}>
+                        <CheckCircle size={14} style={{ display: 'inline', marginRight: '8px', color: '#3b82f6' }} />
+                        <strong>Status Push:</strong> Minimal network traffic via a unidirectional heartbeat model — no constant ping-pong overhead.
                     </p>
                 </div>
             </div>
