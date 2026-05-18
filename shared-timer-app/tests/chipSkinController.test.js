@@ -2,22 +2,24 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-jest.mock('../database', () => ({
-  CHIP_VALUES: [1, 5, 10, 25, 50, 100, 500, 1000],
-  createChipSkin: jest.fn(),
-  updateChipSkin: jest.fn(),
-  deleteChipSkin: jest.fn(),
-  getAvailableChipSkinsForUser: jest.fn(),
-  getChipSkinById: jest.fn(),
-  upsertChipSkinAsset: jest.fn(),
-}));
-
 const dbLayer = require('../database');
+
+// Mutate database exports directly to mock them dynamically for CommonJS
+dbLayer.CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500, 1000];
+dbLayer.createChipSkin = vi.fn();
+dbLayer.updateChipSkin = vi.fn();
+dbLayer.deleteChipSkin = vi.fn();
+dbLayer.getAvailableChipSkinsForUser = vi.fn();
+dbLayer.getChipSkinById = vi.fn();
+dbLayer.upsertChipSkinAsset = vi.fn();
+
 const controller = require('../controllers/chipSkinController');
 
+
 afterEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
+
 
 // Minimal valid 1×1 transparent PNG
 const VALID_1X1_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -84,12 +86,12 @@ test('serveChipSkinAsset returns 404 when skin is not available to the user', as
     user: { id: 'user-1' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
-    setHeader: jest.fn(),
-    sendFile: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
+    setHeader: vi.fn(),
+    sendFile: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.serveChipSkinAsset(req, res, next);
 
@@ -108,13 +110,13 @@ test('serveChipSkinAsset sends file when skin is available to the user', async (
     user: { userId: 'user-2' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
-    setHeader: jest.fn(),
-    sendFile: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
+    setHeader: vi.fn(),
+    sendFile: vi.fn(),
   };
 
-  await controller.serveChipSkinAsset(req, res, jest.fn());
+  await controller.serveChipSkinAsset(req, res, vi.fn());
 
   assert.strictEqual(dbLayer.getAvailableChipSkinsForUser.mock.calls[0][0], 'user-2');
   assert.strictEqual(res.setHeader.mock.calls[0][0], 'Cache-Control');
@@ -136,13 +138,13 @@ test('serveChipSkinAsset uses stored DB asset path when slug changed after uploa
     user: null,
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
-    setHeader: jest.fn(),
-    sendFile: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
+    setHeader: vi.fn(),
+    sendFile: vi.fn(),
   };
 
-  await controller.serveChipSkinAsset(req, res, jest.fn());
+  await controller.serveChipSkinAsset(req, res, vi.fn());
 
   assert.strictEqual(dbLayer.getAvailableChipSkinsForUser.mock.calls[0][0], null);
   assert(res.sendFile.mock.calls[0][0].endsWith(path.join('data', 'chip-skins', 'old-slug', '100.png')));
@@ -157,10 +159,10 @@ test('uploadAdminChipSkinAsset returns 400 for invalid PNG upload', async () => 
     body: { value: 1, dataUrl: 'data:image/png;base64,iVBORw0KGgo=' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.uploadAdminChipSkinAsset(req, res, next);
 
@@ -178,10 +180,10 @@ test('createAdminChipSkin returns 400 for DB validation errors', async () => {
     body: { slug: 'BAD' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.createAdminChipSkin(req, res, next);
 
@@ -198,10 +200,10 @@ test('createAdminChipSkin returns 400 for duplicate slug constraint errors', asy
     body: { slug: 'already-used' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.createAdminChipSkin(req, res, next);
 
@@ -221,10 +223,10 @@ test('updateAdminChipSkin returns 400 for DB validation errors', async () => {
     body: { status: 'public' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.updateAdminChipSkin(req, res, next);
 
@@ -242,10 +244,10 @@ test('updateAdminChipSkin returns 400 when trying to change immutable slug', asy
     body: { slug: 'new-slug' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.updateAdminChipSkin(req, res, next);
 
@@ -260,10 +262,10 @@ test('deleteAdminChipSkin requires superadmin access', async () => {
     params: { id: '12' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.deleteAdminChipSkin(req, res, next);
 
@@ -282,10 +284,10 @@ test('deleteAdminChipSkin removes managed skin and returns success', async () =>
     params: { id: '12' },
   };
   const res = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
   };
-  const next = jest.fn();
+  const next = vi.fn();
 
   await controller.deleteAdminChipSkin(req, res, next);
 

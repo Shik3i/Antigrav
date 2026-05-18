@@ -10,7 +10,8 @@ describe('Deathroll start flow', () => {
   test('starts at 1000 and waits for the first roll click', () => {
     roomManager.createRoom(roomId);
     const originalRandom = Math.random;
-    Math.random = jest.fn(() => 0.123);
+    Math.random = vi.fn(() => 0.123);
+
 
     try {
       const state = roomManager.startDeathroll(roomId, 'Starter');
@@ -31,7 +32,7 @@ describe('Deathroll start flow', () => {
 
     try {
       roomManager.startDeathroll(roomId, 'Starter');
-      Math.random = jest.fn(() => 0.123);
+      Math.random = vi.fn(() => 0.123);
 
       const state = roomManager.rollDeathroll(roomId, 'Roller');
 
