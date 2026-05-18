@@ -13,9 +13,24 @@ const blackjackController = require('../controllers/blackjackController');
 const backupController = require('../controllers/backupController');
 const roomController = require('../controllers/roomController');
 const chipSkinController = require('../controllers/chipSkinController');
+const achievementsController = require('../controllers/achievementsController');
+const speedcubeController = require('../controllers/speedcubeController');
+const levelingController = require('../controllers/levelingController');
+const marketController = require('../controllers/marketController');
+const fortuneController = require('../controllers/fortuneController');
+const lottoController = require('../controllers/lottoController');
 const dbLayer = require('../database');
 const { body, validationResult } = require('express-validator');
 const xss = require('xss');
+
+// Middleware to restrict test endpoints to development only
+const restrictToDev = (req, res, next) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Access denied: Test endpoints are disabled in production.' });
+    }
+    next();
+};
+
 
 // Basic validation middleware
 const validate = (req, res, next) => {
@@ -190,9 +205,9 @@ router.post('/friends/accept', authController.authenticateToken, friendsControll
 router.post('/friends/remove', authController.authenticateToken, friendsController.removeFriend);
 router.get('/friends', authController.authenticateToken, friendsController.getFriends);
 
-router.get('/test/rooms', apiController.testDbRooms);
-router.get('/test/esports', apiController.testEsports);
-router.post('/test/rooms/:id/action', apiController.testRoomAction);
+router.get('/test/rooms', restrictToDev, apiController.testDbRooms);
+router.get('/test/esports', restrictToDev, apiController.testEsports);
+router.post('/test/rooms/:id/action', restrictToDev, apiController.testRoomAction);
 
 // Countdowns
 router.get('/countdowns', authController.optionalAuthenticateToken, apiController.getCountdowns);
@@ -220,7 +235,6 @@ router.get('/twitch/status', apiController.getTwitchStatus);
 router.get('/changelog', apiController.getChangelog);
 
 // ─── Achievements ─────────────────────────────────────────────
-const achievementsController = require('../controllers/achievementsController');
 router.get('/achievements/status', authController.authenticateToken, achievementsController.getStatus);
 router.post('/achievements/claim/:id', authController.authenticateToken, achievementsController.claimAchievement);
 
@@ -229,7 +243,6 @@ router.get('/admin/achievements/settings', authController.authenticateToken, ach
 router.post('/admin/achievements/settings', authController.authenticateToken, achievementsController.updateAdminSettings);
 
 // ─── Speedcube Timer ──────────────────────────────────────────
-const speedcubeController = require('../controllers/speedcubeController');
 router.get('/speedcube', authController.authenticateToken, speedcubeController.getTimes);
 router.post('/speedcube', authController.authenticateToken, speedcubeController.addTime);
 router.patch('/speedcube/:id/note', authController.authenticateToken, speedcubeController.updateNote);
@@ -378,12 +391,10 @@ router.get('/admin/pokemon-configs', authController.authenticateToken, apiContro
 router.post('/admin/pokemon-configs/update', authController.authenticateToken, apiController.updatePokemonConfigs);
 
 // ─── Leveling Tracker (Milestones) ────────────────────────────
-const levelingController = require('../controllers/levelingController');
 router.post('/leveling/milestone', authController.authenticateToken, levelingController.saveMilestone);
 router.get('/leveling/milestones', authController.authenticateToken, levelingController.getMilestones);
 
 // ─── MMO Market Prices ────────────────────────────────────────
-const marketController = require('../controllers/marketController');
 router.get('/market', authController.optionalAuthenticateToken, marketController.getAllActive);
 router.post('/market', authController.authenticateToken, marketController.addItem);
 router.put('/market/:id', authController.authenticateToken, marketController.updateItem);
@@ -415,7 +426,6 @@ router.post('/admin/rss/refresh', authController.authenticateToken, apiControlle
 router.get('/daily-status', authController.authenticateToken, apiController.getDailyStatus);
 
 // ─── Daily Fortune Cookie ────────────────────────────────────
-const fortuneController = require('../controllers/fortuneController');
 router.get('/fortune/status', authController.authenticateToken, fortuneController.getStatus);
 router.post('/fortune/open', authController.authenticateToken, fortuneController.openFortune);
 router.get('/admin/fortunes/dictionary', authController.authenticateToken, fortuneController.adminGetDictionary);
@@ -423,7 +433,6 @@ router.post('/admin/fortunes/bulk-import', authController.authenticateToken, for
 router.delete('/admin/fortunes/:id', authController.authenticateToken, fortuneController.deleteFortune);
 
 // ─── Lotto Imitat ────────────────────────────────────────────
-const lottoController = require('../controllers/lottoController');
 router.get('/lotto/config', authController.optionalAuthenticateToken, lottoController.getConfig);
 router.post('/lotto/buy', authController.authenticateToken, lottoController.buyTicket);
 router.get('/lotto/history', authController.authenticateToken, lottoController.getHistory);
