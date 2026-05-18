@@ -1,5 +1,11 @@
 [
   {
+    "id": 99,
+    "version": "2.60.1",
+    "date": "2026-05-18",
+    "changes": "- **API & Test-Sicherheit**: Test-Endpunkte (/api/test/*) in Produktionsumgebungen gesperrt (403 Forbidden).\n- **Code-Qualität**: Ungenutzte Alt-Komponenten (SharedCanvas, SharedTodo) vollständig gelöscht, um das Bundle zu verkleinern.\n- **Wartbarkeit**: Alle API-Controller-Imports an den Anfang der Routing-Datei konsolidiert und ausführliche .env.example-Konfiguration hinzugefügt.\n- **Test-Infrastruktur**: Veraltete Jest-Mocks vollständig auf native Vitest-Mocks (vi) migriert für 100% grüne Testergebnisse."
+  },
+  {
     "id": 98,
     "version": "2.60.0",
     "date": "2026-05-18",
