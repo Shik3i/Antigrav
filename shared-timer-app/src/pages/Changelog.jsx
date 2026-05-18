@@ -142,7 +142,7 @@ const Changelog = () => {
                         <div>
                             <h1 style={{ margin: 0, fontSize: '2.5rem', lineHeight: 1.1 }}>System Changelog</h1>
                             <p style={{ color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                                Engineering log of the KoalaSync ecosystem.
+                                Engineering log of the KoalaWeb ecosystem.
                             </p>
                         </div>
                     </div>

@@ -1,5 +1,11 @@
 [
   {
+    "id": 98,
+    "version": "2.60.0",
+    "date": "2026-05-18",
+    "changes": "- **Rebranding zu KoalaWeb**: Vollständiges Rebranding der Plattform von \"KoalaSync\" zu \"KoalaWeb\" im Frontend (index.html, appConstants.js, Sidebar, App, Changelog, Impressum).\n- **Neue Extension-Integration**: Direkte Verlinkung zur neuen standalone Chrome-Extension (sync.koalastuff.net, GitHub: Shik3i/KoalaSync) statt veralteter lokaler Extension.\n- **CORS-Sicherheit**: Einschränkung der CORS-Policy auf timer.koalastuff.net statt offener Wildcard.\n- **Impressum**: Kontakt-E-Mail auf koalaweb@koalamail.rocks aktualisiert, Betreiber auf Administrator KoalaWeb."
+  },
+  {
     "id": 97,
     "version": "2.59.2",
     "date": "2026-05-17",
@@ -111,13 +117,13 @@
     "id": 79,
     "version": "2.48.0",
     "date": "2026-04-20",
-    "changes": "- **Achievement Expansion**: Einf\u00fchrung von 7 neuen Achievement-Ketten (Wortakrobat, Gl\u00fchbirnen-Moment, Kartenhai, G\u00f6nner-Modus, Sozialer Schmetterling, Turmspringer, Lottomania) mit insgesamt 21 neuen Meilensteinen.\n- **Backend-Optimierung**: Implementierung von hochperformanten Datenbank-Helpern mit atomaren Abfragen und Null-Safety (COALESCE) zur Gew\u00e4hrleistung der Datenintegrit\u00e4t.\n- **Performance-Tuning**: Hinzuf\u00fchgen von gezielten Datenbank-Indizes f\u00fcr Transaktionen und Freundschaftslisten zur Beschleunigung komplexer Statistiken.\n- **Kategorisiertes UI**: Neue Gruppierungen im Achievement-Bildschirm (Casino, Soziales, Wirtschaft) inklusive neuer Lucide-Icons f\u00fcr eine bessere \u00dcbersichtlichkeit.\n- **Admin-Panel Sync**: Vollst\u00e4ndige Integration der neuen Ketten in die Admin-Verwaltung zur flexiblen Multiplikator-Steuerung."
+    "changes": "- **Achievement Expansion**: Einführung von 7 neuen Achievement-Ketten (Wortakrobat, Glühbirnen-Moment, Kartenhai, Gönner-Modus, Sozialer Schmetterling, Turmspringer, Lottomania) mit insgesamt 21 neuen Meilensteinen.\n- **Backend-Optimierung**: Implementierung von hochperformanten Datenbank-Helpern mit atomaren Abfragen und Null-Safety (COALESCE) zur Gewährleistung der Datenintegrität.\n- **Performance-Tuning**: Hinzufühgen von gezielten Datenbank-Indizes für Transaktionen und Freundschaftslisten zur Beschleunigung komplexer Statistiken.\n- **Kategorisiertes UI**: Neue Gruppierungen im Achievement-Bildschirm (Casino, Soziales, Wirtschaft) inklusive neuer Lucide-Icons für eine bessere Übersichtlichkeit.\n- **Admin-Panel Sync**: Vollständige Integration der neuen Ketten in die Admin-Verwaltung zur flexiblen Multiplikator-Steuerung."
   },
   {
     "id": 78,
     "version": "2.47.0",
     "date": "2026-04-20",
-    "changes": "- **Consolidated Rewards**: Zusammenf\u00fchrung des t\u00e4glichen Login-Bonus (+10 KC) und des Gl\u00fcckskekses zu einer einzigen, intuitiven Interaktion auf der Achievements-Seite.\n- **Backend-Optimierung**: Der `openFortune`-Endpunkt gew\u00e4hrt nun automatisch die t\u00e4gliche Belohnung, inklusive atomarer Guthaben-Updates und Schutz vor Doppel-Abholungen.\n- **UI/UX Redesign**: Entfernung der redundanten \"T\u00e4glicher Bonus\" Karte; der Gl\u00fcckskeks fungiert nun als prominente, zentrale Tagesaufgabe.\n- **Echtzeit-Synchronisation**: Sofortige Aktualisierung des KoalaCoin-Guthabens in der Navigationsleiste direkt nach dem Knacken des Kekses."
+    "changes": "- **Consolidated Rewards**: Zusammenführung des täglichen Login-Bonus (+10 KC) und des Glückskekses zu einer einzigen, intuitiven Interaktion auf der Achievements-Seite.\n- **Backend-Optimierung**: Der `openFortune`-Endpunkt gewährt nun automatisch die tägliche Belohnung, inklusive atomarer Guthaben-Updates und Schutz vor Doppel-Abholungen.\n- **UI/UX Redesign**: Entfernung der redundanten \"Täglicher Bonus\" Karte; der Glückskeks fungiert nun als prominente, zentrale Tagesaufgabe.\n- **Echtzeit-Synchronisation**: Sofortige Aktualisierung des KoalaCoin-Guthabens in der Navigationsleiste direkt nach dem Knacken des Kekses."
   },
   {
     "id": 77,
