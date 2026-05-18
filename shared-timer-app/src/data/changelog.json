@@ -1,5 +1,11 @@
 [
   {
+    "id": 100,
+    "version": "2.60.2",
+    "date": "2026-05-18",
+    "changes": "- **Flyff Extension Link**: Der Download-Link der Flyff-Browser-Erweiterung im Leveling Tracker wurde von Google Drive auf die stets aktuelle offizielle GitHub Releases Page (Shik3i/FlyffUniverseHelper) verlegt."
+  },
+  {
     "id": 99,
     "version": "2.60.1",
     "date": "2026-05-18",
