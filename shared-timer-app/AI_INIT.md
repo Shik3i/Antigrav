@@ -1,11 +1,11 @@
-# Antigrav AI Initialization & Context Guide
+# KoalaWeb AI Initialization & Context Guide
 
-**MANDATORY FIRST READ.** This file defines the architectural constraints and development protocols for the Antigrav platform. AI agents must strictly adhere to these rules to maintain system integrity and prevent regressions.
+**MANDATORY FIRST READ.** This file defines the architectural constraints and development protocols for the KoalaWeb platform. AI agents must strictly adhere to these rules to maintain system integrity, prevent regressions, and ensure environment consistency.
 
 ---
 
 ## 🏗️ Project Persona & Tech Stack
-Antigrav is a **Full-Stack Monolith** optimized for real-time collaborative productivity and social gaming.
+KoalaWeb is a **Full-Stack Monolith** optimized for real-time collaborative productivity, games, and social elements.
 
 - **Backend**: Node.js (CommonJS), Express 5.x, SQLite 3.
 - **Frontend**: React 19, Vite 7.x, React Router 7.
@@ -16,9 +16,11 @@ Antigrav is a **Full-Stack Monolith** optimized for real-time collaborative prod
 ---
 
 ## 🤖 AI Working Directives
-1. **Atomic Iterations**: Perform changes in small, verifiable steps. Never refactor multiple domains simultaneously.
-2. **Context Management**: Be aware of token limits. Keep files logically cohesive. Aim for < 800 lines. The 1000-line mark is a soft goal for further decomposition; logic should not be artificially split if it reduces clarity, but anything significantly over 1000 lines should be evaluated for extraction.
-3. **Planning Mode**: For complex features, create an `implementation_plan.md` and wait for user approval before execution.
+
+1. **🔒 Git Branch Hygiene (CRITICAL)**: Before writing any code or executing edits, **always run `git branch` and `git status`**. Ensure you are on the `main` branch (unless explicitly instructed by the user to work on a feature branch) and pull the latest updates. Working on the wrong branch causes catastrophic merge conflicts!
+2. **Atomic Iterations**: Perform changes in small, verifiable steps. Never refactor multiple domains simultaneously.
+3. **Context Management**: Be aware of token limits. Keep files logically cohesive. Aim for < 800 lines. Anything significantly over 1000 lines should be evaluated for extraction.
+4. **Planning Mode**: For complex features, create an `implementation_plan.md` and wait for user approval before execution.
 
 ---
 
@@ -51,4 +53,4 @@ Antigrav is a **Full-Stack Monolith** optimized for real-time collaborative prod
 - `database/ARCHITECTURE.md`: Deep dive into the DB layer.
 - `socketEvents.json`: Source of truth for real-time events.
 
-**By proceeding, you acknowledge these constraints and commit to maintaining the modular integrity of the Antigrav codebase.**
+**By proceeding, you acknowledge these constraints and commit to maintaining the modular integrity and branching hygiene of the KoalaWeb codebase.**
