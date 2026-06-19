@@ -1,6 +1,12 @@
 // Room Manager to keep track of active timers in memory
 // This ensures fast response times and perfect sync across clients
 
+const {
+    createTimerState,
+    applyTimerAction,
+    tickTimer
+} = require('./utils/timer/timerDomain');
+
 class RoomManager {
     constructor() {
         // rooms: { roomId: { config, state, users: Map } }
@@ -23,16 +29,8 @@ class RoomManager {
                     defaultRole: defaultRole
                 },
                 state: {
-                    isRunning: false,
-                    remainingMs: defaultDurationMinutes * 60 * 1000,
-                    lastTickTime: null,
-                    hasStarted: false,
+                    ...createTimerState(defaultDurationMinutes * 60 * 1000),
                     // Pomodoro state
-                    isPomodoro: false,
-                    pomodoroPhase: 'work', // 'work' or 'break'
-                    pomodoroCycles: 0,
-                    // Auto-Restart
-                    autoRestart: true,
                     // Workspace Features
                     todos: [], // { id, text, completed, author }
                     canvasLines: [], // array of lines drawn
@@ -283,92 +281,58 @@ class RoomManager {
         return null;
     }
 
-    startTimer(roomId) {
+    _applyTimerAction(roomId, action, now = Date.now()) {
         const room = this.getRoom(roomId);
-        if (!room) return false;
-
-        // If timer is finished (at 0, or tiny floating negative), automatically reset to full duration before starting
-        if (room.state.remainingMs <= 50) {
-            room.state.remainingMs = room.config.durationMs;
-        }
-
-        if (!room.state.isRunning && room.state.remainingMs > 0) {
-            room.state.isRunning = true;
-            room.state.hasStarted = true;
-            room.state.lastTickTime = Date.now();
-            return true;
-        }
-        return false;
+        if (!room) return { ok: false, changed: false, error: 'ROOM_NOT_FOUND', completion: null };
+        const result = applyTimerAction({ config: room.config, state: room.state }, action, now);
+        if (!result.ok) return { ...result, changed: false };
+        const changed = result.value.state.timerRevision !== room.state.timerRevision
+            || result.value.state.completionSequence !== room.state.completionSequence;
+        room.config = result.value.config;
+        room.state = result.value.state;
+        return { ...result, changed, room };
     }
 
-    pauseTimer(roomId) {
-        const room = this.getRoom(roomId);
-        if (room.state.isRunning) {
-            this._updateRemaining(room);
-            room.state.isRunning = false;
-            room.state.lastTickTime = null;
-            return true;
-        }
-        return false;
+    startTimer(roomId, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'START' }, now).changed;
     }
 
-    resetTimer(roomId) {
-        const room = this.getRoom(roomId);
-        room.state.isRunning = false;
-        room.state.remainingMs = room.config.durationMs;
-        room.state.lastTickTime = null;
-        room.state.hasStarted = false;
-        return true;
+    pauseTimer(roomId, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'PAUSE' }, now).changed;
     }
 
-    setDuration(roomId, minutes) {
-        const room = this.getRoom(roomId);
-        room.config.durationMs = Math.round(minutes * 60 * 1000); // Ensures no floating point ms issues
-        // If the timer is not actively running, resetting the duration ALWAYS resets the remaining time
-        if (!room.state.isRunning) {
-            room.state.remainingMs = room.config.durationMs;
-        }
-        return true;
+    resetTimer(roomId, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'RESET' }, now).changed;
     }
 
-    _updateRemaining(room) {
-        if (room.state.isRunning && room.state.lastTickTime) {
-            const now = Date.now();
-            const elapsed = now - room.state.lastTickTime;
-            room.state.remainingMs -= elapsed;
-            room.state.lastTickTime = now;
-            // We DO NOT set isRunning = false here. 
-            // tick() must be the one to complete the timer so events fire properly.
-        }
+    setDuration(roomId, minutes, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'SET_DURATION', payload: minutes }, now).changed;
     }
 
-    tick() {
+    setRemaining(roomId, remainingMs, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'SET_REMAINING', payload: remainingMs }, now);
+    }
+
+    endEarly(roomId, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'END_EARLY' }, now);
+    }
+
+    _updateRemaining(room, now = Date.now()) {
+        if (!room) return null;
+        const result = tickTimer({ config: room.config, state: room.state }, now);
+        room.config = result.value.config;
+        room.state = result.value.state;
+        return result.completion;
+    }
+
+    tick(now = Date.now()) {
         // Process all running rooms, return ones that just completed
         const completedRooms = [];
-        const now = Date.now();
 
-        for (const [roomId, room] of this.rooms.entries()) {
+        for (const room of this.rooms.values()) {
             if (room.state.isRunning) {
-                const elapsed = now - room.state.lastTickTime;
-                room.state.remainingMs -= elapsed;
-                room.state.lastTickTime = now;
-
-                if (room.state.remainingMs <= 0) {
-                    room.state.remainingMs = 0;
-                    room.state.isRunning = false;
-
-                    // Track completions
-                    if (!room.state.stats) room.state.stats = { totalCompletions: 0, userCompletions: {} };
-                    room.state.stats.totalCompletions++;
-                    for (const user of room.users.values()) {
-                        const uid = user.userId || user.id;
-                        if (uid) {
-                            room.state.stats.userCompletions[uid] = (room.state.stats.userCompletions[uid] || 0) + 1;
-                        }
-                    }
-
-                    completedRooms.push(room);
-                }
+                const completion = this._updateRemaining(room, now);
+                if (completion) completedRooms.push({ room, completion: { ...completion, roomId: room.id } });
             }
         }
         return completedRooms;
@@ -377,11 +341,6 @@ class RoomManager {
     getRoomState(roomId) {
         const room = this.rooms.get(roomId);
         if (!room) return null;
-        // Always calculate precise remaining right before returning
-        if (room.state.isRunning) {
-            this._updateRemaining(room);
-        }
-
         // Return a safe copy of the state
         const safeState = { ...room.state };
         if (safeState.remainingMs < 0) safeState.remainingMs = 0;
@@ -394,49 +353,32 @@ class RoomManager {
         };
     }
 
-    togglePomodoro(roomId, enabled, pauseMinutes, workName, breakName) {
+    togglePomodoro(roomId, enabled, pauseMinutes, workName, breakName, now = Date.now()) {
         const room = this.getRoom(roomId);
-        if (room) {
-            room.state.isPomodoro = enabled;
-            if (enabled) {
-                if (!room.config.pomodoro) room.config.pomodoro = {};
-                if (pauseMinutes !== undefined && pauseMinutes !== null) {
-                    room.config.pomodoro.pauseMinutes = parseFloat(pauseMinutes) || 5;
-                }
-                if (workName !== undefined) room.config.pomodoro.workName = workName;
-                if (breakName !== undefined) room.config.pomodoro.breakName = breakName;
-            }
-            return true;
+        if (!room) return false;
+        const parsedPause = pauseMinutes === undefined || pauseMinutes === null
+            ? undefined
+            : Number.parseFloat(pauseMinutes);
+        const result = this._applyTimerAction(roomId, {
+            type: 'SET_POMODORO',
+            payload: { enabled, pauseMinutes: parsedPause }
+        }, now);
+        if (!result.ok) return false;
+        if (enabled) {
+            room.config.pomodoro = room.config.pomodoro || {};
+            if (workName !== undefined) room.config.pomodoro.workName = workName;
+            if (breakName !== undefined) room.config.pomodoro.breakName = breakName;
         }
-        return false;
+        return result.changed;
     }
 
-    advancePomodoro(roomId) {
-        const room = this.getRoom(roomId);
-        if (!room || !room.state.isPomodoro) return null;
-
-        // Toggle phase
-        room.state.pomodoroPhase = room.state.pomodoroPhase === 'work' ? 'break' : 'work';
-        
-        if (room.state.pomodoroPhase === 'work') {
-            room.state.pomodoroCycles++;
-            room.state.remainingMs = room.config.durationMs; // Use default work duration
-        } else {
-            const pauseMinutes = room.config.pomodoro?.pauseMinutes || 5;
-            room.state.remainingMs = pauseMinutes * 60 * 1000;
-        }
-
-        this.startTimer(roomId);
-        return room.state.pomodoroPhase;
+    advancePomodoro(roomId, now = Date.now()) {
+        const result = this._applyTimerAction(roomId, { type: 'ADVANCE_POMODORO' }, now);
+        return result.ok && result.changed ? result.room.state.pomodoroPhase : null;
     }
 
-    toggleAutoRestart(roomId, enabled) {
-        const room = this.getRoom(roomId);
-        if (room) {
-            room.state.autoRestart = enabled;
-            return true;
-        }
-        return false;
+    toggleAutoRestart(roomId, enabled, now = Date.now()) {
+        return this._applyTimerAction(roomId, { type: 'TOGGLE_AUTO_RESTART', payload: enabled }, now).changed;
     }
 
 
