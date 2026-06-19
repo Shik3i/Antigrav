@@ -26,6 +26,17 @@ function getPhaseDurationMs(config, state) {
   return config.durationMs;
 }
 
+function getPauseDurationMs(config, pauseMinutes = config.pomodoro?.pauseMinutes ?? 5) {
+  return Math.round(pauseMinutes * 60_000);
+}
+
+function isValidPauseDuration(config, pauseMinutes) {
+  const pauseDurationMs = getPauseDurationMs(config, pauseMinutes);
+  return Number.isFinite(pauseMinutes)
+    && pauseDurationMs >= MIN_REMAINING_MS
+    && pauseDurationMs < config.durationMs;
+}
+
 function cloneSnapshot(snapshot) {
   return {
     ...snapshot,
@@ -124,13 +135,21 @@ function applyTimerAction(snapshot, action, now) {
       || minutes < MIN_DURATION_MINUTES || minutes > MAX_DURATION_MINUTES) {
       return invalid(snapshot, 'INVALID_DURATION');
     }
+    const nextDurationMs = Math.round(minutes * 60_000);
+    if (snapshot.state.isPomodoro) {
+      const pauseMinutes = snapshot.config.pomodoro?.pauseMinutes ?? 5;
+      if (!isValidPauseDuration({ ...snapshot.config, durationMs: nextDurationMs }, pauseMinutes)) {
+        return invalid(snapshot, 'INVALID_PAUSE_DURATION');
+      }
+    }
     const value = cloneSnapshot(snapshot);
-    value.config.durationMs = Math.round(minutes * 60_000);
+    value.config.durationMs = nextDurationMs;
     value.state.remainingMs = value.config.durationMs;
     value.state.elapsedActiveMs = 0;
     value.state.isRunning = false;
     value.state.hasStarted = false;
     value.state.lastTickTime = null;
+    value.state.pomodoroPhase = 'work';
     value.state.timerRevision += 1;
     value.state.transitionGeneration += 1;
     return result(value);
@@ -170,11 +189,9 @@ function applyTimerAction(snapshot, action, now) {
     const payload = action.payload;
     const enabled = typeof payload === 'object' && payload !== null ? payload.enabled : payload;
     const pauseMinutes = typeof payload === 'object' && payload !== null ? payload.pauseMinutes : undefined;
-    const pauseDurationMs = Math.round(pauseMinutes * 60_000);
     if (typeof enabled !== 'boolean') return invalid(snapshot, 'INVALID_POMODORO');
-    if (pauseMinutes !== undefined && (!Number.isFinite(pauseMinutes)
-      || pauseDurationMs < MIN_REMAINING_MS
-      || pauseDurationMs >= snapshot.config.durationMs)) {
+    const effectivePauseMinutes = pauseMinutes ?? snapshot.config.pomodoro?.pauseMinutes ?? 5;
+    if (enabled && !isValidPauseDuration(snapshot.config, effectivePauseMinutes)) {
       return invalid(snapshot, 'INVALID_PAUSE_DURATION');
     }
     const value = cloneSnapshot(snapshot);
