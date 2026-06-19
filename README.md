@@ -12,7 +12,6 @@ Die Anwendung besteht aus:
 - **Node.js + Express** im Backend
 - **Socket.io** für Echtzeitfunktionen
 - **SQLite** als persistente Datenbank
-- einer optionalen **Browser-Erweiterung** in `SyncExtension/`
 
 Antigrav ist damit deutlich mehr als nur ein geteilter Timer oder ein kleines Casino-Modul. Die Plattform bündelt mehrere soziale, spielerische und datenbasierte Features in einer Anwendung.
 
@@ -56,7 +55,7 @@ Antigrav ist damit deutlich mehr als nur ein geteilter Timer oder ein kleines Ca
 
 ### 🔌 Erweiterbarkeit
 - REST-API über Express
-- Browser-Erweiterung im Projekt enthalten
+- optionale Anbindung an die eigenständige KoalaSync-Browser-Erweiterung
 - externe Integrationen, z. B. Twitch oder Odds API
 
 ---
@@ -88,7 +87,6 @@ Antigrav ist damit deutlich mehr als nur ein geteilter Timer oder ein kleines Ca
 ```text
 Antigrav-main/
 ├── README.md
-├── SyncExtension/          # Browser-Erweiterung
 └── shared-timer-app/
     ├── src/                # React-Frontend
     ├── controllers/        # API- und Business-Logik
@@ -293,7 +291,11 @@ npm run dev
 
 ## 🧩 Browser-Erweiterung
 
-Im Projekt ist mit `SyncExtension/` eine Browser-Erweiterung enthalten. Wenn die Erweiterung Teil des Deployments sein soll, sollte sie separat dokumentiert, gebaut und versioniert werden.
+Für synchronisierte Medienwiedergabe kann optional die eigenständige **KoalaSync**-Browser-Erweiterung verwendet werden. Sie ist nicht Bestandteil dieses Repositorys und wird separat entwickelt und veröffentlicht:
+
+- Website: [sync.koalastuff.net](https://sync.koalastuff.net)
+- Releases: [Shik3i/KoalaSync Releases](https://github.com/Shik3i/KoalaSync/releases)
+- Quellcode: [Shik3i/KoalaSync](https://github.com/Shik3i/KoalaSync)
 
 ---
 
@@ -304,7 +306,6 @@ Diese README beschreibt das Projekt auf Basis der aktuellen Struktur deutlich pa
 - genaue Startanleitung für den kombinierten Frontend-/Backend-Workflow
 - Beschreibung der wichtigsten API-Endpunkte
 - Dokumentation der Admin-Funktionen
-- separate README für `SyncExtension/`
 - `.env.example` für einfacheres Setup
 
 ---
