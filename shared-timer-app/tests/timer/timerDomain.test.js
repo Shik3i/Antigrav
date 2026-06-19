@@ -90,6 +90,13 @@ describe('timerDomain', () => {
     });
   });
 
+  test('SET_DURATION accepts fractional minutes and rounds to integer milliseconds', () => {
+    const result = applyTimerAction(snapshot(), { type: 'SET_DURATION', payload: 1.5 }, 1_000);
+    expect(result.ok).toBe(true);
+    expect(result.value.config.durationMs).toBe(90_000);
+    expect(result.value.state.remainingMs).toBe(90_000);
+  });
+
   test.each([NaN, Infinity, -1, 0, 0.5, 121, 'abc'])('rejects invalid duration %p', payload => {
     const initial = snapshot();
     const before = structuredClone(initial);
@@ -158,11 +165,14 @@ describe('timerDomain', () => {
   });
 
   test('SET_POMODORO validates pause duration and resets mode consistently', () => {
-    const enabled = applyTimerAction(snapshot(), { type: 'SET_POMODORO', payload: { enabled: true, pauseMinutes: 3 } }, 10);
-    expect(enabled.value.config.pomodoro.pauseMinutes).toBe(3);
+    const enabled = applyTimerAction(snapshot(), { type: 'SET_POMODORO', payload: { enabled: true, pauseMinutes: 1.234 } }, 10);
+    expect(enabled.value.config.pomodoro.pauseMinutes).toBe(1.234);
+    expect(getPhaseDurationMs(enabled.value.config, { ...enabled.value.state, pomodoroPhase: 'break' })).toBe(74_040);
     expect(enabled.value.state).toMatchObject({ isPomodoro: true, pomodoroPhase: 'work', remainingMs: config.durationMs });
-    expect(applyTimerAction(snapshot(), { type: 'SET_POMODORO', payload: { enabled: true, pauseMinutes: 0.5 } }, 10))
-      .toMatchObject({ ok: false, error: 'INVALID_PAUSE_DURATION' });
+    for (const pauseMinutes of [0, 0.001, 20, Infinity]) {
+      expect(applyTimerAction(snapshot(), { type: 'SET_POMODORO', payload: { enabled: true, pauseMinutes } }, 10))
+        .toMatchObject({ ok: false, error: 'INVALID_PAUSE_DURATION' });
+    }
     const disabled = applyTimerAction(
       { ...enabled.value, state: { ...enabled.value.state, pomodoroPhase: 'break', remainingMs: 5_000 } },
       { type: 'SET_POMODORO', payload: false },
