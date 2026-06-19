@@ -113,21 +113,11 @@ exports.testRoomAction = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Room not found in memory' });
         }
 
-        let changed = false;
-        switch (action) {
-            case 'START':
-                changed = roomManager.startTimer(id);
-                break;
-            case 'PAUSE':
-                changed = roomManager.pauseTimer(id);
-                break;
-            case 'RESET':
-                changed = roomManager.resetTimer(id);
-                break;
-            case 'SET_DURATION':
-                changed = roomManager.setDuration(id, payload);
-                break;
+        const result = roomManager._applyTimerAction(id, { type: action, payload }, Date.now());
+        if (!result.ok) {
+            return res.status(400).json({ success: false, error: result.error });
         }
+        const changed = result.changed;
 
         if (changed) {
             const io = req.app.get('io');

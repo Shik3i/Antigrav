@@ -8,6 +8,8 @@ const sanitize = require('../sanitize');
 const apiController = require('../controllers/apiController');
 const apiDataService = require('../services/apiDataService');
 const { safeEmit, safeStringify } = require('../utils/safeSerialization');
+const { createTimerLifecycleService } = require('../services/timerLifecycleService');
+const { registerTimerSocketHandlers } = require('./timerSocketHandlers');
 
 const JWT_SECRET = require('../jwtSecret');
 
@@ -81,6 +83,12 @@ roomController.initRouletteBroadcast((userId, newBalanceCents) => {
 
 module.exports = function (io) {
     _io = io;
+    const timerLifecycleService = createTimerLifecycleService({
+        io,
+        roomManager,
+        dbLayer,
+        broadcastCoinUpdate
+    });
 
     const persistBlackjackSettlementIfNeeded = async (roomId) => {
         const room = blackjackRoomManager.rooms.get(roomId);
@@ -173,6 +181,7 @@ module.exports = function (io) {
     });
 
     io.on('connection', (socket) => {
+        registerTimerSocketHandlers({ socket, io, roomManager, lifecycleService: timerLifecycleService });
 
         if (socket.user) {
             const userId = socket.user.userId;
@@ -1287,146 +1296,12 @@ module.exports = function (io) {
             }
         });
 
-        socket.on(EVENTS.TIMER_ACTION, ({ roomId, action, payload }) => {
-            // Check permission
-            const user = roomManager.getUserBySocket(socket.id);
-            if (!user || user.role !== 'write') {
-                socket.emit(EVENTS.ERROR, 'You do not have permission to control the timer.');
-                return;
-            }
-
-            let changed = false;
-            let actionText = '';
-            switch (action) {
-                case 'START':
-                    changed = roomManager.startTimer(roomId);
-                    actionText = 'started the timer';
-                    break;
-                case 'PAUSE':
-                    changed = roomManager.pauseTimer(roomId);
-                    actionText = 'paused the timer';
-                    break;
-                case 'RESET':
-                    changed = roomManager.resetTimer(roomId);
-                    actionText = 'reset the timer';
-                    break;
-                case 'SET_DURATION':
-                    changed = roomManager.setDuration(roomId, payload); // payload is minutes
-                    actionText = `set duration to ${payload}m`;
-                    break;
-                case 'END_EARLY': {
-                    const room = roomManager.getRoom(roomId);
-                    if (room && room.state.isRunning) {
-                        roomManager._updateRemaining(room);
-                        const elapsedMs = room.config.durationMs - room.state.remainingMs;
-                        const originalDuration = room.config.durationMs;
-                        
-                        // Temporarily override to calculate strict rewards or fulfill request
-                        room.config.durationMs = elapsedMs;
-                        room.state.remainingMs = 0;
-                        room.state.isRunning = false;
-
-                        io.to(roomId).emit(EVENTS.TIMER_COMPLETED, { roomId, timestamp: Date.now() });
-                        changed = true;
-
-                        dbLayer.getKoalaBaseline().then(settings => {
-                            const durationMinutes = elapsedMs / (60 * 1000);
-                            const coinsToAward = Math.floor((durationMinutes / 60) * settings.koala_points_per_hour);
-
-                            const uniqueUsers = new Map();
-                            room.users.forEach(u => {
-                                const id = u.userId || u.id;
-                                if (id && !uniqueUsers.has(id)) uniqueUsers.set(id, u);
-                            });
-
-                            room.state.stats = room.state.stats || { totalCompletions: 0, userCompletions: {} };
-                            room.state.stats.totalCompletions++;
-
-                            Array.from(uniqueUsers.values()).forEach(u => {
-                                const id = u.userId || u.id;
-                                if (!id) return;
-                                room.state.stats.userCompletions[id] = (room.state.stats.userCompletions[id] || 0) + 1;
-                                dbLayer.addUser(id, u.displayName || u.username).then(() => {
-                                    dbLayer.recordTimerCompletion(id, room.id, room.config.name, durationMinutes).catch(console.error);
-                                    if (coinsToAward > 0) {
-                                        dbLayer.addKoalaCoins(id, coinsToAward, `Completed ${Math.round(durationMinutes)}m timer (ended early)`).then(newBalance => {
-                                            broadcastCoinUpdate(io, id, newBalance);
-                                            const userSockets = Array.from(room.users.values()).filter(us => (us.userId || us.id) === id);
-                                            userSockets.forEach(uSocket => {
-                                                if (uSocket.socketId) io.to(uSocket.socketId).emit('KOALA_COINS_EARNED', { amount: coinsToAward, newBalance });
-                                            });
-                                        }).catch(console.error);
-                                    }
-                                }).catch(console.error);
-                            });
-
-                            // Handle Auto-Restart correctly
-                            if (room.state.autoRestart && !room.state.isPomodoro) {
-                                setTimeout(() => {
-                                    if (roomManager.rooms.has(room.id) && room.state.autoRestart) {
-                                        room.config.durationMs = originalDuration;
-                                        roomManager.resetTimer(room.id);
-                                        roomManager.startTimer(room.id);
-                                        io.to(room.id).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(room.id));
-                                    }
-                                }, 3000);
-                            } else {
-                                room.config.durationMs = originalDuration;
-                            }
-                        }).catch(console.error);
-
-                        actionText = 'ended the timer early';
-                    }
-                    break;
-                }
-            }
-
-            if (changed) {
-                io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
-                if (actionText) {
-                    const ev = roomManager.addEvent(roomId, 'action', `${user.displayName} ${actionText}`, socket.id);
-                    if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
-                }
-            }
-        });
-
         socket.on(EVENTS.GET_INVITE_TOKENS, ({ roomId }) => {
             const user = roomManager.getUserBySocket(socket.id);
             if (user && user.role === 'write') {
                 const readToken = jwt.sign({ roomId, role: 'read' }, JWT_SECRET);
                 const writeToken = jwt.sign({ roomId, role: 'write' }, JWT_SECRET);
                 socket.emit(EVENTS.INVITE_TOKENS, { readToken, writeToken });
-            }
-        });
-
-        socket.on(EVENTS.SET_POMODORO, ({ roomId, enabled, pauseMinutes, workName, breakName }) => {
-            const user = roomManager.getUserBySocket(socket.id);
-            if (user && user.role === 'write') {
-                const room = roomManager.getRoom(roomId);
-                if (room) {
-                    if (enabled) {
-                        if (pauseMinutes && (pauseMinutes * 60 * 1000) >= room.config.durationMs) {
-                            socket.emit(EVENTS.ERROR, 'Fehler: Die Pausenzeit muss kürzer als die Gesamtzeit sein.');
-                            return;
-                        }
-                    }
-                    roomManager.togglePomodoro(roomId, enabled, pauseMinutes, workName, breakName);
-                    io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
-                    const ev = roomManager.addEvent(roomId, 'action', `${user.displayName} ${enabled ? 'enabled' : 'disabled'} Pomodoro mode`, socket.id);
-                    if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
-                }
-            }
-        });
-
-        socket.on(EVENTS.TOGGLE_AUTO_RESTART, ({ roomId, enabled }) => {
-            const user = roomManager.getUserBySocket(socket.id);
-            if (user && user.role === 'write') {
-                const changed = roomManager.toggleAutoRestart(roomId, enabled);
-                if (changed) {
-                    io.to(roomId).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(roomId));
-                    const ev = roomManager.addEvent(roomId, 'action', `${user.displayName} ${enabled ? 'enabled' : 'disabled'} Auto-Restart`, socket.id);
-                    if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
-                }
             }
         });
 
@@ -1732,77 +1607,10 @@ module.exports = function (io) {
         const completedRooms = roomManager.tick();
         const blackjackChangedRooms = blackjackRoomManager.tick();
 
-        // Emit timer_completed event
-        completedRooms.forEach(room => {
-            io.to(room.id).emit(EVENTS.TIMER_COMPLETED, { roomId: room.id, timestamp: Date.now() });
-            io.to(room.id).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(room.id));
-            const ev = roomManager.addEvent(room.id, 'action', 'Timer reached 0!');
-            if (ev) io.to(room.id).emit(EVENTS.ROOM_EVENT, ev);
-
-            // Get baseline to calculate points
-            dbLayer.getKoalaBaseline().then(settings => {
-                const durationMinutes = room.config.durationMs / (60 * 1000);
-                // koala_points_per_hour is stored in cents (e.g. 10000 = 100.00 coins per hour)
-                const coinsToAward = Math.floor((durationMinutes / 60) * settings.koala_points_per_hour);
-
-                // Extract unique users to prevent multiple payouts for users with multiple tabs
-                const uniqueUsers = new Map();
-                room.users.forEach(user => {
-                    const id = user.userId || user.id;
-                    if (id && !uniqueUsers.has(id)) {
-                        uniqueUsers.set(id, user);
-                    }
-                });
-
-                // Record completion in DB for every unique user present
-                Array.from(uniqueUsers.values()).forEach(user => {
-                    const id = user.userId || user.id;
-                    if (!id) return; // Prevent corrupt entries with no ID
-
-                    dbLayer.addUser(id, user.displayName || user.username).then(() => {
-                        dbLayer.recordTimerCompletion(id, room.id, room.config.name, durationMinutes).catch(console.error);
-
-                        // Award KoalaCoins if there is a real duration
-                        if (coinsToAward > 0) {
-                            dbLayer.addKoalaCoins(user.userId || user.id, coinsToAward, `Completed ${Math.round(durationMinutes)}m timer`).then(newBalance => {
-                                // Notify user about earnings (amount shown as display coins, not cents)
-                                // Broadcast to ALL sockets of this user, not just this specific socket reference
-                                broadcastCoinUpdate(io, user.userId || user.id, newBalance);
-                                
-                                // To show the UI popup, we need to find all sockets for this user
-                                const userSockets = Array.from(room.users.values()).filter(u => (u.userId || u.id) === (user.userId || user.id));
-                                userSockets.forEach(uSocket => {
-                                    if (uSocket.socketId) {
-                                        io.to(uSocket.socketId).emit('KOALA_COINS_EARNED', {
-                                            amount: coinsToAward,
-                                            newBalance: newBalance
-                                        });
-                                    }
-                                });
-                            }).catch(console.error);
-                        }
-                    }).catch(console.error);
-                });
-            }).catch(console.error);
-
-            // Pomodoro auto-advance
-            if (room.state.isPomodoro) {
-                setTimeout(() => {
-                    const nextPhase = roomManager.advancePomodoro(room.id);
-                    if (nextPhase) {
-                        io.to(room.id).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(room.id));
-                    }
-                }, 3000); // 3 second delay for a nice breather
-            } else if (room.state.autoRestart) {
-                // Auto-Restart logic if not Pomodoro
-                setTimeout(() => {
-                    if (roomManager.rooms.has(room.id) && room.state.autoRestart) {
-                        roomManager.resetTimer(room.id);
-                        roomManager.startTimer(room.id);
-                        io.to(room.id).emit(EVENTS.SYNC_STATE, roomManager.getRoomState(room.id));
-                    }
-                }, 3000); // 3 second delay before auto-restart starts ticking again
-            }
+        completedRooms.forEach(({ room, completion }) => {
+            timerLifecycleService.handleCompletion(room, completion).catch(error => {
+                console.error('Timer completion failed:', error);
+            });
         });
 
         // To keep clients synced exactly without drift, broadcast state every second
