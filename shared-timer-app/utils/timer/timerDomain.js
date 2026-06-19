@@ -120,12 +120,12 @@ function applyTimerAction(snapshot, action, now) {
 
   if (type === 'SET_DURATION') {
     const minutes = action.payload;
-    if (!Number.isFinite(minutes) || !Number.isInteger(minutes)
+    if (!Number.isFinite(minutes)
       || minutes < MIN_DURATION_MINUTES || minutes > MAX_DURATION_MINUTES) {
       return invalid(snapshot, 'INVALID_DURATION');
     }
     const value = cloneSnapshot(snapshot);
-    value.config.durationMs = minutes * 60_000;
+    value.config.durationMs = Math.round(minutes * 60_000);
     value.state.remainingMs = value.config.durationMs;
     value.state.elapsedActiveMs = 0;
     value.state.isRunning = false;
@@ -170,10 +170,11 @@ function applyTimerAction(snapshot, action, now) {
     const payload = action.payload;
     const enabled = typeof payload === 'object' && payload !== null ? payload.enabled : payload;
     const pauseMinutes = typeof payload === 'object' && payload !== null ? payload.pauseMinutes : undefined;
+    const pauseDurationMs = Math.round(pauseMinutes * 60_000);
     if (typeof enabled !== 'boolean') return invalid(snapshot, 'INVALID_POMODORO');
     if (pauseMinutes !== undefined && (!Number.isFinite(pauseMinutes)
-      || !Number.isInteger(pauseMinutes)
-      || pauseMinutes < MIN_DURATION_MINUTES || pauseMinutes > MAX_DURATION_MINUTES)) {
+      || pauseDurationMs < MIN_REMAINING_MS
+      || pauseDurationMs >= snapshot.config.durationMs)) {
       return invalid(snapshot, 'INVALID_PAUSE_DURATION');
     }
     const value = cloneSnapshot(snapshot);
