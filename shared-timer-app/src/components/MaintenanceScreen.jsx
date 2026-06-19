@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as LucideIcons from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Wrench } from 'lucide-react';
 
 const MaintenanceScreen = () => {
     const navigate = useNavigate();
@@ -68,7 +68,7 @@ const MaintenanceScreen = () => {
                     color: 'var(--accent-primary)',
                     boxShadow: '0 0 20px rgba(59, 130, 246, 0.2)'
                 }}>
-                    <LucideIcons.Wrench size={40} style={{ animation: 'pulse 3s infinite' }} />
+                    <Wrench size={40} style={{ animation: 'pulse 3s infinite' }} />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -121,7 +121,7 @@ const MaintenanceScreen = () => {
                             transition: 'transform 0.2s'
                         }}
                     >
-                        <LucideIcons.ArrowLeft size={18} /> Zurück zum Dashboard
+                        <ArrowLeft size={18} /> Zurück zum Dashboard
                     </button>
                     
                     <div style={{
@@ -132,7 +132,7 @@ const MaintenanceScreen = () => {
                         color: 'rgba(255,255,255,0.4)',
                         fontSize: '0.85rem'
                     }}>
-                        <LucideIcons.ShieldAlert size={14} />
+                        <ShieldAlert size={14} />
                         <span>Professionelle Wartung aktiv</span>
                     </div>
                 </div>

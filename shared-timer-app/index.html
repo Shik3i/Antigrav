@@ -5,9 +5,22 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
+  <meta name="description" content="KoalaWeb ist eine Echtzeit-Plattform fuer gemeinsame Timer, Countdowns, Minigames, News, Highscores und Community-Features." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#121212" />
+  <link rel="canonical" href="https://timer.koalastuff.net/" />
   <link rel="manifest" href="/manifest.json" />
-  <title>KoalaWeb</title>
+  <meta property="og:site_name" content="KoalaWeb" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="de_DE" />
+  <meta property="og:url" content="https://timer.koalastuff.net/" />
+  <meta property="og:title" content="KoalaWeb - Timer, Games und Community" />
+  <meta property="og:description" content="Gemeinsame Timer, Countdowns, Minigames, News, Highscores und Community-Features in einer Echtzeit-Web-App." />
+  <meta property="og:image" content="https://timer.koalastuff.net/vite.svg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="KoalaWeb - Timer, Games und Community" />
+  <meta name="twitter:description" content="Gemeinsame Timer, Countdowns, Minigames, News, Highscores und Community-Features in einer Echtzeit-Web-App." />
+  <title>KoalaWeb - Timer, Games und Community</title>
 
 
 </head>
@@ -15,16 +28,7 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
-          // SW registration failed
-        });
-
-      });
-    }
-  </script>
+  <script src="/register-sw.js" defer></script>
 </body>
 
 </html>

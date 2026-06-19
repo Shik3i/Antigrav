@@ -1,6 +1,32 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import * as LucideIcons from 'lucide-react';
+import {
+    BarChart3,
+    ChevronDown,
+    ChevronRight,
+    CircleDot,
+    Clock,
+    Crown,
+    Gamepad2,
+    Grid3X3,
+    History,
+    LayoutDashboard,
+    Lightbulb,
+    ListTodo,
+    LogIn,
+    LogOut,
+    Maximize2,
+    Palette,
+    Pause,
+    Play,
+    Rss,
+    Settings,
+    Shield,
+    Target,
+    Timer,
+    TrendingUp,
+    Trophy,
+} from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentData } from '../context/PersistentDataContext';
@@ -10,31 +36,31 @@ import { prefetchRoute } from '../utils/prefetchRoutes';
 
 
 const iconMap = {
-    'dashboard': <LucideIcons.LayoutDashboard size={18} />,
-    'countdowns': <LucideIcons.Timer size={18} />,
-    'speedcube': <LucideIcons.Grid3X3 size={18} />,
-    'statistics': <LucideIcons.BarChart3 size={18} />,
-    'esports': <LucideIcons.Trophy size={18} color="#3b82f6" />,
-    'esports-bets': <LucideIcons.Target size={18} color="#f59e0b" />,
-    'polymarket-general': <LucideIcons.TrendingUp size={18} color="#3b82f6" />,
-    'financial-dashboard': <LucideIcons.TrendingUp size={18} color="#10b981" />,
-    'achievements': <LucideIcons.Trophy size={18} color="#facc15" />,
-    'koala-flap': <LucideIcons.Gamepad2 size={18} color="#ec4899" />,
-    'scratch-cards': <LucideIcons.Grid3X3 size={18} color="#fbbf24" />,
-    'rift-defense': <LucideIcons.Shield size={18} color="#10b981" />,
-    'lol-idle': <LucideIcons.Trophy size={18} color="#6366f1" />,
-    'colorsync': <LucideIcons.Palette size={18} color="var(--accent-primary)" />,
-    'game-leaderboards': <LucideIcons.Trophy size={18} color="#f59e0b" />,
-    'tower-climb': <LucideIcons.Shield size={18} color="#3b82f6" />,
-    'blackjack': <LucideIcons.Crown size={18} color="#f59e0b" />,
-    'roulette': <LucideIcons.CircleDot size={18} color="#c9a84c" />,
-    'settings': <LucideIcons.Settings size={18} />,
-    'roadmap': <LucideIcons.Lightbulb size={18} color="#fbbf24" />,
-    'changelog': <LucideIcons.History size={18} color="#94a3b8" />,
-    'admin': <LucideIcons.Shield size={18} color="var(--accent-primary)" />,
-    'tetris': <LucideIcons.Gamepad2 size={18} color="#ec4899" />,
-    'wordle': <LucideIcons.Maximize2 size={18} color="#10b981" />,
-    'news': <LucideIcons.Rss size={18} color="var(--accent-primary)" />,
+    'dashboard': <LayoutDashboard size={18} />,
+    'countdowns': <Timer size={18} />,
+    'speedcube': <Grid3X3 size={18} />,
+    'statistics': <BarChart3 size={18} />,
+    'esports': <Trophy size={18} color="#3b82f6" />,
+    'esports-bets': <Target size={18} color="#f59e0b" />,
+    'polymarket-general': <TrendingUp size={18} color="#3b82f6" />,
+    'financial-dashboard': <TrendingUp size={18} color="#10b981" />,
+    'achievements': <Trophy size={18} color="#facc15" />,
+    'koala-flap': <Gamepad2 size={18} color="#ec4899" />,
+    'scratch-cards': <Grid3X3 size={18} color="#fbbf24" />,
+    'rift-defense': <Shield size={18} color="#10b981" />,
+    'lol-idle': <Trophy size={18} color="#6366f1" />,
+    'colorsync': <Palette size={18} color="var(--accent-primary)" />,
+    'game-leaderboards': <Trophy size={18} color="#f59e0b" />,
+    'tower-climb': <Shield size={18} color="#3b82f6" />,
+    'blackjack': <Crown size={18} color="#f59e0b" />,
+    'roulette': <CircleDot size={18} color="#c9a84c" />,
+    'settings': <Settings size={18} />,
+    'roadmap': <Lightbulb size={18} color="#fbbf24" />,
+    'changelog': <History size={18} color="#94a3b8" />,
+    'admin': <Shield size={18} color="var(--accent-primary)" />,
+    'tetris': <Gamepad2 size={18} color="#ec4899" />,
+    'wordle': <Maximize2 size={18} color="#10b981" />,
+    'news': <Rss size={18} color="var(--accent-primary)" />,
 };
 
 const CATEGORIES = ['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System'];
@@ -187,7 +213,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
             {/* Header Area */}
             <div style={{ flexShrink: 0, marginBottom: '24px', padding: '0 8px' }}>
                 <Link to="/" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: 'inherit' }}>
-                    <LucideIcons.Clock className="animate-glow" color="var(--accent-primary)" size={28} />
+                    <Clock className="animate-glow" color="var(--accent-primary)" size={28} />
                     <h2 style={{ fontSize: '1.25rem', margin: 0, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                         KoalaWeb
                     </h2>
@@ -233,7 +259,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                             }} title="Neuigkeiten verfuegbar"></span>
                                         )}
                                     </span>
-                                    {openGroup === sectionKey ? <LucideIcons.ChevronDown size={14} /> : <LucideIcons.ChevronRight size={14} />}
+                                    {openGroup === sectionKey ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                 </button>
                                 {openGroup === sectionKey && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
@@ -242,14 +268,8 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                                             const showBadge = isBadgeVisible(item.key);
                                             
                                             let icon = iconMap[item.key];
-                                            if (!icon && item.icon) {
-                                                const IconComponent = LucideIcons[item.icon];
-                                                if (IconComponent) {
-                                                    icon = <IconComponent size={18} />;
-                                                }
-                                            }
                                             if (!icon) {
-                                                icon = <LucideIcons.ListTodo size={18} />;
+                                                icon = <ListTodo size={18} />;
                                             }
 
                                             return (
@@ -303,7 +323,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)' }}>Active Session</span>
-                            <LucideIcons.Maximize2 size={12} color="var(--text-muted)" />
+                            <Maximize2 size={12} color="var(--text-muted)" />
                         </div>
                         <div style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: '"Outfit", sans-serif', textAlign: 'center', marginBottom: '4px' }}>
                             {formatTime(localRemainingMs)}
@@ -322,11 +342,11 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 {!roomState.state.isRunning ? (
                                     <button className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '6px' }} onClick={(e) => handleAction(e, 'START')}>
-                                        <LucideIcons.Play size={12} /> Start
+                                        <Play size={12} /> Start
                                     </button>
                                 ) : (
                                     <button className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '6px', background: 'rgba(255,0,0,0.1)' }} onClick={(e) => handleAction(e, 'PAUSE')}>
-                                        <LucideIcons.Pause size={12} /> Pause
+                                        <Pause size={12} /> Pause
                                     </button>
                                 )}
                             </div>
@@ -343,7 +363,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <Link to="/login" onClick={onClose} className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.8rem', textAlign: 'center', borderRadius: '6px' }}><LucideIcons.LogIn size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Login</Link>
+                            <Link to="/login" onClick={onClose} className="btn-primary" style={{ flex: 1, padding: '6px', fontSize: '0.8rem', textAlign: 'center', borderRadius: '6px' }}><LogIn size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Login</Link>
                         </div>
                     </div>
                 ) : (
@@ -358,7 +378,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
                             </div>
                         </NavLink>
                         <button onClick={() => { logout(); navigate('/'); }} className="btn-ghost" style={{ padding: '6px', fontSize: '0.8rem', borderRadius: '6px', background: 'rgba(255,0,0,0.1)', color: '#ef4444' }}>
-                            <LucideIcons.LogOut size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Logout
+                            <LogOut size={14} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Logout
                         </button>
                     </div>
                 )}

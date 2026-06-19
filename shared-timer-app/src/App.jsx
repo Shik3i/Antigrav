@@ -4,7 +4,8 @@ import Login from './pages/Login';
 
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
-import { User, Settings as SettingsIcon, LogOut, Menu, X, Timer as TimerIcon, BarChart3, Bell, Shield, Heart, Sparkles, RefreshCw, ChevronRight, Clock } from 'lucide-react';
+import Menu from 'lucide-react/dist/esm/icons/menu.js';
+import Clock from 'lucide-react/dist/esm/icons/clock.js';
 
 // Socket Events
 import EVENTS from '../socketEvents.json';
