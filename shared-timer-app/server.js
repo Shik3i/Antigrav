@@ -69,14 +69,16 @@ const { startRssCron } = require('./cron/rssCron');
 const { startBackupCron } = require('./cron/backupCron');
 
 const app = express();
+const allowedOrigins = [
+    'https://timer.koalastuff.net',
+    'http://localhost:5173',
+    'http://localhost:3001'
+];
+
 app.disable('x-powered-by');
 app.use(cors({
-    origin: [
-        'https://timer.koalastuff.net',
-        'http://localhost:5173',
-        'http://localhost:3001'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
@@ -91,12 +93,6 @@ app.use('/assets', (req, res, next) => {
 
 // Trust proxy so the rate limiter sees the real client IP (X-Forwarded-For) instead of Unraid's internal IP
 app.set('trust proxy', 1);
-
-// Security Header to suppress 'browsing-topics' warning and improve safety
-app.use((req, res, next) => {
-    res.setHeader('Permissions-Policy', 'browsing-topics=()');
-    next();
-});
 
 app.use('/api', (req, res, next) => {
     if (req.method !== 'GET') {
@@ -146,11 +142,7 @@ app.use(express.static(path.join(__dirname, 'dist'), {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: [
-            'https://timer.koalastuff.net',
-            'http://localhost:5173',
-            'http://localhost:3001'
-        ],
+        origin: allowedOrigins,
         methods: ["GET", "POST"]
     }
 });

@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePersistentData } from '../context/PersistentDataContext';
 import MaintenanceScreen from './MaintenanceScreen';
-import * as LucideIcons from 'lucide-react';
 
 /**
  * MaintenanceGuard HOC
