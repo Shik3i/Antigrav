@@ -1528,30 +1528,6 @@ module.exports = function (io) {
             }
         });
 
-        // GENERIC EXTENSION PAYLOAD PIPE
-        socket.on(EVENTS.EXTENSION_MESSAGE, ({ roomId, payload }) => {
-            if (!roomId || !payload) return;
-            const room = roomManager.getRoom(roomId);
-            if (!room) return;
-
-            const user = roomManager.getUserBySocket(socket.id);
-            if (!user) return;
-
-            // Optional: Log core play/pause actions to room history for UX
-            if (payload && (payload.action === 'play' || payload.action === 'pause') && !payload.originalAction) {
-                const actionFormatted = payload.action === 'play' ? 'started media' : 'paused media';
-                const ev = roomManager.addEvent(roomId, 'action', `${user.displayName} ${actionFormatted}`, socket.id);
-                if (ev) io.to(roomId).emit(EVENTS.ROOM_EVENT, ev);
-            }
-
-            // Broadcast generic payload blindly to everyone else
-            socket.broadcast.to(roomId).emit(EVENTS.EXTENSION_MESSAGE, {
-                userId: socket.id,
-                userDisplayName: user.displayName,
-                payload
-            });
-        });
-
         const verifyAdmin = async (token) => {
             if (token === 'Bearer Entangled-Napping7-Custodian') return true;
             try {

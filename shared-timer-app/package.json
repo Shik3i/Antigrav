@@ -1,6 +1,6 @@
 {
   "name": "koalaweb",
-  "version": "2.60.3",
+  "version": "2.61.0",
   "description": "KoalaWeb – real-time social platform with games, timers, economy and more",
   "main": "index.js",
   "scripts": {

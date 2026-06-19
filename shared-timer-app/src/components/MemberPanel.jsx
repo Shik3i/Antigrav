@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Link, X, Clock, Timer, History, Settings as SettingsIcon, Tv, Play, Pause, Plug, UserPlus, UserCheck, ChevronDown, Gamepad2, Swords, Coins } from 'lucide-react';
+import { Users, Link, X, Clock, Timer, History, Settings as SettingsIcon, UserPlus, UserCheck, ChevronDown, Gamepad2, Swords, Coins } from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import Avatar from './Avatar';
 import UserContextMenu from './UserContextMenu';
@@ -121,16 +121,6 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
         }
     };
 
-    const handleMediaAction = async (action) => {
-        const payload = { action, timestamp: new Date().toISOString() };
-
-        // Send to other users
-        socket.emit(EVENTS.EXTENSION_MESSAGE, { roomId, payload });
-
-        // Trigger the broadcast to the local extension natively via postMessage
-        window.postMessage({ type: 'EXTENSION_INBOUND', payload }, '*');
-    };
-
     if (isMembersCollapsed) return null;
 
     return (
@@ -190,7 +180,6 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                             <span style={{ fontSize: '0.9rem', flex: 1, display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
                                 {u.displayName}
                             {friends.some(f => f.username === u.username) && <UserCheck size={14} color="#10b981" title="Mutual Friend" />}
-                            {u.preferences?.hasExtension && <Plug size={12} color="var(--accent-primary)" title="Media Sync Extension Installed" />}
                             {(u.metrics || u.userId === userRole?.id) && (
                                 <span
                                     title={`Ping: ${u.metrics?.ping || 0}ms | Sync-Offset: ${u.metrics?.offset || 0}ms`}
@@ -418,19 +407,6 @@ const MemberPanel = ({ roomState, userRole, isMembersCollapsed, setIsMembersColl
                                     </div>
                                 </div>
                             )}
-                        </div>
-
-                        {/* Media Sync Signal*/}
-                        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '8px' }}>
-                            <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Tv size={14} /> Screen Sync (Netflix/YT)</h4>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="btn-ghost" style={{ flex: 1, background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '6px' }} onClick={() => handleMediaAction('play')}>
-                                    <Play size={14} /> Play
-                                </button>
-                                <button className="btn-ghost" style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '6px' }} onClick={() => handleMediaAction('pause')}>
-                                    <Pause size={14} /> Pause
-                                </button>
-                            </div>
                         </div>
 
                         {/* Personal Widgets */}

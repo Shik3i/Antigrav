@@ -1,5 +1,11 @@
 [
   {
+    "id": 101,
+    "version": "2.61.0",
+    "date": "2026-06-19",
+    "changes": "- **Legacy-Extension entfernt**: Der alte lokale `SyncExtension`-Quellcode wurde vollständig aus dem Repository entfernt.\n- **Proxy-Pfad entfernt**: Browser-Bridge, generischer Socket.IO-Relay, Extension-Status und Mediensteuerung wurden aus KoalaWeb entfernt, da die aktuelle KoalaSync-Erweiterung ihren eigenen Relay-Server verwendet.\n- **Oberfläche bereinigt**: Extension-Infoseite, Route, Prefetch und Settings-Link wurden entfernt; die frühere URL liefert nun regulär 404.\n- **Regressionstest**: Ein neuer Strukturtest verhindert, dass der obsolete Extension-Datenpfad versehentlich wieder eingeführt wird."
+  },
+  {
     "id": 100,
     "version": "2.60.2",
     "date": "2026-05-18",

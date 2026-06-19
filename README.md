@@ -55,7 +55,6 @@ Antigrav ist damit deutlich mehr als nur ein geteilter Timer oder ein kleines Ca
 
 ### 🔌 Erweiterbarkeit
 - REST-API über Express
-- optionale Anbindung an die eigenständige KoalaSync-Browser-Erweiterung
 - externe Integrationen, z. B. Twitch oder Odds API
 
 ---
@@ -286,16 +285,6 @@ npm run dev
 - REST-Endpunkte laufen unter `/api`
 - Echtzeitkommunikation wird über Socket.io umgesetzt
 - das Backend übernimmt zusätzlich Cronjobs und Hintergrundverarbeitung
-
----
-
-## 🧩 Browser-Erweiterung
-
-Für synchronisierte Medienwiedergabe kann optional die eigenständige **KoalaSync**-Browser-Erweiterung verwendet werden. Sie ist nicht Bestandteil dieses Repositorys und wird separat entwickelt und veröffentlicht:
-
-- Website: [sync.koalastuff.net](https://sync.koalastuff.net)
-- Releases: [Shik3i/KoalaSync Releases](https://github.com/Shik3i/KoalaSync/releases)
-- Quellcode: [Shik3i/KoalaSync](https://github.com/Shik3i/KoalaSync)
 
 ---
 

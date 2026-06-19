@@ -13,7 +13,6 @@ const routePrefetchers = new Map([
     ['/games/leaderboard', () => import('../pages/GameLeaderboards')],
     ['/changelog', () => import('../pages/Changelog')],
     ['/api-docs', () => import('../pages/ApiDocs')],
-    ['/extension-info', () => import('../pages/ExtensionInfo')],
     ['/speedcube', () => import('../pages/SpeedcubeTimer')],
     ['/c', () => import('../pages/SharedCountdown')],
     ['/leveling', () => import('../pages/LevelingTracker')],
