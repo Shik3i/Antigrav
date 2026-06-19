@@ -53,3 +53,11 @@ export function isStaleTimerSnapshot(current, incoming) {
   const incomingRevision = Number(incoming.state.timerRevision) || 0;
   return incomingRevision < currentRevision;
 }
+
+export function getCurrentRoomMember(roomState, userId, socketId) {
+  const users = roomState?.users || [];
+  if (socketId) {
+    return users.find(user => user.socketId === socketId) || null;
+  }
+  return users.find(user => user.userId === userId || user.id === userId) || null;
+}

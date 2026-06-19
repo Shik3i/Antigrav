@@ -12,6 +12,7 @@ import { ALARM_SOUNDS, playAlarmSound } from '../utils/soundGenerator';
 import ClockWidget from '../components/ClockWidget';
 import WeatherWidget from '../components/WeatherWidget';
 import { useToast } from '../context/ToastContext';
+import { getCurrentRoomMember } from '../features/timer/timerSelectors';
 
 const COINFLIP_ANIMATION_MS = 1800;
 const COINFLIP_RESULT_VISIBLE_MS = 5000;
@@ -41,11 +42,7 @@ const Room = ({ user, socket, roomState, roomError, roomTokens, setActiveRoomId,
     };
 
     // Compute role early so hooks can reference it
-    const myUser = roomState?.users?.find(u =>
-        u.userId === user.id ||
-        u.id === user.id ||
-        u.socketId === socket?.id
-    );
+    const myUser = getCurrentRoomMember(roomState, user.id, socket?.id);
     const userRole = myUser?.role || 'read';
 
     // Sync URL ID with App's global active room
