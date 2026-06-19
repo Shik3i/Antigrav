@@ -40,7 +40,11 @@ import { getNextPokemon } from './utils/pokemonUtils';
 import { fetchJson } from './utils/apiClient';
 import { AUTH_SESSION_INVALIDATED_EVENT, getStoredValue, setStoredValue } from './utils/clientStorage';
 import { scheduleDeferred } from './utils/deferred';
-import { getExactRemainingMs, formatTimerTitle } from './utils/timerUtils';
+import {
+  getExactRemainingMs,
+  formatTimerTitle,
+  isStaleTimerSnapshot
+} from './features/timer/timerSelectors';
 import { DEFAULT_LEAGUES, DEFAULT_TITLE, EMPTY_ROOM_TOKENS } from './constants/appConstants';
 
 
@@ -218,7 +222,7 @@ function InnerApp() {
     };
 
     const handleSync = (state) => {
-      setRoomState(state);
+      setRoomState(current => (isStaleTimerSnapshot(current, state) ? current : state));
       setLastRoomSyncAt(Date.now());
       const myUser = state.users.find(u => u.userId === user.id || u.socketId === socket.id);
       if (myUser?.role === 'write' && socket.connected) {
