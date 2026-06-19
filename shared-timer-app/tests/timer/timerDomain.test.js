@@ -97,6 +97,34 @@ describe('timerDomain', () => {
     expect(result.value.state.remainingMs).toBe(90_000);
   });
 
+  test('SET_DURATION returns an active Pomodoro break to a coherent work phase', () => {
+    const onBreak = {
+      config,
+      state: {
+        ...createTimerState(config.durationMs),
+        isPomodoro: true,
+        pomodoroPhase: 'break',
+        remainingMs: 5 * 60_000
+      }
+    };
+    const result = applyTimerAction(onBreak, { type: 'SET_DURATION', payload: 30 }, 1_000);
+    expect(result.value.state).toMatchObject({
+      isPomodoro: true,
+      pomodoroPhase: 'work',
+      remainingMs: 30 * 60_000
+    });
+  });
+
+  test('SET_DURATION rejects a work duration that is not longer than the configured Pomodoro break', () => {
+    const enabled = applyTimerAction(snapshot(), {
+      type: 'SET_POMODORO',
+      payload: { enabled: true, pauseMinutes: 5 }
+    }, 1_000).value;
+    const result = applyTimerAction(enabled, { type: 'SET_DURATION', payload: 4 }, 2_000);
+    expect(result).toMatchObject({ ok: false, error: 'INVALID_PAUSE_DURATION' });
+    expect(result.value).toEqual(enabled);
+  });
+
   test.each([NaN, Infinity, -1, 0, 0.5, 121, 'abc'])('rejects invalid duration %p', payload => {
     const initial = snapshot();
     const before = structuredClone(initial);
@@ -179,6 +207,12 @@ describe('timerDomain', () => {
       20
     );
     expect(disabled.value.state).toMatchObject({ isPomodoro: false, pomodoroPhase: 'work', remainingMs: config.durationMs, isRunning: false });
+  });
+
+  test('SET_POMODORO validates the effective default pause when enabling', () => {
+    const shortWork = { config: { durationMs: 60_000 }, state: createTimerState(60_000) };
+    expect(applyTimerAction(shortWork, { type: 'SET_POMODORO', payload: true }, 10))
+      .toMatchObject({ ok: false, error: 'INVALID_PAUSE_DURATION' });
   });
 
   test('TOGGLE_AUTO_RESTART and ADVANCE_POMODORO produce deterministic next phases', () => {
