@@ -29,7 +29,6 @@
     "METRICS_UPDATE": "metrics_update",
     "RENAME_ROOM": "rename_room",
     "PROMOTE_USER": "promote_user",
-    "EXTENSION_MESSAGE": "extension_message",
     "GET_API_NEWS": "get_api_news",
     "API_NEWS_DATA": "api_news_data",
     "GET_API_ESPORTS": "get_api_esports",

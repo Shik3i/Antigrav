@@ -56,7 +56,6 @@ const NotFound = React.lazy(() => import('./pages/NotFound'));
 // Other Lazy Loaded Pages
 const Highscores = React.lazy(() => import('./pages/Highscores'));
 const ApiDocs = React.lazy(() => import('./pages/ApiDocs'));
-const ExtensionInfo = React.lazy(() => import('./pages/ExtensionInfo'));
 const Esports = React.lazy(() => import('./pages/Esports'));
 const KoalaDashboard = React.lazy(() => import('./pages/KoalaDashboard'));
 const GlobalBets = React.lazy(() => import('./pages/GlobalBets'));
@@ -152,7 +151,7 @@ function InnerApp() {
     }
   }, [token]);
 
-  // --- External Interactions: Browser Extension & Auth Alerts ---
+  // --- Authentication Alerts ---
   useEffect(() => {
     let lastNoticeAt = 0;
     const handleInvalidSession = (event) => {
@@ -194,18 +193,7 @@ function InnerApp() {
     newSocket.on(EVENTS.GLOBAL_ANNOUNCEMENT, onAnnouncement);
     newSocket.on(EVENTS.COIN_BALANCE_UPDATE, onCoinUpdate);
 
-    const handleWindowMessage = (event) => {
-      if (event.data?.action === 'EXTENSION_PONG') {
-        setUser(p => p ? { ...p, preferences: { ...p.preferences, hasExtension: true } } : p);
-      }
-      if (event.data?.type === 'EXTENSION_OUTBOUND') {
-        window.dispatchEvent(new CustomEvent('EXTENSION_OUTBOUND_EVENT', { detail: event.data.payload }));
-      }
-    };
-    window.addEventListener('message', handleWindowMessage);
-
     return () => {
-      window.removeEventListener('message', handleWindowMessage);
       newSocket.off(EVENTS.CONNECT, onConnect);
       newSocket.off(EVENTS.DISCONNECT, onDisconnect);
       newSocket.off(EVENTS.GLOBAL_ANNOUNCEMENT, onAnnouncement);
@@ -456,7 +444,6 @@ function InnerApp() {
                       <Route path="/countdowns" element={<Countdowns user={user} />} />
                       <Route path="/global-bets" element={<GlobalBets />} />
                       <Route path="/api-docs" element={<ApiDocs />} />
-                      <Route path="/extension-info" element={<ExtensionInfo />} />
                       <Route path="/admin/achievements" element={<AdminAchievements />} />
                       <Route path="/features" element={<FeatureRequests />} />
                       <Route path="/changelog" element={<Changelog />} />

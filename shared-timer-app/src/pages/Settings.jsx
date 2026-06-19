@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import axios from 'axios';
-import { Terminal, Volume2, BellRing, Palette, Trophy, Download, Star, Heart, Search, X, ChevronDown, ChevronUp, Dna, Sparkles, RefreshCw, Clock, Shield, User, Lock, Settings as SettingsIcon, Gem } from 'lucide-react';
+import { Terminal, Volume2, BellRing, Palette, Trophy, Star, Heart, Search, X, ChevronDown, ChevronUp, Dna, Sparkles, RefreshCw, Clock, Shield, User, Lock, Settings as SettingsIcon, Gem } from 'lucide-react';
 import { useChipSkin } from '../features/casino/ChipSkinContext';
 import { CHIP_SKINS } from '../features/casino/chipConfig';
 import { getNextPokemon } from '../utils/pokemonUtils';
@@ -1038,17 +1038,9 @@ const Settings = ({ user, setUser, socket }) => {
                         <Terminal size={16} />
                         <span>View API Docs</span>
                     </Link>
-                    <Link to="/extension-info" style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        color: 'var(--accent-primary)', textDecoration: 'none',
-                        fontSize: '0.9rem', padding: '8px 12px', borderRadius: '8px', transition: 'all 0.2s ease', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--border-focus)'
-                    }}>
-                        <Download size={16} />
-                        <span>Get Browser Extension</span>
-                    </Link>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-                    Version 2.60.2
+                    Version 2.61.0
                 </div>
             </div>
         </div>
