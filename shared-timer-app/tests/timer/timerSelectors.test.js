@@ -3,6 +3,7 @@ import {
   getExactRemainingMs,
   getPhaseDurationMs,
   getTimerPresentation,
+  getCurrentRoomMember,
   isStaleTimerSnapshot
 } from '../../src/features/timer/timerSelectors';
 
@@ -72,5 +73,17 @@ describe('timerSelectors', () => {
       { state: { timerRevision: 4 } }
     )).toBe(false);
     expect(isStaleTimerSnapshot(null, { state: {} })).toBe(false);
+  });
+
+  test('selects the current socket member before another tab with the same user id', () => {
+    const state = {
+      users: [
+        { socketId: 'writer-tab', userId: 'guest-1', role: 'write' },
+        { socketId: 'reader-tab', userId: 'guest-1', role: 'read' }
+      ]
+    };
+    expect(getCurrentRoomMember(state, 'guest-1', 'reader-tab')).toMatchObject({ role: 'read' });
+    expect(getCurrentRoomMember(state, 'guest-1', 'unknown-tab')).toBeNull();
+    expect(getCurrentRoomMember(state, 'guest-1', null)).toMatchObject({ role: 'write' });
   });
 });
