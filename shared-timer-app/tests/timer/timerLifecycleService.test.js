@@ -35,8 +35,13 @@ function makeHarness({ pomodoro = false, autoRestart = true } = {}) {
   };
   const io = { to: vi.fn(() => ({ emit })) };
   const broadcastCoinUpdate = vi.fn();
-  const service = createTimerLifecycleService({ io, roomManager, dbLayer, broadcastCoinUpdate });
-  return { service, room, roomManager, dbLayer, io, emit, broadcastCoinUpdate };
+  const onPersistenceError = vi.fn();
+  const service = createTimerLifecycleService({
+    io, roomManager, dbLayer, broadcastCoinUpdate, onPersistenceError
+  });
+  return {
+    service, room, roomManager, dbLayer, io, emit, broadcastCoinUpdate, onPersistenceError
+  };
 }
 
 describe('timerLifecycleService', () => {
@@ -57,6 +62,22 @@ describe('timerLifecycleService', () => {
     expect(h.dbLayer.recordTimerCompletion).toHaveBeenCalledTimes(1);
     expect(h.dbLayer.addKoalaCoins).toHaveBeenCalledTimes(1);
     expect(h.room.state.stats).toEqual({ totalCompletions: 1, userCompletions: { 'user-1': 1 } });
+  });
+
+  test('contains persistence failures after completing timer state', async () => {
+    const h = makeHarness({ autoRestart: false });
+    const error = new Error('database unavailable');
+    h.dbLayer.getKoalaBaseline.mockRejectedValueOnce(error);
+
+    await expect(h.service.handleCompletion(h.room, {
+      roomId: 'room-a', sequence: 1, generation: 3, rewardableElapsedMs: 60_000
+    })).resolves.toBe(true);
+
+    expect(h.onPersistenceError).toHaveBeenCalledWith(error, { roomId: 'room-a', sequence: 1 });
+    expect(h.emit).toHaveBeenCalledWith(
+      EVENTS.TIMER_COMPLETED,
+      expect.objectContaining({ roomId: 'room-a', sequence: 1 })
+    );
   });
 
   test('runs auto-restart only while the captured generation is current', async () => {

@@ -5,6 +5,9 @@ function createTimerLifecycleService({
   roomManager,
   dbLayer,
   broadcastCoinUpdate = () => {},
+  onPersistenceError = (error, context) => {
+    console.error('Timer completion persistence failed:', context, error);
+  },
   setTimeoutFn = setTimeout,
   clearTimeoutFn = clearTimeout
 }) {
@@ -84,13 +87,17 @@ function createTimerLifecycleService({
     if (event) io.to(room.id).emit(EVENTS.ROOM_EVENT, event);
     scheduleFollowUp(room, completion);
 
-    const settings = await dbLayer.getKoalaBaseline();
-    const coinsToAward = Math.floor(
-      (completion.rewardableElapsedMs / 3_600_000) * settings.koala_points_per_hour
-    );
-    await Promise.all(Array.from(uniqueUsers.values()).map(user => (
-      persistUserCompletion(room, user, completion, coinsToAward)
-    )));
+    try {
+      const settings = await dbLayer.getKoalaBaseline();
+      const coinsToAward = Math.floor(
+        (completion.rewardableElapsedMs / 3_600_000) * settings.koala_points_per_hour
+      );
+      await Promise.all(Array.from(uniqueUsers.values()).map(user => (
+        persistUserCompletion(room, user, completion, coinsToAward)
+      )));
+    } catch (error) {
+      onPersistenceError(error, { roomId: room.id, sequence: completion.sequence });
+    }
 
     return true;
   }
