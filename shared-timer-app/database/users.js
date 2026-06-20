@@ -1,291 +1,170 @@
 const db = require('./connection');
 
-/**
- * Core User Management Functions
- */
+async function addUser(id, displayName) {
+  return Number(db.prepare('INSERT OR IGNORE INTO Users (id, displayName) VALUES (?, ?)')
+    .run(id, displayName).changes);
+}
 
-const addUser = (id, displayName) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT OR IGNORE INTO Users (id, displayName) VALUES (?, ?)', [id, displayName], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function updateUserName(id, displayName) {
+  return Number(db.prepare('UPDATE Users SET displayName = ? WHERE id = ?').run(displayName, id).changes);
+}
 
-const updateUserName = (id, displayName) => {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE Users SET displayName = ? WHERE id = ?', [displayName, id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
-
-const getUser = (id) => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM Users WHERE id = ?', [id], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-};
+async function getUser(id) {
+  return db.prepare('SELECT * FROM Users WHERE id = ?').get(id);
+}
 
 const getUserById = getUser;
 
-const registerUser = (id, displayName, username, passwordHash) => {
-  return new Promise((resolve, reject) => {
-    getKoalaBaseline().then(settings => {
-      const startingCoins = settings.koala_start_coins !== undefined ? settings.koala_start_coins : 10000;
-      db.run(
-        'INSERT INTO Users (id, displayName, username, password_hash, preferences, koala_balance) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, displayName, username, passwordHash, '{}', startingCoins],
-        function (err) {
-          if (err) reject(err);
-          else resolve(this.changes);
-        }
-      );
-    }).catch(reject);
-  });
-};
+async function registerUser(id, displayName, username, passwordHash) {
+  const settings = await getKoalaBaseline();
+  const startingCoins = settings.koala_start_coins !== undefined ? settings.koala_start_coins : 10000;
+  const result = db.prepare(`
+    INSERT INTO Users (id, displayName, username, password_hash, preferences, koala_balance)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, displayName, username, passwordHash, '{}', startingCoins);
+  return Number(result.changes);
+}
 
-const getUserByUsername = (username) => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM Users WHERE username = ? COLLATE NOCASE', [username], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-};
+async function getUserByUsername(username) {
+  return db.prepare('SELECT * FROM Users WHERE username = ? COLLATE NOCASE').get(username);
+}
 
-const getAllRegisteredUsers = () => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT 
-        u.id, 
-        u.displayName, 
-        u.username, 
-        u.is_superadmin, 
-        u.createdAt, 
-        u.lastActive,
-        CAST(u.koala_balance AS INTEGER) AS koala_balance,
-        CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_banned,
-        CASE WHEN u.password_hash IS NULL THEN 1 ELSE 0 END as is_guest
-      FROM Users u
-      LEFT JOIN BannedUsers b ON u.id = b.id
-      ORDER BY u.createdAt DESC
-    `;
-    db.all(query, [], (err, rows) => {
-      if (err) reject(err);
-      else resolve((rows || []).map(r => ({ ...r, koala_balance: Number(r.koala_balance || 0) })));
-    });
-  });
-};
+async function getAllRegisteredUsers() {
+  return db.prepare(`
+    SELECT u.id, u.displayName, u.username, u.is_superadmin, u.createdAt, u.lastActive,
+      CAST(u.koala_balance AS INTEGER) AS koala_balance,
+      CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END AS is_banned,
+      CASE WHEN u.password_hash IS NULL THEN 1 ELSE 0 END AS is_guest
+    FROM Users u
+    LEFT JOIN BannedUsers b ON u.id = b.id
+    ORDER BY u.createdAt DESC
+  `).all().map((row) => ({ ...row, koala_balance: Number(row.koala_balance || 0) }));
+}
 
-const updateUserLastActive = (id) => {
-  return new Promise((resolve, reject) => {
-    db.run("UPDATE Users SET lastActive = CURRENT_TIMESTAMP WHERE id = ?", [id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function updateUserLastActive(id) {
+  return Number(db.prepare('UPDATE Users SET lastActive = CURRENT_TIMESTAMP WHERE id = ?').run(id).changes);
+}
 
-const updateUserPreferences = (id, preferences) => {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE Users SET preferences = ? WHERE id = ?', [JSON.stringify(preferences), id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function updateUserPreferences(id, preferences) {
+  return Number(db.prepare('UPDATE Users SET preferences = ? WHERE id = ?')
+    .run(JSON.stringify(preferences), id).changes);
+}
 
-const updateUserPassword = (id, newPasswordHash) => {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE Users SET password_hash = ? WHERE id = ?', [newPasswordHash, id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function updateUserPassword(id, newPasswordHash) {
+  return Number(db.prepare('UPDATE Users SET password_hash = ? WHERE id = ?').run(newPasswordHash, id).changes);
+}
 
-const updateUserRole = (id, isSuperadmin) => {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE Users SET is_superadmin = ? WHERE id = ?', [isSuperadmin ? 1 : 0, id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function updateUserRole(id, isSuperadmin) {
+  return Number(db.prepare('UPDATE Users SET is_superadmin = ? WHERE id = ?')
+    .run(isSuperadmin ? 1 : 0, id).changes);
+}
 
-const deleteUserAdmin = (id) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // 1. Manually clean up tables without schema-level ON DELETE CASCADE
-      db.run('DELETE FROM Friends WHERE userId = ? OR friendId = ?', [id, id], (err) => {
-        if (err) console.error("Error deleting Friends:", err);
-      });
-      db.run('DELETE FROM TimerEvents WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting TimerEvents:", err);
-      });
-      db.run('DELETE FROM KoalaTransactions WHERE user_id = ?', [id], (err) => {
-        if (err) console.error("Error deleting KoalaTransactions:", err);
-      });
-      db.run('DELETE FROM BannedUsers WHERE id = ?', [id], (err) => {
-        if (err) console.error("Error deleting BannedUsers:", err);
-      });
-      db.run('DELETE FROM UserAchievements WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting UserAchievements:", err);
-      });
-      db.run('DELETE FROM Bets WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting Bets:", err);
-      });
-      db.run('DELETE FROM GameScores WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting GameScores:", err);
-      });
-      db.run('DELETE FROM UserUpgrades WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting UserUpgrades:", err);
-      });
-      db.run('DELETE FROM UserMissions WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting UserMissions:", err);
-      });
-      db.run('DELETE FROM Scratchcards WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting Scratchcards:", err);
-      });
-      db.run('DELETE FROM Countdowns WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting Countdowns:", err);
-      });
-      db.run('DELETE FROM FeatureRequests WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting FeatureRequests:", err);
-      });
-      db.run('DELETE FROM FeatureVotes WHERE userId = ?', [id], (err) => {
-        if (err) console.error("Error deleting FeatureVotes:", err);
-      });
+async function deleteUserAdmin(id) {
+  const cleanupStatements = [
+    ['DELETE FROM Friends WHERE userId = ? OR friendId = ?', [id, id]],
+    ['DELETE FROM TimerEvents WHERE userId = ?', [id]],
+    ['DELETE FROM KoalaTransactions WHERE user_id = ?', [id]],
+    ['DELETE FROM BannedUsers WHERE id = ?', [id]],
+    ['DELETE FROM UserAchievements WHERE userId = ?', [id]],
+    ['DELETE FROM Bets WHERE userId = ?', [id]],
+    ['DELETE FROM GameScores WHERE userId = ?', [id]],
+    ['DELETE FROM UserUpgrades WHERE userId = ?', [id]],
+    ['DELETE FROM UserMissions WHERE userId = ?', [id]],
+    ['DELETE FROM Scratchcards WHERE userId = ?', [id]],
+    ['DELETE FROM Countdowns WHERE userId = ?', [id]],
+    ['DELETE FROM FeatureVotes WHERE userId = ?', [id]],
+    ['DELETE FROM FeatureRequests WHERE userId = ?', [id]]
+  ];
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    for (const [sql, params] of cleanupStatements) db.prepare(sql).run(...params);
+    const result = db.prepare('DELETE FROM Users WHERE id = ?').run(id);
+    db.exec('COMMIT');
+    return Number(result.changes);
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
 
-      // 2. Finally delete the user-record (schema-level CASCADE will handle others)
-      db.run('DELETE FROM Users WHERE id = ?', [id], function (err) {
-        if (err) reject(err);
-        else resolve(this.changes);
-      });
-    });
-  });
-};
+async function banUser(userId, username, reason) {
+  return Number(db.prepare('INSERT INTO BannedUsers (id, username, reason) VALUES (?, ?, ?)')
+    .run(userId, username, reason || null).changes);
+}
 
-const banUser = (userId, username, reason) => {
-  return new Promise((resolve, reject) => {
-    db.run('INSERT INTO BannedUsers (id, username, reason) VALUES (?, ?, ?)', [userId, username, reason || null], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function unbanUser(userId) {
+  return Number(db.prepare('DELETE FROM BannedUsers WHERE id = ?').run(userId).changes);
+}
 
-const unbanUser = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM BannedUsers WHERE id = ?', [userId], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function checkIsBanned(username) {
+  return db.prepare('SELECT * FROM BannedUsers WHERE username = ? COLLATE NOCASE').get(username);
+}
 
-const checkIsBanned = (username) => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM BannedUsers WHERE username = ? COLLATE NOCASE', [username], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-};
+async function getBannedUsersList() {
+  return db.prepare('SELECT * FROM BannedUsers ORDER BY bannedAt DESC').all();
+}
 
-const getBannedUsersList = () => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM BannedUsers ORDER BY bannedAt DESC', [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
+async function mergeGuestStats(newUserId, targetUsername) {
+  const guestRows = db.prepare(`
+    SELECT id FROM Users
+    WHERE (username = ? OR username LIKE ? OR displayName = ?) AND password_hash IS NULL
+  `).all(targetUsername, `_guest_%_${targetUsername}`, targetUsername);
+  if (guestRows.length === 0) return 0;
 
-/**
- * Settings related to user initialization (temporary location)
- */
-const mergeGuestStats = (newUserId, targetUsername) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Find all guest accounts that have this username (either exactly or as _guest_xyz...)
-      // But only if they were actually guests (password_hash is null)
-      const guestQuery = `SELECT id FROM Users WHERE (username = ? OR username LIKE ? OR displayName = ?) AND password_hash IS NULL`;
+  const guestIds = guestRows.map((row) => row.id);
+  const placeholders = guestIds.map(() => '?').join(',');
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare(`UPDATE TimerEvents SET userId = ? WHERE userId IN (${placeholders})`)
+      .run(newUserId, ...guestIds);
+    db.prepare(`UPDATE Countdowns SET userId = ? WHERE userId IN (${placeholders})`)
+      .run(newUserId, ...guestIds);
+    db.prepare(`DELETE FROM Users WHERE id IN (${placeholders})`).run(...guestIds);
+    db.exec('COMMIT');
+    return guestIds.length;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
 
-      db.all(guestQuery, [targetUsername, `_guest_%_${targetUsername}`, targetUsername], (err, guestRows) => {
-        if (err) return reject(err);
-        if (!guestRows || guestRows.length === 0) return resolve(0);
-
-        const guestIds = guestRows.map(r => r.id);
-        const placeholders = guestIds.map(() => '?').join(',');
-
-        // 1. Move all timer completions from those guests to the newly registered user
-        db.run(`UPDATE TimerEvents SET userId = ? WHERE userId IN (${placeholders})`, [newUserId, ...guestIds], function (updateErr) {
-          if (updateErr) return reject(updateErr);
-
-          // 2. Move all private countdowns from those guests to the newly registered user
-          db.run(`UPDATE Countdowns SET userId = ? WHERE userId IN (${placeholders})`, [newUserId, ...guestIds], function (countErr) {
-            if (countErr) return reject(countErr);
-
-            // 3. Delete the old guest accounts so they don't clutter the highscores
-            db.run(`DELETE FROM Users WHERE id IN (${placeholders})`, [...guestIds], function (delErr) {
-              if (delErr) return reject(delErr);
-              resolve(guestIds.length);
-            });
-          });
-        });
-      });
-    });
-  });
-};
-
-const getKoalaBaseline = () => {
-  return new Promise((resolve, reject) => {
-    db.all(`SELECT key, value FROM ServerSettings WHERE key IN ('koala_points_per_hour', 'koala_start_coins', 'koala_coin_conversion_rate', 'koala_daily_mission_multiplier', 'achievement_reward_multiplier')`, (err, rows) => {
-      if (err) reject(err);
-      else {
-        const settings = { koala_points_per_hour: 1000, koala_start_coins: 10000, koala_coin_conversion_rate: 0.01, koala_daily_mission_multiplier: 1.0, achievement_reward_multiplier: 2.5 };
-        if (rows) {
-          rows.forEach(r => {
-            if (r.key === 'koala_coin_conversion_rate' || r.key === 'koala_daily_mission_multiplier' || r.key === 'achievement_reward_multiplier') settings[r.key] = parseFloat(r.value);
-            else settings[r.key] = parseInt(r.value, 10);
-          });
-        }
-        resolve(settings);
-      }
-    });
-  });
-};
-
-const updateKoalaBaseline = (settings) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      if (settings.koala_points_per_hour !== undefined) {
-        await new Promise((res, rej) => db.run(`UPDATE ServerSettings SET value = ? WHERE key = 'koala_points_per_hour'`, [String(settings.koala_points_per_hour)], err => err ? rej(err) : res()));
-      }
-      if (settings.koala_start_coins !== undefined) {
-        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_start_coins', ?)`, [String(settings.koala_start_coins)], err => err ? rej(err) : res()));
-      }
-      if (settings.koala_coin_conversion_rate !== undefined) {
-        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_coin_conversion_rate', ?)`, [String(settings.koala_coin_conversion_rate)], err => err ? rej(err) : res()));
-      }
-      if (settings.koala_daily_mission_multiplier !== undefined) {
-        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_multiplier', ?)`, [String(settings.koala_daily_mission_multiplier)], err => err ? rej(err) : res()));
-      }
-      if (settings.achievement_reward_multiplier !== undefined) {
-        await new Promise((res, rej) => db.run(`INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('achievement_reward_multiplier', ?)`, [String(settings.achievement_reward_multiplier)], err => err ? rej(err) : res()));
-      }
-      resolve(true);
-    } catch (e) {
-      reject(e);
+async function getKoalaBaseline() {
+  const settings = {
+    koala_points_per_hour: 1000,
+    koala_start_coins: 10000,
+    koala_coin_conversion_rate: 0.01,
+    koala_daily_mission_multiplier: 1.0,
+    achievement_reward_multiplier: 2.5
+  };
+  const rows = db.prepare(`
+    SELECT key, value FROM ServerSettings
+    WHERE key IN ('koala_points_per_hour', 'koala_start_coins', 'koala_coin_conversion_rate',
+      'koala_daily_mission_multiplier', 'achievement_reward_multiplier')
+  `).all();
+  for (const row of rows) {
+    if (['koala_coin_conversion_rate', 'koala_daily_mission_multiplier', 'achievement_reward_multiplier'].includes(row.key)) {
+      settings[row.key] = parseFloat(row.value);
+    } else {
+      settings[row.key] = parseInt(row.value, 10);
     }
-  });
-};
+  }
+  return settings;
+}
+
+async function updateKoalaBaseline(settings) {
+  const upsert = db.prepare('INSERT OR REPLACE INTO ServerSettings (key, value) VALUES (?, ?)');
+  const keys = [
+    'koala_points_per_hour',
+    'koala_start_coins',
+    'koala_coin_conversion_rate',
+    'koala_daily_mission_multiplier',
+    'achievement_reward_multiplier'
+  ];
+  for (const key of keys) {
+    if (settings[key] !== undefined) upsert.run(key, String(settings[key]));
+  }
+  return true;
+}
 
 module.exports = {
   addUser,
