@@ -33,23 +33,17 @@ exports.saveMilestone = (req, res) => {
         return res.json({ saved: false, reason: 'Level below first milestone (15)' });
     }
 
-    db.db.serialize(() => {
-        db.db.run("BEGIN TRANSACTION");
+    db.db.exec('BEGIN IMMEDIATE');
+    try {
         const stmt = db.db.prepare(`INSERT OR IGNORE INTO LevelingMilestones (userId, level) VALUES (?, ?)`);
-        
-        milestonesToSave.forEach(lvl => {
-            stmt.run(userId, lvl);
-        });
-
-        stmt.finalize();
-        db.db.run("COMMIT", (err) => {
-            if (err) {
-                console.error('[Leveling] Error committing milestones:', err);
-                return res.status(500).json({ error: 'Failed to save milestones' });
-            }
-            res.json({ saved: true, milestonesChecked: milestonesToSave.length, lastLevel: level });
-        });
-    });
+        for (const milestone of milestonesToSave) stmt.run(userId, milestone);
+        db.db.exec('COMMIT');
+        res.json({ saved: true, milestonesChecked: milestonesToSave.length, lastLevel: level });
+    } catch (error) {
+        db.db.exec('ROLLBACK');
+        console.error('[Leveling] Error committing milestones:', error);
+        res.status(500).json({ error: 'Failed to save milestones' });
+    }
 };
 
 /**
@@ -60,13 +54,12 @@ exports.getMilestones = (req, res) => {
     const userId = req.user.userId;
     const query = `SELECT level, reachedAt FROM LevelingMilestones WHERE userId = ? ORDER BY level ASC`;
     
-    db.db.all(query, [userId], (err, rows) => {
-        if (err) {
-            console.error('[Leveling] Error fetching milestones:', err);
-            return res.status(500).json({ error: 'Failed to fetch milestones' });
-        }
-        res.json(rows || []);
-    });
+    try {
+        res.json(db.db.prepare(query).all(userId));
+    } catch (error) {
+        console.error('[Leveling] Error fetching milestones:', error);
+        res.status(500).json({ error: 'Failed to fetch milestones' });
+    }
 };
 
 // Export for testing

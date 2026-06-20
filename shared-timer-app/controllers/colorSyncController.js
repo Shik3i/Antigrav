@@ -58,50 +58,27 @@ exports.getRandomColor = (req, res) => {
     res.json({ r, g, b, hex });
 };
 
-exports.submitScore = (req, res) => {
+exports.submitScore = async (req, res) => {
     const { score, target_color, guessed_color, mode } = req.body;
     const userId = req.user.userId;
     const today = new Date().toISOString().split('T')[0];
 
-    // Handle Daily Lock
-    if (mode === 'DAILY') {
-        const checkQuery = `SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`;
-        db.db.get(checkQuery, [userId, today], async (err, existing) => {
-            if (err) return res.status(500).json({ error: 'Database error' });
+    let earnedCoins = 0;
+    try {
+        if (mode === 'DAILY') {
+            const existing = db.db.prepare('SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?').get(userId, today);
             if (existing) return res.status(403).json({ error: 'You have already played today\'s challenge.' });
-
-            try {
-                // Save to Daily Results
-                const dailyQuery = `INSERT INTO ColorSync_DailyResults (userId, score, guessed_color, date) VALUES (?, ?, ?, ?)`;
-                await new Promise((resolve, reject) => {
-                    db.db.run(dailyQuery, [userId, score, guessed_color, today], (err) => {
-                         if (err) reject(err); else resolve();
-                    });
-                });
-                
-                const dbLayer = require('../database');
-                await dbLayer.addKoalaCoins(userId, 1000, 'Color Sync Daily Completion');
-                
-                // Fall through to general score saving, passing earnedCoins
-                saveGeneralScore(10); // 1000 cents = 10 KC
-            } catch (error) {
-                console.error('Error saving daily result or rewarding:', error);
-                saveGeneralScore();
-            }
-        });
-    } else {
-        saveGeneralScore();
-    }
-
-    function saveGeneralScore(earnedCoins = 0) {
-        const query = `INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, ?)`;
-        db.db.run(query, [userId, score, target_color, guessed_color, mode], function(err) {
-            if (err) {
-                console.error('Error saving ColorSync score:', err);
-                return res.status(500).json({ error: 'Failed to save score' });
-            }
-            res.json({ success: true, id: this.lastID, earnedCoins });
-        });
+            db.db.prepare('INSERT INTO ColorSync_DailyResults (userId, score, guessed_color, date) VALUES (?, ?, ?, ?)')
+                .run(userId, score, guessed_color, today);
+            await db.addKoalaCoins(userId, 1000, 'Color Sync Daily Completion');
+            earnedCoins = 10;
+        }
+        const result = db.db.prepare('INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, ?)')
+            .run(userId, score, target_color, guessed_color, mode);
+        res.json({ success: true, id: Number(result.lastInsertRowid), earnedCoins });
+    } catch (error) {
+        console.error('Error saving ColorSync score:', error);
+        res.status(500).json({ error: 'Failed to save score' });
     }
 };
 
@@ -110,10 +87,8 @@ exports.checkDailyStatus = (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const query = `SELECT * FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`;
     
-    db.db.get(query, [userId, today], (err, result) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        res.json({ played: !!result, result });
-    });
+    try { const result=db.db.prepare(query).get(userId,today); res.json({played:!!result,result}); }
+    catch { res.status(500).json({error:'Database error'}); }
 };
 
 exports.getDailyStats = (req, res) => {
@@ -136,19 +111,8 @@ exports.getDailyStats = (req, res) => {
         LIMIT 3
     `;
 
-    db.db.get(statsQuery, [today], (err, stats) => {
-        if (err) return res.status(500).json({ error: 'Failed to fetch stats' });
-
-        db.db.all(leaderboardQuery, [today], (err, topPerformers) => {
-            if (err) return res.status(500).json({ error: 'Failed to fetch leaderboard' });
-
-            res.json({
-                avgScore: stats.avgScore ? parseFloat(stats.avgScore.toFixed(1)) : 0,
-                participantCount: stats.participantCount || 0,
-                topPerformers: topPerformers || []
-            });
-        });
-    });
+    try { const stats=db.db.prepare(statsQuery).get(today); const topPerformers=db.db.prepare(leaderboardQuery).all(today); res.json({avgScore:stats.avgScore?parseFloat(stats.avgScore.toFixed(1)):0,participantCount:stats.participantCount||0,topPerformers}); }
+    catch { res.status(500).json({error:'Failed to fetch stats'}); }
 };
 
 exports.createLobby = (req, res) => {
@@ -162,13 +126,8 @@ exports.createLobby = (req, res) => {
     const targetColor = JSON.stringify({ r, g, b });
 
     const query = `INSERT INTO ColorSync_Lobbies (id, creatorId, target_color) VALUES (?, ?, ?)`;
-    db.db.run(query, [lobbyId, creatorId, targetColor], (err) => {
-        if (err) {
-            console.error('Error creating ColorSync lobby:', err);
-            return res.status(500).json({ error: 'Failed to create lobby' });
-        }
-        res.json({ lobbyId });
-    });
+    try { db.db.prepare(query).run(lobbyId,creatorId,targetColor); res.json({lobbyId}); }
+    catch(error){console.error('Error creating ColorSync lobby:',error);res.status(500).json({error:'Failed to create lobby'});}
 };
 
 exports.getLobbyData = (req, res) => {
@@ -182,23 +141,8 @@ exports.getLobbyData = (req, res) => {
         WHERE p.lobby_id = ?
     `;
 
-    db.db.get(lobbyQuery, [uuid], (err, lobby) => {
-        if (err || !lobby) {
-            return res.status(404).json({ error: 'Lobby not found' });
-        }
-
-        db.db.all(participantsQuery, [uuid], (err, participants) => {
-            if (err) {
-                return res.status(500).json({ error: 'Failed to fetch participants' });
-            }
-
-            res.json({
-                ...lobby,
-                target_color: JSON.parse(lobby.target_color),
-                participants
-            });
-        });
-    });
+    try { const lobby=db.db.prepare(lobbyQuery).get(uuid); if(!lobby)return res.status(404).json({error:'Lobby not found'}); const participants=db.db.prepare(participantsQuery).all(uuid); res.json({...lobby,target_color:JSON.parse(lobby.target_color),participants}); }
+    catch { res.status(500).json({error:'Failed to fetch participants'}); }
 };
 
 exports.submitLobbyScore = (req, res) => {
@@ -207,9 +151,9 @@ exports.submitLobbyScore = (req, res) => {
     const userId = req.user.userId;
 
     const checkLobby = `SELECT status FROM ColorSync_Lobbies WHERE id = ?`;
-    db.db.get(checkLobby, [uuid], (err, lobby) => {
-        if (err || !lobby) return res.status(404).json({ error: 'Lobby not found' });
-
+    try {
+        const lobby = db.db.prepare(checkLobby).get(uuid);
+        if (!lobby) return res.status(404).json({ error: 'Lobby not found' });
         const query = `
             INSERT INTO ColorSync_LobbyParticipants (lobby_id, userId, score, guessed_color, submitted_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -219,24 +163,9 @@ exports.submitLobbyScore = (req, res) => {
                 submitted_at = CURRENT_TIMESTAMP
         `;
         
-        db.db.run(query, [uuid, userId, score, guessed_color], (err) => {
-            if (err) {
-                console.error('Error submitting lobby score:', err);
-                return res.status(500).json({ error: 'Failed to submit score' });
-            }
-
-            // Also log to general scores for persistence
-            const lobbyColorQuery = `SELECT target_color FROM ColorSync_Lobbies WHERE id = ?`;
-            db.db.get(lobbyColorQuery, [uuid], (err, lobby) => {
-                if (lobby) {
-                    const target = JSON.parse(lobby.target_color);
-                    const targetHex = `#${((1 << 24) + (target.r << 16) + (target.g << 8) + target.b).toString(16).slice(1)}`;
-                    const generalQuery = `INSERT INTO ColorSync_Scores (userId, score, target_color, guessed_color, mode) VALUES (?, ?, ?, ?, 'LOBBY')`;
-                    db.db.run(generalQuery, [userId, score, targetHex, guessed_color]);
-                }
-            });
-
-            res.json({ success: true });
-        });
-    });
+        db.db.prepare(query).run(uuid,userId,score,guessed_color);
+        const colorRow=db.db.prepare('SELECT target_color FROM ColorSync_Lobbies WHERE id=?').get(uuid);
+        if(colorRow){const target=JSON.parse(colorRow.target_color);const targetHex=`#${((1<<24)+(target.r<<16)+(target.g<<8)+target.b).toString(16).slice(1)}`;db.db.prepare("INSERT INTO ColorSync_Scores (userId,score,target_color,guessed_color,mode) VALUES (?,?,?,?,'LOBBY')").run(userId,score,targetHex,guessed_color);}
+        res.json({success:true});
+    } catch(error){console.error('Error submitting lobby score:',error);res.status(500).json({error:'Failed to submit score'});}
 };

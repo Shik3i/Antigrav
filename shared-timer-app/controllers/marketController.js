@@ -8,10 +8,7 @@ exports.getAllActive = (req, res) => {
         WHERE m.isDeleted = 0 
         ORDER BY m.itemName ASC
     `;
-    db.all(query, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        res.json(rows || []);
-    });
+    try { res.json(db.prepare(query).all()); } catch { res.status(500).json({ error: 'Database error' }); }
 };
 
 exports.addItem = (req, res) => {
@@ -20,10 +17,8 @@ exports.addItem = (req, res) => {
     if (!itemName || price == null) return res.status(400).json({ error: 'Missing itemName or price' });
 
     const query = `INSERT INTO MMO_MarketPrices (itemName, price, updatedBy, createdAt, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
-    db.run(query, [itemName, price, updatedBy], function(err) {
-        if (err) return res.status(500).json({ error: 'Failed to add item' });
-        res.status(201).json({ id: this.lastID, itemName, price, updatedBy });
-    });
+    try { const result=db.prepare(query).run(itemName,price,updatedBy); res.status(201).json({id:Number(result.lastInsertRowid),itemName,price,updatedBy}); }
+    catch { res.status(500).json({ error: 'Failed to add item' }); }
 };
 
 exports.updateItem = (req, res) => {
@@ -34,21 +29,15 @@ exports.updateItem = (req, res) => {
     if (!itemName || price == null) return res.status(400).json({ error: 'Missing itemName or price' });
 
     const query = `UPDATE MMO_MarketPrices SET itemName = ?, price = ?, updatedBy = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`;
-    db.run(query, [itemName, price, updatedBy, id], function(err) {
-        if (err) return res.status(500).json({ error: 'Failed to update item' });
-        if (this.changes === 0) return res.status(404).json({ error: 'Item not found' });
-        res.json({ success: true });
-    });
+    try { const result=db.prepare(query).run(itemName,price,updatedBy,id); if(Number(result.changes)===0)return res.status(404).json({error:'Item not found'}); res.json({success:true}); }
+    catch { res.status(500).json({ error: 'Failed to update item' }); }
 };
 
 exports.softDeleteItem = (req, res) => {
     const { id } = req.params;
     const query = `UPDATE MMO_MarketPrices SET isDeleted = 1 WHERE id = ?`;
-    db.run(query, [id], function(err) {
-        if (err) return res.status(500).json({ error: 'Failed to delete item' });
-        if (this.changes === 0) return res.status(404).json({ error: 'Item not found' });
-        res.json({ success: true });
-    });
+    try { const result=db.prepare(query).run(id); if(Number(result.changes)===0)return res.status(404).json({error:'Item not found'}); res.json({success:true}); }
+    catch { res.status(500).json({ error: 'Failed to delete item' }); }
 };
 
 // --- Superadmin Routes ---
@@ -62,10 +51,7 @@ exports.getAllDeleted = (req, res) => {
         WHERE m.isDeleted = 1 
         ORDER BY m.updatedAt DESC
     `;
-    db.all(query, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        res.json(rows || []);
-    });
+    try { res.json(db.prepare(query).all()); } catch { res.status(500).json({ error: 'Database error' }); }
 };
 
 exports.restoreItem = (req, res) => {
@@ -73,10 +59,7 @@ exports.restoreItem = (req, res) => {
     
     const { id } = req.params;
     const query = `UPDATE MMO_MarketPrices SET isDeleted = 0 WHERE id = ?`;
-    db.run(query, [id], function(err) {
-        if (err) return res.status(500).json({ error: 'Failed to restore item' });
-        res.json({ success: true });
-    });
+    try { db.prepare(query).run(id); res.json({success:true}); } catch { res.status(500).json({error:'Failed to restore item'}); }
 };
 
 exports.hardDeleteItem = (req, res) => {
@@ -84,8 +67,5 @@ exports.hardDeleteItem = (req, res) => {
 
     const { id } = req.params;
     const query = `DELETE FROM MMO_MarketPrices WHERE id = ?`;
-    db.run(query, [id], function(err) {
-        if (err) return res.status(500).json({ error: 'Failed to hard delete item' });
-        res.json({ success: true });
-    });
+    try { db.prepare(query).run(id); res.json({success:true}); } catch { res.status(500).json({error:'Failed to hard delete item'}); }
 };

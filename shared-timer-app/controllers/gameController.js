@@ -454,30 +454,22 @@ exports.getDailyStatus = async (req, res, next) => {
         const result = { achievements: false, colorsync: false, 'scratch-cards': false, 'lol-idle': false };
 
         try {
-            const hasClaimedToday = await new Promise((resolve) => {
-                dbLayer.db.get(`SELECT id FROM Users WHERE id = ? AND last_daily_claim >= date('now', 'start of day')`, [userId], (err, row) => resolve(!!row));
-            });
+            const hasClaimedToday = Boolean(dbLayer.db.prepare(`SELECT id FROM Users WHERE id = ? AND last_daily_claim >= date('now', 'start of day')`).get(userId));
             result.achievements = !hasClaimedToday;
         } catch (e) { }
 
         try {
-            const hasPlayedToday = await new Promise((resolve) => {
-                dbLayer.db.get(`SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?`, [userId, today], (err, row) => resolve(!!row));
-            });
+            const hasPlayedToday = Boolean(dbLayer.db.prepare('SELECT id FROM ColorSync_DailyResults WHERE userId = ? AND date = ?').get(userId, today));
             result.colorsync = !hasPlayedToday;
         } catch (e) { }
 
         try {
-            const hasFreePackToday = await new Promise((resolve) => {
-                dbLayer.db.get(`SELECT id FROM Scratchcards WHERE userId = ? AND is_free = 1 AND date(claimed_at) = date('now')`, [userId], (err, row) => resolve(!!row));
-            });
+            const hasFreePackToday = Boolean(dbLayer.db.prepare("SELECT id FROM Scratchcards WHERE userId = ? AND is_free = 1 AND date(claimed_at) = date('now')").get(userId));
             result['scratch-cards'] = !hasFreePackToday;
         } catch (e) { }
 
         try {
-            const hasIdleRewardToday = await new Promise((resolve) => {
-                dbLayer.db.get(`SELECT userId FROM Idle_Profiles WHERE userId = ? AND last_daily_reward >= date('now', 'start of day')`, [userId], (err, row) => resolve(!!row));
-            });
+            const hasIdleRewardToday = Boolean(dbLayer.db.prepare("SELECT userId FROM Idle_Profiles WHERE userId = ? AND last_daily_reward >= date('now', 'start of day')").get(userId));
             result['lol-idle'] = !hasIdleRewardToday;
         } catch (e) { }
 

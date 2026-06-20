@@ -652,7 +652,7 @@ function flushAdminCache(target) {
     }
     if (target === 'rss' || target === 'all') {
         // Since RSS is DB based, we might want to clear the articles table
-        dbLayer.db.run('DELETE FROM RssArticles_Cache');
+        dbLayer.db.prepare('DELETE FROM RssArticles_Cache').run();
     }
     return getAdminCacheStatus();
 }
