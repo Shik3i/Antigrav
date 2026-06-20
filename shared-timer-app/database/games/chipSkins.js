@@ -5,32 +5,14 @@ const VALID_STATUSES = ['draft', 'public', 'restricted', 'disabled'];
 const VALID_RARITIES = ['common', 'rare', 'epic', 'legendary', 'limited', 'exclusive'];
 const SLUG_PATTERN = /^[a-z0-9-]{2,40}$/;
 
-const run = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function onRun(err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
+const run = async (sql, params = []) => {
+  const result = db.prepare(sql).run(...params);
+  return { lastID: Number(result.lastInsertRowid), changes: Number(result.changes) };
 };
 
-const get = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row || null);
-    });
-  });
-};
+const get = async (sql, params = []) => db.prepare(sql).get(...params) || null;
 
-const all = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
+const all = async (sql, params = []) => db.prepare(sql).all(...params);
 
 const validateStatus = (status) => {
   if (!VALID_STATUSES.includes(status)) {
