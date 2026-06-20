@@ -188,12 +188,29 @@ app.get('*catchall', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-    dbLayer.logSystemEvent('info', 'System', `Server listening on port ${PORT}`);
-    apiController.initializeEsportsDb();
-    startCron();
-    startLottoCron(io);
-    startRssCron();
-    startBackupCron();
-});
+async function startServer() {
+    await dbLayer.ready;
+    return new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(PORT, () => {
+            server.off('error', reject);
+            console.log(`Server listening on port ${PORT}`);
+            dbLayer.logSystemEvent('info', 'System', `Server listening on port ${PORT}`);
+            apiController.initializeEsportsDb();
+            startCron();
+            startLottoCron(io);
+            startRssCron();
+            startBackupCron();
+            resolve(server);
+        });
+    });
+}
+
+if (require.main === module) {
+    startServer().catch((error) => {
+        originalConsoleError('Database initialization failed:', error);
+        process.exitCode = 1;
+    });
+}
+
+module.exports = { app, server, startServer };
