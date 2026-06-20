@@ -1,90 +1,37 @@
 const db = require('./connection');
 
-/**
- * Centralized Logging for Error and System Events
- */
+async function logError(message, stack = null, context = null) {
+  const result = db.prepare('INSERT INTO ErrorLogs (message, stack, context) VALUES (?, ?, ?)')
+    .run(message, stack, context);
+  return Number(result.lastInsertRowid);
+}
 
-const logError = (message, stack = null, context = null) => {
-  return new Promise((resolve, reject) => {
-    try {
-      db.run('INSERT INTO ErrorLogs (message, stack, context) VALUES (?, ?, ?)', [message, stack, context], function (err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-};
+async function getErrorLogs(limit = 100) {
+  return db.prepare('SELECT * FROM ErrorLogs ORDER BY timestamp DESC LIMIT ?').all(limit);
+}
 
-const getErrorLogs = (limit = 100) => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM ErrorLogs ORDER BY timestamp DESC LIMIT ?', [limit], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
-};
+async function deleteErrorLog(id) {
+  return Number(db.prepare('DELETE FROM ErrorLogs WHERE id = ?').run(id).changes);
+}
 
-const deleteErrorLog = (id) => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM ErrorLogs WHERE id = ?', [id], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function clearErrorLogs() {
+  return Number(db.prepare('DELETE FROM ErrorLogs').run().changes);
+}
 
-const clearErrorLogs = () => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM ErrorLogs', [], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function logSystemEvent(level, context, message) {
+  const result = db.prepare('INSERT INTO SystemLogs (level, context, message) VALUES (?, ?, ?)')
+    .run(level, context, message);
+  db.prepare("DELETE FROM SystemLogs WHERE createdAt < datetime('now', '-24 hours')").run();
+  return Number(result.lastInsertRowid);
+}
 
-const logSystemEvent = async (level, context, message) => {
-  return new Promise((resolve, reject) => {
-    try {
-      db.run('INSERT INTO SystemLogs (level, context, message) VALUES (?, ?, ?)', [level, context, message], function (err) {
-        if (err) {
-          reject(err);
-          return;
-        }
+async function getSystemLogs() {
+  return db.prepare('SELECT * FROM SystemLogs ORDER BY createdAt DESC').all();
+}
 
-        // Enforce 24h retention
-        try {
-          db.run("DELETE FROM SystemLogs WHERE createdAt < datetime('now', '-24 hours')", () => {
-            resolve(this.lastID);
-          });
-        } catch (cleanupErr) {
-          reject(cleanupErr);
-        }
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-};
-
-const getSystemLogs = () => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM SystemLogs ORDER BY createdAt DESC', [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
-
-const clearSystemLogs = () => {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM SystemLogs', function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function clearSystemLogs() {
+  return Number(db.prepare('DELETE FROM SystemLogs').run().changes);
+}
 
 module.exports = {
   logError,
