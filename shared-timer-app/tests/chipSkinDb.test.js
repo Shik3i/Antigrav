@@ -2,9 +2,7 @@ const assert = require('assert');
 const dbLayer = require('../database');
 
 function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    dbLayer.db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
-  });
+  return dbLayer.db.prepare(sql).all(...params);
 }
 
 test('chip skin tables exist with required columns', async () => {
@@ -46,12 +44,11 @@ const TEST_SKIN_SLUGS = [
 ];
 
 async function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    dbLayer.db.run(sql, params, function onRun(err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
+  const result = dbLayer.db.prepare(sql).run(...params);
+  return {
+    lastID: Number(result.lastInsertRowid),
+    changes: Number(result.changes)
+  };
 }
 
 async function clearChipSkinRows() {
