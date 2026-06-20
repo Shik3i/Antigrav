@@ -9,12 +9,24 @@ const external = require('./external');
 const games = require('./games');
 const utils = require('./utils');
 
-// 1. Initialize the database schema and migrations
-initializeDatabaseSchema();
+let initializationError;
+try {
+  initializeDatabaseSchema(db);
+} catch (error) {
+  initializationError = error;
+}
+
+const ready = initializationError
+  ? Promise.reject(initializationError)
+  : Promise.resolve();
+
+// Prevent an unhandled rejection between module loading and server startup.
+ready.catch(() => {});
 
 // 2. Export everything from the modularized files
 module.exports = {
   db,
+  ready,
   ...utils,
   ...logging,
   ...users,
