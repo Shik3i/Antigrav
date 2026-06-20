@@ -91,9 +91,11 @@ describe('timerSocketHandlers', () => {
 
   test('routes END_EARLY through the lifecycle exactly once', async () => {
     const h = makeHarness();
-    await h.socket.receive(EVENTS.TIMER_ACTION, { roomId: 'room-a', action: 'END_EARLY' }, vi.fn());
+    const ack = vi.fn();
+    await h.socket.receive(EVENTS.TIMER_ACTION, { roomId: 'room-a', action: 'END_EARLY' }, ack);
     expect(h.lifecycleService.handleCompletion).toHaveBeenCalledTimes(1);
     expect(h.lifecycleService.handleCompletion).toHaveBeenCalledWith(h.room, expect.objectContaining({ early: true }));
+    expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true, changed: true }));
   });
 
   test('registers Pomodoro and auto-restart handlers with room-scoped authorization', async () => {
