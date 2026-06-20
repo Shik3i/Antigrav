@@ -1,67 +1,31 @@
 const db = require('../connection');
 
-const getGameUpgradesConfig = () => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM GameUpgrades_Config ORDER BY category ASC', [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
+const getGameUpgradesConfig = async () => db.prepare('SELECT * FROM GameUpgrades_Config ORDER BY category ASC').all();
 
-const purchaseUpgrade = (userId, upgradeId, price) => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (err, user) => {
-        if (err || !user || user.koala_balance < price) {
-          db.run('ROLLBACK');
-          return reject(err || new Error('Insufficient balance'));
-        }
-        db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [price, userId]);
-        db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, -price, `Purchase Upgrade: ${upgradeId}`]);
-        db.run(
-          'INSERT INTO UserUpgrades (userId, upgrade_id, current_level) VALUES (?, ?, 1) ON CONFLICT(userId, upgrade_id) DO UPDATE SET current_level = current_level + 1',
-          [userId, upgradeId],
-          function (err) {
-            if (err) {
-              db.run('ROLLBACK');
-              return reject(err);
-            }
-            db.run('COMMIT', (err) => err ? reject(err) : resolve({ success: true }));
-          }
-        );
-      });
-    });
-  });
-};
+async function purchaseUpgrade(userId, upgradeId, price) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const user = db.prepare('SELECT koala_balance FROM Users WHERE id = ?').get(userId);
+    if (!user || user.koala_balance < price) throw new Error('Insufficient balance');
+    db.prepare('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?').run(price, userId);
+    db.prepare('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)')
+      .run(userId, -price, `Purchase Upgrade: ${upgradeId}`);
+    db.prepare(`
+      INSERT INTO UserUpgrades (userId, upgrade_id, current_level) VALUES (?, ?, 1)
+      ON CONFLICT(userId, upgrade_id) DO UPDATE SET current_level = current_level + 1
+    `).run(userId, upgradeId);
+    db.exec('COMMIT');
+    return { success: true };
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
 
-const getLeaderboardSettings = () => {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM LeaderboardSettings', [], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
+const getLeaderboardSettings = async () => db.prepare('SELECT * FROM LeaderboardSettings').all();
 
-const updateLeaderboardSetting = (gameId, isHidden) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      INSERT INTO LeaderboardSettings (game_id, is_hidden)
-      VALUES (?, ?)
-      ON CONFLICT(game_id) DO UPDATE SET is_hidden = excluded.is_hidden
-    `;
-    db.run(query, [gameId, isHidden ? 1 : 0], function (err) {
-      if (err) reject(err);
-      else resolve(this.changes);
-    });
-  });
-};
+async function updateLeaderboardSetting(gameId, isHidden) {
+  return Number(db.prepare(`
+    INSERT INTO LeaderboardSettings (game_id, is_hidden) VALUES (?, ?)
+    ON CONFLICT(game_id) DO UPDATE SET is_hidden = excluded.is_hidden
+  `).run(gameId, isHidden ? 1 : 0).changes);
+}
 
-module.exports = {
-  getGameUpgradesConfig,
-  purchaseUpgrade,
-  getLeaderboardSettings,
-  updateLeaderboardSetting,
-};
+module.exports = { getGameUpgradesConfig, purchaseUpgrade, getLeaderboardSettings, updateLeaderboardSetting };
