@@ -14,6 +14,14 @@ function createTimerLifecycleService({
   const processedByRoom = new WeakMap();
   const pendingByRoom = new Map();
 
+  function reportPersistenceError(error, context) {
+    try {
+      Promise.resolve(onPersistenceError(error, context)).catch(() => {});
+    } catch {
+      // Error reporting is best-effort and must not affect timer completion.
+    }
+  }
+
   function invalidate(roomId) {
     const timeoutId = pendingByRoom.get(roomId);
     if (timeoutId !== undefined) clearTimeoutFn(timeoutId);
@@ -96,7 +104,7 @@ function createTimerLifecycleService({
         persistUserCompletion(room, user, completion, coinsToAward)
       )));
     } catch (error) {
-      onPersistenceError(error, { roomId: room.id, sequence: completion.sequence });
+      reportPersistenceError(error, { roomId: room.id, sequence: completion.sequence });
     }
 
     return true;

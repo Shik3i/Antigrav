@@ -80,6 +80,33 @@ describe('timerLifecycleService', () => {
     );
   });
 
+  test('contains synchronous persistence error reporter failures', async () => {
+    const h = makeHarness({ autoRestart: false });
+    h.dbLayer.getKoalaBaseline.mockRejectedValueOnce(new Error('database unavailable'));
+    h.onPersistenceError.mockImplementationOnce(() => {
+      throw new Error('reporter unavailable');
+    });
+
+    await expect(h.service.handleCompletion(h.room, {
+      roomId: 'room-a', sequence: 1, generation: 3, rewardableElapsedMs: 60_000
+    })).resolves.toBe(true);
+  });
+
+  test('contains asynchronous persistence error reporter failures', async () => {
+    const h = makeHarness({ autoRestart: false });
+    h.dbLayer.getKoalaBaseline.mockRejectedValueOnce(new Error('database unavailable'));
+    const reporterResult = Promise.reject(new Error('reporter unavailable'));
+    const catchSpy = vi.spyOn(reporterResult, 'catch');
+    h.onPersistenceError.mockReturnValueOnce(reporterResult);
+
+    await expect(h.service.handleCompletion(h.room, {
+      roomId: 'room-a', sequence: 1, generation: 3, rewardableElapsedMs: 60_000
+    })).resolves.toBe(true);
+    const rejectionWasConsumed = catchSpy.mock.calls.length > 0;
+    if (!rejectionWasConsumed) await reporterResult.catch(() => {});
+    expect(rejectionWasConsumed).toBe(true);
+  });
+
   test('runs auto-restart only while the captured generation is current', async () => {
     const h = makeHarness();
     await h.service.handleCompletion(h.room, {
