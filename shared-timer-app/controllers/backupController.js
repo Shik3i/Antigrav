@@ -21,7 +21,7 @@ const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
 
   isBackingUp = true;
 
-  return new Promise((resolve, reject) => {
+  try {
     const targetDir = type === 'manual' ? BACKUP_MANUAL_DIR : BACKUP_AUTO_DIR;
     
     // Ensure directories exist
@@ -45,37 +45,19 @@ const createBackup = async ({ type = 'automatic', note = '' } = {}) => {
       
     const destPath = path.join(targetDir, filename);
 
-    db.run(`VACUUM INTO ?`, [destPath], function(err) {
-      // Ensure we clear the lock regardless of outcome
-      if (err) {
-        isBackingUp = false;
-        console.error(`[Backup] Failed to create ${type} backup:`, err);
-        if (logging && logging.logError) {
-          logging.logError(`${type.toUpperCase()} Backup failed`, err, { destPath });
-        }
-        reject(err);
-      } else {
-        console.log(`[Backup] Successfully created ${type} backup: ${filename}`);
-        
-        // Only prune automatic backups
-        if (type === 'automatic') {
-          pruneBackups()
-            .then(() => {
-              isBackingUp = false;
-              resolve({ filename, timestamp: now, type });
-            })
-            .catch(e => {
-              console.error('[Backup] Pruning failed:', e);
-              isBackingUp = false; // Still release lock
-              resolve({ filename, timestamp: now, type });
-            });
-        } else {
-          isBackingUp = false;
-          resolve({ filename, timestamp: now, type });
-        }
-      }
-    });
-  });
+    db.prepare('VACUUM INTO ?').run(destPath);
+    console.log(`[Backup] Successfully created ${type} backup: ${filename}`);
+    if (type === 'automatic') {
+      try { await pruneBackups(); } catch (error) { console.error('[Backup] Pruning failed:', error); }
+    }
+    return { filename, timestamp: now, type };
+  } catch (error) {
+    console.error(`[Backup] Failed to create ${type} backup:`, error);
+    if (logging && logging.logError) logging.logError(`${type.toUpperCase()} Backup failed`, error, { destPath: error.destPath });
+    throw error;
+  } finally {
+    isBackingUp = false;
+  }
 };
 
 /**
@@ -150,28 +132,17 @@ const getBackupsList = async () => {
  * Toggles the auto-backup state in ServerSettings
  */
 const setAutoBackupState = async (enabled) => {
-  return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('auto_backup_enabled', ?)`,
-      [enabled ? 'true' : 'false'],
-      (err) => {
-        if (err) reject(err);
-        else resolve({ enabled });
-      }
-    );
-  });
+  db.prepare("INSERT OR REPLACE INTO ServerSettings (key, value) VALUES ('auto_backup_enabled', ?)")
+    .run(enabled ? 'true' : 'false');
+  return { enabled };
 };
 
 /**
  * Gets the current auto-backup state
  */
 const getAutoBackupState = async () => {
-  return new Promise((resolve, reject) => {
-    db.get(`SELECT value FROM ServerSettings WHERE key = 'auto_backup_enabled'`, (err, row) => {
-      if (err) reject(err);
-      else resolve(row ? row.value === 'true' : false);
-    });
-  });
+  const row = db.prepare("SELECT value FROM ServerSettings WHERE key = 'auto_backup_enabled'").get();
+  return row ? row.value === 'true' : false;
 };
 
 /**
