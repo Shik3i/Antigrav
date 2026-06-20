@@ -1,110 +1,74 @@
 const db = require('../connection');
 
-const getLottoConfig = () => {
-  return new Promise((resolve, reject) => {
-    db.get("SELECT * FROM GlobalGameStats WHERE gameId = 'lotto'", (err, stats) => {
-      if (err) return reject(err);
-      const finalStats = stats || { totalPayout: 0, totalWins: 0, totalPlayed: 0 };
-      db.get("SELECT COUNT(*) as totalPending FROM LottoTickets WHERE status = 'pending'", (err, pendRow) => {
-        if (err) return reject(err);
-        finalStats.totalPending = pendRow ? pendRow.totalPending : 0;
-        db.get("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT 1", (err, lastDraw) => {
-          if (err) return reject(err);
-          if (!lastDraw) return resolve({ stats: finalStats, lastDraw: null });
-          db.all("SELECT winClass, COUNT(*) as winnerCount FROM LottoTickets WHERE drawDate = ? AND winClass > 0 GROUP BY winClass", [lastDraw.drawDate], (err, winnerRows) => {
-            if (err) return reject(err);
-            const winnersByClass = {};
-            winnerRows.forEach(row => winnersByClass[row.winClass] = row.winnerCount);
-            lastDraw.winnersByClass = winnersByClass;
-            resolve({ stats: finalStats, lastDraw });
-          });
-        });
-      });
-    });
-  });
-};
+async function getLottoConfig() {
+  const stats = db.prepare("SELECT * FROM GlobalGameStats WHERE gameId = 'lotto'").get()
+    || { totalPayout: 0, totalWins: 0, totalPlayed: 0 };
+  stats.totalPending = db.prepare("SELECT COUNT(*) AS count FROM LottoTickets WHERE status = 'pending'").get().count;
+  const lastDraw = db.prepare('SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT 1').get();
+  if (!lastDraw) return { stats, lastDraw: null };
+  lastDraw.winnersByClass = {};
+  for (const row of db.prepare('SELECT winClass, COUNT(*) AS winnerCount FROM LottoTickets WHERE drawDate = ? AND winClass > 0 GROUP BY winClass').all(lastDraw.drawDate)) {
+    lastDraw.winnersByClass[row.winClass] = row.winnerCount;
+  }
+  return { stats, lastDraw };
+}
 
-const purchaseLottoTickets = (userId, tickets, drawDate) => {
-  return new Promise((resolve, reject) => {
-    const totalCost = tickets.length * 100;
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      db.get('SELECT koala_balance FROM Users WHERE id = ?', [userId], (err, user) => {
-        if (err || !user || user.koala_balance < totalCost) return db.run('ROLLBACK', () => reject(new Error(user ? 'Not enough KoalaCoins.' : 'User not found.')));
-        db.all("SELECT numbers, superzahl FROM LottoTickets WHERE userId = ? AND drawDate = ?", [userId, drawDate], (err, existingRows) => {
-          if (err) return db.run('ROLLBACK', () => reject(err));
-          if ((existingRows ? existingRows.length : 0) + tickets.length > 100) return db.run('ROLLBACK', () => reject(new Error('Tägliches Limit erreicht. (Max 100)')));
-          db.run('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?', [totalCost, userId]);
-          db.run('UPDATE GlobalGameStats SET totalPlayed = totalPlayed + ? WHERE gameId = ?', [tickets.length, 'lotto']);
-          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, -totalCost, `Lotto Kauf (${tickets.length}x)`]);
-          const stmt = db.prepare('INSERT INTO LottoTickets (userId, drawDate, numbers, superzahl) VALUES (?, ?, ?, ?)');
-          tickets.forEach(t => stmt.run([userId, drawDate, JSON.stringify(t.numbers.sort((a,b) => a-b)), t.superzahl]));
-          stmt.finalize();
-          db.run('COMMIT', (err) => err ? reject(err) : resolve({ newBalance: user.koala_balance - totalCost }));
-        });
-      });
-    });
-  });
-};
+async function purchaseLottoTickets(userId, tickets, drawDate) {
+  const totalCost = tickets.length * 100;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const user = db.prepare('SELECT koala_balance FROM Users WHERE id = ?').get(userId);
+    if (!user) throw new Error('User not found.');
+    if (user.koala_balance < totalCost) throw new Error('Not enough KoalaCoins.');
+    const existingCount = db.prepare('SELECT COUNT(*) AS count FROM LottoTickets WHERE userId = ? AND drawDate = ?').get(userId, drawDate).count;
+    if (existingCount + tickets.length > 100) throw new Error('Tägliches Limit erreicht. (Max 100)');
+    db.prepare('UPDATE Users SET koala_balance = koala_balance - ? WHERE id = ?').run(totalCost, userId);
+    db.prepare("UPDATE GlobalGameStats SET totalPlayed = totalPlayed + ? WHERE gameId = 'lotto'").run(tickets.length);
+    db.prepare('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)')
+      .run(userId, -totalCost, `Lotto Kauf (${tickets.length}x)`);
+    const insert = db.prepare('INSERT INTO LottoTickets (userId, drawDate, numbers, superzahl) VALUES (?, ?, ?, ?)');
+    for (const ticket of tickets) insert.run(userId, drawDate, JSON.stringify([...ticket.numbers].sort((a, b) => a - b)), ticket.superzahl);
+    db.exec('COMMIT');
+    return { newBalance: user.koala_balance - totalCost };
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
 
-const getUserLottoTicketCountForDraw = (userId, drawDate) => {
-  return new Promise((resolve, reject) => {
-    db.get("SELECT COUNT(*) as count FROM LottoTickets WHERE userId = ? AND drawDate = ?", [userId, drawDate], (err, row) => err ? reject(err) : resolve(row ? row.count : 0));
-  });
-};
+const getUserLottoTicketCountForDraw = async (userId, drawDate) => db.prepare(
+  'SELECT COUNT(*) AS count FROM LottoTickets WHERE userId = ? AND drawDate = ?'
+).get(userId, drawDate).count;
 
-const executeLottoDraw = (drawDate, drawnNumbers, drawnSuperzahl) => {
+async function executeLottoDraw(drawDate, drawnNumbers, drawnSuperzahl) {
   const { determineWinClass, getPayoutForClass } = require('../../config/lotto.js');
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      db.all("SELECT * FROM LottoTickets WHERE drawDate = ? AND status = 'pending'", [drawDate], (err, tickets) => {
-        if (err) return db.run('ROLLBACK', () => reject(err));
-        let totalPayout = 0; let totalWinners = 0; const userPayouts = {};
-        for (const ticket of tickets) {
-          const ticketNumbers = JSON.parse(ticket.numbers);
-          const winClass = determineWinClass(ticketNumbers, ticket.superzahl, drawnNumbers, drawnSuperzahl);
-          const payout = getPayoutForClass(winClass);
-          db.run("UPDATE LottoTickets SET matchCount = ?, superzahlMatch = ?, winClass = ?, winAmount = ?, status = 'drawn' WHERE id = ?", [ticketNumbers.filter(n => drawnNumbers.includes(n)).length, ticket.superzahl === drawnSuperzahl ? 1 : 0, winClass, payout, ticket.id]);
-          if (payout > 0) { totalPayout += payout; totalWinners++; userPayouts[ticket.userId] = (userPayouts[ticket.userId] || 0) + payout; }
-        }
-        for (const [userId, amount] of Object.entries(userPayouts)) {
-          db.run('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?', [amount, userId]);
-          db.run('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)', [userId, amount, `Lotto Gewinn (${drawDate})`]);
-        }
-        db.run('UPDATE GlobalGameStats SET totalPayout = totalPayout + ?, totalWins = totalWins + ? WHERE gameId = ?', [totalPayout, totalWinners, 'lotto']);
-        db.run('INSERT INTO LottoDrawings (drawDate, numbers, superzahl, totalTickets, totalWinners, totalPayout) VALUES (?, ?, ?, ?, ?, ?)', [drawDate, JSON.stringify(drawnNumbers), drawnSuperzahl, tickets.length, totalWinners, totalPayout]);
-        db.run('COMMIT', (err) => err ? reject(err) : resolve({ drawDate, numbers: drawnNumbers, superzahl: drawnSuperzahl, totalTickets: tickets.length, totalWinners, totalPayout }));
-      });
-    });
-  });
-};
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const tickets = db.prepare("SELECT * FROM LottoTickets WHERE drawDate = ? AND status = 'pending'").all(drawDate);
+    let totalPayout = 0; let totalWinners = 0; const userPayouts = {};
+    const update = db.prepare("UPDATE LottoTickets SET matchCount = ?, superzahlMatch = ?, winClass = ?, winAmount = ?, status = 'drawn' WHERE id = ?");
+    for (const ticket of tickets) {
+      const numbers = JSON.parse(ticket.numbers);
+      const winClass = determineWinClass(numbers, ticket.superzahl, drawnNumbers, drawnSuperzahl);
+      const payout = getPayoutForClass(winClass);
+      update.run(numbers.filter((number) => drawnNumbers.includes(number)).length, ticket.superzahl === drawnSuperzahl ? 1 : 0, winClass, payout, ticket.id);
+      if (payout > 0) { totalPayout += payout; totalWinners += 1; userPayouts[ticket.userId] = (userPayouts[ticket.userId] || 0) + payout; }
+    }
+    for (const [userId, amount] of Object.entries(userPayouts)) {
+      db.prepare('UPDATE Users SET koala_balance = koala_balance + ? WHERE id = ?').run(amount, userId);
+      db.prepare('INSERT INTO KoalaTransactions (user_id, amount, reason) VALUES (?, ?, ?)').run(userId, amount, `Lotto Gewinn (${drawDate})`);
+    }
+    db.prepare("UPDATE GlobalGameStats SET totalPayout = totalPayout + ?, totalWins = totalWins + ? WHERE gameId = 'lotto'").run(totalPayout, totalWinners);
+    db.prepare('INSERT INTO LottoDrawings (drawDate, numbers, superzahl, totalTickets, totalWinners, totalPayout) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(drawDate, JSON.stringify(drawnNumbers), drawnSuperzahl, tickets.length, totalWinners, totalPayout);
+    db.exec('COMMIT');
+    return { drawDate, numbers: drawnNumbers, superzahl: drawnSuperzahl, totalTickets: tickets.length, totalWinners, totalPayout };
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
 
-const getUserLottoHistory = (userId, limit = 999) => {
-  return new Promise((resolve, reject) => {
-    const q = 'SELECT t.*, d.numbers as drawNumbers, d.superzahl as drawSuperzahl, d.totalPayout as drawTotalPayout FROM LottoTickets t LEFT JOIN LottoDrawings d ON t.drawDate = d.drawDate WHERE t.userId = ? ORDER BY t.drawDate DESC, t.winAmount DESC LIMIT ?';
-    db.all(q, [userId, limit], (err, rows) => err ? reject(err) : resolve(rows || []));
-  });
-};
+const getUserLottoHistory = async (userId, limit = 999) => db.prepare(`
+  SELECT t.*, d.numbers AS drawNumbers, d.superzahl AS drawSuperzahl, d.totalPayout AS drawTotalPayout
+  FROM LottoTickets t LEFT JOIN LottoDrawings d ON t.drawDate = d.drawDate
+  WHERE t.userId = ? ORDER BY t.drawDate DESC, t.winAmount DESC LIMIT ?
+`).all(userId, limit);
+const getLottoDrawHistory = async (limit = 30) => db.prepare('SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT ?').all(limit);
+const getUserLifetimeLottoTicketCount = async (userId) => db.prepare('SELECT COUNT(*) AS count FROM LottoTickets WHERE userId = ?').get(userId).count;
 
-const getLottoDrawHistory = (limit = 30) => {
-  return new Promise((resolve, reject) => {
-    db.all("SELECT * FROM LottoDrawings ORDER BY drawDate DESC LIMIT ?", [limit], (err, rows) => err ? reject(err) : resolve(rows || []));
-  });
-};
-
-const getUserLifetimeLottoTicketCount = (userId) => {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT COUNT(*) as count FROM LottoTickets WHERE userId = ?', [userId], (err, row) => err ? reject(err) : resolve(row ? row.count : 0));
-  });
-};
-
-module.exports = {
-  getLottoConfig,
-  purchaseLottoTickets,
-  getUserLottoTicketCountForDraw,
-  executeLottoDraw,
-  getUserLottoHistory,
-  getLottoDrawHistory,
-  getUserLifetimeLottoTicketCount,
-};
+module.exports = { getLottoConfig, purchaseLottoTickets, getUserLottoTicketCountForDraw, executeLottoDraw, getUserLottoHistory, getLottoDrawHistory, getUserLifetimeLottoTicketCount };

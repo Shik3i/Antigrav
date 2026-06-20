@@ -5,12 +5,7 @@ const db = dbLayer.db;
 const USER_ID = 'plan-blackjack-economy-user';
 
 function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function onRun(err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
+  return db.prepare(sql).run(...params);
 }
 
 async function cleanup() {
@@ -68,12 +63,8 @@ async function cleanup() {
       }
     ]);
 
-    const stats = await new Promise((resolve, reject) => {
-      db.get('SELECT gamesPlayed, totalWagered, totalWon FROM BlackjackStats WHERE userId = ?', [USER_ID], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
+    const stats = db.prepare('SELECT gamesPlayed, totalWagered, totalWon FROM BlackjackStats WHERE userId = ?')
+      .get(USER_ID);
     assert.strictEqual(stats.gamesPlayed, 1, 'side bet settlement should not count as an extra blackjack hand');
     assert.strictEqual(stats.totalWagered, 10000, 'side bet wager should not inflate main blackjack wager stats');
     assert.strictEqual(stats.totalWon, 20000, 'side bet payout should not inflate main blackjack win stats');
