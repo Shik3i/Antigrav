@@ -49,6 +49,7 @@ export function getTimerPresentation({ roomState, serverTimeOffset = 0, now = Da
 
 export function isStaleTimerSnapshot(current, incoming) {
   if (!current?.state || !incoming?.state) return false;
+  if (current.id !== incoming.id) return false;
   const currentRevision = Number(current.state.timerRevision) || 0;
   const incomingRevision = Number(incoming.state.timerRevision) || 0;
   return incomingRevision < currentRevision;

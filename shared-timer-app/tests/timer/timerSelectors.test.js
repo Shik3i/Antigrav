@@ -72,6 +72,10 @@ describe('timerSelectors', () => {
       { state: { timerRevision: 4 } },
       { state: { timerRevision: 4 } }
     )).toBe(false);
+    expect(isStaleTimerSnapshot(
+      { id: 'room-a', state: { timerRevision: 20 } },
+      { id: 'room-b', state: { timerRevision: 0 } }
+    )).toBe(false);
     expect(isStaleTimerSnapshot(null, { state: {} })).toBe(false);
   });
 
