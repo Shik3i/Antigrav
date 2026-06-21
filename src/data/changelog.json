@@ -1,5 +1,11 @@
 [
   {
+    "id": 102,
+    "version": "3.0.1",
+    "date": "2026-06-21",
+    "changes": "- **Sichere v3-Migration**: Verbliebene Daten und `.env` aus `shared-timer-app/` werden vor dem Start idempotent ins Repository-Root übernommen, ohne vorhandene Dateien zu überschreiben.\n- **Node-24-Guard**: Installation und Serverstart prüfen die für `node:sqlite` erforderliche Node.js-24-Version mit einer verständlichen Fehlermeldung.\n- **Docker-Updates repariert**: Compose referenziert jetzt das veröffentlichte GHCR-Image, sodass `docker compose pull` und Watchtower funktionieren; lokale Builds bleiben weiterhin möglich.\n- **Regressionstests und Dokumentation**: Upgrade-, Konflikt- und Deploymentpfade sind automatisiert abgesichert und in der README beschrieben."
+  },
+  {
     "id": 101,
     "version": "2.61.0",
     "date": "2026-06-19",

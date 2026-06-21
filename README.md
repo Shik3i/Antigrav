@@ -108,7 +108,7 @@ Antigrav-main/
 ## 🚀 Lokales Setup
 
 ### Voraussetzungen
-- Node.js
+- Node.js 24 (siehe `.nvmrc`)
 - npm
 - optional: Docker und Docker Compose
 
@@ -310,23 +310,40 @@ Mit Version 3.0.0 wurde die Projektstruktur vereinfacht:
 **Migration von bestehenden lokalen Installationen:**
 1. Stoppen Sie den laufenden Server
 2. Sichern Sie Ihre `data/` und `.env` Dateien
-3. Aktualisieren Sie auf die neue Version
-4. Führen Sie `npm install` im Root-Verzeichnis aus
-5. Starten Sie den Server mit `npm start`
+3. Aktualisieren Sie auf Node.js 24, zum Beispiel mit `nvm use`
+4. Aktualisieren Sie auf die neue Version
+5. Migrieren Sie ignorierte Laufzeitdaten aus dem alten Wrapper-Verzeichnis:
+   ```bash
+   node scripts/migrate-v3-layout.js
+   ```
+   Vorhandene Dateien im Root werden dabei nie überschrieben; Konflikte bleiben unter `shared-timer-app/` erhalten und werden gemeldet.
+6. Führen Sie `npm install` im Root-Verzeichnis aus
+7. Starten Sie den Server mit `npm start` (die Migration wird dabei sicherheitshalber erneut und idempotent geprüft)
 
-Die Konfiguration und Funktionalität bleiben unverändert - nur die Verzeichnisstruktur wurde vereinfacht.
+Version 3 benötigt wegen der direkten SQLite-Anbindung zwingend Node.js 24.
 
 ### Für Docker-Nutzer
 
-**Keine manuelle Migration nötig!**
+**Einmalige Pfadmigration bei Repository-basierten Installationen**
 
-Für Docker-Nutzer ist der Update-Prozess einfach:
-- Watchtower aktualisiert automatisch, wenn der neue Tag `v3.0.0` veröffentlicht wird
-- Bei manueller Aktualisierung: `docker compose pull` und `docker compose up -d`
-- Die Datenbank und Konfiguration im `./data` Volume bleiben unverändert
+Wenn Version 2 per Compose aus `shared-timer-app/` gestartet wurde, lag der Host-Mount unter `shared-timer-app/data`. Führen Sie vor dem ersten v3-Start einmal `node scripts/migrate-v3-layout.js` aus. Danach liegt die Datenbank unter `./data`.
+
+Für das veröffentlichte GHCR-Image:
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Watchtower kann `ghcr.io/shik3i/antigrav:latest` nun ebenfalls aktualisieren. Für einen lokalen Build aus dem Checkout:
+```bash
+docker compose build --pull
+docker compose up -d
+```
+
+- Die Datenbank und Konfiguration im `./data` Volume bleiben nach der einmaligen Migration erhalten
 - Die App-Struktur im Container war bereits korrekt unter `/app` (nicht `/app/shared-timer-app`)
 
-**Keine Änderungen an Ihrer Docker-Konfiguration nötig!**
+Die mitgelieferte Compose-Datei unterstützt sowohl Registry-Pulls als auch lokale Builds.
 
 ---
 

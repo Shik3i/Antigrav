@@ -1,12 +1,14 @@
 {
   "name": "koalaweb",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "KoalaWeb – real-time social platform with games, timers, economy and more",
   "main": "index.js",
   "scripts": {
+    "preinstall": "node scripts/require-node-24.js",
     "dev": "vite",
     "build": "vite build",
     "build:analyze": "vite build --mode analyze",
+    "prestart": "node scripts/require-node-24.js && node scripts/migrate-v3-layout.js",
     "start": "node server.js",
     "test": "vitest run --passWithNoTests"
   },
