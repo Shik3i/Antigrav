@@ -86,7 +86,6 @@ Antigrav ist damit deutlich mehr als nur ein geteilter Timer oder ein kleines Ca
 ```text
 Antigrav-main/
 ├── README.md
-└── shared-timer-app/
     ├── src/                # React-Frontend
     ├── controllers/        # API- und Business-Logik
     ├── routes/             # Express-Routen
@@ -116,7 +115,6 @@ Antigrav-main/
 ### Installation
 
 ```bash
-cd shared-timer-app
 npm install
 ```
 
@@ -172,12 +170,12 @@ TWITCH_CLIENT_SECRET=
 
 ## 🐳 Docker
 
-Im Ordner `shared-timer-app/` liegt eine `docker-compose.yml` für den Containerbetrieb.
+Im Root-Verzeichnis liegt eine `docker-compose.yml` für den Containerbetrieb.
 
 Typischer Ablauf:
 
 ```bash
-cd shared-timer-app
+cd .
 docker compose up --build
 ```
 
@@ -296,6 +294,39 @@ Diese README beschreibt das Projekt auf Basis der aktuellen Struktur deutlich pa
 - Beschreibung der wichtigsten API-Endpunkte
 - Dokumentation der Admin-Funktionen
 - `.env.example` für einfacheres Setup
+
+## 🆕 Update-Hinweis für Version 3.0.0
+
+### Für Entwickler (Source-Code Installation)
+
+**Wichtig für bestehende lokale Installationen:**
+
+Mit Version 3.0.0 wurde die Projektstruktur vereinfacht:
+- Der `shared-timer-app/` Wrapper-Ordner wurde entfernt
+- Alle Dateien liegen nun direkt im Repository-Root
+- Docker-Context ist jetzt `.` statt `./shared-timer-app`
+- Alle Befehle werden direkt aus dem Root-Verzeichnis ausgeführt
+
+**Migration von bestehenden lokalen Installationen:**
+1. Stoppen Sie den laufenden Server
+2. Sichern Sie Ihre `data/` und `.env` Dateien
+3. Aktualisieren Sie auf die neue Version
+4. Führen Sie `npm install` im Root-Verzeichnis aus
+5. Starten Sie den Server mit `npm start`
+
+Die Konfiguration und Funktionalität bleiben unverändert - nur die Verzeichnisstruktur wurde vereinfacht.
+
+### Für Docker-Nutzer
+
+**Keine manuelle Migration nötig!**
+
+Für Docker-Nutzer ist der Update-Prozess einfach:
+- Watchtower aktualisiert automatisch, wenn der neue Tag `v3.0.0` veröffentlicht wird
+- Bei manueller Aktualisierung: `docker compose pull` und `docker compose up -d`
+- Die Datenbank und Konfiguration im `./data` Volume bleiben unverändert
+- Die App-Struktur im Container war bereits korrekt unter `/app` (nicht `/app/shared-timer-app`)
+
+**Keine Änderungen an Ihrer Docker-Konfiguration nötig!**
 
 ---
 
