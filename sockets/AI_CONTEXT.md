@@ -24,5 +24,5 @@
 - **Socket ID Volatility:** A single user can have multiple socket IDs (multiple tabs); always iterate through the set in `onlineUsers`.
 
 **🔗 Key Files:**
-- [socketHandler.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/shared-timer-app/sockets/socketHandler.js): The primary real-time logic handler.
-- [socketEvents.json](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/shared-timer-app/socketEvents.json): The single source of truth for all real-time events.
+- [socketHandler.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/sockets/socketHandler.js): The primary real-time logic handler.
+- [socketEvents.json](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/socketEvents.json): The single source of truth for all real-time events.

@@ -83,7 +83,7 @@ import { formatKC } from '../../casino/formatters';
 - [ ] **Step 4: Verify build passes**
 
 ```bash
-cd /Users/justus/Documents/KoalaGit/Antigrav/shared-timer-app && npm run build 2>&1 | tail -20
+cd /Users/justus/Documents/KoalaGit/Antigrav && npm run build 2>&1 | tail -20
 ```
 
 Expected: no errors referencing `formatKC`.

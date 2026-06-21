@@ -25,7 +25,7 @@ This document outlines critical rules and best practices for AI agents collabora
 
 - **Reasoning**: Manual terminal commands only affect the local SQLite file (`data/timerapp.db`). These changes will NOT exist in the production environment or for other developers.
 - **Mandatory Workflow**:
-    1. All schema changes must be implemented in `shared-timer-app/database/schema.js` within the `initializeDatabaseSchema()` function.
+    1. All schema changes must be implemented in `database/schema.js` within the `initializeDatabaseSchema()` function.
     2. Use `CREATE TABLE IF NOT EXISTS` for new tables.
     3. Use `ALTER TABLE` within the migration section (near the bottom of the schema function) to add columns to existing tables.
     4. Always include safety checks (e.g., catching error code for "duplicate column name") to ensure migrations are idempotent.
