@@ -19,7 +19,7 @@
 - **Volatile State:** Root managers (Blackjack) hold state in RAM; it is NOT persistent across server restarts unless explicitly synced to DB.
 
 **🔗 Key Files:**
-- [blackjackRoomManager.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/shared-timer-app/utils/blackjackRoomManager.js): High-complexity memory state for the blackjack engine.
-- [safeSerialization.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/shared-timer-app/utils/safeSerialization.js): Critical stability layer for socket communication.
-- [apiClient.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/shared-timer-app/src/utils/apiClient.js): Standardized frontend fetch wrapper.
-- [timerUtils.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/shared-timer-app/src/utils/timerUtils.js): Shared time calculation logic.
+- [blackjackRoomManager.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/utils/blackjackRoomManager.js): High-complexity memory state for the blackjack engine.
+- [safeSerialization.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/utils/safeSerialization.js): Critical stability layer for socket communication.
+- [apiClient.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/src/utils/apiClient.js): Standardized frontend fetch wrapper.
+- [timerUtils.js](file:///c:/Users/s3ish/Documents/Workspace/AntiGravity/Antigrav/src/utils/timerUtils.js): Shared time calculation logic.
