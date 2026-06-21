@@ -64,6 +64,10 @@ const PersonalCounter = ({ totalCompletions }) => {
         }
     };
 
+    const handleIncrementTimer = () => {
+        setTimersSinceClick(prev => prev + 1);
+    };
+
     return (
         <div className="glass-card animate-fade-in" style={{
             position: 'absolute',
@@ -79,10 +83,15 @@ const PersonalCounter = ({ totalCompletions }) => {
             border: '1px solid rgba(255,255,255,0.1)'
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Counter</span>
-                <button className="btn-ghost" style={{ padding: '4px', height: 'auto' }} onClick={handleReset} title="Reset Counter">
-                    <RotateCcw size={14} />
-                </button>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>Köpfe</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn-ghost" style={{ padding: '4px', height: 'auto' }} onClick={handleReset} title="Reset Counter">
+                        <RotateCcw size={14} />
+                    </button>
+                    <button className="btn-ghost" style={{ padding: '4px', height: 'auto' }} onClick={handleIncrementTimer} title="Timer +1">
+                        <Plus size={14} />
+                    </button>
+                </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -100,11 +109,11 @@ const PersonalCounter = ({ totalCompletions }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={12} /> Time since last</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={12} /> Zeit seit letztem Kopf</span>
                     <span style={{ color: 'var(--text-main)', fontFamily: 'monospace', fontSize: '0.85rem' }}>{elapsedStr}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Target size={12} /> Timers since last</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Target size={12} /> Timer seit letztem Kopf</span>
                     <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{timersSinceClick}</span>
                 </div>
             </div>
