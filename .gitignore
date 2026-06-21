@@ -7,3 +7,58 @@
 .memsearch
 .playwright-mcp
 .worktrees/
+
+# Dependencies
+node_modules/
+.vite/
+.cache/
+
+# Build output
+dist/
+build/
+output/
+
+# Data and databases
+data/
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+jspm_packages/
+bower_components/
+
+# Typescript cache
+*.tsbuildinfo
+
+# npm debug log
+npm-debug.log*
+
+# Yarn
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
