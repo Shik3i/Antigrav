@@ -4,6 +4,7 @@ FROM node:24.17.0-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
+COPY scripts/require-node-24.js scripts/
 RUN npm ci
 
 COPY . .
