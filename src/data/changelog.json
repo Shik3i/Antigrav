@@ -1,5 +1,11 @@
 [
   {
+    "id": 103,
+    "version": "3.1.0",
+    "date": "2026-06-22",
+    "changes": "- **Freundes-System Überarbeitung**: Komplettes Refactoring des Freundes-Systems mit Benutzersuche, Profilen und Blockier-Funktion.\n- **UserSearch-Komponente**: Neue Komponente zum Suchen nach Benutzern nach Name/Username mit Echtzeit-Ergebnissen.\n- **FriendProfileModal**: Modal zum Anzeigen von Benutzerprofilen mit Freundschaftsstatus, Blockier-Optionen und Echtzeit-Updates.\n- **Blockier-System**: Vollständiges System zum Blockieren/Entblockieren von Benutzern mit neuer BlockedUsers Datenbank-Tabelle.\n- **Erweiterte Friends-Seite**: Filterung, Sortierung, Notifications für Freundschaftsanfragen und verbesserte UX mit Auto-dismiss Notifications.\n- **Socket-Events**: Echtzeit-Updates für Freundschaftsanfragen, Statusänderungen und Blockier-Aktionen.\n- **API-Endpoints**: Neue Endpoints für Benutzersuche, Profilabfrage, Blockieren und Entblockieren.\n- **UI-Verbesserungen**: Bessere UX in der Friends-Seite mit Filterung, Sortierung und Echtzeit-Notifications."
+  },
+  {
     "id": 102,
     "version": "3.0.1",
     "date": "2026-06-21",
