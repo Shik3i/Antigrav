@@ -195,6 +195,7 @@ const getUserFriendsAdmin = async (req, res) => {
     const { id } = req.params;
     try {
         const friendsRaw = await dbLayer.getAdminFriends(id);
+        const blockedUsers = await dbLayer.getBlockedUsers(id);
         const mapped = friendsRaw.map(f => {
             const isRequester = f.requesterId === id;
             return {
@@ -205,7 +206,7 @@ const getUserFriendsAdmin = async (req, res) => {
                 isRequester
             };
         });
-        res.json(mapped);
+        res.json({ friends: mapped, blockedUsers });
     } catch (err) {
         console.error('getUserFriendsAdmin error:', err);
         res.status(500).json({ error: 'Internal server error' });

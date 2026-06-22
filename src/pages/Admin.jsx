@@ -92,8 +92,8 @@ const Admin = ({ socket }) => {
     const [scratchcardPacks, setScratchcardPacks] = useState([]);
     const [isEditingPack, setIsEditingPack] = useState(null); // id or 'new'
     const [packForm, setPackForm] = useState({
-        name: '', region_label: '', scope: 'Regional', price: 1000, 
-        win_chance: 0.25, reward_amount: 5000, is_weighted: false, 
+        name: '', region_label: '', scope: 'Regional', price: 1000,
+        win_chance: 0.25, reward_amount: 5000, is_weighted: false,
         max_daily_limit: 0, is_active: true, is_special: false
     });
     const [packTeams, setPackTeams] = useState([]); // List of team codes for the current pack
@@ -164,7 +164,7 @@ const Admin = ({ socket }) => {
             await axios.post('/api/admin/navbar-settings', { settings: normalizedSettings }, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
-            
+
             // Update local state with normalized values to keep UI in sync
             setNavbarSettings(normalizedSettings);
             addLog('Success', 'Navbar settings saved and normalized.', 'success');
@@ -303,7 +303,7 @@ const Admin = ({ socket }) => {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
             });
             setRssFeeds(Array.isArray(res.data) ? res.data : []);
-            
+
             // Trigger fetch for stats and articles as well
             handleFetchRssStats();
             handleFetchRssArticles();
@@ -349,7 +349,7 @@ const Admin = ({ socket }) => {
     const handlePurgeRssCache = async (hours = 0) => {
         const msg = hours > 0 ? `Wirklich alle Artikel löschen, die älter als ${hours} Stunden sind?` : "Wirklich den gesamten RSS-Artikel-Cache leeren?";
         if (!window.confirm(msg)) return;
-        
+
         try {
             await axios.post('/api/admin/rss/purge', { hours }, {
                 headers: { 'Authorization': `Bearer ${globalToken}` }
@@ -628,7 +628,7 @@ const Admin = ({ socket }) => {
     const handleDownloadBackup = (tier, filename) => {
         // Construct the authenticated download URL
         const url = `/api/admin/backups/download/${tier}/${filename}?token=${globalToken}`;
-        
+
         // Use a hidden anchor to trigger download
         const link = document.createElement('a');
         link.href = url;
@@ -636,7 +636,7 @@ const Admin = ({ socket }) => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         addLog('Info', `Starting download for ${filename}...`, 'info');
     };
 
@@ -832,7 +832,6 @@ const Admin = ({ socket }) => {
             addLog('Error', err.response?.data?.error || 'Failed to revoke chip skin grant.', 'error');
         }
     };
-
 
     // Forms
     const [originalCode, setOriginalCode] = useState('');
@@ -1136,9 +1135,9 @@ const Admin = ({ socket }) => {
         try {
             const res = await fetch(`/api/admin/bets/${betId}/status`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Authorization': `Bearer ${globalToken}`,
-                    'Content-Type': 'application/json' 
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ status: newStatus })
             });
@@ -1376,6 +1375,8 @@ const Admin = ({ socket }) => {
     };
 
     const [friendsLoading, setFriendsLoading] = useState(false);
+    const [activeSocialTab, setActiveSocialTab] = useState('friends');
+    const [userSocialData, setUserSocialData] = useState({ friends: [], blockedUsers: [] });
 
     const handleAdjustKoalaCoins = (userId, amountCents, reason) => {
         if (!amountCents || amountCents === 0) return;
@@ -1401,7 +1402,7 @@ const Admin = ({ socket }) => {
     const handleViewFriends = async (userId) => {
         if (expandedUserFriends === userId) {
             setExpandedUserFriends(null);
-            setUserFriendsList([]);
+            setUserSocialData({ friends: [], blockedUsers: [] });
             return;
         }
 
@@ -1415,7 +1416,7 @@ const Admin = ({ socket }) => {
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            setUserFriendsList(data);
+            setUserSocialData(data);
         } catch (err) {
             console.error(`[Admin API Debug] Request failed for Friends (User ${userId}):`, {
                 message: err.message
@@ -1721,7 +1722,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: TEAM MAPPINGS */}
             {activeTab === 'mappings' && (
-                <TeamMappingsTab 
+                <TeamMappingsTab
                     mappings={mappings}
                     originalCode={originalCode}
                     onOriginalCodeChange={setOriginalCode}
@@ -1736,22 +1737,22 @@ const Admin = ({ socket }) => {
 
             {/* TAB: CACHE STATUS */}
             {activeTab === 'cache' && (
-                <ApiCachesTab 
+                <ApiCachesTab
                     cacheStatus={cacheStatus}
                     availableTeams={availableTeams}
                     esportsLastUpdated={esportsLastUpdated}
                     formatCacheAge={formatCacheAge}
                     onFlush={handleFlushCache}
-                    onRefreshTeams={() => { 
-                        setLoading(true); 
-                        socket.emit(EVENTS.TRIGGER_FETCH_ALL_TEAMS, { token: globalToken }); 
+                    onRefreshTeams={() => {
+                        setLoading(true);
+                        socket.emit(EVENTS.TRIGGER_FETCH_ALL_TEAMS, { token: globalToken });
                     }}
                 />
             )}
 
             {/* TAB: RSS FEEDS */}
             {activeTab === 'rss' && (
-                <RSSFeedsTab 
+                <RSSFeedsTab
                     rssFeeds={rssFeeds}
                     rssStats={rssStats}
                     rssArticles={rssArticles}
@@ -1767,7 +1768,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: ACTIVITY LOG */}
             {activeTab === 'activity' && (
-                <ActivityLogTab 
+                <ActivityLogTab
                     activity={activity}
                     formatDate={formatDate}
                     onDelete={handleDeleteActivity}
@@ -1776,7 +1777,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: ROOMS OVERVIEW */}
             {activeTab === 'rooms' && (
-                <ServerRoomsTab 
+                <ServerRoomsTab
                     rooms={rooms}
                     formatDate={formatDate}
                     onEdit={handleEditRoom}
@@ -1786,7 +1787,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: USER MANAGEMENT */}
             {activeTab === 'users' && (
-                <UserManagementTab 
+                <UserManagementTab
                     usersList={usersList}
                     sortConfig={sortConfig}
                     onSortChange={handleSortChange}
@@ -1830,23 +1831,23 @@ const Admin = ({ socket }) => {
                     onAchievementRewardMultiplierChange={setAchievementRewardMultiplier}
                     koalaFlapPayoutEnabled={koalaFlapPayoutEnabled}
                     onToggleFlapPayout={() => setKoalaFlapPayoutEnabled(!koalaFlapPayoutEnabled)}
-                    onSaveKoalaConfig={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', { 
-                        token: globalToken, 
-                        baseline: { 
-                            koala_points_per_hour: koalaBaseline, 
-                            koala_start_coins: koalaStartCoins, 
-                            koala_coin_conversion_rate: koalaCoinRate, 
-                            koala_daily_mission_multiplier: koalaDailyMissionMultiplier, 
-                            achievement_reward_multiplier: achievementRewardMultiplier, 
-                            game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString() 
-                        } 
+                    onSaveKoalaConfig={() => socket.emit('ADMIN_UPDATE_KOALA_BASELINE', {
+                        token: globalToken,
+                        baseline: {
+                            koala_points_per_hour: koalaBaseline,
+                            koala_start_coins: koalaStartCoins,
+                            koala_coin_conversion_rate: koalaCoinRate,
+                            koala_daily_mission_multiplier: koalaDailyMissionMultiplier,
+                            achievement_reward_multiplier: achievementRewardMultiplier,
+                            game_koalaflap_payout_enabled: koalaFlapPayoutEnabled.toString()
+                        }
                     })}
                 />
             )}
 
             {/* TAB: ERROR LOGS */}
             {activeTab === 'errors' && (
-                <ErrorLogsTab 
+                <ErrorLogsTab
                     errorLogs={errorLogs}
                     onFetch={handleFetchErrorLogs}
                     onClear={handleClearErrorLogs}
@@ -1857,7 +1858,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: SYSTEM LOGS */}
             {activeTab === 'system_logs' && (
-                <SystemLogsTab 
+                <SystemLogsTab
                     systemLogs={systemLogs}
                     onFetch={handleFetchSystemLogs}
                     onClear={handleClearSystemLogs}
@@ -1867,7 +1868,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: BETS (WETT-VERWALTUNG) */}
             {activeTab === 'bets' && (
-                <BetsManagementTab 
+                <BetsManagementTab
                     betsList={betsList}
                     onFetch={handleFetchBets}
                     onTriggerResolver={handleTriggerResolver}
@@ -1878,7 +1879,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: AUDIT LOGS */}
             {activeTab === 'audit' && (
-                <AuditLogsTab 
+                <AuditLogsTab
                     auditLogs={auditLogs}
                     onFetch={handleFetchAuditLogs}
                     formatDate={formatDate}
@@ -1887,7 +1888,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: GAME HIGHSCORES */}
             {activeTab === 'game_scores' && (
-                <GameHighscoresTab 
+                <GameHighscoresTab
                     gameScores={gameScores}
                     onFetch={handleFetchGameScores}
                     onDelete={handleDeleteGameScore}
@@ -1897,7 +1898,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: SCRATCHCARD POOLS */}
             {activeTab === 'scratchcards' && (
-                <ScratchcardPacksTab 
+                <ScratchcardPacksTab
                     scratchcardPacks={scratchcardPacks}
                     isEditingPack={isEditingPack}
                     onSetIsEditingPack={setIsEditingPack}
@@ -1952,7 +1953,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: NAVBAR SETTINGS */}
             {activeTab === 'navbar' && (
-                <SidebarSettingsTab 
+                <SidebarSettingsTab
                     navbarSettings={navbarSettings}
                     onSetNavbarSettings={setNavbarSettings}
                     onSave={handleSaveNavbarSettings}
@@ -1961,7 +1962,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: POKEMON CONFIG */}
             {activeTab === 'pokemon' && (
-                <PokemonConfigTab 
+                <PokemonConfigTab
                     pokemonConfigs={pokemonConfigs}
                     onSetPokemonConfigs={setPokemonConfigs}
                     onSave={handleSavePokemonConfigs}
@@ -1971,7 +1972,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: WORDLE DICTIONARY */}
             {activeTab === 'wordle' && (
-                <WordleDictionaryTab 
+                <WordleDictionaryTab
                     wordleDictionary={wordleDictionary}
                     showWordleImportExport={showWordleImportExport}
                     onToggleShowImportExport={() => setShowWordleImportExport(!showWordleImportExport)}
@@ -2019,7 +2020,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: FORTUNE COOKIES */}
             {activeTab === 'fortunes' && (
-                <FortuneCookiesTab 
+                <FortuneCookiesTab
                     fortunesDictionary={fortunesDictionary}
                     onFetch={handleFetchFortunes}
                     fortunesBulkInput={fortunesBulkInput}
@@ -2040,7 +2041,7 @@ const Admin = ({ socket }) => {
 
             {/* TAB: DATABASE BACKUPS */}
             {activeTab === 'backups' && (
-                <DatabaseBackupsTab 
+                <DatabaseBackupsTab
                     automaticBackups={automaticBackups}
                     manualBackups={manualBackups}
                     autoBackupEnabled={autoBackupEnabled}
@@ -2066,12 +2067,12 @@ const Admin = ({ socket }) => {
                             You are about to permanently delete <strong>{deleteModalTarget.filename}</strong>.
                             This action is irreversible and the snapshot will be lost forever.
                         </p>
-                        
+
                         <div className="input-group" style={{ marginBottom: '24px' }}>
                             <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
                                 To confirm, type the filename exactly:
                             </label>
-                            <input 
+                            <input
                                 type="text"
                                 className="form-input"
                                 placeholder={deleteModalTarget.filename}
@@ -2084,7 +2085,7 @@ const Admin = ({ socket }) => {
 
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                             <button className="btn-ghost" onClick={() => { setDeleteModalTarget(null); setDeleteConfirmationInput(''); }}>Cancel</button>
-                            <button 
+                            <button
                                 className="btn-danger"
                                 onClick={() => handleDeleteBackup(deleteModalTarget.filename)}
                                 disabled={deleteConfirmationInput !== deleteModalTarget.filename}

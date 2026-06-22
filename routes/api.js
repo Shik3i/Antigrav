@@ -200,10 +200,15 @@ router.get('/auth/me', authController.authenticateToken, authController.getMe);
 router.put('/auth/me/password', authController.authenticateToken, authController.changeOwnPassword);
 
 // Friends
+router.get('/users/search', authController.authenticateToken, friendsController.searchUsers);
+router.get('/users/profile/:userId', authController.authenticateToken, friendsController.getUserProfile);
 router.post('/friends/request', authController.authenticateToken, friendsController.sendRequest);
 router.post('/friends/accept', authController.authenticateToken, friendsController.acceptRequest);
 router.post('/friends/remove', authController.authenticateToken, friendsController.removeFriend);
 router.get('/friends', authController.authenticateToken, friendsController.getFriends);
+router.post('/friends/block', authController.authenticateToken, friendsController.blockUser);
+router.post('/friends/unblock', authController.authenticateToken, friendsController.unblockUser);
+router.get('/friends/blocked', authController.authenticateToken, friendsController.getBlockedUsers);
 
 router.get('/test/rooms', restrictToDev, apiController.testDbRooms);
 router.get('/test/esports', restrictToDev, apiController.testEsports);

@@ -174,6 +174,18 @@ function initializeDatabaseSchema(database = db) {
     )`);
     database.exec('CREATE INDEX IF NOT EXISTS idx_friends_friendId ON Friends(friendId)');
 
+    // BlockedUsers: stores blocked user relationships
+    database.exec(`CREATE TABLE IF NOT EXISTS BlockedUsers (
+      blockerId TEXT NOT NULL,
+      blockedId TEXT NOT NULL,
+      blockedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (blockerId, blockedId),
+      FOREIGN KEY(blockerId) REFERENCES Users(id),
+      FOREIGN KEY(blockedId) REFERENCES Users(id)
+    )`);
+    database.exec('CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON BlockedUsers(blockerId)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON BlockedUsers(blockedId)');
+
     // TimerEvents: stores history of completed timers for stats
     // Note: No foreign key to Rooms anymore as rooms are RAM-only.
     database.exec(`CREATE TABLE IF NOT EXISTS TimerEvents (
@@ -801,7 +813,8 @@ function initializeDatabaseSchema(database = db) {
       ['settings', 'Settings', '/settings', 'System', 1, 1],
       ['roadmap', 'Feature Roadmap', '/features', 'System', 1, 2],
       ['changelog', 'Changelog', '/changelog', 'System', 1, 3],
-      ['admin', 'Admin Panel', '/admin', 'System', 1, 4]
+      ['admin', 'Admin Panel', '/admin', 'System', 1, 4],
+      ['friends', 'Friends', '/friends', 'Social', 1, 1]
     ];
 
     const insertNavbarItem = database.prepare(
@@ -809,8 +822,9 @@ function initializeDatabaseSchema(database = db) {
     );
     for (const values of defaults) insertNavbarItem.run(...values);
 
-    // Migration: Remove dead friends link and ensure admin link exists
-    database.exec("DELETE FROM NavbarSettings WHERE key = 'friends'");
+    // Migration: Ensure friends link exists with proper icon
+    database.exec(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder, icon)
+            VALUES ('friends', 'Friends', '/friends', 'Social', 1, 1, 'Users')`);
     database.exec(`INSERT OR IGNORE INTO NavbarSettings (key, label, path, category, isVisible, sortOrder)
             VALUES ('admin', 'Admin Panel', '/admin', 'System', 1, 4)`);
 

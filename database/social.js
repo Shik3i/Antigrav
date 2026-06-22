@@ -45,6 +45,10 @@ async function getAdminFriends(userId) {
   return db.prepare(friendsQuery).all(userId, userId);
 }
 
+async function getUserByUsername(username) {
+  return db.prepare('SELECT id, displayName, username, password_hash FROM Users WHERE username = ?').get(username);
+}
+
 async function getUserFriendCount(userId) {
   const row = db.prepare(`
     SELECT COUNT(*) AS count FROM Friends
@@ -53,11 +57,49 @@ async function getUserFriendCount(userId) {
   return row ? row.count : 0;
 }
 
+// Blocked Users functions
+async function blockUser(blockerId, blockedId) {
+  const result = db.prepare(`
+    INSERT INTO BlockedUsers (blockerId, blockedId)
+    VALUES (?, ?)
+  `).run(blockerId, blockedId);
+  return Number(result.changes);
+}
+
+async function unblockUser(blockerId, blockedId) {
+  const result = db.prepare(`
+    DELETE FROM BlockedUsers
+    WHERE blockerId = ? AND blockedId = ?
+  `).run(blockerId, blockedId);
+  return Number(result.changes);
+}
+
+async function getBlockedUsers(userId) {
+  return db.prepare(`
+    SELECT u.id, u.displayName, u.username
+    FROM BlockedUsers b
+    JOIN Users u ON u.id = b.blockedId
+    WHERE b.blockerId = ?
+  `).all(userId);
+}
+
+async function isUserBlocked(blockerId, blockedId) {
+  return db.prepare(`
+    SELECT 1 FROM BlockedUsers
+    WHERE blockerId = ? AND blockedId = ?
+  `).get(blockerId, blockedId);
+}
+
 module.exports = {
   addFriend,
   removeFriend,
   getFriends,
   getFriendStatus,
   getAdminFriends,
-  getUserFriendCount
+  getUserFriendCount,
+  getUserByUsername,
+  blockUser,
+  unblockUser,
+  getBlockedUsers,
+  isUserBlocked
 };

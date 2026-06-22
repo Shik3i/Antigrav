@@ -468,6 +468,7 @@ function InnerApp() {
                       <Route path="/games/roulette" element={<Roulette socket={activeSocket} />} />
                       <Route path="/lotto" element={<LottoImitat />} />
                       <Route path="/news" element={<News socket={activeSocket} />} />
+                      <Route path="/friends" element={<Friends />} />
                       <Route path="/c" element={<SharedCountdown />} />
                       <Route path="/impressum" element={<Impressum />} />
                       <Route path="/datenschutz" element={<Datenschutz />} />

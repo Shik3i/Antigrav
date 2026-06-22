@@ -62,7 +62,7 @@ const Home = ({ user, globalSocket }) => {
         const fd = new FormData(e.target);
         const useName = fd.get('name');
         const isPublic = isPublicSelection === 'on';
-        const visibleToFriends = fd.get('visibleToFriends') === 'on';
+        const visibleToFriends = isPublicSelection === 'friends-only' || fd.get('visibleToFriends') === 'on';
         const defaultRole = fd.get('defaultRole') || 'read';
         const duration = parseFloat(fd.get('duration')) || 20;
 
@@ -173,18 +173,19 @@ const Home = ({ user, globalSocket }) => {
                                 <input type="number" name="duration" className="input-primary" defaultValue={localStorage.getItem('timer_room_duration') || 20} min={0.01} step="any" max={120} required />
                             </div>
 
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>Room Visibility</label>
-                                <select
-                                    name="isPublic"
-                                    className="input-primary"
-                                    value={isPublicSelection}
-                                    onChange={(e) => setIsPublicSelection(e.target.value)}
-                                >
-                                    <option value="on">Public (Visible on Home Screen)</option>
-                                    <option value="off">Private (Hidden, needs Invite Link)</option>
-                                </select>
-                            </div>
+                             <div>
+                                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 500 }}>Room Visibility</label>
+                                 <select
+                                     name="isPublic"
+                                     className="input-primary"
+                                     value={isPublicSelection}
+                                     onChange={(e) => setIsPublicSelection(e.target.value)}
+                                 >
+                                     <option value="on">Public (Visible on Home Screen)</option>
+                                     <option value="friends-only">Friends Only (Only visible to friends)</option>
+                                     <option value="off">Private (Hidden, needs Invite Link)</option>
+                                 </select>
+                             </div>
 
                             {isPublicSelection === 'on' ? (
                                 <div className="animate-fade-in">
@@ -193,6 +194,10 @@ const Home = ({ user, globalSocket }) => {
                                         <option value="read">Read-only (Recommended)</option>
                                         <option value="write">Admin (Everyone can control timer)</option>
                                     </select>
+                                </div>
+                            ) : isPublicSelection === 'friends-only' ? (
+                                <div className="animate-fade-in" style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', color: 'var(--accent-primary)' }}>
+                                    <span style={{ fontSize: '0.85rem' }}>✅ This room will be visible to your friends</span>
                                 </div>
                             ) : (
                                 <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>

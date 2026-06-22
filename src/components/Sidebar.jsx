@@ -26,6 +26,7 @@ import {
     Timer,
     TrendingUp,
     Trophy,
+    Users,
 } from 'lucide-react';
 import EVENTS from '../../socketEvents.json';
 import { useAuth } from '../context/AuthContext';
@@ -61,6 +62,7 @@ const iconMap = {
     'tetris': <Gamepad2 size={18} color="#ec4899" />,
     'wordle': <Maximize2 size={18} color="#10b981" />,
     'news': <Rss size={18} color="var(--accent-primary)" />,
+    'friends': <Users size={18} color="#3b82f6" />,
 };
 
 const CATEGORIES = ['Timers', 'Esports', 'Games', 'Social', 'Tools', 'System'];
