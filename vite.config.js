@@ -53,12 +53,24 @@ export default defineConfig(({ mode }) => ({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-utils': ['axios', 'socket.io-client', 'xss', 'fast-xml-parser'],
-          'vendor-charts': ['recharts'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) {
+              return 'vendor-react';
+            }
+            if (id.includes('axios') || id.includes('socket.io-client') || id.includes('xss') || id.includes('fast-xml-parser')) {
+              return 'vendor-utils';
+            }
+            if (id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+            return 'vendor';
+          }
         }
       }
+    },
+    rolldownOptions: {
+      external: []
     }
   },
   server: {
@@ -75,7 +87,12 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     globals: true,
-    environment: 'node',
-    setupFiles: ['./testSetup.js']
+    environment: 'jsdom',
+    setupFiles: ['./testSetup.js'],
+    environmentOptions: {
+      jsdom: {
+        resources: 'usable'
+      }
+    }
   }
 }))

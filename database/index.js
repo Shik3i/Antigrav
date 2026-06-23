@@ -1,5 +1,6 @@
 const db = require('./connection');
 const { initializeDatabaseSchema } = require('./schema');
+const { initializeFirstStart } = require('./init/firstStart');
 const logging = require('./logging');
 const users = require('./users');
 const economy = require('./economy');
@@ -12,6 +13,8 @@ const utils = require('./utils');
 let initializationError;
 try {
   initializeDatabaseSchema(db);
+  // Initialize first-start routine after schema is ready
+  initializeFirstStart();
 } catch (error) {
   initializationError = error;
 }
