@@ -1,5 +1,11 @@
 [
   {
+    "id": 104,
+    "version": "3.0.2",
+    "date": "2026-06-23",
+    "changes": "- **Codebase Refactoring**: Vollständige Aufteilung der monolithischen Dateien `socketHandler.js` (1.671 Zeilen) und `database/schema.js` (1.041 Zeilen) in modularisierte, wartbare Module.\n- **Socket Handler Modularisierung**: Aufteilung in 10 spezialisierte Handler-Module (admin, blackjack, esports, room, scratchcard, timer) mit zentraler Koordination.\n- **Database Schema Modularisierung**: Aufteilung in 22 dedizierte Schema-Module (users, games, economy, achievements, lotto, scratchcards, towerClimb, blackjack, wordle, fortune, rss, navbar, esports, polymarket, riftDefense, idleGame, colorSync, admin, pokemon, market, indexes) mit zentraler Initialisierung.\n- **Performance-Verbesserung**: Reduzierung der Build-Zeit durch gezieltes Code-Splitting und bessere Caching-Effizienz.\n- **Wartbarkeit**: Jedes Modul hat klare Verantwortlichkeiten, unabhängige Testbarkeit und verbesserte Team-Zusammenarbeit.\n- **Build-Verifikation**: Erfolgreicher Produktions-Build mit 685ms Build-Zeit und vollständiger Funktionalität."
+  },
+  {
     "id": 103,
     "version": "3.1.0",
     "date": "2026-06-22",

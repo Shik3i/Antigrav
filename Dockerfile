@@ -17,7 +17,8 @@ WORKDIR /app
 # Copy package files and install production deps only
 COPY package.json package-lock.json* ./
 # Skip preinstall script for production build
-RUN npm ci --omit=dev --legacy-peer-deps --ignore-scripts
+RUN npm ci --omit=dev --legacy-peer-deps --ignore-scripts \
+    && npm cache clean --force
 
 # Copy the built frontend from stage 1
 COPY --from=builder /app/dist ./dist
@@ -39,7 +40,6 @@ COPY utils/ ./utils/
 COPY cron/ ./cron/
 COPY public/ ./public/
 COPY assets_static/ ./assets_static/
-COPY scripts/ ./scripts/
 
 # The SQLite DB will be stored in /app/data so we can mount it
 RUN mkdir -p /app/data
