@@ -1,4 +1,4 @@
-const { addColumn } = require('./utils');
+const { addColumn, hasColumn } = require('./utils');
 
 function initializeRssSchema(database) {
     // --- RSS News Tables ---

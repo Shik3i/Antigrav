@@ -1,4 +1,4 @@
-const { addColumn, seedWordleDictionary } = require('./utils');
+const { addColumn, hasColumn, seedWordleDictionary } = require('./utils');
 
 function initializeWordleSchema(database) {
     // --- Wordle Minigame ---

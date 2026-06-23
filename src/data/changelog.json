@@ -6,10 +6,10 @@
     "changes": "- **Codebase Refactoring**: Vollständige Aufteilung der monolithischen Dateien `socketHandler.js` (1.671 Zeilen) und `database/schema.js` (1.041 Zeilen) in modularisierte, wartbare Module.\n- **Socket Handler Modularisierung**: Aufteilung in 10 spezialisierte Handler-Module (admin, blackjack, esports, room, scratchcard, timer) mit zentraler Koordination.\n- **Database Schema Modularisierung**: Aufteilung in 22 dedizierte Schema-Module (users, games, economy, achievements, lotto, scratchcards, towerClimb, blackjack, wordle, fortune, rss, navbar, esports, polymarket, riftDefense, idleGame, colorSync, admin, pokemon, market, indexes) mit zentraler Initialisierung.\n- **Performance-Verbesserung**: Reduzierung der Build-Zeit durch gezieltes Code-Splitting und bessere Caching-Effizienz.\n- **Wartbarkeit**: Jedes Modul hat klare Verantwortlichkeiten, unabhängige Testbarkeit und verbesserte Team-Zusammenarbeit.\n- **Build-Verifikation**: Erfolgreicher Produktions-Build mit 685ms Build-Zeit und vollständiger Funktionalität."
   },
   {
-    "id": 103,
-    "version": "3.1.0",
-    "date": "2026-06-22",
-    "changes": "- **Freundes-System Überarbeitung**: Komplettes Refactoring des Freundes-Systems mit Benutzersuche, Profilen und Blockier-Funktion.\n- **UserSearch-Komponente**: Neue Komponente zum Suchen nach Benutzern nach Name/Username mit Echtzeit-Ergebnissen.\n- **FriendProfileModal**: Modal zum Anzeigen von Benutzerprofilen mit Freundschaftsstatus, Blockier-Optionen und Echtzeit-Updates.\n- **Blockier-System**: Vollständiges System zum Blockieren/Entblockieren von Benutzern mit neuer BlockedUsers Datenbank-Tabelle.\n- **Erweiterte Friends-Seite**: Filterung, Sortierung, Notifications für Freundschaftsanfragen und verbesserte UX mit Auto-dismiss Notifications.\n- **Socket-Events**: Echtzeit-Updates für Freundschaftsanfragen, Statusänderungen und Blockier-Aktionen.\n- **API-Endpoints**: Neue Endpoints für Benutzersuche, Profilabfrage, Blockieren und Entblockieren.\n- **UI-Verbesserungen**: Bessere UX in der Friends-Seite mit Filterung, Sortierung und Echtzeit-Notifications."
+    "id": 105,
+    "version": "3.0.3",
+    "date": "2026-06-23",
+    "changes": "- **Security Update**: Behebung der esbuild Path Traversal Vulnerability (GHSA-g7r4-m6w7-qqqr) durch Update auf esbuild@0.28.1.\n- **Dependency Updates**: Aktualisierung von @vitejs/plugin-react auf ^6.0.3 und vitest auf ^4.1.9 für verbesserte Kompatibilität und Stabilität.\n- **Database Schema Fixes**: Behebung von fehlenden `hasColumn` Importen in games.js, wordle.js und rss.js zur Korrektur der Datenbank-Initialisierungsfehler.\n- **Build Verification**: Erfolgreicher Produktions-Build mit 0 Vulnerabilities und vollständiger Testabdeckung (220/220 Tests).\n- **Docker Integration**: Aktualisierte Container-Images mit allen Sicherheits-Patches und stabiler Datenbank-Initialisierung."
   },
   {
     "id": 102,

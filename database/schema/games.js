@@ -1,4 +1,4 @@
-const { addColumn } = require('./utils');
+const { addColumn, hasColumn } = require('./utils');
 
 function initializeGamesSchema(database) {
     // LeaderboardSettings: visibility toggle for games
