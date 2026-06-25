@@ -224,8 +224,9 @@ const Friends = ({ socket, embedded }) => {
         );
     }
 
-    const pendingRequests = friends.filter(f => f.status === 'pending');
-    const incomingCount = friends.filter(f => f.status === 'pending' && f.direction === 'incoming').length;
+    const pendingRequests = friends.filter(f => f.status === 'pending' && f.direction === 'incoming');
+    const outgoingRequests = friends.filter(f => f.status === 'pending' && f.direction === 'outgoing');
+    const incomingCount = pendingRequests.length;
     const acceptedFriends = friends.filter(f => f.status === 'accepted');
 
     // Filter and sort friends
@@ -524,6 +525,29 @@ const Friends = ({ socket, embedded }) => {
                                                         )}
                                                         <button className="btn-secondary" style={{ padding: '6px 12px' }} onClick={() => handleRemove(req.id)}>
                                                             <X size={16} /> {req.direction === 'incoming' ? 'Decline' : 'Cancel'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {outgoingRequests.length > 0 && (
+                                    <div style={{ marginBottom: '32px' }}>
+                                        <h4 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px' }}>Outgoing Requests ({outgoingRequests.length})</h4>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {outgoingRequests.map(req => (
+                                                <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        <Clock size={16} color="var(--text-muted)" />
+                                                        <span style={{ fontWeight: 500 }}>{req.displayName}</span>
+                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>({req.username})</span>
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Waiting for response...</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button className="btn-secondary" style={{ padding: '6px 12px' }} onClick={() => handleRemove(req.id)}>
+                                                            <X size={16} /> Cancel
                                                         </button>
                                                     </div>
                                                 </div>

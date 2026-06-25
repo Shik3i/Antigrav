@@ -40,6 +40,7 @@ COPY utils/ ./utils/
 COPY cron/ ./cron/
 COPY public/ ./public/
 COPY assets_static/ ./assets_static/
+COPY src/data/ ./src/data/
 
 # The SQLite DB will be stored in /app/data so we can mount it
 RUN mkdir -p /app/data

@@ -166,6 +166,8 @@ router.get('/admin/navbar-settings', authController.authenticateToken, apiContro
 router.post('/admin/navbar-settings', authController.authenticateToken, apiController.updateNavbarSettings);
 
 router.post('/users', apiController.registerUser);
+// Friends profile endpoint (before username endpoint to avoid conflicts)
+router.get('/friends/profile/:userId', authController.authenticateToken, friendsController.getUserProfile);
 router.get('/users/profile/:username', apiController.getUserProfile);
 router.get('/rooms', authController.optionalAuthenticateToken, apiController.getRooms);
 router.post('/rooms', [

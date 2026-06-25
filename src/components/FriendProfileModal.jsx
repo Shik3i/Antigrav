@@ -9,11 +9,11 @@ const FriendProfileModal = ({ userId, onClose, onAddFriend, onRemoveFriend, onBl
     const token = localStorage.getItem('timerToken');
 
     useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const res = await fetch(`/api/users/profile/${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+    const fetchProfile = async () => {
+        try {
+            const res = await fetch(`/api/friends/profile/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
                 if (res.ok) {
                     const data = await res.json();

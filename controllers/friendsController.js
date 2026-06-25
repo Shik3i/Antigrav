@@ -14,7 +14,7 @@ exports.searchUsers = async (req, res) => {
         const users = db.prepare(`
             SELECT id, displayName, username
             FROM Users
-            WHERE (displayName LIKE ? OR username LIKE ?)
+            WHERE (LOWER(displayName) LIKE LOWER(?) OR LOWER(username) LIKE LOWER(?))
             AND id != ?
             LIMIT 10
         `).all(`%${q}%`, `%${q}%`, userId);
@@ -145,6 +145,14 @@ exports.sendRequest = async (req, res) => {
             }
         }
 
+        // Check for mutual pending request (they sent us a request, we're sending them one)
+        const mutualRequest = await dbLayer.getMutualPendingRequest(userId, friend.id);
+        if (mutualRequest) {
+            // Accept their request and create our accepted friendship
+            await dbLayer.addFriend(userId, friend.id, 'accepted');
+            return res.status(200).json({ message: 'Friend request accepted (mutual)' });
+        }
+
     await dbLayer.addFriend(userId, friend.id, 'pending');
 
     // Broadcast friend request to recipient
@@ -173,6 +181,7 @@ exports.acceptRequest = async (req, res) => {
     }
 
     try {
+    // Accept the friendship (only one entry needed)
     await dbLayer.addFriend(userId, friendId, 'accepted');
 
     // Broadcast acceptance to the original requester
@@ -239,7 +248,8 @@ exports.getFriends = async (req, res) => {
                 username: f.username,
                 displayName: f.displayName,
                 status: f.status,
-                isRequester
+                isRequester,
+                direction: isRequester ? 'outgoing' : 'incoming'
             };
         });
 

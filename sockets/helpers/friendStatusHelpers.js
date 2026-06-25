@@ -4,7 +4,7 @@ const EVENTS = require('../../socketEvents.json');
 /**
  * Helper to broadcast a user's status to their mutual friends
  */
-async function broadcastFriendStatus(io, userId, isOnline) {
+async function broadcastFriendStatus(io, userId, isOnline, onlineUsers) {
     try {
         const friends = await dbLayer.getFriends(userId);
         const acceptedFriends = friends.filter(f => f.status === 'accepted').map(f => f.id);
@@ -25,7 +25,7 @@ async function broadcastFriendStatus(io, userId, isOnline) {
 /**
  * Helper to broadcast live coin balance updates to all sockets of a user
  */
-function broadcastCoinUpdate(io, userId, newBalanceCents) {
+function broadcastCoinUpdate(io, userId, newBalanceCents, onlineUsers) {
     const userSockets = onlineUsers.get(userId);
     if (userSockets) {
         userSockets.forEach(socketId => {

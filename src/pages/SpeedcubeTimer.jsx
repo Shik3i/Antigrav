@@ -1,6 +1,49 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Trash2, Edit3, Save, X, Timer, Grid3X3, Trophy, Zap, TrendingUp, Eye, EyeOff, RefreshCw, Info } from 'lucide-react';
+import { Clock, Trash2, Edit3, Save, X, Timer, Grid3X3, Trophy, Zap, TrendingUp, Eye, EyeOff, RefreshCw, Info, Play, Square } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+// CSS for mobile touch controls
+const mobileTouchControlsStyle = `
+  .mobile-touch-controls {
+    display: none;
+  }
+
+  .spacebar-instructions {
+    display: block;
+  }
+
+  /* Prevent text selection on buttons */
+  .btn-primary {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-touch-controls {
+      display: block !important;
+    }
+
+    .spacebar-instructions {
+      display: none !important;
+    }
+
+    /* Mobile-specific timer fixes - only target the timer display */
+    .glass-card {
+      overflow: visible !important;
+      padding: 40px 24px !important;
+    }
+
+    /* Target only the timer text (the formatted time) */
+    .timer-display {
+      font-size: 3rem !important;
+      letter-spacing: normal !important;
+      text-shadow: 0 0 8px rgba(255,255,255,0.3) !important;
+      overflow: visible !important;
+    }
+  }
+`;
 
 const formatTime = (ms) => {
     const minutes = Math.floor(ms / 60000);
@@ -45,11 +88,11 @@ const SpeedcubeTimer = () => {
     const [history, setHistory] = useState([]);
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editingNoteValue, setEditingNoteValue] = useState('');
-    
+
     const [currentScramble, setCurrentScramble] = useState('');
     const [showScramble, setShowScramble] = useState(true);
     const [showScrambleHistoryId, setShowScrambleHistoryId] = useState(null);
-    
+
     const startTimeRef = useRef(0);
     const timerIdRef = useRef(null);
     const isHoldingSpaceRef = useRef(false);
@@ -167,6 +210,27 @@ const SpeedcubeTimer = () => {
         setEditingNoteId(null);
     };
 
+    // Touch button handlers for mobile
+    const handleTouchStart = (e) => {
+        e.preventDefault();
+        if (status === 'running') {
+            // Stop timer
+            const finalTime = performance.now() - startTimeRef.current;
+            setTime(finalTime);
+            saveResult(finalTime);
+            setStatus('idle');
+        } else if (status === 'idle') {
+            setStatus('ready');
+        }
+    };
+
+    const handleTouchEnd = (e) => {
+        e.preventDefault();
+        if (status === 'ready') {
+            setStatus('running');
+        }
+    };
+
     // Timer Loop Effect
     useEffect(() => {
         if (status !== 'running') return;
@@ -190,7 +254,7 @@ const SpeedcubeTimer = () => {
         const handleKeyDown = (e) => {
             if (e.code === 'Space') {
                 e.preventDefault();
-                
+
                 if (status === 'running') {
                     // Stop timer
                     const finalTime = performance.now() - startTimeRef.current;
@@ -219,21 +283,22 @@ const SpeedcubeTimer = () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [status, history]); // Added history to dependencies to ensure saveResult has access to it if needed (though it uses setHistory)
+    }, [status, history]);
 
     return (
         <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
+            <style>{mobileTouchControlsStyle}</style>
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '24px' }}>
                     <Grid3X3 size={40} color="var(--accent-primary)" />
                     <h1 style={{ fontSize: '3rem', margin: 0 }}>Speedcube Timer</h1>
                 </div>
-                
-                <div 
-                    className="glass-card" 
-                    style={{ 
-                        padding: '60px 20px', 
-                        fontSize: '6rem', 
+
+                <div
+                    className="glass-card"
+                    style={{
+                        padding: '60px 20px',
+                        fontSize: '6rem',
                         fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
                         color: status === 'ready' ? '#10b981' : (status === 'running' ? 'var(--text-main)' : 'var(--text-muted)'),
                         textShadow: status === 'ready' ? '0 0 30px rgba(16, 185, 129, 0.4)' : 'none',
@@ -248,11 +313,11 @@ const SpeedcubeTimer = () => {
                     }}
                 >
                     {showScramble && currentScramble && status !== 'running' && (
-                        <div style={{ 
-                            fontSize: '1.25rem', 
-                            color: 'var(--text-main)', 
-                            marginBottom: '30px', 
-                            maxWidth: '80%', 
+                        <div style={{
+                            fontSize: '1.25rem',
+                            color: 'var(--text-main)',
+                            marginBottom: '30px',
+                            maxWidth: '80%',
                             lineHeight: '1.6',
                             fontWeight: 500,
                             letterSpacing: '0.02em'
@@ -260,21 +325,21 @@ const SpeedcubeTimer = () => {
                             {currentScramble}
                         </div>
                     )}
-                    <div>{formatTime(time)}</div>
+                    <div className="timer-display">{formatTime(time)}</div>
 
                     {status === 'idle' && (
                         <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '8px' }}>
-                            <button 
-                                onClick={() => setShowScramble(!showScramble)} 
-                                className="btn-ghost" 
+                            <button
+                                onClick={() => setShowScramble(!showScramble)}
+                                className="btn-ghost"
                                 title={showScramble ? "Hide Scramble" : "Show Scramble"}
                                 style={{ padding: '8px', background: 'rgba(255,255,255,0.05)' }}
                             >
                                 {showScramble ? <EyeOff size={20} /> : <Eye size={20} />}
                             </button>
-                            <button 
-                                onClick={() => setCurrentScramble(generateScramble())} 
-                                className="btn-ghost" 
+                            <button
+                                onClick={() => setCurrentScramble(generateScramble())}
+                                className="btn-ghost"
                                 title="New Scramble"
                                 style={{ padding: '8px', background: 'rgba(255,255,255,0.05)' }}
                             >
@@ -283,12 +348,66 @@ const SpeedcubeTimer = () => {
                         </div>
                     )}
                 </div>
-                
-                <p style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '1.1rem' }}>
+
+                <p className="spacebar-instructions" style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '1.1rem' }}>
                     {status === 'idle' && "Hold [Space] to get ready"}
                     {status === 'ready' && "Release [Space] to start"}
                     {status === 'running' && "Press [Space] to stop"}
                 </p>
+
+                {/* Touch Controls for Mobile - Only show on small screens */}
+                <div className="mobile-touch-controls">
+                    <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center', gap: '16px' }}>
+                        {status === 'running' ? (
+                            <button
+                                onClick={handleTouchStart}
+                                onTouchStart={handleTouchStart}
+                                className="btn-primary"
+                                style={{
+                                    padding: '16px 32px',
+                                    fontSize: '1.2rem',
+                                    fontWeight: 600,
+                                    background: '#ef4444',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    transition: 'all 0.2s',
+                                    minHeight: '60px',
+                                    minWidth: '160px'
+                                }}
+                            >
+                                <Square size={24} /> Stop
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleTouchStart}
+                                onTouchStart={handleTouchStart}
+                                onTouchEnd={handleTouchEnd}
+                                className="btn-primary"
+                                style={{
+                                    padding: '16px 32px',
+                                    fontSize: '1.2rem',
+                                    fontWeight: 600,
+                                    background: '#10b981',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    transition: 'all 0.2s',
+                                    minHeight: '60px',
+                                    minWidth: '160px'
+                                }}
+                            >
+                                <Play size={24} /> Start
+                            </button>
+                        )}
+                    </div>
+                </div>
 
                 {/* Stats Section */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '32px' }}>
@@ -396,8 +515,8 @@ const SpeedcubeTimer = () => {
                                                 {formatTime(item.time_ms)}
                                                 {item.scramble && (
                                                     <div style={{ position: 'relative' }}>
-                                                        <button 
-                                                            className="btn-ghost" 
+                                                        <button
+                                                            className="btn-ghost"
                                                             style={{ padding: '4px', color: 'var(--text-muted)' }}
                                                             onMouseEnter={() => setShowScrambleHistoryId(item.id)}
                                                             onMouseLeave={() => setShowScrambleHistoryId(null)}
@@ -406,13 +525,13 @@ const SpeedcubeTimer = () => {
                                                             <Info size={14} />
                                                         </button>
                                                         {showScrambleHistoryId === item.id && (
-                                                            <div style={{ 
-                                                                position: 'absolute', 
-                                                                bottom: '100%', 
-                                                                left: '50%', 
-                                                                transform: 'translateX(-50%)', 
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                bottom: '100%',
+                                                                left: '50%',
+                                                                transform: 'translateX(-50%)',
                                                                 marginBottom: '10px',
-                                                                background: 'var(--bg-color)', 
+                                                                background: 'var(--bg-color)',
                                                                 border: '1px solid var(--accent-primary)',
                                                                 padding: '12px',
                                                                 borderRadius: '8px',
@@ -438,8 +557,8 @@ const SpeedcubeTimer = () => {
                                         <td style={{ padding: '12px 16px', flex: 1 }}>
                                             {editingNoteId === item.id ? (
                                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                    <input 
-                                                        type="text" 
+                                                    <input
+                                                        type="text"
                                                         className="input-primary"
                                                         value={editingNoteValue}
                                                         onChange={(e) => setEditingNoteValue(e.target.value)}
@@ -458,8 +577,8 @@ const SpeedcubeTimer = () => {
                                                     <span style={{ fontSize: '0.9rem', color: item.note ? 'var(--text-main)' : 'var(--text-muted)' }}>
                                                         {item.note || 'No note'}
                                                     </span>
-                                                    <button 
-                                                        className="btn-ghost" 
+                                                    <button
+                                                        className="btn-ghost"
                                                         style={{ padding: '4px', opacity: 0.5 }}
                                                         onClick={() => {
                                                             setEditingNoteId(item.id);
@@ -472,8 +591,8 @@ const SpeedcubeTimer = () => {
                                             )}
                                         </td>
                                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                            <button 
-                                                className="btn-ghost" 
+                                            <button
+                                                className="btn-ghost"
                                                 style={{ padding: '8px', color: '#ef4444' }}
                                                 onClick={() => handleDelete(item.id)}
                                             >
@@ -487,10 +606,10 @@ const SpeedcubeTimer = () => {
                     </table>
                 </div>
             </div>
-            
+
             {!user && (
                 <div style={{ marginTop: '24px', textAlign: 'center', padding: '16px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', fontSize: '0.9rem' }}>
-                    <strong>Note:</strong> You are using the timer as a guest. Your times are saved locally and will be lost if you clear your browser data. 
+                    <strong>Note:</strong> You are using the timer as a guest. Your times are saved locally and will be lost if you clear your browser data.
                     <a href="/login" style={{ color: '#f59e0b', marginLeft: '8px', fontWeight: 700 }}>Login</a> to save your progress permanently.
                 </div>
             )}

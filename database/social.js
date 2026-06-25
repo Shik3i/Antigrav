@@ -1,11 +1,27 @@
 const db = require('./connection');
 
 async function addFriend(userId, friendId, status = 'pending') {
-  const result = db.prepare(`
-    INSERT INTO Friends (userId, friendId, status) VALUES (?, ?, ?)
-    ON CONFLICT(userId, friendId) DO UPDATE SET status = ?, updatedAt = CURRENT_TIMESTAMP
-  `).run(userId, friendId, status, status);
-  return Number(result.changes);
+  // Check if friendship already exists in either direction
+  const existing = db.prepare(`
+    SELECT 1 FROM Friends
+    WHERE (userId = ? AND friendId = ?) OR (userId = ? AND friendId = ?)
+  `).get(userId, friendId, friendId, userId);
+
+  if (existing) {
+    // Friendship already exists, update the status
+    const result = db.prepare(`
+      UPDATE Friends
+      SET status = ?, updatedAt = CURRENT_TIMESTAMP
+      WHERE (userId = ? AND friendId = ?) OR (userId = ? AND friendId = ?)
+    `).run(status, userId, friendId, friendId, userId);
+    return Number(result.changes);
+  } else {
+    // Create new friendship entry
+    const result = db.prepare(`
+      INSERT INTO Friends (userId, friendId, status) VALUES (?, ?, ?)
+    `).run(userId, friendId, status);
+    return Number(result.changes);
+  }
 }
 
 async function removeFriend(userId, friendId) {
@@ -21,16 +37,16 @@ const friendsQuery = `
     u.id, u.displayName, u.username
   FROM Friends f
   JOIN Users u ON u.id = f.friendId
-  WHERE f.userId = ?
-  UNION ALL
+  WHERE f.userId = ? AND (f.status = 'accepted' OR f.status = 'pending')
+  UNION
   SELECT f.status, f.userId AS requesterId, f.friendId AS targetId,
     u.id, u.displayName, u.username
   FROM Friends f
   JOIN Users u ON u.id = f.userId
-  WHERE f.friendId = ?
+  WHERE f.friendId = ? AND (f.status = 'accepted' OR f.status = 'pending')
 `;
 
-async function getFriends(userId) {
+function getFriends(userId) {
   return db.prepare(friendsQuery).all(userId, userId);
 }
 
@@ -55,6 +71,15 @@ async function getUserFriendCount(userId) {
     WHERE (userId = ? OR friendId = ?) AND status = 'accepted'
   `).get(userId, userId);
   return row ? row.count : 0;
+}
+
+async function getMutualPendingRequest(userId, friendId) {
+  // Check if there's a pending request in the opposite direction
+  const result = db.prepare(`
+    SELECT status, userId AS requesterId FROM Friends
+    WHERE userId = ? AND friendId = ? AND status = 'pending'
+  `).get(friendId, userId);
+  return result;
 }
 
 // Blocked Users functions
@@ -98,8 +123,10 @@ module.exports = {
   getAdminFriends,
   getUserFriendCount,
   getUserByUsername,
+  getMutualPendingRequest,
   blockUser,
   unblockUser,
   getBlockedUsers,
-  isUserBlocked
+  isUserBlocked,
+  friendsQuery
 };

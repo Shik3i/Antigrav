@@ -68,7 +68,7 @@ module.exports = function (io) {
 
     // Initialize roulette broadcast
     roomController.initRouletteBroadcast((userId, newBalanceCents) => {
-        if (_io) broadcastCoinUpdate(_io, userId, newBalanceCents);
+        if (_io) broadcastCoinUpdate(_io, userId, newBalanceCents, onlineUsers);
     });
 
     // Middleware to extract and verify user token
@@ -79,11 +79,11 @@ module.exports = function (io) {
 
         if (socket.user) {
             const userId = socket.user.userId;
-            if (!onlineUsers.has(userId)) {
-                onlineUsers.set(userId, new Set());
-                // First connection -> broadcast online to friends
-                broadcastFriendStatus(io, userId, true);
-            }
+             if (!onlineUsers.has(userId)) {
+                 onlineUsers.set(userId, new Set());
+                 // First connection -> broadcast online to friends
+                 broadcastFriendStatus(io, userId, true, onlineUsers);
+             }
             onlineUsers.get(userId).add(socket.id);
             socket.join(userId); // Join private room for targeted updates (e.g. balance)
         }
@@ -128,7 +128,7 @@ module.exports = function (io) {
                     if (userSockets.size === 0) {
                         onlineUsers.delete(userId);
                         // Last connection closed -> broadcast offline to friends
-                        broadcastFriendStatus(io, userId, false);
+                        broadcastFriendStatus(io, userId, false, onlineUsers);
                     }
                 }
             }

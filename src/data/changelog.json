@@ -1,5 +1,11 @@
 [
   {
+    "id": 106,
+    "version": "3.0.4",
+    "date": "2026-06-25",
+    "changes": "- **Mobile Touch Controls**: Vollständige Implementierung von Touch-Buttons für Smartphone-Nutzer mit Hold-to-Get-Ready Mechanik (wie Spacebar).\n- **Responsive Design**: Automatische Anzeige der Touch-Controls auf Bildschirmen ≤ 768px und Ausblenden der Spacebar-Instruktionen auf Mobilgeräten.\n- **Timer Display Fix**: Reduzierung der Timer-Schriftgröße auf 3rem für mobile Geräte und Entfernung von letter-spacing zur Vermeidung von Text-Overflow.\n- **Text Selection Prevention**: Hinzufügung von user-select: none zu Touch-Buttons zur Vermeidung von Text-Markierung beim Halten.\n- **CSS Precision**: Gezielte Anwendung der Timer-Formatierung über eine dedizierte .timer-display Klasse statt unspezifischer :last-child Selektoren."
+  },
+  {
     "id": 104,
     "version": "3.0.2",
     "date": "2026-06-23",
