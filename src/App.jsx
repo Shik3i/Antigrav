@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import Home from './pages/Home';
-import Login from './pages/Login';
 
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
@@ -50,6 +48,8 @@ import { DEFAULT_LEAGUES, DEFAULT_TITLE, EMPTY_ROOM_TOKENS } from './constants/a
 
 // Lazy load pages for code splitting
 
+const Home = React.lazy(() => import('./pages/Home'));
+const Login = React.lazy(() => import('./pages/Login'));
 const Room = React.lazy(() => import('./pages/Room'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Countdowns = React.lazy(() => import('./pages/Countdowns'));

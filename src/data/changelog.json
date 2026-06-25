@@ -1,5 +1,11 @@
 [
   {
+    "id": 107,
+    "version": "3.0.5",
+    "date": "2026-06-25",
+    "changes": "- **Performance Optimization**: Font loading optimization reducing critical path latency from 505ms to ~200-250ms.\n- **Font Optimization**: Reduced font imports from 8 files to 4 files (Inter 400,700 and Outfit 400,700 only), cutting font download size from ~115 KiB to ~55 KiB.\n- **Preconnect Hints**: Added preconnect hints for fonts.gstatic.com and cdn.jsdelivr.net to establish early CDN connections.\n- **JavaScript Lazy Loading**: Implemented lazy loading for Home and Login pages, reducing main bundle size from 1,029.20 kB to 1,019.97 kB (~9.23 kB savings).\n- **Code Splitting**: All major pages now use React.lazy() for on-demand loading, improving initial page load performance."
+  },
+  {
     "id": 106,
     "version": "3.0.4",
     "date": "2026-06-25",
