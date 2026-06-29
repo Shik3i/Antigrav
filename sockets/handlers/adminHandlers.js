@@ -1,7 +1,9 @@
+const jwt = require('jsonwebtoken');
 const dbLayer = require('../../database');
 const apiController = require('../../controllers/apiController');
 const apiDataService = require('../../services/apiDataService');
 const EVENTS = require('../../socketEvents.json');
+const JWT_SECRET = require('../../jwtSecret');
 const { safeEmit } = require('../../utils/safeSerialization');
 
 /**

@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const roomManager = require('../../utils/blackjackRoomManager');
 const dbLayer = require('../../database');
 const sanitize = require('../../sanitize');

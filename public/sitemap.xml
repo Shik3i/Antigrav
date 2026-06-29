@@ -6,6 +6,11 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://timer.koalastuff.net/news</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://timer.koalastuff.net/countdowns</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -21,14 +26,14 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://timer.koalastuff.net/news</loc>
+    <loc>https://timer.koalastuff.net/esports</loc>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://timer.koalastuff.net/esports</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.6</priority>
+    <loc>https://timer.koalastuff.net/features</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://timer.koalastuff.net/speedcube</loc>
@@ -41,13 +46,98 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://timer.koalastuff.net/global-bets</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/lotto</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://timer.koalastuff.net/games/koalaflap</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/games/blackjack</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/games/roulette</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/scratchcards</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/friends</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://timer.koalastuff.net/changelog</loc>
     <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/polymarket-general</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/games/tower-climb</loc>
+    <changefreq>weekly</changefreq>
     <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/tetris</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/games/rift-defense</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/games/lol-idle</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/color-sync</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/leveling</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/api-docs</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/c</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/impressum</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://timer.koalastuff.net/datenschutz</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>
