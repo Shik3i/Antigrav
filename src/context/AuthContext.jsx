@@ -110,7 +110,14 @@ export const AuthProvider = ({ children }) => {
                     if (data.id) {
                         setAuthUser(prev => {
                             // Preserve local preferences if needed, but merge backend overrides
-                            const updated = { ...prev, ...data };
+                            const updated = {
+                                ...prev,
+                                ...data,
+                                preferences: {
+                                    ...(prev?.preferences || {}),
+                                    ...(data.preferences || {})
+                                }
+                            };
                             localStorage.setItem('timerAuthUser', JSON.stringify(updated));
                             return updated;
                         });

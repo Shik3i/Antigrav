@@ -969,7 +969,7 @@ const Settings = ({ user, setUser, socket }) => {
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
                         <button type="submit" className="btn-primary">
-                            Save Profile
+                            Save Settings
                         </button>
                         {saved && <span style={{ color: '#10b981', fontSize: '0.85rem' }}>Successfully saved!</span>}
                     </div>
