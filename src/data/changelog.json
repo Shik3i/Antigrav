@@ -1,5 +1,11 @@
 [
   {
+    "id": 108,
+    "version": "3.0.7",
+    "date": "2026-07-05",
+    "changes": "- **Mobile Touch Stop Fix**: Globales Touch-Stop für Speedcube-Timer implementiert, das beim Tippen auf den Bildschirm während des Timers stoppt.\n- **Stop-Button Integration**: Spezieller Stop-Button mit eigenem onPointerDown Handler für Touch-Geräte.\n- **Doppelspeichern Verhindern**: Verhindert das Speichern derselben Solve mehrfach.\n- **Neustart Verhindern**: Zeitbasiertes Delay (300ms) verhindert ungewolltes Neustart nach Stop.\n- **Testabdeckung**: Umfassende Tests für Touch-Stop, Stop-Button, Spacebar und UI-Zustände."
+  },
+  {
     "id": 107,
     "version": "3.0.5",
     "date": "2026-06-25",
