@@ -96,6 +96,11 @@ const SpeedcubeTimer = () => {
     const startTimeRef = useRef(0);
     const timerIdRef = useRef(null);
     const isHoldingSpaceRef = useRef(false);
+    const hasStoppedCurrentSolveRef = useRef(false);
+    const isTouchInteractionRef = useRef(false);
+    const ignoreNextTouchEndRef = useRef(false);
+    const lastStopTimeRef = useRef(0);
+    const MAX_STOP_CLICK_DELAY = 300;
 
     useEffect(() => {
         setCurrentScramble(generateScramble());
@@ -130,7 +135,7 @@ const SpeedcubeTimer = () => {
     }, [fetchHistory]);
 
     // Save result
-    const saveResult = async (time_ms) => {
+    const saveResult = useCallback(async (time_ms) => {
         const scramble = currentScramble;
         const newEntry = {
             id: isGuest ? Date.now() : null, // Temp ID for guest
@@ -163,7 +168,7 @@ const SpeedcubeTimer = () => {
             }
         }
         setCurrentScramble(generateScramble());
-    };
+    }, [currentScramble, fetchHistory, history, isGuest, token, user?.id]);
 
     const handleDelete = async (id) => {
         if (isGuest) {
@@ -210,31 +215,77 @@ const SpeedcubeTimer = () => {
         setEditingNoteId(null);
     };
 
+    const stopTimer = useCallback(() => {
+        if (status !== 'running' || hasStoppedCurrentSolveRef.current) return;
+
+        hasStoppedCurrentSolveRef.current = true;
+        lastStopTimeRef.current = performance.now();
+        const finalTime = performance.now() - startTimeRef.current;
+        setTime(finalTime);
+        saveResult(finalTime);
+        ignoreNextTouchEndRef.current = true;
+        setStatus('idle');
+    }, [status, saveResult]);
+
     // Touch button handlers for mobile
     const handleTouchStart = (e) => {
         e.preventDefault();
+        if (lastStopTimeRef.current > 0 && performance.now() - lastStopTimeRef.current < MAX_STOP_CLICK_DELAY) {
+            return;
+        }
         if (status === 'running') {
-            // Stop timer
-            const finalTime = performance.now() - startTimeRef.current;
-            setTime(finalTime);
-            saveResult(finalTime);
-            setStatus('idle');
+            stopTimer();
         } else if (status === 'idle') {
+            ignoreNextTouchEndRef.current = false;
+            lastStopTimeRef.current = 0;
             setStatus('ready');
         }
     };
 
     const handleTouchEnd = (e) => {
         e.preventDefault();
+        if (lastStopTimeRef.current > 0 && performance.now() - lastStopTimeRef.current < MAX_STOP_CLICK_DELAY) {
+            return;
+        }
+        if (ignoreNextTouchEndRef.current) {
+            ignoreNextTouchEndRef.current = false;
+            return;
+        }
         if (status === 'ready') {
             setStatus('running');
         }
     };
 
+    const handleStopPointerDown = (e) => {
+        if (e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
+        e.stopPropagation();
+        if (lastStopTimeRef.current > 0 && performance.now() - lastStopTimeRef.current < MAX_STOP_CLICK_DELAY) {
+            return;
+        }
+        stopTimer();
+    };
+
+    // Global touch stop listener
+    useEffect(() => {
+        if (status !== 'running') return;
+
+        const handleWindowPointerDown = (e) => {
+            if (e.pointerType !== 'touch') return;
+            e.preventDefault();
+            stopTimer();
+        };
+
+        window.addEventListener('pointerdown', handleWindowPointerDown, { passive: false });
+        return () => window.removeEventListener('pointerdown', handleWindowPointerDown);
+    }, [status, stopTimer]);
+
     // Timer Loop Effect
     useEffect(() => {
         if (status !== 'running') return;
 
+        hasStoppedCurrentSolveRef.current = false;
+        ignoreNextTouchEndRef.current = false;
+        lastStopTimeRef.current = 0;
         startTimeRef.current = performance.now();
         const tick = () => {
             setTime(performance.now() - startTimeRef.current);
@@ -256,11 +307,7 @@ const SpeedcubeTimer = () => {
                 e.preventDefault();
 
                 if (status === 'running') {
-                    // Stop timer
-                    const finalTime = performance.now() - startTimeRef.current;
-                    setTime(finalTime);
-                    saveResult(finalTime);
-                    setStatus('idle');
+                    stopTimer();
                 } else if (status === 'idle' && !isHoldingSpaceRef.current) {
                     isHoldingSpaceRef.current = true;
                     setStatus('ready');
@@ -283,7 +330,7 @@ const SpeedcubeTimer = () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [status, history]);
+    }, [status, stopTimer]);
 
     return (
         <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
@@ -361,6 +408,7 @@ const SpeedcubeTimer = () => {
                         {status === 'running' ? (
                             <button
                                 onClick={handleTouchStart}
+                                onPointerDown={handleStopPointerDown}
                                 onTouchStart={handleTouchStart}
                                 className="btn-primary"
                                 style={{
