@@ -70,7 +70,7 @@ const LiveStreamWidget = () => {
         };
     }, []);
 
-    const handleMouseDown = (e) => {
+    const handleDragStart = (e) => {
         if (e.target.closest('.drag-handle')) {
             setIsDragging(true);
             dragStartPos.current = {
@@ -82,7 +82,7 @@ const LiveStreamWidget = () => {
     };
 
     useEffect(() => {
-        const handleMouseMove = (e) => {
+        const handlePointerMove = (e) => {
             if (isDragging) {
                 const newX = e.clientX - dragStartPos.current.x;
                 const newY = e.clientY - dragStartPos.current.y;
@@ -98,18 +98,20 @@ const LiveStreamWidget = () => {
             }
         };
 
-        const handleMouseUp = () => {
+        const handlePointerUp = () => {
             setIsDragging(false);
         };
 
         if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+            window.addEventListener('pointercancel', handlePointerUp);
         }
 
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+            window.removeEventListener('pointercancel', handlePointerUp);
         };
     }, [isDragging, isMinimized]);
 
@@ -148,9 +150,9 @@ const LiveStreamWidget = () => {
     return (
         <div style={{ zIndex: 1000 }}>
             {/* Floating Trigger Button */}
-            <button 
+            <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="glass-card animate-fade-in stream-trigger"
+                className="glass-card animate-fade-in stream-trigger stream-widget-trigger"
                 aria-label="Stream umschalten"
                 style={{
                     position: 'fixed',
@@ -167,6 +169,7 @@ const LiveStreamWidget = () => {
                     border: '1px solid var(--border-color)',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
                     cursor: 'pointer',
+                    touchAction: 'manipulation',
                     zIndex: 1001,
                     transition: 'all 0.2s ease'
                 }}
@@ -281,7 +284,7 @@ const LiveStreamWidget = () => {
                     {/* Header / Drag Handle */}
                     <div 
                         className="drag-handle"
-                        onMouseDown={handleMouseDown}
+                        onPointerDown={handleDragStart}
                         style={{
                             height: '40px',
                             display: 'flex',
@@ -290,7 +293,8 @@ const LiveStreamWidget = () => {
                             padding: '0 12px',
                             background: 'rgba(255,255,255,0.05)',
                             cursor: 'move',
-                            userSelect: 'none'
+                            userSelect: 'none',
+                            touchAction: 'none'
                         }}
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

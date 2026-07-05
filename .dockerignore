@@ -1,6 +1,9 @@
 node_modules
 dist
 .git
+.worktrees
+.memsearch
+Users
 .gitignore
 *.md
 .vscode

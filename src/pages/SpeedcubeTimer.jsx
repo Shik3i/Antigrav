@@ -30,7 +30,7 @@ const mobileTouchControlsStyle = `
     }
 
     /* Mobile-specific timer fixes - only target the timer display */
-    .glass-card {
+    .speedcube-timer-card {
       overflow: visible !important;
       padding: 40px 24px !important;
     }
@@ -295,7 +295,7 @@ const SpeedcubeTimer = () => {
                 </div>
 
                 <div
-                    className="glass-card"
+                    className="glass-card speedcube-timer-card"
                     style={{
                         padding: '60px 20px',
                         fontSize: '6rem',
