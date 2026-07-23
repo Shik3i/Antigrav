@@ -131,11 +131,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://timer.koalastuff.net/impressum</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
     <loc>https://timer.koalastuff.net/datenschutz</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>

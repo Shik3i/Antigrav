@@ -387,7 +387,7 @@ const Sidebar = ({ user, roomState, socket, activeToken, isOpen, onClose }) => {
 
                 {/* Legal Links */}
                 <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '16px', paddingBottom: '4px' }}>
-                    <Link to="/impressum" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Impressum</Link>
+                    <a href="https://koalastuff.net/legal" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Impressum</a>
                     <Link to="/datenschutz" onClick={onClose} style={{ color: 'var(--text-muted)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--text-main)'} onMouseLeave={e => e.target.style.color = 'var(--text-muted)'}>Datenschutz</Link>
                 </div>
             </div>
