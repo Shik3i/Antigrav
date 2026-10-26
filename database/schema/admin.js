@@ -36,9 +36,29 @@ function initializeAdminSchema(database) {
       FOREIGN KEY(requestId) REFERENCES FeatureRequests(id) ON DELETE CASCADE
     )`);
 
+    // ErrorLogs: persistent storage for server-side errors
+    database.exec(`CREATE TABLE IF NOT EXISTS ErrorLogs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message TEXT NOT NULL,
+      stack TEXT,
+      context TEXT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // SystemLogs: dedicated table for info/warn logs with 24h retention
+    database.exec(`CREATE TABLE IF NOT EXISTS SystemLogs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      level TEXT,
+      context TEXT,
+      message TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // Indexes
     database.exec('CREATE INDEX IF NOT EXISTS idx_admin_actions_timestamp ON AdminActions(timestamp)');
     database.exec('CREATE INDEX IF NOT EXISTS idx_features_status ON FeatureRequests(status)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_error_logs_timestamp ON ErrorLogs(timestamp)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_system_logs_createdAt ON SystemLogs(createdAt)');
 }
 
 module.exports = {

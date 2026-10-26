@@ -66,6 +66,43 @@ function initializeEconomySchema(database) {
     database.exec('CREATE INDEX IF NOT EXISTS idx_chip_skins_status_release ON chip_skins(status, release_date)');
     database.exec('CREATE INDEX IF NOT EXISTS idx_chip_skin_grants_user ON chip_skin_grants(user_id)');
 
+    // --- Game Upgrades & Config ---
+    database.exec(`CREATE TABLE IF NOT EXISTS GameUpgrades_Config (
+      upgrade_id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      description TEXT,
+      base_price INTEGER NOT NULL,
+      price_step INTEGER NOT NULL,
+      max_level INTEGER NOT NULL,
+      category TEXT DEFAULT 'koala_flap'
+    )`);
+
+    database.exec(`CREATE TABLE IF NOT EXISTS UserUpgrades (
+      userId TEXT NOT NULL,
+      upgrade_id TEXT NOT NULL,
+      current_level INTEGER DEFAULT 0,
+      PRIMARY KEY (userId, upgrade_id),
+      FOREIGN KEY(userId) REFERENCES Users(id),
+      FOREIGN KEY(upgrade_id) REFERENCES GameUpgrades_Config(upgrade_id)
+    )`);
+    database.exec(`INSERT OR IGNORE INTO GameUpgrades_Config (upgrade_id, display_name, description, base_price, price_step, max_level, category) VALUES
+      ('coin_base_value', 'Münz-Wert', 'Erhöht den KoalaCoin-Basiswert jeder Münze um +20% pro Level.', 500, 250, 10, 'koala_flap'),
+      ('extra_lives', 'Extra-Leben', 'Jedes Level gewährt ein zusätzliches Herz zu Rundenbeginn.', 1000, 500, 3, 'koala_flap'),
+      ('crit_coins', 'Crit Coins', 'Erhöht die Chance auf den 10-fachen Münzwert um +1% pro Level.', 1500, 750, 10, 'koala_flap')`);
+    database.exec("UPDATE GameUpgrades_Config SET description = 'Erhöht den KoalaCoin-Basiswert jeder Münze um +20% pro Level.' WHERE upgrade_id = 'coin_base_value'");
+    database.exec("UPDATE GameUpgrades_Config SET description = 'Jedes Level gewährt ein zusätzliches Herz zu Rundenbeginn.' WHERE upgrade_id = 'extra_lives'");
+    database.exec("DELETE FROM UserUpgrades WHERE upgrade_id = 'hotstreak_multiplier'");
+    database.exec("DELETE FROM GameUpgrades_Config WHERE upgrade_id = 'hotstreak_multiplier'");
+
+    // UserMissions: tracks completion of daily tasks
+    database.exec(`CREATE TABLE IF NOT EXISTS UserMissions (
+      userId TEXT NOT NULL,
+      mission_id TEXT NOT NULL,
+      last_completed_at TEXT NOT NULL,
+      PRIMARY KEY (userId, mission_id),
+      FOREIGN KEY(userId) REFERENCES Users(id)
+    )`);
+
     // Additional economy settings
     database.exec("INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_coin_conversion_rate', '0.01')");
     database.exec("INSERT OR IGNORE INTO ServerSettings (key, value) VALUES ('koala_daily_mission_reward', '5000')");

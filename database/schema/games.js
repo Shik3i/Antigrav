@@ -91,6 +91,19 @@ function initializeGamesSchema(database) {
     // Phase 19 Migration: Add maxLevel to UserGameStats
     addColumn(database, 'UserGameStats', 'maxLevel', 'INTEGER DEFAULT 1');
     addColumn(database, 'UserGameStats', 'sprintHighscore', 'INTEGER DEFAULT 0');
+
+    // SpeedcubeTimes: stores cube timer results
+    database.exec(`CREATE TABLE IF NOT EXISTS SpeedcubeTimes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT NOT NULL,
+      time_ms INTEGER NOT NULL,
+      note TEXT DEFAULT '',
+      scramble TEXT DEFAULT '',
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(userId) REFERENCES Users(id) ON DELETE CASCADE
+    )`);
+    addColumn(database, 'SpeedcubeTimes', 'scramble', "TEXT DEFAULT ''");
+    database.exec('CREATE INDEX IF NOT EXISTS idx_speedcube_userId ON SpeedcubeTimes(userId)');
 }
 
 module.exports = {
